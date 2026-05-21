@@ -28,5 +28,7 @@ documents:
     - .agent-os/operations/agent-handoff-template.md
     - .agent-os/operations/pr-rules.md
     - .agent-os/operations/merge-rules.md
+  automation:
+    - .github/workflows/docs-harness.yml
 active_specs:
   - .agent-os/specs/2026-05-21-0943-ai-resume-diagnoser

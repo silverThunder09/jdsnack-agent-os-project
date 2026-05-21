@@ -42,6 +42,7 @@ jdsnack-agent-os/
 - 아키텍처 상세 문서: `docs/architecture/`
 - CI 기준 문서: `.agent-os/operations/ci-checklist.md`
 - CD 기준 문서: `.agent-os/operations/cd-checklist.md`
+- 문서 하네스 워크플로우: `.github/workflows/docs-harness.yml`
 
 ## 1차 MVP 구현 범위
 

@@ -1,0 +1,64 @@
+name: Docs Harness
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-harness:
+    name: Validate Agent OS docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check required spec markers
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          spec=".agent-os/specs/2026-05-21-0943-ai-resume-diagnoser"
+
+          test -f "$spec/requirements.md"
+          test -f "$spec/acceptance-criteria.md"
+          test -f "$spec/test-scenarios.md"
+          test -f "$spec/traceability.md"
+          test -f "$spec/api-spec.md"
+          test -f "$spec/ui-spec.md"
+
+          grep -Eq 'REQ-[0-9]{2}' "$spec/requirements.md"
+          grep -Eq 'AC-[0-9]{2}' "$spec/acceptance-criteria.md"
+          grep -Eq 'TC-[0-9]{2}' "$spec/test-scenarios.md"
+          grep -Eq 'REQ-[0-9]{2}.*AC-[0-9]{2}.*TC-[0-9]{2}' "$spec/traceability.md"
+
+      - name: Check standards index paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r path; do
+            test -e "$path" || {
+              echo "Missing indexed document: $path"
+              exit 1
+            }
+          done < <(grep -E '^[[:space:]]+- ' .agent-os/standards/index.yml | sed 's/^[[:space:]]*- //')
+
+      - name: Block legacy MVP references
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          legacy_pattern='gemini-api-key|API Key 설정|API Key 입력|GEMINI_API_KEY|GeminiService|AI_SERVICE_ERROR|INVALID_API_KEY|tests\.md|testing\.md|jdsnack-agent-os-main\.zip'
+
+          if grep -R -n -E "$legacy_pattern" AGENTS.md agent.md README.md config.yml .agent-os docs backend frontend; then
+            echo "Legacy MVP reference found. Keep phase 1 no-key docs clean."
+            exit 1
+          fi
+

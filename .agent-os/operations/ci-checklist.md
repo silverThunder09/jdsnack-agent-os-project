@@ -8,9 +8,9 @@
 
 ## 현재 단계
 
-- 상태: 문서형 CI/CD v0
-- 실제 GitHub Actions 워크플로우는 `backend/`, `frontend/` 프로젝트 생성 후 추가합니다.
-- 이 문서는 이후 `.github/workflows/**`로 승격할 기준 문서입니다.
+- 상태: 문서 하네스 CI v1
+- `.github/workflows/docs-harness.yml`에서 문서 계약을 먼저 자동 검증합니다.
+- 백엔드/프론트엔드 빌드 CI는 `backend/`, `frontend/` 프로젝트 생성 후 추가합니다.
 
 ## 권장 트리거
 
@@ -31,13 +31,9 @@
 - `standards/index.yml`의 경로가 실제 파일과 일치
 - 1차 MVP 문서에 구버전 인증 키 입력 흐름이 남아 있지 않음
 
-대표 검증 방식:
+현재 워크플로우:
 
-```sh
-rg -n "<구버전 인증 키 저장명>|<서버 비밀값 환경변수명>|<구버전 AI 서비스 클래스명>|<구버전 테스트 파일명>" AGENTS.md README.md .agent-os docs backend frontend
-```
-
-실제 워크플로우 작성 시 괄호 안의 금지 키워드를 구체화하고, 검색 결과가 없어야 통과합니다.
+- `.github/workflows/docs-harness.yml`
 
 ### 2. 백엔드 CI
 

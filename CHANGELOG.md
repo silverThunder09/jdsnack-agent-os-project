@@ -2,6 +2,7 @@
 
 ## 2026-05-22
 
+- 문서 하네스 GitHub Actions 워크플로우 추가
 - 문서형 CI/CD v0 기준 추가
 - `ci-checklist.md`, `cd-checklist.md`를 운영 문서로 등록
 - PR/머지/완료정의/배포/릴리즈 문서에 CI/CD 확인 기준 연결
