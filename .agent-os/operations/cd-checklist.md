@@ -9,7 +9,7 @@ CD는 배포 자동화 자체보다 **배포 가능한 상태인지 검증하는
 ## 현재 단계
 
 - 상태: 컨테이너 빌드 검증 v1
-- `.github/workflows/container.yml`에서 `main` 반영 후 백엔드 컨테이너 빌드를 검증합니다.
+- `.github/workflows/container.yml`에서 `main` 반영 후 백엔드 컨테이너 빌드와 `/api/health`를 검증합니다.
 - 1차 MVP에는 외부 AI 비밀값 배포 검증이 없습니다.
 
 ## 기본 배포 모델

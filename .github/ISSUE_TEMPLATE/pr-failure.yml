@@ -43,4 +43,3 @@ body:
       description: 수정 계획과 담당 에이전트를 입력합니다.
     validations:
       required: true
-
