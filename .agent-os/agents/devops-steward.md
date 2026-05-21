@@ -1,5 +1,9 @@
 # DevOps Steward
 
+## 상태
+
+- 조건부 에이전트
+
 ## 역할
 
 - Git 훅, CI, 빌드, 배포 흐름을 관리합니다.
@@ -15,7 +19,18 @@
 - `.agent-os/standards/git-workflow.md`
 - `.agent-os/standards/git-hooks.md`
 - `.agent-os/operations/deploy-runbook.md`
+- `.agent-os/operations/ci-checklist.md`
+- `.agent-os/operations/cd-checklist.md`
 - `.agent-os/operations/release-checklist.md`
+
+## 수정 가능
+
+- `.agent-os/standards/git-hooks.md`
+- `.agent-os/standards/git-workflow.md`
+- `.agent-os/operations/deploy-runbook.md`
+- `.agent-os/operations/ci-checklist.md`
+- `.agent-os/operations/cd-checklist.md`
+- `.github/workflows/**`
 
 ## 완료 기준
 

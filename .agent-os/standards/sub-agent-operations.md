@@ -66,7 +66,8 @@ MVP 1차 기본 에이전트:
 역할:
 
 - Spring Boot 백엔드 구현
-- `Controller -> Service -> External API` 경계 유지
+- 1차 MVP에서는 `Controller -> Validation Service` 경계 유지
+- 2차 MVP 이후 외부 AI 연동 시 `Controller -> Service -> External API` 경계 유지
 - API 명세에 맞는 요청/응답 구현
 - 예외 처리와 입력 검증 구현
 - 백엔드 테스트 작성
@@ -93,7 +94,7 @@ MVP 1차 기본 에이전트:
 
 - 구현 API가 `api-spec.md`와 일치합니다.
 - 입력 검증이 존재합니다.
-- 외부 API 실패 처리 로직이 존재합니다.
+- 외부 API 연동 작업인 경우 실패 처리 로직이 존재합니다.
 - 백엔드 테스트가 핵심 시나리오를 검증합니다.
 
 ## 3. Frontend Engineer

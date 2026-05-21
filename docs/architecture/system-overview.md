@@ -10,8 +10,8 @@ JDSnack은 Spring Boot와 React를 하나의 실행 단위로 묶는 **단일 JA
 - 사용자 브라우저에서 React SPA 실행
 - React가 `/api/diagnose`와 `/api/health` 호출
 - Spring Boot가 REST API와 정적 리소스를 함께 서빙
-- Spring Boot가 Google Gemini API를 호출해 진단 결과 생성
-- 초기 MVP는 DB 없이 LocalStorage 중심으로 동작
+- Spring Boot가 입력값을 검증하고 준비중 응답 반환
+- 1차 MVP는 DB 없이 LocalStorage 중심으로 동작
 
 ## 문서 역할
 
@@ -23,6 +23,7 @@ JDSnack은 Spring Boot와 React를 하나의 실행 단위로 묶는 **단일 JA
 ## 핵심 불변 조건
 
 - 프론트와 백은 같은 배포 단위 안에서 동작합니다.
-- 외부 AI 호출은 백엔드 경계에서만 수행합니다.
-- 프론트는 API 계약에만 의존하고 Gemini 세부 구현은 모릅니다.
+- 1차 MVP에서는 외부 AI를 호출하지 않습니다.
+- 2차 MVP에서 외부 AI 호출을 추가할 경우 백엔드 경계에서만 수행합니다.
+- 프론트는 API 계약에만 의존하고 외부 AI 세부 구현은 모릅니다.
 - 확장 전까지 데이터 영속화는 서버 DB가 아니라 로컬 저장소를 우선 사용합니다.

@@ -15,6 +15,8 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - `traceability.md`에 요구사항과 테스트 연결이 있다.
 - 코드 구현이 완료되었다.
 - 테스트 또는 검증 절차가 수행되었다.
+- 변경 범위에 맞는 CI 체크리스트가 확인되었다.
+- 배포 영향이 있으면 CD 체크리스트가 확인되었다.
 - 변경 이유가 `standards/` 문서와 충돌하지 않는다.
 - 커밋, PR, 머지 규칙이 Git 운영 표준과 충돌하지 않는다.
 - 서브 에이전트 작업이면 handoff가 남아 있다.
@@ -44,6 +46,12 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - `standards/` 문서 반영
 - 왜 승격했는지 이유 기록
 
+### CI/CD 변경
+
+- [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md) 갱신
+- 배포 영향이 있으면 [cd-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/cd-checklist.md) 갱신
+- PR/머지 규칙과 충돌하지 않는지 확인
+
 ### 서브 에이전트 작업
 
 - [sub-agent-operations.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/standards/sub-agent-operations.md)의 수정 권한을 지켰다.
@@ -58,5 +66,6 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - 테스트 연결 누락
 - 경계 규칙 위반
 - 구현과 문서의 계약 불일치
+- CI/CD 체크 누락
 - 커밋/PR/머지 규칙 누락
 - 서브 에이전트 권한 위반 또는 handoff 누락

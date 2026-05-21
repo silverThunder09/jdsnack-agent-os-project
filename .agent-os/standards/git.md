@@ -1,16 +1,11 @@
 # Git 표준
 
-## 브랜치
+이 문서는 호환용 짧은 안내문입니다.
 
-- 기능 단위 브랜치를 사용합니다.
-- 예: `feat/resume-analysis-api`
+원본 Git 기준은 [git-workflow.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/git-workflow.md)와 [git-hooks.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/git-hooks.md)를 따릅니다.
 
-## 커밋
+## 핵심만 기억
 
-- 한 커밋은 하나의 의도를 담습니다.
-- 예: `feat(api): 이력서 분석 요청 엔드포인트 추가`
-
-## 원칙
-
-- 문서 변경과 구조 변경의 이유를 남깁니다.
-- 큰 구조 변경은 README나 spec에 반영합니다.
+- 커밋 메시지는 Conventional Commits 형식을 사용합니다.
+- API/UI/요구사항/테스트 기준 변경은 커밋 본문에 `REQ`, `AC`, `TC`, 문서 경로를 남깁니다.
+- 문서 계약 없는 API/UI 변경은 금지합니다.

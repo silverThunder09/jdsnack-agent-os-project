@@ -1,13 +1,11 @@
 # 테스트 표준
 
-## 기본 원칙
+이 문서는 호환용 짧은 안내문입니다.
 
-- 정상 흐름과 예외 흐름을 함께 검증합니다.
-- 테스트 이름만 봐도 의도를 이해할 수 있어야 합니다.
-- 문서의 검증 항목과 실제 테스트가 연결되어야 합니다.
+원본 테스트 기준은 [testing-standards.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/testing-standards.md)를 따릅니다.
 
-## 우선순위
+## 핵심만 기억
 
-1. 입력 검증
-2. 핵심 비즈니스 로직
-3. 외부 API 실패 처리
+- 모든 `AC`에는 대응 `TC`가 있어야 합니다.
+- 기능별 테스트 시나리오는 활성 spec의 `test-scenarios.md`를 기준으로 합니다.
+- 1차 MVP 필수 검증은 입력 검증과 `AI_ANALYSIS_NOT_ENABLED` 준비중 안내입니다.

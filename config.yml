@@ -1,5 +1,7 @@
 project_name: JDSnack
 repository_name: jdsnack-agent-os
-structure_version: 2
+structure_version: 3
 active_spec: 2026-05-21-0943-ai-resume-diagnoser
-documentation_source: jdsnack-agent-os-main.zip
+agent_os_root: .agent-os
+documentation_source: .agent-os
+reference_source: /Users/t2025-m0141/Downloads/jdsnack-agent-os-main

@@ -15,9 +15,10 @@
 - PR 본문 체크리스트 완료
 - 관련 문서 최신화
 - 테스트 통과
+- CI 체크리스트 통과
 - 충돌 없음
 - 리뷰 승인 1명 이상
-- 배포 영향이 있으면 `operations/` 문서 확인
+- 배포 영향이 있으면 `cd-checklist.md`, `deploy-runbook.md`, `release-checklist.md` 확인
 - 서브 에이전트 작업이면 handoff 확인
 
 ## Squash 커밋 메시지
@@ -43,6 +44,7 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 ## 머지 금지 조건
 
 - 테스트 실패
+- CI 체크리스트 미확인
 - 문서 드리프트 존재
 - PR 범위 초과 변경 포함
 - 보안 정보 노출
@@ -53,6 +55,7 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 ## 머지 후 작업
 
 - 필요 시 릴리즈 체크리스트 갱신
+- CI/CD 기준이 바뀌었으면 [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md) 또는 [cd-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/cd-checklist.md) 갱신
 - 배포 대상이면 [release-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/operations/release-checklist.md) 확인
 - 장애 가능성이 있으면 [incident-playbook.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/operations/incident-playbook.md) 확인
 - 다음 작업이 있으면 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/operations/agent-handoff-template.md) 기준 handoff 확인

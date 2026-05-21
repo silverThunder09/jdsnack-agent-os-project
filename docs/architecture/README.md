@@ -7,7 +7,7 @@
 - `system-overview.md`: 전체 시스템 개요
 - `backend-architecture.md`: Spring Boot 백엔드 구조
 - `frontend-architecture.md`: React 프론트엔드 구조
-- `integration-architecture.md`: 프론트/백엔드/Gemini 통합 흐름
+- `integration-architecture.md`: 프론트/백엔드 통합 흐름
 
 ## 관련 문서
 

@@ -21,6 +21,8 @@ documents:
     - docs/architecture/integration-architecture.md
   operations:
     - .agent-os/operations/release-checklist.md
+    - .agent-os/operations/ci-checklist.md
+    - .agent-os/operations/cd-checklist.md
     - .agent-os/operations/deploy-runbook.md
     - .agent-os/operations/incident-playbook.md
     - .agent-os/operations/agent-handoff-template.md
@@ -28,5 +30,3 @@ documents:
     - .agent-os/operations/merge-rules.md
 active_specs:
   - .agent-os/specs/2026-05-21-0943-ai-resume-diagnoser
-supporting_specs:
-  - .agent-os/specs/2026-05-21-initial-setup

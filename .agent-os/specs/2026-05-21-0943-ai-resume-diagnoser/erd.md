@@ -183,7 +183,7 @@ CREATE INDEX idx_feedbacks_diagnosis ON feedbacks(diagnosis_id);
 1. **의존성 추가**: 백엔드 `build.gradle`에 Spring Data JPA 및 DB 커넥터(예: `mysql-connector-j` 혹은 `h2` 등) 의존성을 추가합니다.
 2. **JPA Entity 정의**: 위의 테이블 스키마에 맞춘 `@Entity` 클래스들(`Member`, `Resume`, `Diagnosis`, `Feedback`)을 작성합니다.
 3. **Repository 레이어 구축**: Spring Data JPA의 `JpaRepository`를 구현하여 DB C.R.U.D 인터페이스를 확보합니다.
-4. **Service 레이어 변경**: `GeminiService`에서 진단 결과를 받아온 뒤 단순히 DTO로 변환하여 넘기던 기존 구조에서, 데이터를 Entity로 빌드하여 `repository.save()`를 호출하는 로직이 추가됩니다.
+4. **Service 레이어 변경**: 2차 MVP에서 실제 분석 결과가 생기면, 응답 DTO만 반환하던 구조에서 데이터를 Entity로 빌드하여 `repository.save()`를 호출하는 로직이 추가됩니다.
 5. **프론트엔드 API 연동**:
    - 로그인 / 회원가입 API 추가 연동
    - 과거 진단 내역 리스트 조회 API (`GET /api/diagnoses`)

@@ -1,7 +1,19 @@
 # 변경 이력
 
+## 2026-05-22
+
+- 문서형 CI/CD v0 기준 추가
+- `ci-checklist.md`, `cd-checklist.md`를 운영 문서로 등록
+- PR/머지/완료정의/배포/릴리즈 문서에 CI/CD 확인 기준 연결
+
 ## 2026-05-21
 
+- 1차 MVP에서 사용자 인증 정보 입력과 서버 외부 AI 연동 제거
+- `POST /api/diagnose` 정상 입력 응답을 `501 AI_ANALYSIS_NOT_ENABLED`로 재설계
+- API/UI/아키텍처/테스트 문서를 입력 검증과 준비중 안내 중심으로 재정리
+- 중복 상세 문서 복사본 정리
+- 오래된 `initial-setup` 스펙 제거
+- API/ERD 원본 문서를 활성 기능 명세 경로로 통일
 - `jdsnack-agent-os-main.zip` 참고본을 기준으로 상세 문서 복원
 - 제품 문서, 기능 명세, 표준, 운영 문서를 `.agent-os/` 아래로 재배치
 - API, ERD, 아키텍처 상세 문서를 `docs/` 아래로 복사
