@@ -1,0 +1,32 @@
+# JDSnack Agent OS 표준 문서 인덱스
+
+documents:
+  harness:
+    - .agent-os/standards/codex-harness.md
+    - .agent-os/standards/sub-agent-operations.md
+    - .agent-os/standards/doc-lifecycle.md
+    - .agent-os/standards/definition-of-done.md
+  engineering:
+    - .agent-os/standards/coding-standards.md
+    - .agent-os/standards/testing-standards.md
+    - .agent-os/standards/git-workflow.md
+    - .agent-os/standards/git-hooks.md
+    - .agent-os/standards/backend.md
+    - .agent-os/standards/frontend.md
+    - .agent-os/standards/api.md
+  architecture:
+    - docs/architecture/system-overview.md
+    - docs/architecture/backend-architecture.md
+    - docs/architecture/frontend-architecture.md
+    - docs/architecture/integration-architecture.md
+  operations:
+    - .agent-os/operations/release-checklist.md
+    - .agent-os/operations/deploy-runbook.md
+    - .agent-os/operations/incident-playbook.md
+    - .agent-os/operations/agent-handoff-template.md
+    - .agent-os/operations/pr-rules.md
+    - .agent-os/operations/merge-rules.md
+active_specs:
+  - .agent-os/specs/2026-05-21-0943-ai-resume-diagnoser
+supporting_specs:
+  - .agent-os/specs/2026-05-21-initial-setup

@@ -1,0 +1,33 @@
+# 테스트 표준
+
+## 목적
+
+테스트는 “있으면 좋은 것”이 아니라 문서 계약을 검증하는 하네스입니다.
+
+## 기본 규칙
+
+- acceptance criteria 없는 테스트는 방향을 잃기 쉽습니다.
+- test scenario 없는 acceptance criteria는 검증되지 않은 요구사항입니다.
+- 가능하면 테스트명 또는 주석에 `AC-xx`, `TC-xx`를 연결합니다.
+
+## 필수 검증 범주
+
+- 정상 흐름
+- 예외 흐름
+- 경계값
+- 외부 API 실패 또는 지연
+- 문서 계약과 실제 응답 일치 여부
+
+## JDSnack MVP 기준 필수 시나리오
+
+- 정상 이력서 입력 시 진단 성공
+- 빈 입력 시 검증 실패
+- 너무 짧은 입력 시 검증 실패
+- 너무 긴 입력 시 검증 실패
+- Gemini API 실패 시 사용자 친화적 오류 반환
+- 프론트에서 입력 -> 로딩 -> 결과 표시 흐름 유지
+
+## 문서 연결
+
+- 기능별 상세 시나리오는 각 spec의 `test-scenarios.md`를 기준 문서로 봅니다.
+- 공통 완료 기준은 [definition-of-done.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/standards/definition-of-done.md)를 따릅니다.

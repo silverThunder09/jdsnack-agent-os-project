@@ -1,0 +1,34 @@
+# 코딩 표준
+
+## 목적
+
+이 문서는 실제 코드 구조와 의존성 규칙을 짧고 강하게 유지하기 위한 표준입니다.
+
+## 백엔드 규칙
+
+- 패키지 기본 구조는 `controller`, `service`, `dto`, `exception`, `config`를 따른다.
+- Controller는 HTTP 입출력과 검증에 집중한다.
+- Service는 비즈니스 로직과 외부 API 연동을 담당한다.
+- DTO는 경계 데이터 전달용으로 사용한다.
+- 공통 API 응답은 일관된 공통 래퍼 패턴을 유지한다.
+- 예외는 글로벌 핸들러에서 사용자 메시지로 정규화한다.
+
+## 프론트엔드 규칙
+
+- 컴포넌트는 화면 렌더링에 집중한다.
+- API 호출은 서비스 계층을 통해서만 수행한다.
+- 상태 관리와 렌더링 로직을 분리한다.
+- 타입은 백엔드 계약과 동기화한다.
+
+## 네이밍 규칙
+
+- Java 클래스: PascalCase
+- Java 메서드/변수: camelCase
+- TypeScript 타입/컴포넌트: PascalCase
+- TypeScript 함수/변수: camelCase
+- 설정 키: kebab-case
+
+## 문서 연결
+
+- 상세 코딩 예시와 레거시 표준은 [specs/2026-05-21-0943-ai-resume-diagnoser/standards.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/standards.md)에서 유지합니다.
+- 앞으로 반복되는 코드 리뷰 피드백은 이 문서로 승격합니다.
