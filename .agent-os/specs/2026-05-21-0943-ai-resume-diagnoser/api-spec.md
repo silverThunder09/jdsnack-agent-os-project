@@ -79,6 +79,12 @@ Accept: application/json
 |---|---|---|---|---|
 | `resumeText` | `string` | 예 | 50자 이상 10,000자 이하 | 사용자가 붙여넣은 이력서 텍스트 |
 
+검증 규칙:
+
+- `resumeText`가 누락, `null`, 빈 문자열, 공백 문자만 있는 값이면 `EMPTY_RESUME`으로 처리한다.
+- 길이 검증은 앞뒤 공백을 제거한 뒤의 텍스트 기준으로 수행한다.
+- 정확히 50자와 정확히 10,000자는 유효한 입력으로 본다.
+
 ### 2.3 정상 입력이지만 AI 미연동 — `501 Not Implemented`
 
 50자 이상 10,000자 이하의 입력은 검증을 통과한다. 다만 1차 MVP에서는 AI 분석을 수행하지 않으므로 아래 응답을 반환한다.
@@ -139,11 +145,11 @@ Accept: application/json
 
 ```java
 public record DiagnoseRequest(
-    @NotBlank(message = "이력서 내용을 입력해주세요.")
-    @Size(min = 50, max = 10000, message = "이력서는 50자 이상 10,000자 이하로 입력해주세요.")
     String resumeText
 ) {}
 ```
+
+`EMPTY_RESUME`, `TEXT_TOO_SHORT`, `TEXT_TOO_LONG`을 구분해야 하므로 Bean Validation 기본 메시지에만 의존하지 않고 Validation Service 또는 공통 예외 매핑에서 에러 코드를 정규화한다.
 
 ```java
 public record ApiResponse<T>(

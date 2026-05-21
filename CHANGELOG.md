@@ -2,6 +2,8 @@
 
 ## 2026-05-22
 
+- 서브 에이전트 리뷰 결과를 반영해 health API 추적 매핑과 경계값 테스트 문서화
+- 문서 하네스 CI를 `REQ/AC/TC` 완전 매핑 검사로 강화
 - 문서 하네스 GitHub Actions 워크플로우 추가
 - 문서형 CI/CD v0 기준 추가
 - `ci-checklist.md`, `cd-checklist.md`를 운영 문서로 등록

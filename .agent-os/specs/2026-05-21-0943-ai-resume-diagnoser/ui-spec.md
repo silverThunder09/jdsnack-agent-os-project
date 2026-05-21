@@ -50,6 +50,8 @@ AI 분석 기능은 준비 중입니다.
 | `not-enabled` | `AI_ANALYSIS_NOT_ENABLED` 준비중 안내 |
 | `error` | 입력 검증 또는 네트워크 오류 안내 |
 
+`501 AI_ANALYSIS_NOT_ENABLED`는 장애 실패가 아니라 1차 MVP의 정상 준비중 상태로 보고 `not-enabled`로 렌더링한다.
+
 ## 3. 사용자 흐름
 
 ```mermaid

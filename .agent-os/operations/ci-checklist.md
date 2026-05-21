@@ -28,6 +28,8 @@
 - `acceptance-criteria.md`에 `AC` 존재
 - `test-scenarios.md`에 `TC` 존재
 - `traceability.md`에 `REQ -> AC -> TC` 매핑 존재
+- 모든 `REQ`, `AC`, `TC`가 `traceability.md`에 빠짐없이 연결
+- 각 traceability 행에 계약/설계 문서 경로 포함
 - `standards/index.yml`의 경로가 실제 파일과 일치
 - 1차 MVP 문서에 구버전 인증 키 입력 흐름이 남아 있지 않음
 
@@ -48,6 +50,8 @@
 - `GET /api/health`
 - `POST /api/diagnose` 입력 검증
 - 정상 입력 시 `501 AI_ANALYSIS_NOT_ENABLED`
+- 정확히 50자와 정확히 10,000자 경계값 검증
+- `resumeText` 누락, `null`, 공백 문자만 있는 입력 검증
 
 대표 명령 후보:
 
@@ -90,6 +94,7 @@ npm run build
 검증 대상:
 
 - `/api/health` 정상 응답
+- `/api/health` 응답에 `status=UP`, `service=JDSnack`, `version=1.0.0` 포함
 - 빈 입력 요청 시 `EMPTY_RESUME`
 - 50자 미만 요청 시 `TEXT_TOO_SHORT`
 - 10,000자 초과 요청 시 `TEXT_TOO_LONG`

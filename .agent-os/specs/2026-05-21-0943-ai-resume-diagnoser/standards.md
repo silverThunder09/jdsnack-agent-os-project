@@ -14,6 +14,8 @@
 - Controller는 HTTP 요청/응답 처리에 집중한다.
 - 입력 검증은 Validation Service 또는 Bean Validation으로 분리한다.
 - `POST /api/diagnose`는 빈 입력, 최소 길이, 최대 길이를 구분한다.
+- `resumeText` 누락, `null`, 공백 문자만 있는 값은 `EMPTY_RESUME`으로 처리한다.
+- 정확히 50자와 정확히 10,000자 입력은 유효한 입력으로 처리한다.
 - 검증 통과 시 `501 Not Implemented`와 `AI_ANALYSIS_NOT_ENABLED`를 반환한다.
 - 1차 MVP 코드에는 외부 AI 클라이언트, 프롬프트 조립기, AI 응답 파서를 만들지 않는다.
 
@@ -31,6 +33,8 @@
 - 50자 미만 입력은 `TEXT_TOO_SHORT`로 검증한다.
 - 10,000자 초과 입력은 `TEXT_TOO_LONG`으로 검증한다.
 - 정상 길이 입력은 `AI_ANALYSIS_NOT_ENABLED`로 검증한다.
+- 경계값 50자와 10,000자를 검증한다.
+- `GET /api/health`는 `200 OK`, `status=UP`, `service=JDSnack`, `version=1.0.0`을 검증한다.
 - 프론트는 준비중 안내를 렌더링해야 한다.
 
 ## 5. 2차 MVP 전환 조건
