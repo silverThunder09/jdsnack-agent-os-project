@@ -21,8 +21,10 @@ documents:
     - docs/architecture/integration-architecture.md
   operations:
     - .agent-os/operations/release-checklist.md
+    - .agent-os/operations/pr-automation-loop.md
     - .agent-os/operations/ci-checklist.md
     - .agent-os/operations/cd-checklist.md
+    - .agent-os/operations/container-workflow.md
     - .agent-os/operations/deploy-runbook.md
     - .agent-os/operations/incident-playbook.md
     - .agent-os/operations/agent-handoff-template.md
@@ -30,5 +32,9 @@ documents:
     - .agent-os/operations/merge-rules.md
   automation:
     - .github/workflows/docs-harness.yml
+    - .github/workflows/backend-ci.yml
+    - .github/workflows/container.yml
+    - .github/pull_request_template.md
+    - .github/ISSUE_TEMPLATE/pr-failure.yml
 active_specs:
   - .agent-os/specs/2026-05-21-0943-ai-resume-diagnoser

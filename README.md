@@ -42,7 +42,11 @@ jdsnack-agent-os/
 - 아키텍처 상세 문서: `docs/architecture/`
 - CI 기준 문서: `.agent-os/operations/ci-checklist.md`
 - CD 기준 문서: `.agent-os/operations/cd-checklist.md`
+- PR 자동 운영 루프: `.agent-os/operations/pr-automation-loop.md`
+- 컨테이너 워크플로우: `.agent-os/operations/container-workflow.md`
 - 문서 하네스 워크플로우: `.github/workflows/docs-harness.yml`
+- 백엔드 CI 워크플로우: `.github/workflows/backend-ci.yml`
+- 컨테이너 워크플로우: `.github/workflows/container.yml`
 
 ## 1차 MVP 구현 범위
 
