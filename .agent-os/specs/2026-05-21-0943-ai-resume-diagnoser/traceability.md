@@ -12,9 +12,9 @@
 | `REQ-04` 단순한 운영 구조 | `AC-05`, `AC-07` | `TC-08`, `TC-09` | `architecture.md` |
 | `REQ-04` 단순한 운영 구조 | `AC-05`, `AC-07` | `TC-08`, `TC-09` | `plan.md` |
 | `REQ-04` 단순한 운영 구조 | `AC-05`, `AC-07` | `TC-08`, `TC-09` | `standards.md` |
-| `REQ-05` 상태 확인 API | `AC-08` | `TC-10` | `api-spec.md` |
-| `REQ-05` 상태 확인 API | `AC-08` | `TC-10` | `architecture.md` |
-| `REQ-05` 상태 확인 API | `AC-08` | `TC-10` | `deploy-runbook.md` |
+| `REQ-05` 상태 확인 API | `AC-08`, `AC-09` | `TC-10`, `TC-12`, `TC-13` | `api-spec.md` |
+| `REQ-05` 상태 확인 API | `AC-08`, `AC-09` | `TC-10`, `TC-12`, `TC-13` | `architecture.md` |
+| `REQ-05` 상태 확인 API | `AC-08`, `AC-09` | `TC-10`, `TC-12`, `TC-13` | `deploy-runbook.md` |
 
 ## 사용 규칙
 
