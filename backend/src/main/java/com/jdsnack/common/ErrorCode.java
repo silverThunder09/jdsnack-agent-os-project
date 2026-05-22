@@ -15,9 +15,21 @@ public enum ErrorCode {
             HttpStatus.BAD_REQUEST,
             "이력서 내용이 너무 깁니다. 10,000자 이내로 입력해주세요."
     ),
+    UNSUPPORTED_FILE_TYPE(
+            HttpStatus.BAD_REQUEST,
+            "PDF 또는 DOCX 파일만 업로드할 수 있습니다."
+    ),
+    FILE_TEXT_EXTRACTION_FAILED(
+            HttpStatus.BAD_REQUEST,
+            "파일에서 텍스트를 추출하지 못했습니다. 다른 파일로 다시 시도해주세요."
+    ),
     AI_ANALYSIS_NOT_ENABLED(
             HttpStatus.NOT_IMPLEMENTED,
             "AI 분석 기능은 준비 중입니다. 현재는 이력서 입력 검증만 가능합니다."
+    ),
+    FIXTURE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "테스트 분석 결과를 찾지 못했습니다. 다른 샘플로 다시 시도해주세요."
     ),
     NOT_FOUND(
             HttpStatus.NOT_FOUND,

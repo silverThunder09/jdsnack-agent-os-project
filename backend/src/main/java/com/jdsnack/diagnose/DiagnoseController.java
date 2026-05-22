@@ -1,11 +1,11 @@
 package com.jdsnack.diagnose;
 
 import com.jdsnack.common.ApiResponse;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 public class DiagnoseController {
@@ -17,10 +17,14 @@ public class DiagnoseController {
     }
 
     @PostMapping("/api/diagnose")
-    @ResponseStatus(HttpStatus.NOT_IMPLEMENTED)
-    public ApiResponse<Void> diagnose(@RequestBody(required = false) DiagnoseRequest request) {
-        diagnoseService.validate(request);
+    public ApiResponse<DiagnosisResultResponse> diagnose(@RequestBody(required = false) DiagnoseRequest request) {
+        return ApiResponse.success(diagnoseService.diagnose(request));
+    }
 
-        return ApiResponse.failure(DiagnoseService.NOT_ENABLED.toDetail());
+    @PostMapping("/api/diagnose/file")
+    public ApiResponse<DiagnosisResultResponse> diagnoseFile(
+            @RequestParam("resumeFile") MultipartFile resumeFile
+    ) {
+        return ApiResponse.success(diagnoseService.diagnoseFile(resumeFile));
     }
 }
