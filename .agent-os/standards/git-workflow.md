@@ -23,6 +23,12 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 | `refactor` | 동작 변경 없는 구조 개선 | `refactor/api-response-wrapper` |
 | `chore` | 설정/빌드/운영 보조 작업 | `chore/git-hooks` |
 
+## 작업 시작 규칙
+
+- 브랜치를 만든 뒤 바로 큰 수정에 들어가지 않습니다.
+- 먼저 [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md) 기준으로 대상 spec, 변경 범위, 테스트 방법, PR 범위를 고정합니다.
+- 체크포인트 없이 PR 범위가 커지면 작업을 쪼개고 새 체크포인트를 다시 잡습니다.
+
 ## 커밋 메시지 규칙
 
 커밋 메시지는 Conventional Commits를 기본으로 사용합니다.

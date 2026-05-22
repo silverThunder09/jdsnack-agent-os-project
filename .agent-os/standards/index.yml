@@ -32,6 +32,8 @@ documents:
     - .agent-os/operations/pr-rules.md
     - .agent-os/operations/pr-review-gate.md
     - .agent-os/operations/merge-rules.md
+    - .agent-os/operations/work-start-checkpoint.md
+    - .agent-os/operations/browser-smoke-tests.md
   automation:
     - .github/workflows/docs-harness.yml
     - .github/workflows/backend-ci.yml
@@ -39,5 +41,6 @@ documents:
     - .github/pull_request_template.md
     - .github/ISSUE_TEMPLATE/pr-failure.yml
     - scripts/pr-review-gate.sh
+    - scripts/smoke-test.sh
 active_specs:
   - .agent-os/specs/2026-05-21-0943-ai-resume-diagnoser

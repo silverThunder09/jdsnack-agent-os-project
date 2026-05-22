@@ -12,6 +12,7 @@
 - `.github/workflows/docs-harness.yml`에서 문서 계약을 먼저 자동 검증합니다.
 - `.github/workflows/backend-ci.yml`에서 백엔드 테스트와 `bootJar` 빌드를 검증합니다.
 - `.github/workflows/frontend-ci.yml`에서 프론트엔드 린트, 테스트, 빌드를 검증합니다.
+- `.github/workflows/container.yml`에서 compose 기반 스모크 테스트를 함께 검증합니다.
 - 보호 브랜치 required check와 충돌하지 않도록 백엔드/프론트 CI는 경로 필터 없이 항상 실행합니다.
 
 ## 권장 트리거
@@ -89,15 +90,22 @@ npm run build
 도입 시점:
 
 - 백엔드와 프론트엔드가 연결된 뒤
+- 현재는 1차 MVP 기준 시나리오부터 적용한다.
 
 검증 대상:
 
+- 프론트 루트 페이지 응답
 - `/api/health` 정상 응답
 - `/api/health` 응답에 `status=UP`, `service=JDSnack`, `version=1.0.0` 포함
 - 빈 입력 요청 시 `EMPTY_RESUME`
 - 50자 미만 요청 시 `TEXT_TOO_SHORT`
 - 10,000자 초과 요청 시 `TEXT_TOO_LONG`
 - 정상 길이 요청 시 `AI_ANALYSIS_NOT_ENABLED`
+
+현재 실행 기준:
+
+- [browser-smoke-tests.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/browser-smoke-tests.md)
+- [scripts/smoke-test.sh](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/scripts/smoke-test.sh)
 
 ## PR 필수 기준
 

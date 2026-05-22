@@ -5,6 +5,18 @@ labels:
   - pr-failure
   - needs-fix
 body:
+  - type: dropdown
+    id: failure-type
+    attributes:
+      label: Failure Type
+      description: 가장 가까운 실패 유형을 선택합니다.
+      options:
+        - ci-failure
+        - contract-drift
+        - test-gap
+        - deploy-risk
+    validations:
+      required: true
   - type: input
     id: pr
     attributes:
