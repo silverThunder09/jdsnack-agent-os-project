@@ -9,8 +9,11 @@ JDSnack은 로컬 실행과 배포 환경 차이를 줄이기 위해 Dockerfile 
 ## 현재 기준
 
 - 백엔드 Dockerfile: `backend/Dockerfile`
+- 프론트 Dockerfile: `frontend/Dockerfile`
+- 로컬 통합 실행 파일: `compose.yaml`
 - 컨테이너 검증 워크플로우: `.github/workflows/container.yml`
 - 실행 포트: `8080`
+- 프론트 포트: `5173`
 - 헬스체크: `GET /api/health`
 - 외부 AI 비밀값: 1차 MVP에서는 없음
 
@@ -29,6 +32,18 @@ docker build -f backend/Dockerfile -t jdsnack-backend:local backend
 docker run --rm -p 8080:8080 jdsnack-backend:local
 curl -i http://localhost:8080/api/health
 ```
+
+프론트와 백엔드를 함께 확인할 때:
+
+```sh
+docker compose up --build
+```
+
+기본 접속 주소:
+
+- 프론트: `http://localhost:5173`
+- 백엔드: `http://localhost:8080`
+- 헬스체크: `http://localhost:8080/api/health`
 
 ## GitHub Actions 흐름
 

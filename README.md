@@ -75,6 +75,20 @@ jdsnack-agent-os/
 ## 다음 구현 우선순위
 
 1. 프론트엔드와 백엔드 정적 자산 통합
-2. `docker compose` 기반 로컬 통합 실행
-3. 브라우저 스모크 테스트 자동화
+2. 브라우저 스모크 테스트 자동화
+3. `docker compose` 흐름을 CI나 문서 하네스와 더 촘촘하게 연결
 4. 2차 MVP에서 서버 기반 AI 분석 연동
+
+## 로컬 통합 실행
+
+루트 디렉토리에서 아래 명령으로 프론트와 백엔드를 같이 띄울 수 있습니다.
+
+```bash
+docker compose up --build
+```
+
+접속 주소:
+
+- 프론트: `http://localhost:5173`
+- 백엔드 루트: `http://localhost:8080`
+- 백엔드 헬스체크: `http://localhost:8080/api/health`
