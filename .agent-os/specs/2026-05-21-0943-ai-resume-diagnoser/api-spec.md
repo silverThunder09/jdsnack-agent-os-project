@@ -48,6 +48,7 @@
 | `400` | `TEXT_TOO_SHORT` | 이력서 텍스트가 50자 미만 | `이력서 내용이 너무 짧습니다. 최소 50자 이상 입력해주세요.` |
 | `400` | `TEXT_TOO_LONG` | 이력서 텍스트가 10,000자 초과 | `이력서 내용이 너무 깁니다. 10,000자 이내로 입력해주세요.` |
 | `501` | `AI_ANALYSIS_NOT_ENABLED` | 1차 MVP에서 AI 분석 미연동 | `AI 분석 기능은 준비 중입니다. 현재는 이력서 입력 검증만 가능합니다.` |
+| `404` | `NOT_FOUND` | 등록되지 않은 경로 요청 | `요청한 경로를 찾을 수 없습니다.` |
 | `500` | `INTERNAL_ERROR` | 서버 내부 오류 | `서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.` |
 
 ## 2. `POST /api/diagnose`
@@ -183,9 +184,34 @@ public record ErrorDetail(
 [4] 검증 통과 -> 501 AI_ANALYSIS_NOT_ENABLED
 ```
 
-## 3. `GET /api/health`
+## 3. `GET /`
 
 ### 3.1 개요
+
+| 항목 | 값 |
+|---|---|
+| 엔드포인트 | `GET /` |
+| 설명 | 브라우저에서 서비스 기동 여부를 확인하기 위한 기본 엔트리 응답 |
+| 인증 | 없음 |
+
+### 3.2 Response — `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "service": "JDSnack",
+    "status": "RUNNING",
+    "healthPath": "/api/health",
+    "diagnosePath": "/api/diagnose"
+  },
+  "timestamp": "2026-05-22T11:41:00.000+09:00"
+}
+```
+
+## 4. `GET /api/health`
+
+### 4.1 개요
 
 | 항목 | 값 |
 |---|---|
@@ -193,7 +219,7 @@ public record ErrorDetail(
 | 설명 | 서버 상태 확인용 API |
 | 인증 | 없음 |
 
-### 3.2 Response — `200 OK`
+### 4.2 Response — `200 OK`
 
 ```json
 {
@@ -207,7 +233,22 @@ public record ErrorDetail(
 }
 ```
 
-## 4. 2차 MVP 확장 예정
+## 5. 미등록 경로 응답
+
+등록되지 않은 경로는 `404 NOT_FOUND`로 응답한다.
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "요청한 경로를 찾을 수 없습니다."
+  },
+  "timestamp": "2026-05-22T11:41:00.000+09:00"
+}
+```
+
+## 6. 2차 MVP 확장 예정
 
 1차 MVP에서는 외부 AI 호출을 하지 않는다. 아래 항목은 2차 MVP에서 별도 `REQ`, `AC`, `TC`를 추가한 뒤 구현한다.
 

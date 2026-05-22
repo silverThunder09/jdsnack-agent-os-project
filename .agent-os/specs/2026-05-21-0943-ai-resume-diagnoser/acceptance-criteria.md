@@ -39,3 +39,9 @@
 
 - `GET /api/health` 요청은 `200 OK`를 반환해야 한다.
 - 응답 본문에는 `status=UP`, `service=JDSnack`, `version=1.0.0`이 포함되어야 한다.
+
+## `AC-09` 루트 경로와 미등록 경로 응답
+
+- `GET /` 요청은 `200 OK`를 반환해야 한다.
+- 응답 본문에는 `service=JDSnack`, `status=RUNNING`, `healthPath=/api/health`, `diagnosePath=/api/diagnose`가 포함되어야 한다.
+- 등록되지 않은 경로 요청은 `404 NOT_FOUND`로 응답해야 한다.

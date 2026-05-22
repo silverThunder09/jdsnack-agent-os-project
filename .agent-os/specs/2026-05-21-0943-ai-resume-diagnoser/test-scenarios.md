@@ -101,6 +101,27 @@
   - `service=JDSnack`
   - `version=1.0.0`
 
+## `TC-12` 루트 경로 기본 응답
+
+- 대응 AC: `AC-09`
+- 절차:
+  - 브라우저 또는 HTTP 클라이언트로 `GET /` 요청
+- 기대 결과:
+  - `200 OK`
+  - `service=JDSnack`
+  - `status=RUNNING`
+  - `healthPath=/api/health`
+  - `diagnosePath=/api/diagnose`
+
+## `TC-13` 미등록 경로 404 응답
+
+- 대응 AC: `AC-09`
+- 절차:
+  - 등록되지 않은 경로로 요청
+- 기대 결과:
+  - `404 NOT_FOUND`
+  - `error.code=NOT_FOUND`
+
 ## `TC-11` 프론트 네트워크 오류 안내
 
 - 대응 AC: `AC-06`
