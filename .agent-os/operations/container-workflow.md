@@ -4,7 +4,7 @@
 
 JDSnack은 로컬 실행과 배포 환경 차이를 줄이기 위해 Dockerfile 기반 컨테이너 흐름을 사용합니다.
 
-1차 MVP에서는 먼저 백엔드 컨테이너 빌드를 고정하고, 프론트엔드가 생성되면 단일 서비스 컨테이너 또는 분리 컨테이너 전략을 다시 결정합니다.
+최종 배포 전략은 `frontend`, `backend` **분리 컨테이너형**입니다.
 
 ## 현재 기준
 
@@ -12,6 +12,7 @@ JDSnack은 로컬 실행과 배포 환경 차이를 줄이기 위해 Dockerfile 
 - 프론트 Dockerfile: `frontend/Dockerfile`
 - 로컬 통합 실행 파일: `compose.yaml`
 - 컨테이너 검증 워크플로우: `.github/workflows/container.yml`
+- 운영 배포 단위: `frontend` 컨테이너 + `backend` 컨테이너
 - 실행 포트: `8080`
 - 프론트 포트: `5173`
 - 헬스체크: `GET /api/health`
@@ -48,11 +49,19 @@ docker compose up --build
 ## GitHub Actions 흐름
 
 - PR에서는 문서 하네스, 백엔드 테스트, 컨테이너 빌드와 `/api/health` 검증을 함께 실행합니다.
+- PR에서는 `docker compose` 기반 스모크 테스트로 프론트 프록시와 `POST /api/diagnose` 흐름도 함께 확인합니다.
 - `main` 반영 후 모든 push에서도 같은 컨테이너 검증을 다시 실행합니다.
 - 컨테이너 빌드 실패 시 PR 실패 Issue와 같은 형식으로 Issue를 생성합니다.
 
+## 운영 원칙
+
+- 프론트는 정적 자산과 사용자 진입점을 담당한다.
+- 백엔드는 API와 이후 외부 AI 연동 경계를 담당한다.
+- 운영 환경에서는 reverse proxy 또는 ingress로 두 컨테이너를 묶는다.
+- CI와 로컬 검증은 `compose.yaml` 기준으로 맞춘다.
+
 ## 2차 확장
 
-- 프론트엔드 빌드 결과물을 백엔드 정적 리소스로 포함하는 단일 컨테이너
-- 또는 `backend`, `frontend` 분리 컨테이너와 reverse proxy 구성
 - 외부 AI 연동 시 서버 비밀값 주입과 로그 정책 검증
+- reverse proxy 캐시/압축 정책 고도화
+- 필요 시 `frontend`, `backend` 외 별도 gateway 또는 worker 컨테이너 추가

@@ -9,15 +9,15 @@ CD는 배포 자동화 자체보다 **배포 가능한 상태인지 검증하는
 ## 현재 단계
 
 - 상태: 컨테이너 빌드 검증 v1
-- `.github/workflows/container.yml`에서 `main` 반영 후 백엔드 컨테이너 빌드와 `/api/health`를 검증합니다.
+- `.github/workflows/container.yml`에서 `main` 반영 후 백엔드 컨테이너 빌드와 compose 스모크 테스트를 검증합니다.
 - 1차 MVP에는 외부 AI 비밀값 배포 검증이 없습니다.
 
 ## 기본 배포 모델
 
-- React 정적 빌드 결과물을 Spring Boot 정적 리소스로 포함합니다.
-- Spring Boot 단일 JAR를 빌드합니다.
-- `backend/Dockerfile`로 컨테이너 이미지를 빌드합니다.
-- AWS EC2, Elastic Beanstalk, ECS 중 하나로 배포 대상을 확정합니다.
+- `frontend`, `backend`를 분리 컨테이너로 배포합니다.
+- `frontend/Dockerfile`, `backend/Dockerfile`를 각각 빌드합니다.
+- reverse proxy 또는 ingress 뒤에서 하나의 서비스처럼 노출합니다.
+- AWS EC2, ECS 또는 유사한 컨테이너 환경을 배포 대상으로 둡니다.
 
 ## 배포 전 조건
 
@@ -31,13 +31,12 @@ CD는 배포 자동화 자체보다 **배포 가능한 상태인지 검증하는
 
 ## 배포 절차 초안
 
-1. 프론트엔드 프로덕션 빌드를 생성합니다.
-2. 빌드 결과물을 백엔드 정적 리소스 경로에 포함합니다.
-3. 백엔드 단일 JAR를 빌드합니다.
-4. Docker 이미지를 빌드합니다.
-5. 컨테이너를 실행합니다.
-6. `/api/health`를 확인합니다.
-7. 핵심 진단 흐름을 수동 검증합니다.
+1. 프론트 컨테이너 이미지를 빌드합니다.
+2. 백엔드 컨테이너 이미지를 빌드합니다.
+3. 두 컨테이너를 같은 네트워크에 배치합니다.
+4. reverse proxy 또는 ingress 라우팅을 적용합니다.
+5. `/api/health`를 확인합니다.
+6. 핵심 진단 흐름을 수동 검증합니다.
 
 ## 배포 후 확인
 
@@ -57,7 +56,7 @@ CD는 배포 자동화 자체보다 **배포 가능한 상태인지 검증하는
 
 롤백 방식:
 
-- 직전 정상 JAR로 되돌립니다.
+- 직전 정상 프론트/백엔드 이미지 조합으로 되돌립니다.
 - 배포 실패 원인을 `incident-playbook.md` 기준으로 기록합니다.
 - 재발 방지 항목을 `ci-checklist.md` 또는 `release-checklist.md`에 반영합니다.
 
