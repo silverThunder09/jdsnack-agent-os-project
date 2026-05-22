@@ -33,7 +33,7 @@ documents:
     - .agent-os/operations/pr-review-gate.md
     - .agent-os/operations/merge-rules.md
     - .agent-os/operations/work-start-checkpoint.md
-    - .agent-os/operations/browser-smoke-tests.md
+    - .agent-os/operations/browser-smoke-checks.md
   automation:
     - .github/workflows/docs-harness.yml
     - .github/workflows/backend-ci.yml
