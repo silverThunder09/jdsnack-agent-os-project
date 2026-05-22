@@ -2,6 +2,10 @@
 
 ## 2026-05-22
 
+- PR 자동 운영 루프, PR 실패 Issue 템플릿, PR 템플릿 추가
+- 백엔드 CI와 컨테이너 빌드 GitHub Actions 추가
+- 컨테이너 workflow에 실행 및 `/api/health` 검증 조건 추가
+- `backend/Dockerfile` 기반 컨테이너 흐름 추가
 - 서브 에이전트 리뷰 결과를 반영해 health API 추적 매핑과 경계값 테스트 문서화
 - 문서 하네스 CI를 `REQ/AC/TC` 완전 매핑 검사로 강화
 - 문서 하네스 GitHub Actions 워크플로우 추가

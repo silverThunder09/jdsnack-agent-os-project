@@ -18,6 +18,7 @@
 
 - `.agent-os/operations/pr-rules.md`
 - `.agent-os/operations/merge-rules.md`
+- `.agent-os/operations/pr-automation-loop.md`
 - `.agent-os/operations/release-checklist.md`
 - `.agent-os/standards/definition-of-done.md`
 
@@ -26,6 +27,7 @@
 - `.agent-os/operations/pr-rules.md`
 - `.agent-os/operations/merge-rules.md`
 - `.agent-os/operations/release-checklist.md`
+- `.github/pull_request_template.md`
 - `release-note.md`
 
 ## 완료 기준

@@ -10,7 +10,8 @@
 
 - 상태: 문서 하네스 CI v1
 - `.github/workflows/docs-harness.yml`에서 문서 계약을 먼저 자동 검증합니다.
-- 백엔드/프론트엔드 빌드 CI는 `backend/`, `frontend/` 프로젝트 생성 후 추가합니다.
+- `.github/workflows/backend-ci.yml`에서 백엔드 테스트와 `bootJar` 빌드를 검증합니다.
+- 프론트엔드 빌드 CI는 `frontend/` 프로젝트 생성 후 추가합니다.
 
 ## 권장 트리거
 
@@ -36,6 +37,7 @@
 현재 워크플로우:
 
 - `.github/workflows/docs-harness.yml`
+- `.github/workflows/backend-ci.yml`
 
 ### 2. 백엔드 CI
 
@@ -57,8 +59,8 @@
 
 ```sh
 cd backend
-./gradlew test
-./gradlew bootJar
+gradle test
+gradle bootJar
 ```
 
 ### 3. 프론트엔드 CI

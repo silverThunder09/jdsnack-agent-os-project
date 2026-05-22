@@ -1,0 +1,45 @@
+name: PR Failure
+description: PR 검사 실패를 추적하고 수정 루프를 시작합니다.
+title: "[PR Failure] "
+labels:
+  - pr-failure
+  - needs-fix
+body:
+  - type: input
+    id: pr
+    attributes:
+      label: Failed PR
+      description: 실패한 PR 링크를 입력합니다.
+      placeholder: "https://github.com/owner/repo/pull/1"
+    validations:
+      required: true
+  - type: input
+    id: check
+    attributes:
+      label: Failed Check
+      description: 실패한 GitHub Actions job 또는 리뷰 항목을 입력합니다.
+      placeholder: "Docs Harness / Backend CI / Container Flow"
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Key Logs
+      description: 핵심 실패 로그만 붙입니다.
+    validations:
+      required: true
+  - type: textarea
+    id: traceability
+    attributes:
+      label: Traceability
+      description: 관련 REQ, AC, TC를 입력합니다.
+      placeholder: "REQ-xx, AC-xx, TC-xx"
+    validations:
+      required: true
+  - type: textarea
+    id: fix-plan
+    attributes:
+      label: Fix Plan
+      description: 수정 계획과 담당 에이전트를 입력합니다.
+    validations:
+      required: true

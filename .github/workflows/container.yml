@@ -1,0 +1,62 @@
+name: Container Flow
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-container:
+    name: Build backend container
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: false
+          load: true
+          tags: jdsnack-backend:ci
+
+      - name: Run container
+        run: |
+          docker run --rm -d \
+            --name jdsnack-backend-ci \
+            -p 8080:8080 \
+            jdsnack-backend:ci
+
+      - name: Check health endpoint
+        run: |
+          set -euo pipefail
+
+          for attempt in {1..30}; do
+            if curl -fsS http://localhost:8080/api/health | tee /tmp/health.json; then
+              grep -q '"success":true' /tmp/health.json
+              grep -q '"status":"UP"' /tmp/health.json
+              grep -q '"service":"JDSnack"' /tmp/health.json
+              grep -q '"version":"1.0.0"' /tmp/health.json
+              exit 0
+            fi
+
+            echo "Waiting for backend container health check... ${attempt}/30"
+            sleep 2
+          done
+
+          docker logs jdsnack-backend-ci
+          exit 1
+
+      - name: Stop container
+        if: always()
+        run: docker stop jdsnack-backend-ci || true

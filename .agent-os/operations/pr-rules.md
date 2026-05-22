@@ -9,6 +9,7 @@ PR은 코드 리뷰 요청이 아니라 **문서, 테스트, 구현이 일치하
 - 한 PR은 하나의 기능 또는 하나의 문제만 다룹니다.
 - 요구사항 ID 기준으로 묶습니다.
 - 서로 다른 기능의 UI/API/DB 변경을 한 PR에 섞지 않습니다.
+- 직접 `main`에 푸시하지 않고 작업 브랜치에서 PR을 생성합니다.
 
 ## PR 제목
 
@@ -26,6 +27,8 @@ docs(harness): Git 운영 규칙 추가
 ```
 
 ## PR 본문 템플릿
+
+PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 
 ```md
 ## 변경 요약
@@ -45,6 +48,7 @@ docs(harness): Git 운영 규칙 추가
 - [ ] 테스트 추가/수정
 - [ ] 테스트 실행
 - [ ] CI 체크리스트 확인
+- [ ] 컨테이너 영향 확인
 - [ ] 수동 검증
 - [ ] 에이전트 handoff 확인
 
@@ -66,6 +70,7 @@ docs(harness): Git 운영 규칙 추가
 - 완료 기준은 [standards/definition-of-done.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/standards/definition-of-done.md)를 따름
 - 서브 에이전트 작업은 [standards/sub-agent-operations.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/standards/sub-agent-operations.md)를 따름
 - CI 기준은 [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md)를 따름
+- PR 자동 운영 루프는 [pr-automation-loop.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-automation-loop.md)를 따름
 
 ## PR 전 필수 검증 기준
 
@@ -76,8 +81,15 @@ docs(harness): Git 운영 규칙 추가
 - API 변경이 있으면 `api-spec.md`가 갱신되어 있다.
 - UI 변경이 있으면 `ui-spec.md`가 갱신되어 있다.
 - 문서/백엔드/프론트 변경 범위에 맞는 CI 체크리스트가 확인되어 있다.
+- 담당 에이전트 검사 결과가 `PASS`다.
 - Gemini API 또는 외부 API 사용 시 `Security Reviewer` 검토가 완료되어 있다.
 - 문서와 구현이 불일치하는 상태로 PR을 생성하지 않는다.
+
+## PR 실패 처리
+
+- GitHub Actions 또는 리뷰가 실패하면 `.github/ISSUE_TEMPLATE/pr-failure.yml` 형식으로 Issue를 생성한다.
+- Issue에는 실패 PR, 실패 체크, 핵심 로그, 관련 `REQ/AC/TC`, 수정 계획을 남긴다.
+- 수정은 같은 브랜치에서 진행하고 다시 담당 에이전트 검사를 받는다.
 
 ## 리뷰 기준
 

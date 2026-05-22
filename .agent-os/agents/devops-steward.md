@@ -21,6 +21,8 @@
 - `.agent-os/operations/deploy-runbook.md`
 - `.agent-os/operations/ci-checklist.md`
 - `.agent-os/operations/cd-checklist.md`
+- `.agent-os/operations/container-workflow.md`
+- `.agent-os/operations/pr-automation-loop.md`
 - `.agent-os/operations/release-checklist.md`
 
 ## 수정 가능
@@ -30,7 +32,10 @@
 - `.agent-os/operations/deploy-runbook.md`
 - `.agent-os/operations/ci-checklist.md`
 - `.agent-os/operations/cd-checklist.md`
+- `.agent-os/operations/container-workflow.md`
 - `.github/workflows/**`
+- `.github/pull_request_template.md`
+- `.github/ISSUE_TEMPLATE/**`
 
 ## 완료 기준
 
