@@ -48,11 +48,13 @@ warnings=()
 add_agent() {
   local agent="$1"
   local existing
-  for existing in "${agents[@]}"; do
-    if [ "$existing" = "$agent" ]; then
-      return
-    fi
-  done
+  if [ "${#agents[@]}" -gt 0 ]; then
+    for existing in "${agents[@]}"; do
+      if [ "$existing" = "$agent" ]; then
+        return
+      fi
+    done
+  fi
   agents+=("$agent")
 }
 
