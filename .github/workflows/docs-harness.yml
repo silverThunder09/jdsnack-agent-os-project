@@ -63,7 +63,17 @@ jobs:
           diff -u "$tcs" "$mapped_tcs"
 
           awk -F'|' '/REQ-[0-9]{2}/ {
-            if ($2 !~ /REQ-[0-9]{2}/ || $3 !~ /AC-[0-9]{2}/ || $4 !~ /TC-[0-9]{2}/ || $5 !~ /\\.md/) {
+            req = $2
+            ac = $3
+            tc = $4
+            doc = $5
+
+            gsub(/[`[:space:]]/, "", req)
+            gsub(/[`[:space:]]/, "", ac)
+            gsub(/[`[:space:]]/, "", tc)
+            gsub(/[`[:space:]]/, "", doc)
+
+            if (req !~ /REQ-[0-9]{2}/ || ac !~ /AC-[0-9]{2}/ || tc !~ /TC-[0-9]{2}/ || doc !~ /.md$/) {
               print "Invalid traceability row: " $0
               exit 1
             }
