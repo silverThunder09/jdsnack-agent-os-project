@@ -50,6 +50,42 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
           />
         ) : null}
 
+        {result.status === 'success' && result.diagnosis ? (
+          <div className="analysis-result">
+            <StatusMessage
+              badge="Fixture Result"
+              title={result.title}
+              message={result.message}
+              tone="success"
+            />
+
+            <div className="analysis-score-card">
+              <span>분석 점수</span>
+              <strong>{result.diagnosis.score}점</strong>
+            </div>
+
+            <div className="analysis-feedback-grid">
+              <section className="analysis-feedback-card">
+                <h3>강점</h3>
+                <ul>
+                  {result.diagnosis.strengths.map((strength) => (
+                    <li key={strength}>{strength}</li>
+                  ))}
+                </ul>
+              </section>
+
+              <section className="analysis-feedback-card">
+                <h3>개선 포인트</h3>
+                <ul>
+                  {result.diagnosis.improvements.map((improvement) => (
+                    <li key={improvement}>{improvement}</li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          </div>
+        ) : null}
+
         {result.status === 'error' ? (
           <StatusMessage
             badge="Action Needed"
@@ -61,8 +97,8 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
 
         <div className="result-meta">
           <div className="result-meta-card">
-            <span>정상 준비중 상태</span>
-            <strong>`501 AI_ANALYSIS_NOT_ENABLED`</strong>
+            <span>응답 모드</span>
+            <strong>Fixture 결과 또는 501 준비중</strong>
           </div>
           <div className="result-meta-card">
             <span>클라이언트 검증 기준</span>

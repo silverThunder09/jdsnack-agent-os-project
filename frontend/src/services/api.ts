@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   DiagnoseOutcome,
   DiagnoseRequest,
+  DiagnosisResult,
 } from '../types/diagnosis'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -20,6 +21,9 @@ const KNOWN_ERROR_CODES: ApiErrorCode[] = [
   'EMPTY_RESUME',
   'TEXT_TOO_SHORT',
   'TEXT_TOO_LONG',
+  'UNSUPPORTED_FILE_TYPE',
+  'FILE_TEXT_EXTRACTION_FAILED',
+  'FIXTURE_NOT_FOUND',
   'AI_ANALYSIS_NOT_ENABLED',
   'INTERNAL_ERROR',
 ]
@@ -32,9 +36,16 @@ async function parseJson<T>(response: Response): Promise<ApiResponse<T> | null> 
   }
 }
 
-function normalizeOutcome<T>(
-  payload: ApiResponse<T> | null,
+function normalizeOutcome(
+  payload: ApiResponse<DiagnosisResult> | null,
 ): DiagnoseOutcome | null {
+  if (payload?.success && payload.data) {
+    return {
+      kind: 'success',
+      result: payload.data,
+    }
+  }
+
   if (!payload?.error || !KNOWN_ERROR_CODES.includes(payload.error.code)) {
     return null
   }
@@ -59,7 +70,11 @@ function normalizeOutcome<T>(
     }
   }
 
-  return null
+  return {
+    kind: 'error',
+    code: payload.error.code,
+    message: payload.error.message,
+  }
 }
 
 export async function diagnoseResume(
@@ -80,7 +95,32 @@ export async function diagnoseResume(
     throw new NetworkError()
   }
 
-  const payload = await parseJson<null>(response)
+  const payload = await parseJson<DiagnosisResult>(response)
+  const outcome = normalizeOutcome(payload)
+
+  if (outcome) {
+    return outcome
+  }
+
+  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+}
+
+export async function diagnoseResumeFile(file: File): Promise<DiagnoseOutcome> {
+  const formData = new FormData()
+  formData.append('resumeFile', file)
+
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/diagnose/file`, {
+      method: 'POST',
+      body: formData,
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<DiagnosisResult>(response)
   const outcome = normalizeOutcome(payload)
 
   if (outcome) {
