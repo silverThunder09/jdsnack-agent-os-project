@@ -30,5 +30,5 @@
 
 ## 문서 연결
 
-- 상세 코딩 예시와 레거시 표준은 [specs/2026-05-21-0943-ai-resume-diagnoser/standards.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/standards.md)에서 유지합니다.
+- 상세 코딩 예시와 레거시 표준은 [specs/2026-05-21-0943-ai-resume-diagnoser/standards.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/standards.md)에서 유지합니다.
 - 앞으로 반복되는 코드 리뷰 피드백은 이 문서로 승격합니다.

@@ -61,9 +61,9 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 - 필요 시 릴리즈 체크리스트 갱신
 - `main` 반영 후 GitHub Actions 결과 확인
 - CI/CD 기준이 바뀌었으면 [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md) 또는 [cd-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/cd-checklist.md) 갱신
-- 배포 대상이면 [release-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/operations/release-checklist.md) 확인
-- 장애 가능성이 있으면 [incident-playbook.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/operations/incident-playbook.md) 확인
-- 다음 작업이 있으면 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/operations/agent-handoff-template.md) 기준 handoff 확인
+- 배포 대상이면 [release-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/release-checklist.md) 확인
+- 장애 가능성이 있으면 [incident-playbook.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/incident-playbook.md) 확인
+- 다음 작업이 있으면 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/agent-handoff-template.md) 기준 handoff 확인
 
 ## 핫픽스 예외
 

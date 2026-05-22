@@ -29,4 +29,4 @@
 ## 문서 연결
 
 - 기능별 상세 시나리오는 각 spec의 `test-scenarios.md`를 기준 문서로 봅니다.
-- 공통 완료 기준은 [definition-of-done.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/standards/definition-of-done.md)를 따릅니다.
+- 공통 완료 기준은 [definition-of-done.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/definition-of-done.md)를 따릅니다.
