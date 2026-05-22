@@ -263,7 +263,7 @@ MVP 1차 기본 에이전트:
 
 ## Agent Handoff 규칙
 
-각 에이전트는 작업 종료 시 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/operations/agent-handoff-template.md) 형식으로 handoff를 남깁니다.
+각 에이전트는 작업 종료 시 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/agent-handoff-template.md) 형식으로 handoff를 남깁니다.
 
 handoff는 다음 에이전트가 바로 이어받을 수 있을 정도로 구체적이어야 합니다.
 

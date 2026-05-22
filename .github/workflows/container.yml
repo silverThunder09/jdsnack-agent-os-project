@@ -1,6 +1,7 @@
 name: Container Flow
 
 on:
+  pull_request:
   push:
     branches:
       - main

@@ -1,17 +1,40 @@
 # Frontend
 
-이 디렉토리에는 JDSnack React 프론트엔드 프로젝트를 생성합니다.
+JDSnack 1차 MVP React 프론트엔드입니다.
 
-1차 MVP 범위:
+## 현재 구현 범위
 
-- 이력서 입력 화면
-- 글자 수와 입력 검증 메시지
-- 진단 요청 로딩 상태
-- `AI_ANALYSIS_NOT_ENABLED` 준비중 안내
-- API 연동
-- 로딩/오류 상태 처리
+- 이력서 `textarea` 입력
+- 공백 제외 글자 수 표시
+- 클라이언트 입력 검증
+- `/api/diagnose` 호출
+- `loading / not-enabled / error` 상태 렌더링
+- LocalStorage 임시 저장
 
-2차 MVP 이후:
+## 실행 명령
 
-- AI 분석 결과 리포트 화면
-- JD 입력과 매칭 인사이트
+```bash
+npm install
+npm run dev
+```
+
+기본 개발 서버는 `/api` 요청을 `http://localhost:8080`으로 프록시합니다.
+
+## 테스트 명령
+
+```bash
+npm run lint
+npm run test
+npm run build
+```
+
+## 디렉토리 구조
+
+```text
+src/
+├── components/
+├── hooks/
+├── services/
+├── test/
+└── types/
+```

@@ -54,8 +54,8 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 
 ### 서브 에이전트 작업
 
-- [sub-agent-operations.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/standards/sub-agent-operations.md)의 수정 권한을 지켰다.
-- 작업 종료 시 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/operations/agent-handoff-template.md) 형식으로 handoff를 남겼다.
+- [sub-agent-operations.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/sub-agent-operations.md)의 수정 권한을 지켰다.
+- 작업 종료 시 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/agent-handoff-template.md) 형식으로 handoff를 남겼다.
 - 영역 밖 변경 필요 사항은 직접 수정하지 않고 변경 요청으로 남겼다.
 
 ## 리뷰 기준
