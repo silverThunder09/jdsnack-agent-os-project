@@ -4,6 +4,7 @@
 
 ## 범위 판단
 
+- 작업 시작 체크포인트:
 - 주 목적:
 - 같은 PR에 포함한 이유:
 - 별도 PR로 분리한 항목:
@@ -26,6 +27,13 @@
 - [ ] DevOps Steward
 - [ ] Release Captain
 
+## Handoff 요약
+
+- 현재 단계:
+- 다음 에이전트:
+- 남은 위험:
+- 변경 요청:
+
 ## 검증
 
 - [ ] 문서 갱신
@@ -35,6 +43,7 @@
 - [ ] 컨테이너 영향 확인
 - [ ] 수동 검증
 - [ ] 에이전트 handoff 확인
+- [ ] PR Review Gate 실행
 
 ## 영향 범위
 
@@ -43,6 +52,13 @@
 ## 리뷰 포인트
 
 - TBD
+
+## 자체 리뷰 결과
+
+- Review Gate 명령: `./scripts/pr-review-gate.sh <PR_NUMBER>`
+- 필수 리뷰 에이전트:
+- 결정: PASS / COMMENT / REQUEST_CHANGES
+- 리뷰 리포트:
 
 ## 실패 시 Issue
 
