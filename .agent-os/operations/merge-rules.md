@@ -13,6 +13,7 @@
 
 ## 머지 전 필수 조건
 
+- PR 주 목적이 하나이고 변경 범위가 [pr-rules.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-rules.md)의 `PR 범위 경계`를 통과
 - PR 본문 체크리스트 완료
 - 담당 에이전트 검사 `PASS`
 - 관련 문서 최신화
@@ -48,6 +49,7 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 
 - 테스트 실패
 - CI 체크리스트 미확인
+- PR 주 목적과 무관한 CI/운영/템플릿/광범위 문서 정리 포함
 - 문서 드리프트 존재
 - PR 범위 초과 변경 포함
 - 보안 정보 노출
