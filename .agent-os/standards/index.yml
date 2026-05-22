@@ -28,7 +28,9 @@ documents:
     - .agent-os/operations/deploy-runbook.md
     - .agent-os/operations/incident-playbook.md
     - .agent-os/operations/agent-handoff-template.md
+    - .agent-os/operations/agent-review-report-template.md
     - .agent-os/operations/pr-rules.md
+    - .agent-os/operations/pr-review-gate.md
     - .agent-os/operations/merge-rules.md
   automation:
     - .github/workflows/docs-harness.yml
@@ -36,5 +38,6 @@ documents:
     - .github/workflows/container.yml
     - .github/pull_request_template.md
     - .github/ISSUE_TEMPLATE/pr-failure.yml
+    - scripts/pr-review-gate.sh
 active_specs:
   - .agent-os/specs/2026-05-21-0943-ai-resume-diagnoser

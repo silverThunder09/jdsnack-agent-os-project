@@ -15,7 +15,9 @@
 
 - PR 주 목적이 하나이고 변경 범위가 [pr-rules.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-rules.md)의 `PR 범위 경계`를 통과
 - PR 본문 체크리스트 완료
+- 작업 시작 체크포인트와 PR 범위 판단이 일치
 - 담당 에이전트 검사 `PASS`
+- [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md) 기준 자체 리뷰 결과가 `PASS` 또는 허용 가능한 `COMMENT`
 - 관련 문서 최신화
 - 테스트 통과
 - CI 체크리스트 통과
@@ -56,6 +58,7 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 - 배포 절차 미확인 상태에서 운영 영향 있는 변경
 - 문서와 구현 불일치
 - 에이전트 권한 위반 또는 handoff 누락
+- 자체 리뷰 결과 `REQUEST_CHANGES` 존재
 - 해결되지 않은 PR 실패 Issue 존재
 
 ## 머지 후 작업
@@ -66,6 +69,7 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 - 배포 대상이면 [release-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/release-checklist.md) 확인
 - 장애 가능성이 있으면 [incident-playbook.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/incident-playbook.md) 확인
 - 다음 작업이 있으면 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/agent-handoff-template.md) 기준 handoff 확인
+- 머지 후 짧은 운영 기록으로 무엇을 머지했고 어떤 체크를 통과했는지 남김
 
 ## 핫픽스 예외
 

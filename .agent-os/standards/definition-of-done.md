@@ -20,6 +20,7 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - 변경 이유가 `standards/` 문서와 충돌하지 않는다.
 - 커밋, PR, 머지 규칙이 Git 운영 표준과 충돌하지 않는다.
 - 서브 에이전트 작업이면 handoff가 남아 있다.
+- PR 작업이면 [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md) 기준 자체 리뷰 결과가 남아 있다.
 
 ## 문서별 완료 조건
 
@@ -69,3 +70,4 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - CI/CD 체크 누락
 - 커밋/PR/머지 규칙 누락
 - 서브 에이전트 권한 위반 또는 handoff 누락
+- 자체 리뷰 게이트 누락 또는 `REQUEST_CHANGES` 미해결
