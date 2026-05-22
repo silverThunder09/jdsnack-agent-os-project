@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { diagnoseResume, NetworkError } from '../services/api'
-import type { ResultState } from '../types/diagnosis'
+import { diagnoseResume, diagnoseResumeFile, NetworkError } from '../services/api'
+import type { ResultState, ResumeInputMode } from '../types/diagnosis'
 
 const idleState: ResultState = {
   status: 'idle',
@@ -13,7 +13,7 @@ const loadingState: ResultState = {
   status: 'loading',
   title: '요청을 확인하고 있습니다',
   message:
-    '입력 길이와 요청 형식을 검증하는 중입니다. 1차 MVP에서는 성공 후 준비중 안내로 이어집니다.',
+    '입력 길이와 요청 형식을 검증하고 있습니다. fixture 모드에서는 준비된 분석 결과를 바로 보여줍니다.',
 }
 
 const validationMessages = {
@@ -40,6 +40,19 @@ export function validateResumeText(resumeText: string): string | null {
   return null
 }
 
+export function validateResumeFile(
+  mode: ResumeInputMode,
+  file: File | null,
+): string | null {
+  if (!file) {
+    return mode === 'pdf'
+      ? 'PDF 파일을 선택해주세요.'
+      : 'DOCX 파일을 선택해주세요.'
+  }
+
+  return null
+}
+
 export function useDiagnose() {
   const [inlineError, setInlineError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -51,36 +64,28 @@ export function useDiagnose() {
     setResult(idleState)
   }
 
-  const submit = async (resumeText: string) => {
-    const validationError = validateResumeText(resumeText)
-
-    if (validationError) {
-      setInlineError(validationError)
+  const handleOutcome = (outcome: Awaited<ReturnType<typeof diagnoseResume>>) => {
+    if (outcome.kind === 'success') {
       setResult({
-        status: 'error',
-        title: '입력 확인이 필요합니다',
-        message: validationError,
+        status: 'success',
+        title: '이력서 분석 결과입니다',
+        message: outcome.result.summary,
+        diagnosis: outcome.result,
       })
       return
     }
 
-    setInlineError('')
-    setIsSubmitting(true)
-    setResult(loadingState)
+    if (outcome.kind === 'not-enabled') {
+      setResult({
+        status: 'not-enabled',
+        title: 'AI 분석 기능은 준비 중입니다',
+        message: outcome.message,
+        code: outcome.code,
+      })
+      return
+    }
 
-    try {
-      const outcome = await diagnoseResume({ resumeText })
-
-      if (outcome.kind === 'not-enabled') {
-        setResult({
-          status: 'not-enabled',
-          title: 'AI 분석 기능은 준비 중입니다',
-          message: outcome.message,
-          code: outcome.code,
-        })
-        return
-      }
-
+    if (outcome.kind === 'validation-error') {
       setInlineError(outcome.message)
       setResult({
         status: 'error',
@@ -88,6 +93,25 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
+      return
+    }
+
+    setResult({
+      status: 'error',
+      title: '분석 결과를 찾지 못했습니다',
+      message: outcome.message,
+      code: outcome.code,
+    })
+  }
+
+  const handleRequest = async (request: Promise<Awaited<ReturnType<typeof diagnoseResume>>>) => {
+    setInlineError('')
+    setIsSubmitting(true)
+    setResult(loadingState)
+
+    try {
+      const outcome = await request
+      handleOutcome(outcome)
     } catch (error) {
       const message =
         error instanceof NetworkError
@@ -104,6 +128,38 @@ export function useDiagnose() {
     }
   }
 
+  const submit = async (resumeText: string) => {
+    const validationError = validateResumeText(resumeText)
+
+    if (validationError) {
+      setInlineError(validationError)
+      setResult({
+        status: 'error',
+        title: '입력 확인이 필요합니다',
+        message: validationError,
+      })
+      return
+    }
+
+    await handleRequest(diagnoseResume({ resumeText }))
+  }
+
+  const submitFile = async (mode: ResumeInputMode, file: File | null) => {
+    const validationError = validateResumeFile(mode, file)
+
+    if (validationError) {
+      setInlineError(validationError)
+      setResult({
+        status: 'error',
+        title: '파일 확인이 필요합니다',
+        message: validationError,
+      })
+      return
+    }
+
+    await handleRequest(diagnoseResumeFile(file as File))
+  }
+
   return {
     clearInlineError,
     inlineError,
@@ -111,5 +167,6 @@ export function useDiagnose() {
     resetResult,
     result,
     submit,
+    submitFile,
   }
 }
