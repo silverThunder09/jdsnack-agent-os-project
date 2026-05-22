@@ -45,7 +45,7 @@
 
 ## Decisions Made
 
-- 1차 MVP 프론트는 API Key 입력 없이 `resumeText`만 받습니다.
+- 1차 MVP 프론트는 사용자 인증 키나 서버 외부 AI 비밀값 없이 `resumeText`만 받습니다.
 - 유효한 입력은 `501 AI_ANALYSIS_NOT_ENABLED`를 정상 준비중 상태로 렌더링합니다.
 - 입력값은 `localStorage`에 임시 저장하되 인증 정보는 저장하지 않습니다.
 - `main` 보호 규칙과 맞추기 위해 백엔드/프론트 CI는 경로 필터 없이 항상 실행되도록 유지합니다.

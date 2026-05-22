@@ -32,8 +32,8 @@ curl -i http://localhost:8080/api/health
 
 ## GitHub Actions 흐름
 
-- PR에서는 백엔드 테스트와 문서 하네스를 우선 검증합니다.
-- `main` 반영 후 모든 push에서 컨테이너 빌드와 `/api/health` 검증을 실행합니다.
+- PR에서는 문서 하네스, 백엔드 테스트, 컨테이너 빌드와 `/api/health` 검증을 함께 실행합니다.
+- `main` 반영 후 모든 push에서도 같은 컨테이너 검증을 다시 실행합니다.
 - 컨테이너 빌드 실패 시 PR 실패 Issue와 같은 형식으로 Issue를 생성합니다.
 
 ## 2차 확장
