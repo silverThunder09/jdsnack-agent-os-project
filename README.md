@@ -74,8 +74,7 @@ jdsnack-agent-os/
 
 ## 다음 구현 우선순위
 
-1. `backend/`에 Spring Boot 프로젝트 생성
-2. `frontend/`에 React + Vite 프로젝트 생성
-3. `POST /api/diagnose` 입력 검증 구현
-4. 준비중 안내 UI 구현
-5. 2차 MVP에서 서버 기반 AI 분석 연동
+1. 프론트엔드와 백엔드 정적 자산 통합
+2. `docker compose` 기반 로컬 통합 실행
+3. 브라우저 스모크 테스트 자동화
+4. 2차 MVP에서 서버 기반 AI 분석 연동

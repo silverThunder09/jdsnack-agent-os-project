@@ -19,7 +19,7 @@
 - 테스트 통과
 - CI 체크리스트 통과
 - 충돌 없음
-- 리뷰 승인 1명 이상
+- 저장소 보호 규칙이 요구하는 승인 수 충족
 - 배포 영향이 있으면 `cd-checklist.md`, `deploy-runbook.md`, `release-checklist.md` 확인
 - 서브 에이전트 작업이면 handoff 확인
 - PR 실패 Issue가 있으면 해결 또는 후속 이슈 연결 확인
