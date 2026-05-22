@@ -15,8 +15,9 @@
  -> POST /api/diagnose 또는 POST /api/diagnose/file
  -> Controller
  -> ResumeExtractionService (파일인 경우)
- -> DiagnosisProvider
- -> FixtureDiagnosisProvider
+ -> DiagnoseService
+ -> DiagnosisProvider (mode selector)
+ -> StubDiagnosisProvider 또는 FixtureDiagnosisProvider
  -> 분석 결과 반환
  -> Frontend 결과 카드 렌더링
 ```
@@ -28,15 +29,12 @@ backend/
 └── src/main/java/com/jdsnack/
     ├── diagnose/
     │   ├── DiagnoseController.java
-    │   ├── DiagnoseFileController.java
     │   ├── DiagnoseService.java
     │   ├── DiagnosisProvider.java
     │   ├── StubDiagnosisProvider.java
-    │   └── FixtureDiagnosisProvider.java
-    ├── extraction/
-    │   └── ResumeExtractionService.java
-    └── fixture/
-        └── FixtureAnalysisRepository.java
+    │   ├── FixtureDiagnosisProvider.java
+    │   ├── ResumeExtractionService.java
+    │   └── FixtureAnalysisRepository.java
 ```
 
 ## 4. 핵심 경계
@@ -49,7 +47,9 @@ backend/
 ## 5. 저장 전략
 
 - 1.5차 MVP의 테스트 DB는 영구 사용자 데이터 저장소가 아니다.
-- fixture 결과는 샘플 ID, 텍스트 해시, 정적 JSON 파일 또는 경량 테이블로 관리한다.
+- 현재 구현은 H2 테스트 DB를 사용한다.
+- fixture 결과는 샘플 ID와 텍스트 해시 기반으로 매핑한다.
+- 상세 스키마는 [fixture-data-model.md](fixture-data-model.md)를 기준으로 한다.
 
 ## 6. 2차 MVP 확장 포인트
 

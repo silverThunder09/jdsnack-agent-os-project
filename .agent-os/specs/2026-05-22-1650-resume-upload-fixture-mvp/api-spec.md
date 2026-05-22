@@ -41,6 +41,7 @@
 ### 3.1 개요
 
 - 기존 1차 MVP의 텍스트 입력 API를 유지한다.
+- 기본 운영 모드는 `stub`다.
 - 운영 모드가 fixture일 때는 `501 AI_ANALYSIS_NOT_ENABLED` 대신 fixture 결과를 반환한다.
 
 ### 3.2 Request
@@ -110,8 +111,12 @@ Form fields:
 }
 ```
 
+- 최소 응답 구조만 유지하고, 내부 fixture 저장 구조는 [fixture-data-model.md](fixture-data-model.md)에 정의한다.
+- 구현 시 입력 매핑과 분석 결과 본문은 분리 저장한다.
+
 ## 6. 구현 메모
 
 - `DiagnosisProvider` 인터페이스를 두고 `StubDiagnosisProvider`, `FixtureDiagnosisProvider`를 분리한다.
 - 파일 업로드 API는 `multipart/form-data`를 사용한다.
 - PDF/DOCX 텍스트 추출은 별도 `ResumeExtractionService` 계층에서 처리한다.
+- fixture 저장소는 H2 테스트 DB와 `JdbcTemplate` 기반 조회로 구현한다.
