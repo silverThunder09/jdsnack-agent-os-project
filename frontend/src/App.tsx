@@ -156,9 +156,9 @@ function App() {
             <p className="hero-eyebrow">JDSnack 1차 MVP</p>
             <h1>이력서 분석 흐름을 먼저 완성합니다</h1>
             <p className="hero-description">
-              아직 외부 AI는 연결하지 않았습니다. 대신 이력서 입력, 길이 검증,
-              fixture 분석 결과, 준비중 모드까지 한 화면에서 안정적으로 확인할 수
-              있습니다.
+              이력서 입력, 길이 검증, fixture 분석, 로컬 AI 분석까지 한 화면에서
+              안정적으로 확인할 수 있습니다. 사용자 키 입력 없이 서버 환경변수
+              기반 분석 흐름을 검증합니다.
             </p>
           </div>
           <div className="hero-stats" aria-label="현재 MVP 범위">
@@ -168,11 +168,11 @@ function App() {
             </div>
             <div className="stat-card">
               <span className="stat-label">분석 모드</span>
-              <strong>Fixture / Stub</strong>
+              <strong>Stub / Fixture / AI Local</strong>
             </div>
             <div className="stat-card">
               <span className="stat-label">현재 응답</span>
-              <strong>200 결과 / 키워드 미리보기</strong>
+              <strong>200 분석 결과 / JD 미리보기</strong>
             </div>
           </div>
         </section>

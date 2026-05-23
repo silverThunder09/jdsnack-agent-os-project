@@ -16,17 +16,20 @@ public class DiagnoseService {
 
     private final DiagnosisProvider stubDiagnosisProvider;
     private final DiagnosisProvider fixtureDiagnosisProvider;
+    private final DiagnosisProvider geminiDiagnosisProvider;
     private final ResumeExtractionService resumeExtractionService;
     private final DiagnosisMode diagnosisMode;
 
     public DiagnoseService(
             StubDiagnosisProvider stubDiagnosisProvider,
             FixtureDiagnosisProvider fixtureDiagnosisProvider,
+            GeminiDiagnosisProvider geminiDiagnosisProvider,
             ResumeExtractionService resumeExtractionService,
             @Value("${jdsnack.diagnosis.mode:stub}") String diagnosisMode
     ) {
         this.stubDiagnosisProvider = stubDiagnosisProvider;
         this.fixtureDiagnosisProvider = fixtureDiagnosisProvider;
+        this.geminiDiagnosisProvider = geminiDiagnosisProvider;
         this.resumeExtractionService = resumeExtractionService;
         this.diagnosisMode = DiagnosisMode.from(diagnosisMode);
     }
@@ -76,6 +79,7 @@ public class DiagnoseService {
         return switch (diagnosisMode) {
             case STUB -> stubDiagnosisProvider;
             case FIXTURE -> fixtureDiagnosisProvider;
+            case AI_LOCAL -> geminiDiagnosisProvider;
         };
     }
 }
