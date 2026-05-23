@@ -7,6 +7,7 @@
 | `REQ-03` JD 입력 검증 | `AC-03`, `AC-04` | `TC-02`, `TC-03`, `TC-04` | `api-spec.md` |
 | `REQ-04` 비교 API 응답 구조 제공 | `AC-05`, `AC-06` | `TC-06`, `TC-07` | `api-spec.md` |
 | `REQ-05` 화면 흐름 연결 | `AC-07` | `TC-01`, `TC-05`, `TC-07` | `ui-spec.md`, `plan.md` |
+| `REQ-05` 화면 흐름 연결 | `AC-07` | `TC-08` | `frontend/e2e/upload-and-jd-preview.spec.ts` |
 
 ## 사용 규칙
 

@@ -64,3 +64,25 @@
 - 기대 결과:
   - stub 모드: `501 AI_ANALYSIS_NOT_ENABLED`
   - fixture 모드: `200 OK` fixture 결과
+
+## `TC-08` 브라우저 PDF 업로드 smoke
+
+- 대응 AC: `AC-02`, `AC-05`
+- 절차:
+  - 브라우저에서 PDF 탭 선택
+  - fixture PDF 업로드
+  - 진단 요청
+- 기대 결과:
+  - 결과 카드가 렌더링된다
+  - fixture 점수와 요약이 보인다
+
+## `TC-09` 브라우저 DOCX 업로드 smoke
+
+- 대응 AC: `AC-03`, `AC-05`
+- 절차:
+  - 브라우저에서 DOCX 탭 선택
+  - fixture DOCX 업로드
+  - 진단 요청
+- 기대 결과:
+  - 결과 카드가 렌더링된다
+  - fixture 점수와 요약이 보인다

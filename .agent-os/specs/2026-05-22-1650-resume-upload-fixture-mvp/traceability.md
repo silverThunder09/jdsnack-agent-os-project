@@ -8,6 +8,7 @@
 | `REQ-03` fixture 분석 결과 반환 | `AC-01`, `AC-02`, `AC-03`, `AC-05` | `TC-01`, `TC-02`, `TC-03`, `TC-06` | `api-spec.md`, `fixture-data-model.md` |
 | `REQ-04` 결과 화면 검증 | `AC-05` | `TC-01`, `TC-02`, `TC-03` | `ui-spec.md` |
 | `REQ-05` 운영 모드 분리 | `AC-06`, `AC-07` | `TC-07` | `architecture.md` |
+| `REQ-04` 결과 화면 검증 | `AC-05` | `TC-08`, `TC-09` | `frontend/e2e/upload-and-jd-preview.spec.ts` |
 
 ## 사용 규칙
 
