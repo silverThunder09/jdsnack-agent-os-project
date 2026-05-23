@@ -63,3 +63,14 @@
 - 기대 결과:
   - 요청 형식 검증은 통과한다
   - `matchingScore`, `summary`, `strengths`, `gaps`, `suggestions`가 포함된 응답이 반환된다
+
+## `TC-08` 브라우저 JD 비교 smoke
+
+- 대응 AC: `AC-05`, `AC-06`, `AC-07`
+- 절차:
+  - 브라우저에서 fixture 분석 성공 상태를 만든다
+  - JD 텍스트를 입력한다
+  - `JD 비교 미리보기`를 실행한다
+- 기대 결과:
+  - JD 결과 카드가 렌더링된다
+  - `matchingScore`와 결과 요약이 보인다
