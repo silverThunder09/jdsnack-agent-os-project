@@ -172,7 +172,7 @@ function App() {
             </div>
             <div className="stat-card">
               <span className="stat-label">현재 응답</span>
-              <strong>200 분석 결과 / JD 미리보기</strong>
+              <strong>200 분석 결과 / JD 매칭 결과</strong>
             </div>
           </div>
         </section>
@@ -269,7 +269,7 @@ function App() {
 
             <div className="action-row jd-action-row">
               <p className="action-hint">
-                현재는 AI 대신 키워드 기준 미리보기 결과를 먼저 보여줍니다.
+                기본은 규칙 기반 비교를 사용하고, `ai-local`에서는 Gemini 기준 JD 매칭 결과를 보여줍니다.
               </p>
               <DiagnoseButton
                 isSubmitting={isPreviewSubmitting}

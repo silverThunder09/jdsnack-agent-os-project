@@ -495,7 +495,8 @@
 }
 
 .analysis-score-card,
-.analysis-feedback-card {
+.analysis-feedback-card,
+.analysis-source-card {
   padding: 1.1rem 1.15rem;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.78);
@@ -538,6 +539,18 @@
 
 .analysis-feedback-card li + li {
   margin-top: 0.55rem;
+}
+
+.analysis-source-card h3 {
+  margin: 0 0 0.8rem;
+  font-size: 1rem;
+}
+
+.analysis-source-card p {
+  margin: 0;
+  color: var(--color-copy-muted);
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 
 .result-meta {

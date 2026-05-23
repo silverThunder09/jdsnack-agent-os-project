@@ -41,6 +41,7 @@ describe('App', () => {
             '풀스택 경험은 분명하지만 프로젝트 성과를 수치로 더 드러내면 설득력이 커집니다.',
           strengths: ['백엔드와 프론트엔드를 함께 설계한 경험이 보입니다.'],
           improvements: ['성과 지표를 숫자로 보강해 주세요.'],
+          sourceText: validResumeText,
         },
         timestamp: '2026-05-22T10:00:00.000+09:00',
       }),
@@ -60,6 +61,9 @@ describe('App', () => {
         '풀스택 경험은 분명하지만 프로젝트 성과를 수치로 더 드러내면 설득력이 커집니다.',
       ),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: '분석 기준 이력서 본문' }),
+    ).toHaveTextContent(validResumeText)
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
@@ -119,6 +123,7 @@ describe('App', () => {
           summary: '백엔드 중심 경험은 분명하지만 성과 수치가 더 필요합니다.',
           strengths: ['Spring Boot API 구현 경험이 보입니다.'],
           improvements: ['프로젝트 결과를 수치로 보강해 주세요.'],
+          sourceText: validResumeText,
         },
         timestamp: '2026-05-22T10:00:00.000+09:00',
       }),
@@ -143,6 +148,89 @@ describe('App', () => {
         body: expect.any(FormData),
       }),
     )
+  })
+
+  it('Gemini 요청 실패 오류를 화면에 보여준다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      json: async () => ({
+        success: false,
+        error: {
+          code: 'GEMINI_API_REQUEST_FAILED',
+          message: 'Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
+        },
+        timestamp: '2026-05-23T10:00:00.000+09:00',
+      }),
+    } as Response)
+
+    render(<App />)
+
+    await user.type(
+      screen.getByRole('textbox', { name: '이력서 내용' }),
+      validResumeText,
+    )
+    await user.click(screen.getByRole('button', { name: '진단 요청' }))
+
+    expect(
+      await screen.findByText('로컬 AI 분석을 완료하지 못했습니다'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'),
+    ).toBeInTheDocument()
+  })
+
+  it('JD 비교에서 Gemini 요청 실패 오류를 화면에 보여준다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: true,
+          data: {
+            score: 84,
+            summary: '백엔드 중심 경험은 분명하지만 성과 수치가 더 필요합니다.',
+            strengths: ['Spring Boot API 구현 경험이 보입니다.'],
+            improvements: ['프로젝트 결과를 수치로 보강해 주세요.'],
+            sourceText: validResumeText,
+          },
+          timestamp: '2026-05-23T10:00:00.000+09:00',
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: false,
+          error: {
+            code: 'GEMINI_API_REQUEST_FAILED',
+            message: 'Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
+          },
+          timestamp: '2026-05-23T10:00:00.000+09:00',
+        }),
+      } as Response)
+
+    render(<App />)
+
+    await user.type(
+      screen.getByRole('textbox', { name: '이력서 내용' }),
+      validResumeText,
+    )
+    await user.click(screen.getByRole('button', { name: '진단 요청' }))
+    await screen.findByText('백엔드 중심 경험은 분명하지만 성과 수치가 더 필요합니다.')
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'JD 내용' }),
+      'Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구합니다.',
+    )
+    await user.type(
+      screen.getByRole('textbox', { name: 'JD 링크 (선택)' }),
+      'https://example.com/jobs/backend',
+    )
+    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
+
+    expect(
+      await screen.findByText('JD AI 매칭을 완료하지 못했습니다'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'),
+    ).toBeInTheDocument()
   })
 
   it('docx 모드에서 파일이 없으면 클라이언트에서 막는다', async () => {

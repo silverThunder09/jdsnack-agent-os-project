@@ -2,6 +2,8 @@ package com.jdsnack.match;
 
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
+import com.jdsnack.diagnose.DiagnosisMode;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -27,8 +29,22 @@ public class MatchPreviewService {
             "역량", "기술", "능력", "이해", "보유", "활용", "개발", "운영", "프로젝트"
     );
 
+    private final DiagnosisMode diagnosisMode;
+    private final GeminiMatchPreviewProvider geminiMatchPreviewProvider;
+
+    public MatchPreviewService(
+            @Value("${jdsnack.diagnosis.mode:stub}") String diagnosisMode,
+            GeminiMatchPreviewProvider geminiMatchPreviewProvider
+    ) {
+        this.diagnosisMode = DiagnosisMode.from(diagnosisMode);
+        this.geminiMatchPreviewProvider = geminiMatchPreviewProvider;
+    }
+
     public MatchPreviewResponse preview(MatchPreviewRequest request) {
         validateRequest(request);
+        if (diagnosisMode == DiagnosisMode.AI_LOCAL) {
+            return geminiMatchPreviewProvider.preview(request);
+        }
         return buildPreview(request);
     }
 

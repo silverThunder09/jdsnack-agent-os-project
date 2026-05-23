@@ -39,10 +39,11 @@ class DiagnoseAiLocalModeControllerTest {
 
         mockMvc.perform(post("/api/diagnose")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonWithResumeText("a".repeat(120))))
+                .content(jsonWithResumeText("a".repeat(120))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.score").value(84))
-                .andExpect(jsonPath("$.data.summary").value("백엔드 중심 역량은 분명하지만 성과 수치가 더 보강되면 좋습니다."));
+                .andExpect(jsonPath("$.data.summary").value("백엔드 중심 역량은 분명하지만 성과 수치가 더 보강되면 좋습니다."))
+                .andExpect(jsonPath("$.data.sourceText").value("a".repeat(120)));
     }
 
     @Test
@@ -84,6 +85,18 @@ class DiagnoseAiLocalModeControllerTest {
                         .content(jsonWithResumeText("a".repeat(120))))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error.code").value("GEMINI_API_RESPONSE_INVALID"));
+    }
+
+    @Test
+    void geminiRequestFailureReturnsBadGateway() throws Exception {
+        given(geminiDiagnosisProvider.diagnose(eq(UploadedResumeType.TEXT), any()))
+                .willThrow(new GeminiApiException(ErrorCode.GEMINI_API_REQUEST_FAILED));
+
+        mockMvc.perform(post("/api/diagnose")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonWithResumeText("a".repeat(120))))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("GEMINI_API_REQUEST_FAILED"));
     }
 
     private DiagnosisResultResponse sampleResponse(String sourceText) {

@@ -28,5 +28,11 @@
 
 ## Phase 3: 포스트 론칭 (Post-Launch)
 
-- **JD(직무 기술서) 매칭 기능**: 원하는 채용 공고(JD)를 입력하면 내 이력서와의 적합도 점수(Matching Score) 및 보완점 추천.
+- **JD(직무 기술서) AI 매칭 기능**: 원하는 채용 공고(JD)를 입력하면 내 이력서와의 적합도 점수(Matching Score) 및 보완점 추천.
 - **모의 면접 질문 생성**: 이력서 기반 예상 기술/인성 면접 질문 리스트 자동 제안.
+
+## Phase 2.5: 로컬 전용 AI JD 매칭 MVP
+
+- **로컬 ai-local 모드 JD 매칭**: Gemini 기반으로 JD 본문과 이력서를 비교해 실제 매칭 결과를 반환.
+- **응답 계약 유지**: `matchingScore`, `summary`, `strengths`, `gaps`, `suggestions` 구조 고정.
+- **안전한 롤백 경로**: `stub`/`fixture`에서는 기존 규칙 기반 미리보기 유지.
