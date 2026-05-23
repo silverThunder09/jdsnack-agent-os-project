@@ -13,7 +13,7 @@ const loadingState: ResultState = {
   status: 'loading',
   title: 'JD 비교 미리보기를 생성하고 있습니다',
   message:
-    'JD 본문과 링크 형식을 검증하고, 이력서와의 키워드 겹침을 정리하고 있습니다.',
+    'JD 본문과 링크 형식을 검증하고, 이력서와의 키워드 또는 AI 기준 비교 결과를 정리하고 있습니다.',
 }
 
 const textValidationMessages = {
@@ -134,9 +134,16 @@ export function useMatchPreview() {
       }
 
       if (outcome.kind === 'error') {
+        const isGeminiError =
+          outcome.code === 'GEMINI_API_KEY_MISSING' ||
+          outcome.code === 'GEMINI_API_REQUEST_FAILED' ||
+          outcome.code === 'GEMINI_API_RESPONSE_INVALID'
+
         setResult({
           status: 'error',
-          title: 'JD 비교 요청을 완료하지 못했습니다',
+          title: isGeminiError
+            ? 'JD AI 매칭을 완료하지 못했습니다'
+            : 'JD 비교 요청을 완료하지 못했습니다',
           message: outcome.message,
           code: outcome.code,
         })

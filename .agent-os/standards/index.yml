@@ -46,3 +46,6 @@ documents:
     - scripts/google-test.sh
 active_specs:
   - .agent-os/specs/2026-05-21-0943-ai-resume-diagnoser
+  - .agent-os/specs/2026-05-23-0900-jd-intake-mvp
+  - .agent-os/specs/2026-05-23-1300-local-ai-resume-analysis-mvp
+  - .agent-os/specs/2026-05-23-1500-local-ai-jd-match-mvp

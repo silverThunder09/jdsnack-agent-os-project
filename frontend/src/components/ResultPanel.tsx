@@ -83,6 +83,11 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
                 </ul>
               </section>
             </div>
+
+            <section className="analysis-source-card" aria-label="분석 기준 이력서 본문">
+              <h3>분석 기준 본문</h3>
+              <p>{result.diagnosis.sourceText}</p>
+            </section>
           </div>
         ) : null}
 
