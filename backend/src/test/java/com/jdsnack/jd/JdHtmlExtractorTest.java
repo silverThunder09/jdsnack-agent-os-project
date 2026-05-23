@@ -68,7 +68,7 @@ class JdHtmlExtractorTest {
     }
 
     @Test
-    void extractsCleanContentFromStaticCareerFixture() throws IOException {
+    void stripsPromotionalLeadFromStaticCareerFixture() throws IOException {
         String html = fixture("jd/fixtures/telktia-careers-backend-engineer.html");
 
         JdFetchResponse response = extractor.extract(html, "https://www.telktia.com/careers/backend-engineer");
@@ -76,6 +76,52 @@ class JdHtmlExtractorTest {
         assertEquals("Backend Engineer | Telktia Careers", response.title());
         assertEquals(
                 "플랫폼 백엔드 API를 설계하고 운영합니다. Spring Boot와 MySQL 기반 서비스 개발 경험이 필요합니다. 테스트 자동화와 배포 파이프라인 개선 경험을 우대합니다. 장애를 빠르게 분석하고 재발 방지까지 연결할 수 있어야 합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
+    void trimsUnknownEnglishPromotionalLeadBeforeKoreanJdContent() {
+        String html = """
+                <html>
+                  <head><title>Backend Engineer | Example Careers</title></head>
+                  <body>
+                    <section class="job-description">
+                      <p>Build a meaningful future with a product-led team shaping the next generation of workflow tools.</p>
+                      <p>백엔드 API를 설계하고 운영합니다.</p>
+                      <p>Spring Boot와 데이터베이스 운영 경험이 필요합니다.</p>
+                    </section>
+                  </body>
+                </html>
+                """;
+
+        JdFetchResponse response = extractor.extract(html, "https://example.com/careers/backend-engineer");
+
+        assertEquals(
+                "백엔드 API를 설계하고 운영합니다. Spring Boot와 데이터베이스 운영 경험이 필요합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
+    void trimsDiscountPromotionalLeadBeforeJdContent() {
+        String html = """
+                <html>
+                  <head><title>Backend Engineer | Example Careers</title></head>
+                  <body>
+                    <section class="job-description">
+                      <p>We are currently offering a 20% discount to customers who upgrade this month.</p>
+                      <p>백엔드 서비스 API를 설계하고 운영합니다.</p>
+                      <p>Spring Boot와 MySQL 운영 경험이 필요합니다.</p>
+                    </section>
+                  </body>
+                </html>
+                """;
+
+        JdFetchResponse response = extractor.extract(html, "https://example.com/careers/backend-engineer");
+
+        assertEquals(
+                "백엔드 서비스 API를 설계하고 운영합니다. Spring Boot와 MySQL 운영 경험이 필요합니다.",
                 response.jdText()
         );
     }
