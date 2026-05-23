@@ -34,6 +34,7 @@ documents:
     - .agent-os/operations/merge-rules.md
     - .agent-os/operations/work-start-checkpoint.md
     - .agent-os/operations/browser-smoke-checks.md
+    - .agent-os/operations/gemini-local-test-policy.md
   automation:
     - .github/workflows/docs-harness.yml
     - .github/workflows/backend-ci.yml
@@ -42,5 +43,6 @@ documents:
     - .github/ISSUE_TEMPLATE/pr-failure.yml
     - scripts/pr-review-gate.sh
     - scripts/smoke-test.sh
+    - scripts/google-test.sh
 active_specs:
   - .agent-os/specs/2026-05-21-0943-ai-resume-diagnoser

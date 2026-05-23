@@ -96,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          legacy_pattern='gemini-api-key|API Key 설정|API Key 입력|GEMINI_API_KEY|GeminiService|AI_SERVICE_ERROR|INVALID_API_KEY|tests\.md|testing\.md|jdsnack-agent-os-main\.zip'
+          legacy_pattern='gemini-api-key|API Key 설정|API Key 입력|GeminiService|AI_SERVICE_ERROR|INVALID_API_KEY|tests\.md|testing\.md|jdsnack-agent-os-main\.zip'
 
           if grep -R -n -E "$legacy_pattern" AGENTS.md agent.md README.md config.yml .agent-os docs backend frontend; then
             echo "Legacy MVP reference found. Keep phase 1 no-key docs clean."

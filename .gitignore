@@ -25,6 +25,9 @@ pids
 *.pid
 *.seed
 *.pid.lock
+.env
+.env.*
+!.env.example
 
 # Dependencies
 node_modules/
