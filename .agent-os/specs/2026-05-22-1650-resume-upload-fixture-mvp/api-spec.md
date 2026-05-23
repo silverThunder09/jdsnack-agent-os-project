@@ -41,8 +41,9 @@
 ### 3.1 개요
 
 - 기존 1차 MVP의 텍스트 입력 API를 유지한다.
-- 기본 운영 모드는 `stub`다.
-- 운영 모드가 fixture일 때는 `501 AI_ANALYSIS_NOT_ENABLED` 대신 fixture 결과를 반환한다.
+- 백엔드 애플리케이션 기본 모드는 `stub`다.
+- `compose.yaml` 기반 로컬 통합 실행은 `fixture` 모드로 올려 실제 결과 화면을 검증한다.
+- `googleTest`는 별도 Gradle task로만 실행하며 기본 API 런타임 모드에는 포함하지 않는다.
 
 ### 3.2 Request
 
@@ -51,6 +52,13 @@
   "resumeText": "string"
 }
 ```
+
+### 3.4 운영 모드별 응답
+
+| 모드 | 유효한 텍스트 입력 결과 |
+|---|---|
+| `stub` | `501 AI_ANALYSIS_NOT_ENABLED` |
+| `fixture` | `200 OK` fixture 결과 |
 
 ### 3.3 Response — fixture 성공
 
@@ -99,6 +107,15 @@ Form fields:
 - 지원하지 않는 형식: `400 UNSUPPORTED_FILE_TYPE`
 - 텍스트 추출 실패: `400 FILE_TEXT_EXTRACTION_FAILED`
 - fixture 매핑 없음: `404 FIXTURE_NOT_FOUND`
+- 추출 뒤 텍스트가 50자 미만이면 `400 TEXT_TOO_SHORT`
+- 추출 뒤 텍스트가 10,000자 초과면 `400 TEXT_TOO_LONG`
+
+### 4.5 운영 모드별 응답
+
+| 모드 | 유효한 업로드 입력 결과 |
+|---|---|
+| `stub` | 추출과 길이 검증 후 `501 AI_ANALYSIS_NOT_ENABLED` |
+| `fixture` | 추출과 길이 검증 후 `200 OK` fixture 결과 |
 
 ## 5. fixture 결과 구조
 
@@ -112,7 +129,7 @@ Form fields:
 ```
 
 - 최소 응답 구조만 유지하고, 내부 fixture 저장 구조는 [fixture-data-model.md](fixture-data-model.md)에 정의한다.
-- 구현 시 입력 매핑과 분석 결과 본문은 분리 저장한다.
+- 현재 구현은 입력 매핑과 분석 결과 본문을 H2에서 분리 저장한다.
 
 ## 6. 구현 메모
 
@@ -120,3 +137,4 @@ Form fields:
 - 파일 업로드 API는 `multipart/form-data`를 사용한다.
 - PDF/DOCX 텍스트 추출은 별도 `ResumeExtractionService` 계층에서 처리한다.
 - fixture 저장소는 H2 테스트 DB와 `JdbcTemplate` 기반 조회로 구현한다.
+- fixture 매핑 조회는 입력 타입별 `TEXT_HASH` 기준으로 수행한다.

@@ -2,7 +2,7 @@
 
 JDSnack은 개발자 이력서와 JD를 AI로 분석해 개선 피드백과 매칭 인사이트를 제공하는 것을 목표로 하는 웹 서비스 프로젝트입니다.
 
-1차 MVP는 사용자 인증 키 입력도, 서버 Gemini 연동도 없는 no-key 서비스 뼈대입니다. 먼저 이력서 입력, 입력 검증, 준비중 안내, 백엔드/프론트 기본 구조를 완성하고, 실제 AI/JD 분석은 2차 MVP 이후에 붙입니다.
+현재 구현은 두 단계로 나뉩니다. 1차 MVP는 사용자 인증 키 입력도, 서버 Gemini 연동도 없는 no-key 서비스 뼈대이고, 1.5차 MVP는 외부 AI 대신 fixture 분석 결과로 텍스트 입력과 PDF/DOCX 업로드 흐름을 검증하는 단계입니다.
 
 이 저장소는 서비스 코드와 문서 하네스를 함께 관리합니다. 쉽게 말하면, `backend/`와 `frontend/`가 실제 제품을 만들고, `.agent-os/`와 `docs/`가 그 제품을 어떻게 만들지 정해주는 설계도 역할을 합니다.
 
@@ -36,8 +36,9 @@ jdsnack-agent-os/
 - 제품 목적: `.agent-os/product/mission.md`
 - 로드맵: `.agent-os/product/roadmap.md`
 - 기술 스택: `.agent-os/product/tech-stack.md`
-- 현재 활성 기능: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/`
-- API 상세 문서: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md`
+- 1차 MVP 기본 계약: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/`
+- 1.5차 MVP 업로드 + fixture 확장: `.agent-os/specs/2026-05-22-1650-resume-upload-fixture-mvp/`
+- API 상세 문서: `.agent-os/specs/2026-05-22-1650-resume-upload-fixture-mvp/api-spec.md`
 - ERD 상세 문서: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/erd.md`
 - 아키텍처 상세 문서: `docs/architecture/`
 - CI 기준 문서: `.agent-os/operations/ci-checklist.md`
@@ -57,6 +58,16 @@ jdsnack-agent-os/
 - `POST /api/diagnose`
 - Spring Boot 백엔드와 React 프론트엔드 기반 서비스 구성
 
+## 1.5차 MVP 구현 범위
+
+- 텍스트 입력 fixture 분석
+- PDF 업로드 후 텍스트 추출 + fixture 분석
+- DOCX 업로드 후 텍스트 추출 + fixture 분석
+- `POST /api/diagnose/file`
+- H2 fixture 매핑 조회
+- 점수, 요약, 강점, 개선 포인트 결과 카드 렌더링
+- `googleTest` 로컬 실호출 검증 경로 분리
+
 1차 MVP에서 하지 않는 것:
 
 - 사용자 인증 키 입력 UI
@@ -74,10 +85,10 @@ jdsnack-agent-os/
 
 ## 다음 구현 우선순위
 
-1. 프론트엔드와 백엔드 정적 자산 통합
-2. 브라우저 스모크 테스트 자동화
-3. `docker compose` 흐름을 CI나 문서 하네스와 더 촘촘하게 연결
-4. 2차 MVP에서 서버 기반 AI 분석 연동
+1. JD 입력과 JD 비교 분석 흐름 설계
+2. 2차 MVP에서 서버 기반 AI 분석 계약과 보안 정책 확정
+3. 브라우저 기반 업로드 스모크 자동화
+4. 분리 컨테이너 운영용 reverse proxy / ingress 설정 문서화
 
 ## 로컬 통합 실행
 
