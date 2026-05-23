@@ -7,7 +7,7 @@
 
 - fixture는 분석을 생성하지 않고, 준비된 결과를 반환만 한다.
 - 입력 원문과 분석 결과는 분리 저장한다.
-- 1.5차 MVP에서는 영구 운영 DB보다 정적 JSON 또는 H2 같은 경량 저장소를 우선한다.
+- 1.5차 MVP에서는 영구 운영 DB보다 H2 같은 경량 저장소를 우선한다.
 - 2차 MVP에서 실제 AI 분석기로 교체할 수 있도록 `DiagnosisProvider` 경계를 유지한다.
 
 ## 2. 데이터 계층
@@ -28,8 +28,8 @@ fixture 데이터는 두 계층으로 나눈다.
 |---|---|---|---|
 | `mappingId` | string | 예 | 매핑 식별자 |
 | `inputType` | string | 예 | `TEXT`, `PDF`, `DOCX` |
-| `matchType` | string | 예 | `TEXT_HASH`, `FILE_NAME`, `FIXTURE_KEY` |
-| `matchValue` | string | 예 | 텍스트 해시 또는 파일명 등 비교값 |
+| `matchType` | string | 예 | 현재 구현은 `TEXT_HASH`만 사용 |
+| `matchValue` | string | 예 | 정규화된 텍스트의 SHA-256 해시 |
 | `fixtureKey` | string | 예 | 연결할 분석 결과 키 |
 | `title` | string | 아니오 | 샘플 이름 |
 | `createdAt` | string | 예 | ISO-8601 시각 |
@@ -37,9 +37,9 @@ fixture 데이터는 두 계층으로 나눈다.
 
 ### 3.2 매칭 규칙
 
-- 텍스트 입력은 기본적으로 `TEXT_HASH`를 사용한다.
-- 파일 업로드는 초기에는 `FILE_NAME` 또는 추출 텍스트의 `TEXT_HASH`를 사용한다.
-- 운영 안정성을 위해 1.5차 MVP 초반에는 파일명 기반 샘플 매핑도 허용한다.
+- 텍스트 입력은 `TEXT_HASH`를 사용한다.
+- PDF/DOCX 업로드도 추출 텍스트의 `TEXT_HASH`를 사용한다.
+- 입력 타입은 `TEXT`, `PDF`, `DOCX`로 구분해 같은 해시라도 요청 경로별 매핑을 유지한다.
 - 같은 입력이 여러 결과에 매핑되면 안 된다.
 
 ## 4. 분석 결과 구조
@@ -128,24 +128,16 @@ fixture 데이터는 두 계층으로 나눈다.
 
 ## 6. 저장 위치 권장안
 
-### 6.1 1순위: 정적 fixture 파일
+### 6.1 현재 구현: H2 테스트 DB
 
-- `backend/src/main/resources/fixtures/resume-mappings.json`
-- `backend/src/main/resources/fixtures/analysis-results.json`
-
-장점:
-- 구현이 가장 빠르다.
-- 리뷰와 테스트가 쉽다.
-
-### 6.2 2순위: H2 테스트 DB
-
-테이블 예시:
+테이블:
 
 - `resume_fixture_mapping`
 - `fixture_analysis`
 
-장점:
-- 조회 조건과 예외 처리를 DB처럼 검증할 수 있다.
+이유:
+- 조회 조건과 예외 처리를 실제 런타임처럼 검증할 수 있다.
+- `TEXT_HASH`와 입력 타입 조합을 SQL로 명확하게 확인할 수 있다.
 
 ## 7. 조회 규칙
 
@@ -167,5 +159,5 @@ fixture 데이터는 두 계층으로 나눈다.
 ## 9. 구현 메모
 
 - Java DTO는 `ResumeFixtureMapping`, `FixtureAnalysis`, `DiagnosisResultResponse`로 나눈다.
-- Repository는 처음에는 JSON 로더 기반으로 시작하고, 나중에 H2/JPA로 교체한다.
-- 파일명 매핑은 빠른 시연용이고, 장기적으로는 `TEXT_HASH` 중심으로 통일한다.
+- Repository는 `JdbcTemplate` 기반 H2 조회를 사용한다.
+- 파일명 매핑은 사용하지 않고 `TEXT_HASH` 기준으로 통일한다.
