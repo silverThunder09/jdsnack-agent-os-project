@@ -159,6 +159,89 @@ describe('App', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
 
+  it('지원하지 않는 파일 형식 오류를 화면에 보여준다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      json: async () => ({
+        success: false,
+        error: {
+          code: 'UNSUPPORTED_FILE_TYPE',
+          message: 'PDF 또는 DOCX 파일만 업로드할 수 있습니다.',
+        },
+        timestamp: '2026-05-23T10:00:00.000+09:00',
+      }),
+    } as Response)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: 'PDF' }))
+    const input = screen.getByLabelText('PDF 이력서 파일')
+    const file = new File(['dummy txt'], 'resume.pdf', {
+      type: 'application/pdf',
+    })
+
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '진단 요청' }))
+
+    expect(await screen.findByText('파일 확인이 필요합니다')).toBeInTheDocument()
+    expect(
+      screen.getByText('PDF 또는 DOCX 파일만 업로드할 수 있습니다.'),
+    ).toBeInTheDocument()
+  })
+
+  it('JD 링크 형식 오류는 클라이언트에서 바로 막는다', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
+    await user.type(screen.getByLabelText('JD 내용'), 'a'.repeat(80))
+    await user.type(screen.getByLabelText('JD 링크 (선택)'), 'not-a-url')
+    await user.click(screen.getByRole('button', { name: 'JD 비교 준비 요청' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '올바른 JD 링크 형식을 입력해주세요.',
+    )
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+  })
+
+  it('JD 비교 준비 요청은 준비중 안내를 보여준다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      json: async () => ({
+        success: false,
+        error: {
+          code: 'JD_MATCH_PREVIEW_NOT_ENABLED',
+          message:
+            'JD 비교 분석 기능은 준비 중입니다. 현재는 JD 입력 검증만 가능합니다.',
+        },
+        timestamp: '2026-05-23T10:00:00.000+09:00',
+      }),
+    } as Response)
+
+    render(<App />)
+
+    await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
+    await user.type(screen.getByLabelText('JD 내용'), 'b'.repeat(100))
+    await user.type(
+      screen.getByLabelText('JD 링크 (선택)'),
+      'https://example.com/jobs/backend',
+    )
+    await user.click(screen.getByRole('button', { name: 'JD 비교 준비 요청' }))
+
+    expect(
+      await screen.findByText(
+        'JD 비교 분석 기능은 준비 중입니다. 현재는 JD 입력 검증만 가능합니다.',
+      ),
+    ).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/match/preview'),
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    )
+  })
+
   it('저장된 이력서를 다시 불러온다', () => {
     window.localStorage.setItem('jdsnack.resume-text', validResumeText)
 

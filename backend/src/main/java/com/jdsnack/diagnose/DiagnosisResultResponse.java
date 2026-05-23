@@ -6,6 +6,7 @@ public record DiagnosisResultResponse(
         int score,
         String summary,
         List<String> strengths,
-        List<String> improvements
+        List<String> improvements,
+        String sourceText
 ) {
 }

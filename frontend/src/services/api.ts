@@ -4,6 +4,7 @@ import type {
   DiagnoseOutcome,
   DiagnoseRequest,
   DiagnosisResult,
+  MatchPreviewRequest,
 } from '../types/diagnosis'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -21,10 +22,15 @@ const KNOWN_ERROR_CODES: ApiErrorCode[] = [
   'EMPTY_RESUME',
   'TEXT_TOO_SHORT',
   'TEXT_TOO_LONG',
+  'EMPTY_JD',
+  'JD_TEXT_TOO_SHORT',
+  'JD_TEXT_TOO_LONG',
+  'INVALID_JD_URL',
   'UNSUPPORTED_FILE_TYPE',
   'FILE_TEXT_EXTRACTION_FAILED',
   'FIXTURE_NOT_FOUND',
   'AI_ANALYSIS_NOT_ENABLED',
+  'JD_MATCH_PREVIEW_NOT_ENABLED',
   'INTERNAL_ERROR',
 ]
 
@@ -128,4 +134,55 @@ export async function diagnoseResumeFile(file: File): Promise<DiagnoseOutcome> {
   }
 
   throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+}
+
+export async function previewMatch(
+  request: MatchPreviewRequest,
+): Promise<DiagnoseOutcome> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/match/preview`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<null>(response)
+  if (!payload?.error || !KNOWN_ERROR_CODES.includes(payload.error.code)) {
+    throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+  }
+
+  if (payload.error.code === 'JD_MATCH_PREVIEW_NOT_ENABLED') {
+    return {
+      kind: 'not-enabled',
+      code: payload.error.code,
+      message: payload.error.message,
+    }
+  }
+
+  if (
+    payload.error.code === 'EMPTY_JD' ||
+    payload.error.code === 'JD_TEXT_TOO_SHORT' ||
+    payload.error.code === 'JD_TEXT_TOO_LONG' ||
+    payload.error.code === 'INVALID_JD_URL'
+  ) {
+    return {
+      kind: 'validation-error',
+      code: payload.error.code,
+      message: payload.error.message,
+    }
+  }
+
+  return {
+    kind: 'error',
+    code: payload.error.code,
+    message: payload.error.message,
+  }
 }
