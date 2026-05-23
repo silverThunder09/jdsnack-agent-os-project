@@ -224,8 +224,8 @@ function App() {
             <div className="action-row">
               <p className="action-hint">
                 {inputMode === 'text'
-                  ? '입력값은 브라우저에만 임시 저장되고, API Key 같은 인증 정보는 받지 않습니다.'
-                  : '업로드 파일은 분석 요청에만 사용되고, 사용자 인증 키 입력은 받지 않습니다.'}
+                  ? '입력값은 브라우저에만 임시 저장되고, 사용자 비밀키 입력은 받지 않습니다.'
+                  : '업로드 파일은 분석 요청에만 사용되고, 사용자 비밀키 입력은 받지 않습니다.'}
               </p>
               <DiagnoseButton isSubmitting={isSubmitting} />
             </div>
