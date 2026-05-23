@@ -6,14 +6,14 @@ const idleState: ResultState = {
   status: 'idle',
   title: '입력 대기 상태입니다',
   message:
-    '이력서를 붙여넣고 진단 요청을 누르면 입력 검증 결과와 1차 MVP 준비 상태를 확인할 수 있습니다.',
+    '이력서를 붙여넣고 진단 요청을 누르면 입력 검증 뒤 분석 결과를 확인할 수 있습니다.',
 }
 
 const loadingState: ResultState = {
   status: 'loading',
   title: '요청을 확인하고 있습니다',
   message:
-    '입력 길이와 요청 형식을 검증하고 있습니다. fixture 모드에서는 준비된 분석 결과를 바로 보여줍니다.',
+    '입력 길이와 요청 형식을 검증하고 있습니다. 모드에 따라 stub, fixture, ai-local 결과를 반환합니다.',
 }
 
 const validationMessages = {
@@ -103,6 +103,20 @@ export function useDiagnose() {
       setResult({
         status: 'error',
         title: '파일 확인이 필요합니다',
+        message: outcome.message,
+        code: outcome.code,
+      })
+      return
+    }
+
+    if (
+      outcome.code === 'GEMINI_API_KEY_MISSING' ||
+      outcome.code === 'GEMINI_API_REQUEST_FAILED' ||
+      outcome.code === 'GEMINI_API_RESPONSE_INVALID'
+    ) {
+      setResult({
+        status: 'error',
+        title: '로컬 AI 분석을 완료하지 못했습니다',
         message: outcome.message,
         code: outcome.code,
       })

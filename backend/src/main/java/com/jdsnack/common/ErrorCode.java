@@ -39,6 +39,18 @@ public enum ErrorCode {
             HttpStatus.BAD_REQUEST,
             "파일에서 텍스트를 추출하지 못했습니다. 다른 파일로 다시 시도해주세요."
     ),
+    GEMINI_API_KEY_MISSING(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "로컬 AI 분석 설정이 비어 있습니다. GEMINI_API_KEY를 확인해주세요."
+    ),
+    GEMINI_API_REQUEST_FAILED(
+            HttpStatus.BAD_GATEWAY,
+            "Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요."
+    ),
+    GEMINI_API_RESPONSE_INVALID(
+            HttpStatus.BAD_GATEWAY,
+            "Gemini AI 응답 형식을 해석하지 못했습니다. 다시 시도해주세요."
+    ),
     AI_ANALYSIS_NOT_ENABLED(
             HttpStatus.NOT_IMPLEMENTED,
             "AI 분석 기능은 준비 중입니다. 현재는 이력서 입력 검증만 가능합니다."

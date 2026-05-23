@@ -2,7 +2,7 @@
 
 JDSnack은 개발자 이력서와 JD를 AI로 분석해 개선 피드백과 매칭 인사이트를 제공하는 것을 목표로 하는 웹 서비스 프로젝트입니다.
 
-현재 구현은 두 단계로 나뉩니다. 1차 MVP는 사용자 인증 키 입력도, 서버 Gemini 연동도 없는 no-key 서비스 뼈대이고, 1.5차 MVP는 외부 AI 대신 fixture 분석 결과로 텍스트 입력과 PDF/DOCX 업로드 흐름을 검증하는 단계입니다.
+현재 구현은 세 단계로 나뉩니다. 1차 MVP는 no-key 서비스 뼈대, 1.5차 MVP는 fixture 기반 업로드 분석, 2차 MVP는 로컬 전용 `ai-local` Gemini 이력서 분석 단계입니다.
 
 이 저장소는 서비스 코드와 문서 하네스를 함께 관리합니다. 쉽게 말하면, `backend/`와 `frontend/`가 실제 제품을 만들고, `.agent-os/`와 `docs/`가 그 제품을 어떻게 만들지 정해주는 설계도 역할을 합니다.
 
@@ -39,6 +39,7 @@ jdsnack-agent-os/
 - 1차 MVP 기본 계약: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/`
 - 1.5차 MVP 업로드 + fixture 확장: `.agent-os/specs/2026-05-22-1650-resume-upload-fixture-mvp/`
 - 다음 설계 단계: `.agent-os/specs/2026-05-23-0900-jd-intake-mvp/`
+- 2차 MVP AI 이력서 분석: `.agent-os/specs/2026-05-23-1300-local-ai-resume-analysis-mvp/`
 - API 상세 문서: `.agent-os/specs/2026-05-22-1650-resume-upload-fixture-mvp/api-spec.md`
 - ERD 상세 문서: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/erd.md`
 - 아키텍처 상세 문서: `docs/architecture/`
@@ -69,6 +70,14 @@ jdsnack-agent-os/
 - 점수, 요약, 강점, 개선 포인트 결과 카드 렌더링
 - `googleTest` 로컬 실호출 검증 경로 분리
 
+## 2차 MVP 구현 범위
+
+- `ai-local` 모드 기반 실제 Gemini 이력서 분석
+- 텍스트 입력 AI 분석
+- PDF/DOCX 업로드 AI 분석
+- 점수, 요약, 강점, 개선 포인트 AI 결과 카드
+- 구조화된 JSON 응답 파싱
+
 1차 MVP에서 하지 않는 것:
 
 - 사용자 인증 키 입력 UI
@@ -86,10 +95,10 @@ jdsnack-agent-os/
 
 ## 다음 구현 우선순위
 
-1. JD 입력 MVP 문서 기준으로 API/UI 구현
-2. 2차 MVP에서 서버 기반 AI 분석 계약과 보안 정책 확정
-3. 브라우저 기반 업로드 스모크 자동화
-4. 분리 컨테이너 운영용 reverse proxy / ingress 설정 문서화
+1. JD AI 매칭 계약 설계
+2. 브라우저 기반 업로드 스모크 자동화
+3. 분리 컨테이너 운영용 reverse proxy / ingress 설정 문서화
+4. 운영 배포용 Gemini 보안/재시도 정책 확장
 
 ## 로컬 통합 실행
 

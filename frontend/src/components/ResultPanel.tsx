@@ -53,7 +53,7 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
         {result.status === 'success' && result.diagnosis ? (
           <div className="analysis-result">
             <StatusMessage
-              badge="Fixture Result"
+              badge="Analysis Result"
               title={result.title}
               message={result.message}
               tone="success"
@@ -98,7 +98,7 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
         <div className="result-meta">
           <div className="result-meta-card">
             <span>응답 모드</span>
-            <strong>Fixture 결과 또는 501 준비중</strong>
+            <strong>Stub / Fixture / AI Local</strong>
           </div>
           <div className="result-meta-card">
             <span>클라이언트 검증 기준</span>
