@@ -19,12 +19,16 @@ class MatchPreviewControllerTest {
     private MockMvc mockMvc;
 
     @Test
-    void validPreviewRequestReturnsNotEnabled() throws Exception {
+    void validPreviewRequestReturnsPreviewResult() throws Exception {
         mockMvc.perform(post("/api/match/preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest()))
-                .andExpect(status().isNotImplemented())
-                .andExpect(jsonPath("$.error.code").value("JD_MATCH_PREVIEW_NOT_ENABLED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.matchingScore").isNumber())
+                .andExpect(jsonPath("$.data.summary").isString())
+                .andExpect(jsonPath("$.data.strengths").isArray())
+                .andExpect(jsonPath("$.data.gaps").isArray())
+                .andExpect(jsonPath("$.data.suggestions").isArray());
     }
 
     @Test
@@ -86,11 +90,11 @@ class MatchPreviewControllerTest {
                 {
                   "resumeSource": {
                     "type": "TEXT",
-                    "value": "%s"
+                    "value": "Spring Boot API 개발과 테스트 자동화 경험이 있으며 배포 운영도 다뤘습니다."
                   },
-                  "jdText": "%s",
+                  "jdText": "Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구합니다.",
                   "jdUrl": "https://example.com/jobs/backend"
                 }
-                """.formatted("a".repeat(120), "b".repeat(120));
+                """;
     }
 }

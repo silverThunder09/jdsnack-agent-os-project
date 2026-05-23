@@ -4,7 +4,9 @@ import type {
   DiagnoseOutcome,
   DiagnoseRequest,
   DiagnosisResult,
+  MatchPreviewOutcome,
   MatchPreviewRequest,
+  MatchPreviewResult,
 } from '../types/diagnosis'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -138,7 +140,7 @@ export async function diagnoseResumeFile(file: File): Promise<DiagnoseOutcome> {
 
 export async function previewMatch(
   request: MatchPreviewRequest,
-): Promise<DiagnoseOutcome> {
+): Promise<MatchPreviewOutcome> {
   let response: Response
 
   try {
@@ -154,17 +156,17 @@ export async function previewMatch(
     throw new NetworkError()
   }
 
-  const payload = await parseJson<null>(response)
-  if (!payload?.error || !KNOWN_ERROR_CODES.includes(payload.error.code)) {
-    throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+  const payload = await parseJson<MatchPreviewResult>(response)
+
+  if (payload?.success && payload.data) {
+    return {
+      kind: 'success',
+      result: payload.data,
+    }
   }
 
-  if (payload.error.code === 'JD_MATCH_PREVIEW_NOT_ENABLED') {
-    return {
-      kind: 'not-enabled',
-      code: payload.error.code,
-      message: payload.error.message,
-    }
+  if (!payload?.error || !KNOWN_ERROR_CODES.includes(payload.error.code)) {
+    throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
   }
 
   if (

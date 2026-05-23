@@ -46,20 +46,20 @@
 - 기대 결과:
   - 흐름이 정상 진행된다
 
-## `TC-06` 비교 API 요청 계약 확인
+## `TC-06` 비교 API 요청/응답 계약 확인
 
 - 대응 AC: `AC-05`, `AC-06`
 - 절차:
-  - `POST /api/match/preview` 문서 초안을 확인한다
+  - `POST /api/match/preview` 문서를 확인한다
 - 기대 결과:
   - `resumeSource`, `jdText`, `jdUrl` 요청 구조가 존재한다
-  - 응답은 예약 필드만 정의되고 실제 계산 결과는 포함하지 않는다
+  - 응답에 `matchingScore`, `summary`, `strengths`, `gaps`, `suggestions`가 정의되어 있다
 
-## `TC-07` 유효한 JD 비교 준비 요청
+## `TC-07` 유효한 JD 비교 미리보기 요청
 
 - 대응 AC: `AC-05`, `AC-06`, `AC-07`
 - 절차:
   - 유효한 이력서 소스와 JD 텍스트를 함께 보낸다
 - 기대 결과:
   - 요청 형식 검증은 통과한다
-  - 현재 단계에서는 `JD_MATCH_PREVIEW_NOT_ENABLED` 준비중 응답이 반환된다
+  - `matchingScore`, `summary`, `strengths`, `gaps`, `suggestions`가 포함된 응답이 반환된다
