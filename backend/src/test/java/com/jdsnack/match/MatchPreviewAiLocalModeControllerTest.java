@@ -73,6 +73,18 @@ class MatchPreviewAiLocalModeControllerTest {
                 .andExpect(jsonPath("$.error.code").value("GEMINI_API_RESPONSE_INVALID"));
     }
 
+    @Test
+    void geminiRequestFailureReturnsBadGateway() throws Exception {
+        given(geminiMatchPreviewProvider.preview(any()))
+                .willThrow(new GeminiApiException(ErrorCode.GEMINI_API_REQUEST_FAILED));
+
+        mockMvc.perform(post("/api/match/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRequest()))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("GEMINI_API_REQUEST_FAILED"));
+    }
+
     private String validRequest() {
         return """
                 {
