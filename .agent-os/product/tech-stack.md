@@ -8,7 +8,7 @@
   - 안정적이고 확장성 높은 엔터프라이즈급 API 서비스 구축.
   - **Spring Web**: RESTful API 엔드포인트 구현 및 클라이언트 통신 담당.
   - **입력 검증 API**: 이력서 텍스트 검증과 준비중 응답 반환.
-  - **Static Resource Serving**: 빌드된 프론트엔드 자산을 `src/main/resources/static/` 폴더에 패키징하여 단일 JAR 파일 배포 형태 구축 (AWS 배포 단순화).
+  - **API 전용 서비스**: 프론트 정적 자산 서빙과 분리된 API 컨테이너 역할을 담당.
 
 ## 프론트엔드 (Frontend - 추천 스택)
 
@@ -19,7 +19,8 @@
 ## 인프라 및 배포 (Infrastructure & Deployment)
 
 - **AWS (Amazon Web Services)**:
-  - **배포 아키텍처**: Spring Boot가 내장 톰캣을 통해 React 정적 자산까지 서빙하는 단일 패키지(JAR) 형태를 구성하여, AWS **EC2** 또는 **Elastic Beanstalk**에 단일 애플리케이션 파일 업로드만으로 즉시 배포가 가능하게 설계합니다.
+  - **배포 아키텍처**: `frontend`, `backend` 분리 컨테이너를 기본 배포 단위로 두고, AWS **EC2**, **ECS**, 또는 유사한 컨테이너 실행 환경에서 reverse proxy / ingress 뒤에 배치합니다.
+  - **로컬/CI 기준**: `compose.yaml`로 프론트와 백엔드를 함께 올려 운영 전 통합 검증을 수행합니다.
 
 ## 2차 MVP 확장 기술
 
