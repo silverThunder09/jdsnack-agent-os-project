@@ -8,6 +8,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,6 +45,35 @@ public class JdHtmlExtractor {
             "nav", "menu", "banner", "breadcrumb", "popup", "modal", "login", "signup",
             "추천", "관련", "공유", "메뉴", "배너", "댓글", "푸터", "헤더"
     );
+    private static final List<String> NOISE_SELECTORS = List.of(
+            "[hidden]",
+            "[aria-hidden=true]",
+            "[role=dialog]",
+            "[role=alert]",
+            "[role=navigation]",
+            "[class*=sticky]",
+            "[class*=share]",
+            "[class*=social]",
+            "[class*=recommend]",
+            "[class*=related]",
+            "[class*=sidebar]",
+            "[class*=toolbar]",
+            "[class*=cta]",
+            "[class*=apply]",
+            "[class*=benefit]",
+            "[class*=location]",
+            "[class*=job-meta]",
+            "[class*=newsletter]",
+            "[class*=footer]",
+            "[class*=header]",
+            "[id*=share]",
+            "[id*=social]",
+            "[id*=recommend]",
+            "[id*=related]",
+            "[id*=sidebar]",
+            "[id*=cta]",
+            "[id*=apply]"
+    );
 
     public JdFetchResponse extract(String html, String sourceUrl) {
         Document document = Jsoup.parse(html, sourceUrl);
@@ -55,7 +85,7 @@ public class JdHtmlExtractor {
         }
 
         String title = extractTitle(document);
-        String jdText = trimDuplicatedTitlePrefix(normalize(candidate.text()), title);
+        String jdText = trimDuplicatedTitlePrefix(extractCandidateText(candidate, title), title);
         if (jdText.length() < MIN_CONTENT_LENGTH) {
             throw new ApiException(ErrorCode.JD_FETCH_EMPTY_CONTENT);
         }
@@ -70,6 +100,9 @@ public class JdHtmlExtractor {
 
     private void sanitize(Document document) {
         document.select("script, style, noscript, nav, footer, header, form, button, svg, aside").remove();
+        for (String selector : NOISE_SELECTORS) {
+            document.select(selector).remove();
+        }
         document.select("[class], [id]").removeIf(this::isNoiseContainer);
     }
 
@@ -161,6 +194,62 @@ public class JdHtmlExtractor {
                 return true;
             }
         }
+        return false;
+    }
+
+    private String extractCandidateText(Element candidate, String title) {
+        Element sanitizedCandidate = candidate.clone();
+        removeNestedNoise(sanitizedCandidate);
+        removeDuplicatedHeadings(sanitizedCandidate, title);
+
+        List<String> parts = new ArrayList<>();
+        for (Element block : sanitizedCandidate.select("p, li")) {
+            String text = normalize(block.text());
+            if (text.isBlank() || isLikelyNoiseText(text)) {
+                continue;
+            }
+            parts.add(text);
+        }
+
+        if (!parts.isEmpty()) {
+            return normalize(String.join(" ", parts));
+        }
+
+        return normalize(sanitizedCandidate.text());
+    }
+
+    private void removeNestedNoise(Element candidate) {
+        for (String selector : NOISE_SELECTORS) {
+            candidate.select(selector).remove();
+        }
+        candidate.select("[class], [id]").removeIf(this::isNoiseContainer);
+    }
+
+    private void removeDuplicatedHeadings(Element candidate, String title) {
+        if (title.isBlank()) {
+            return;
+        }
+
+        candidate.select("h1, h2").removeIf(element -> normalize(element.text()).equalsIgnoreCase(title));
+    }
+
+    private boolean isLikelyNoiseText(String text) {
+        String normalized = text.toLowerCase(Locale.ROOT);
+        if (normalized.length() <= 4) {
+            return true;
+        }
+
+        int separatorCount = normalized.split("[|·/]").length - 1;
+        if (separatorCount >= 3 && normalized.length() < 80) {
+            return true;
+        }
+
+        for (String hint : NOISE_HINTS) {
+            if (normalized.contains(hint) && normalized.length() < 120) {
+                return true;
+            }
+        }
+
         return false;
     }
 

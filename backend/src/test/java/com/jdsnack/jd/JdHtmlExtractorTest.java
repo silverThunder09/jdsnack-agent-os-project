@@ -3,6 +3,10 @@ package com.jdsnack.jd;
 import com.jdsnack.common.ApiException;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -64,6 +68,32 @@ class JdHtmlExtractorTest {
     }
 
     @Test
+    void extractsCleanContentFromStaticCareerFixture() throws IOException {
+        String html = fixture("jd/fixtures/telktia-careers-backend-engineer.html");
+
+        JdFetchResponse response = extractor.extract(html, "https://www.telktia.com/careers/backend-engineer");
+
+        assertEquals("Backend Engineer | Telktia Careers", response.title());
+        assertEquals(
+                "플랫폼 백엔드 API를 설계하고 운영합니다. Spring Boot와 MySQL 기반 서비스 개발 경험이 필요합니다. 테스트 자동화와 배포 파이프라인 개선 경험을 우대합니다. 장애를 빠르게 분석하고 재발 방지까지 연결할 수 있어야 합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
+    void removesStickyApplyAndShareNoiseFromRealisticCareerFixture() throws IOException {
+        String html = fixture("jd/fixtures/productive-careers-backend-engineer.html");
+
+        JdFetchResponse response = extractor.extract(html, "https://productive.io/careers/backend-engineer/");
+
+        assertEquals("Senior Backend Engineer - Productive", response.title());
+        assertEquals(
+                "분산 환경에서 안정적인 백엔드 서비스를 설계하고 운영합니다. Kafka, PostgreSQL, 관측성 도구를 활용한 장애 대응 경험이 필요합니다. 제품 팀과 협업하며 요구사항을 서비스 구조로 구체화할 수 있어야 합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
     void emptyCandidateThrowsEmptyContent() {
         String html = """
                 <html>
@@ -95,5 +125,14 @@ class JdHtmlExtractorTest {
                 () -> extractor.extract(html, "https://example.com/jobs/backend"));
 
         assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", exception.errorCode().name());
+    }
+
+    private String fixture(String path) throws IOException {
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(path)) {
+            if (inputStream == null) {
+                throw new IOException("Fixture not found: " + path);
+            }
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }
