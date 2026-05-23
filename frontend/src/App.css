@@ -173,6 +173,78 @@
   flex-direction: column;
 }
 
+.jd-panel {
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 1.25rem;
+}
+
+.jd-source-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(224, 185, 142, 0.4);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.jd-source-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.jd-source-card p {
+  margin: 0;
+  color: var(--color-copy-muted);
+  line-height: 1.6;
+}
+
+.jd-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.jd-input-group {
+  display: grid;
+  gap: 1rem;
+}
+
+.jd-textarea {
+  min-height: 220px;
+}
+
+.jd-url-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.jd-url-input {
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(214, 195, 175, 0.95);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-copy);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.jd-url-input:focus {
+  outline: none;
+  border-color: rgba(225, 115, 52, 0.54);
+  box-shadow: 0 0 0 4px rgba(248, 146, 82, 0.12);
+  transform: translateY(-1px);
+}
+
+.jd-url-input--error {
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.08);
+}
+
+.jd-action-row {
+  margin-top: 0;
+}
+
 .mode-tabs {
   display: inline-grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

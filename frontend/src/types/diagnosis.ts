@@ -5,10 +5,15 @@ export type ApiErrorCode =
   | 'EMPTY_RESUME'
   | 'TEXT_TOO_SHORT'
   | 'TEXT_TOO_LONG'
+  | 'EMPTY_JD'
+  | 'JD_TEXT_TOO_SHORT'
+  | 'JD_TEXT_TOO_LONG'
+  | 'INVALID_JD_URL'
   | 'UNSUPPORTED_FILE_TYPE'
   | 'FILE_TEXT_EXTRACTION_FAILED'
   | 'FIXTURE_NOT_FOUND'
   | 'AI_ANALYSIS_NOT_ENABLED'
+  | 'JD_MATCH_PREVIEW_NOT_ENABLED'
   | 'INTERNAL_ERROR'
 
 export interface DiagnoseRequest {
@@ -20,6 +25,16 @@ export interface DiagnosisResult {
   summary: string
   strengths: string[]
   improvements: string[]
+  sourceText: string
+}
+
+export interface MatchPreviewRequest {
+  resumeSource: {
+    type: 'TEXT' | 'FILE'
+    value: string
+  }
+  jdText: string
+  jdUrl?: string
 }
 
 export interface ApiError {

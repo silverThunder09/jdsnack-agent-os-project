@@ -10,7 +10,7 @@ public record FixtureAnalysis(
         List<String> improvements
 ) {
 
-    public DiagnosisResultResponse toResponse() {
-        return new DiagnosisResultResponse(score, summary, strengths, improvements);
+    public DiagnosisResultResponse toResponse(String sourceText) {
+        return new DiagnosisResultResponse(score, summary, strengths, improvements, sourceText);
     }
 }

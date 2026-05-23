@@ -96,9 +96,22 @@ export function useDiagnose() {
       return
     }
 
+    if (
+      outcome.code === 'UNSUPPORTED_FILE_TYPE' ||
+      outcome.code === 'FILE_TEXT_EXTRACTION_FAILED'
+    ) {
+      setResult({
+        status: 'error',
+        title: '파일 확인이 필요합니다',
+        message: outcome.message,
+        code: outcome.code,
+      })
+      return
+    }
+
     setResult({
       status: 'error',
-      title: '분석 결과를 찾지 못했습니다',
+      title: '테스트 분석 결과를 찾지 못했습니다',
       message: outcome.message,
       code: outcome.code,
     })

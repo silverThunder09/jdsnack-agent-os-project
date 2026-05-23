@@ -32,6 +32,6 @@ public class FixtureDiagnosisProvider implements DiagnosisProvider {
                 )
                 .orElseThrow(() -> new ApiException(ErrorCode.FIXTURE_NOT_FOUND));
 
-        return analysis.toResponse();
+        return analysis.toResponse(normalizedResumeText);
     }
 }

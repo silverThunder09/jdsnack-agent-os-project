@@ -15,6 +15,22 @@ public enum ErrorCode {
             HttpStatus.BAD_REQUEST,
             "이력서 내용이 너무 깁니다. 10,000자 이내로 입력해주세요."
     ),
+    EMPTY_JD(
+            HttpStatus.BAD_REQUEST,
+            "JD 내용을 입력해주세요."
+    ),
+    JD_TEXT_TOO_SHORT(
+            HttpStatus.BAD_REQUEST,
+            "JD 내용이 너무 짧습니다. 핵심 자격요건이 드러나도록 더 입력해주세요."
+    ),
+    JD_TEXT_TOO_LONG(
+            HttpStatus.BAD_REQUEST,
+            "JD 내용이 너무 깁니다. 핵심 본문만 정리해서 입력해주세요."
+    ),
+    INVALID_JD_URL(
+            HttpStatus.BAD_REQUEST,
+            "올바른 JD 링크 형식을 입력해주세요."
+    ),
     UNSUPPORTED_FILE_TYPE(
             HttpStatus.BAD_REQUEST,
             "PDF 또는 DOCX 파일만 업로드할 수 있습니다."
@@ -26,6 +42,10 @@ public enum ErrorCode {
     AI_ANALYSIS_NOT_ENABLED(
             HttpStatus.NOT_IMPLEMENTED,
             "AI 분석 기능은 준비 중입니다. 현재는 이력서 입력 검증만 가능합니다."
+    ),
+    JD_MATCH_PREVIEW_NOT_ENABLED(
+            HttpStatus.NOT_IMPLEMENTED,
+            "JD 비교 분석 기능은 준비 중입니다. 현재는 JD 입력 검증만 가능합니다."
     ),
     FIXTURE_NOT_FOUND(
             HttpStatus.NOT_FOUND,

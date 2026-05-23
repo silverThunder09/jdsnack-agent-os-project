@@ -5,6 +5,9 @@ import { DiagnoseButton } from './components/DiagnoseButton'
 import { ResultPanel } from './components/ResultPanel'
 import { ResumeInput } from './components/ResumeInput'
 import { useDiagnose } from './hooks/useDiagnose'
+import { JdInputFields } from './components/JdInputFields'
+import { StatusMessage } from './components/StatusMessage'
+import { useMatchPreview } from './hooks/useMatchPreview'
 import type { ResumeInputMode } from './types/diagnosis'
 import './App.css'
 
@@ -22,6 +25,8 @@ function App() {
     return window.localStorage.getItem(LOCAL_STORAGE_KEY) ?? ''
   })
   const [resumeFile, setResumeFile] = useState<File | null>(null)
+  const [jdText, setJdText] = useState('')
+  const [jdUrl, setJdUrl] = useState('')
   const {
     clearInlineError,
     inlineError,
@@ -31,8 +36,28 @@ function App() {
     submit,
     submitFile,
   } = useDiagnose()
+  const {
+    clearErrors: clearJdErrors,
+    isSubmitting: isPreviewSubmitting,
+    jdTextError,
+    jdUrlError,
+    resetResult: resetPreviewResult,
+    result: previewResult,
+    submit: submitPreview,
+  } = useMatchPreview()
   const resultRef = useRef<HTMLElement>(null)
   const trimmedLength = resumeText.trim().length
+  const trimmedResumeText = resumeText.trim()
+  const resumeSourceForPreview =
+    inputMode === 'text'
+      ? trimmedResumeText
+      : result.status === 'success' && result.diagnosis?.sourceText
+        ? result.diagnosis.sourceText
+        : ''
+  const canPreviewWithCurrentSource =
+    inputMode === 'text'
+      ? trimmedLength >= MIN_LENGTH && trimmedLength <= MAX_LENGTH
+      : Boolean(resumeSourceForPreview)
 
   useEffect(() => {
     window.localStorage.setItem(LOCAL_STORAGE_KEY, resumeText)
@@ -79,6 +104,26 @@ function App() {
     }
   }
 
+  const handleJdTextChange = (nextValue: string) => {
+    setJdText(nextValue)
+    if (jdTextError || jdUrlError) {
+      clearJdErrors()
+    }
+    if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
+      resetPreviewResult()
+    }
+  }
+
+  const handleJdUrlChange = (nextValue: string) => {
+    setJdUrl(nextValue)
+    if (jdTextError || jdUrlError) {
+      clearJdErrors()
+    }
+    if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
+      resetPreviewResult()
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -88,6 +133,19 @@ function App() {
     }
 
     await submitFile(inputMode, resumeFile)
+  }
+
+  const handleJdPreviewSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    await submitPreview({
+      resumeSource: {
+        type: inputMode === 'text' ? 'TEXT' : 'FILE',
+        value: resumeSourceForPreview,
+      },
+      jdText,
+      jdUrl: jdUrl.trim(),
+    })
   }
 
   return (
@@ -174,6 +232,92 @@ function App() {
           </form>
 
           <ResultPanel ref={resultRef} result={result} />
+        </section>
+
+        <section className="panel jd-panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-eyebrow">JD Intake</p>
+              <h2>JD 입력과 비교 요청 형식을 준비합니다</h2>
+            </div>
+            <div className="counter-box" aria-live="polite">
+              <span>이력서 연결 상태</span>
+              <strong>{canPreviewWithCurrentSource ? '준비됨' : '이력서 필요'}</strong>
+            </div>
+          </div>
+
+          <div className="jd-source-card">
+            <strong>현재 연결 소스</strong>
+            <p>
+              {inputMode === 'text'
+                ? '텍스트 이력서는 현재 입력값을 기준으로 JD 비교 준비 요청을 보냅니다.'
+                : canPreviewWithCurrentSource
+                  ? '업로드 이력서는 최근 분석 성공 응답의 추출 텍스트를 기준으로 JD 비교 준비 요청을 보냅니다.'
+                  : '파일 업로드 모드에서는 먼저 분석 요청이 성공해야 JD 비교 준비 요청으로 이어집니다.'}
+            </p>
+          </div>
+
+          <form className="jd-form" onSubmit={handleJdPreviewSubmit}>
+            <JdInputFields
+              jdText={jdText}
+              jdUrl={jdUrl}
+              jdTextError={jdTextError}
+              jdUrlError={jdUrlError}
+              onJdTextChange={handleJdTextChange}
+              onJdUrlChange={handleJdUrlChange}
+            />
+
+            <div className="action-row jd-action-row">
+              <p className="action-hint">
+                실제 JD 매칭 점수와 갭 분석은 다음 단계에서 연결됩니다. 지금은 입력과
+                요청 계약이 먼저 맞는지 확인합니다.
+              </p>
+              <button
+                className="diagnose-button"
+                type="submit"
+                disabled={isPreviewSubmitting || !canPreviewWithCurrentSource}
+              >
+                {isPreviewSubmitting ? '비교 요청 확인 중...' : 'JD 비교 준비 요청'}
+              </button>
+            </div>
+          </form>
+
+          {previewResult.status === 'loading' ? (
+            <StatusMessage
+              badge="Preparing"
+              title={previewResult.title}
+              message={previewResult.message}
+              tone="active"
+              withLoadingBar
+            />
+          ) : null}
+
+          {previewResult.status === 'idle' ? (
+            <StatusMessage
+              badge="Next Step"
+              title={previewResult.title}
+              message={previewResult.message}
+              tone="neutral"
+            />
+          ) : null}
+
+          {previewResult.status === 'not-enabled' ? (
+            <StatusMessage
+              badge="Planned"
+              title={previewResult.title}
+              message={previewResult.message}
+              tone="success"
+            />
+          ) : null}
+
+          {previewResult.status === 'error' ? (
+            <StatusMessage
+              badge="Check Input"
+              title={previewResult.title}
+              message={previewResult.message}
+              tone="danger"
+            />
+          ) : null}
         </section>
       </main>
     </div>
