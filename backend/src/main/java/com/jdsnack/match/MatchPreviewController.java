@@ -15,8 +15,7 @@ public class MatchPreviewController {
     }
 
     @PostMapping("/api/match/preview")
-    public ApiResponse<Void> preview(@RequestBody(required = false) MatchPreviewRequest request) {
-        matchPreviewService.preview(request);
-        return ApiResponse.success(null);
+    public ApiResponse<MatchPreviewResponse> preview(@RequestBody(required = false) MatchPreviewRequest request) {
+        return ApiResponse.success(matchPreviewService.preview(request));
     }
 }

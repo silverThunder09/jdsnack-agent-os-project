@@ -4,16 +4,16 @@ import type { ApiErrorCode, MatchPreviewRequest, ResultState } from '../types/di
 
 const idleState: ResultState = {
   status: 'idle',
-  title: 'JD 비교 준비 단계입니다',
+  title: 'JD 비교 미리보기 단계입니다',
   message:
-    '이력서 다음 단계로 JD를 입력하면 비교 분석 요청 형식을 먼저 검증할 수 있습니다.',
+    '이력서 다음 단계로 JD를 입력하면 키워드 기준 비교 미리보기를 먼저 확인할 수 있습니다.',
 }
 
 const loadingState: ResultState = {
   status: 'loading',
-  title: 'JD 비교 요청을 확인하고 있습니다',
+  title: 'JD 비교 미리보기를 생성하고 있습니다',
   message:
-    'JD 본문과 링크 형식을 검증하고 있습니다. 실제 비교 분석은 다음 단계에서 연결됩니다.',
+    'JD 본문과 링크 형식을 검증하고, 이력서와의 키워드 겹침을 정리하고 있습니다.',
 }
 
 const textValidationMessages = {
@@ -118,12 +118,12 @@ export function useMatchPreview() {
     try {
       const outcome = await previewMatch(request)
 
-      if (outcome.kind === 'not-enabled') {
+      if (outcome.kind === 'success') {
         setResult({
-          status: 'not-enabled',
-          title: 'JD 비교 분석 기능은 준비 중입니다',
-          message: outcome.message,
-          code: outcome.code,
+          status: 'success',
+          title: 'JD 비교 미리보기를 만들었습니다',
+          message: outcome.result.summary,
+          matchPreview: outcome.result,
         })
         return
       }

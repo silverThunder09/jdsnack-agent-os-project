@@ -37,6 +37,14 @@ export interface MatchPreviewRequest {
   jdUrl?: string
 }
 
+export interface MatchPreviewResult {
+  matchingScore: number
+  summary: string
+  strengths: string[]
+  gaps: string[]
+  suggestions: string[]
+}
+
 export interface ApiError {
   code: ApiErrorCode
   message: string
@@ -60,10 +68,22 @@ export type DiagnoseOutcome =
       message: string
     }
 
+export type MatchPreviewOutcome =
+  | {
+      kind: 'success'
+      result: MatchPreviewResult
+    }
+  | {
+      kind: 'validation-error' | 'error'
+      code: ApiErrorCode
+      message: string
+    }
+
 export interface ResultState {
   status: AnalysisStatus
   title: string
   message: string
   code?: ApiErrorCode
   diagnosis?: DiagnosisResult
+  matchPreview?: MatchPreviewResult
 }

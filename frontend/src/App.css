@@ -245,6 +245,14 @@
   margin-top: 0;
 }
 
+.jd-preview-result {
+  margin-top: 0.25rem;
+}
+
+.jd-suggestion-card {
+  margin-top: 1rem;
+}
+
 .mode-tabs {
   display: inline-grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

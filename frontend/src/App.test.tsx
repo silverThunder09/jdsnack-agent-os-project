@@ -197,7 +197,7 @@ describe('App', () => {
     await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
     await user.type(screen.getByLabelText('JD 내용'), 'a'.repeat(80))
     await user.type(screen.getByLabelText('JD 링크 (선택)'), 'not-a-url')
-    await user.click(screen.getByRole('button', { name: 'JD 비교 준비 요청' }))
+    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       '올바른 JD 링크 형식을 입력해주세요.',
@@ -205,15 +205,18 @@ describe('App', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
 
-  it('JD 비교 준비 요청은 준비중 안내를 보여준다', async () => {
+  it('JD 비교 미리보기 요청은 결과 카드를 보여준다', async () => {
     const user = userEvent.setup()
     vi.mocked(globalThis.fetch).mockResolvedValue({
       json: async () => ({
-        success: false,
-        error: {
-          code: 'JD_MATCH_PREVIEW_NOT_ENABLED',
-          message:
-            'JD 비교 분석 기능은 준비 중입니다. 현재는 JD 입력 검증만 가능합니다.',
+        success: true,
+        data: {
+          matchingScore: 76,
+          summary:
+            'Spring Boot와 테스트 자동화 키워드는 잘 맞지만 배포 경험 근거를 더 드러내면 좋습니다.',
+          strengths: ['Spring Boot 관련 표현이 JD와 겹칩니다.'],
+          gaps: ['배포 관련 경험 또는 성과 근거가 이력서에서 약하게 보입니다.'],
+          suggestions: ['배포 경험이 있다면 프로젝트 맥락, 사용 기술, 결과를 함께 적어 보세요.'],
         },
         timestamp: '2026-05-23T10:00:00.000+09:00',
       }),
@@ -227,13 +230,10 @@ describe('App', () => {
       screen.getByLabelText('JD 링크 (선택)'),
       'https://example.com/jobs/backend',
     )
-    await user.click(screen.getByRole('button', { name: 'JD 비교 준비 요청' }))
+    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
 
-    expect(
-      await screen.findByText(
-        'JD 비교 분석 기능은 준비 중입니다. 현재는 JD 입력 검증만 가능합니다.',
-      ),
-    ).toBeInTheDocument()
+    expect(await screen.findByText('JD 매칭 미리보기 점수')).toBeInTheDocument()
+    expect(screen.getByText('76점')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/match/preview'),
       expect.objectContaining({

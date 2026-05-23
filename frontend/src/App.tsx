@@ -172,7 +172,7 @@ function App() {
             </div>
             <div className="stat-card">
               <span className="stat-label">현재 응답</span>
-              <strong>200 결과 / 501 준비중</strong>
+              <strong>200 결과 / 키워드 미리보기</strong>
             </div>
           </div>
         </section>
@@ -250,10 +250,10 @@ function App() {
             <strong>현재 연결 소스</strong>
             <p>
               {inputMode === 'text'
-                ? '텍스트 이력서는 현재 입력값을 기준으로 JD 비교 준비 요청을 보냅니다.'
+                ? '텍스트 이력서는 현재 입력값을 기준으로 JD 비교 미리보기를 생성합니다.'
                 : canPreviewWithCurrentSource
-                  ? '업로드 이력서는 최근 분석 성공 응답의 추출 텍스트를 기준으로 JD 비교 준비 요청을 보냅니다.'
-                  : '파일 업로드 모드에서는 먼저 분석 요청이 성공해야 JD 비교 준비 요청으로 이어집니다.'}
+                  ? '업로드 이력서는 최근 분석 성공 응답의 추출 텍스트를 기준으로 JD 비교 미리보기를 생성합니다.'
+                  : '파일 업로드 모드에서는 먼저 분석 요청이 성공해야 JD 비교 미리보기로 이어집니다.'}
             </p>
           </div>
 
@@ -269,18 +269,61 @@ function App() {
 
             <div className="action-row jd-action-row">
               <p className="action-hint">
-                실제 JD 매칭 점수와 갭 분석은 다음 단계에서 연결됩니다. 지금은 입력과
-                요청 계약이 먼저 맞는지 확인합니다.
+                현재는 AI 대신 키워드 기준 미리보기 결과를 먼저 보여줍니다.
               </p>
-              <button
-                className="diagnose-button"
-                type="submit"
-                disabled={isPreviewSubmitting || !canPreviewWithCurrentSource}
-              >
-                {isPreviewSubmitting ? '비교 요청 확인 중...' : 'JD 비교 준비 요청'}
-              </button>
+              <DiagnoseButton
+                isSubmitting={isPreviewSubmitting}
+                idleLabel="JD 비교 미리보기"
+                loadingLabel="JD 비교 미리보기 생성 중..."
+                disabled={!canPreviewWithCurrentSource}
+              />
             </div>
           </form>
+
+          {previewResult.status === 'success' && previewResult.matchPreview ? (
+            <div className="analysis-result jd-preview-result">
+              <StatusMessage
+                badge="Preview Result"
+                title={previewResult.title}
+                message={previewResult.message}
+                tone="success"
+              />
+
+              <div className="analysis-score-card">
+                <span>JD 매칭 미리보기 점수</span>
+                <strong>{previewResult.matchPreview.matchingScore}점</strong>
+              </div>
+
+              <div className="analysis-feedback-grid">
+                <section className="analysis-feedback-card">
+                  <h3>강점</h3>
+                  <ul>
+                    {previewResult.matchPreview.strengths.map((strength) => (
+                      <li key={strength}>{strength}</li>
+                    ))}
+                  </ul>
+                </section>
+
+                <section className="analysis-feedback-card">
+                  <h3>보완 포인트</h3>
+                  <ul>
+                    {previewResult.matchPreview.gaps.map((gap) => (
+                      <li key={gap}>{gap}</li>
+                    ))}
+                  </ul>
+                </section>
+              </div>
+
+              <section className="analysis-feedback-card jd-suggestion-card">
+                <h3>다음 보완 제안</h3>
+                <ul>
+                  {previewResult.matchPreview.suggestions.map((suggestion) => (
+                    <li key={suggestion}>{suggestion}</li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          ) : null}
 
           {previewResult.status === 'loading' ? (
             <StatusMessage
@@ -298,15 +341,6 @@ function App() {
               title={previewResult.title}
               message={previewResult.message}
               tone="neutral"
-            />
-          ) : null}
-
-          {previewResult.status === 'not-enabled' ? (
-            <StatusMessage
-              badge="Planned"
-              title={previewResult.title}
-              message={previewResult.message}
-              tone="success"
             />
           ) : null}
 
