@@ -4,6 +4,83 @@
 
 PR은 코드 리뷰 요청이 아니라 **문서, 테스트, 구현이 일치하는지 검증하는 단위**입니다.
 
+## 시작 분기
+
+모든 PR을 같은 강도로 검증하지 않습니다.
+
+작업 시작 시 먼저 이 PR이 아래 셋 중 무엇인지 판단합니다.
+
+- `Light`: 작고 위험이 낮은 변경
+- `Standard`: 일반적인 기능/로직/API/UI 변경
+- `High-risk`: 보안, 외부 API, 배포, DB, 인증, CI/CD 영향이 있는 변경
+
+기본 원칙:
+
+- `Light`는 빠르게 검증합니다.
+- `Standard`는 담당 에이전트와 `QA Reviewer` 중심으로 검증합니다.
+- `High-risk`는 기존 풀 플로우를 적용합니다.
+
+## PR 위험도 기준
+
+### `Light`
+
+예시:
+
+- README 수정
+- 문서 오타 수정
+- 주석 수정
+- 테스트 이름 변경
+- 기능 영향 없는 파일 정리
+- UI 문구 수정
+- 동작 변경 없는 작은 리팩토링
+
+필수 검증:
+
+- 작성자 확인
+- 관련 테스트 또는 관련 CI
+
+### `Standard`
+
+예시:
+
+- 백엔드 API 추가/수정
+- 프론트 화면 수정
+- 비즈니스 로직 변경
+- validation 추가
+- DTO 변경
+- 일반 테스트 추가
+- provider 내부 로직 수정
+- 일반 버그 수정
+
+필수 검증:
+
+- 담당 에이전트
+- `QA Reviewer`
+- 관련 CI
+
+### `High-risk`
+
+예시:
+
+- 외부 API 실호출
+- `.env`, API Key, secret 관련 변경
+- 로그 정책 변경
+- 인증/인가 변경
+- CI/CD 변경
+- Docker / Compose / 배포 흐름 변경
+- DB 마이그레이션
+- 결제, 권한, 운영 정책 변경
+- Docs Harness 정책 변경
+- 여러 도메인에 걸친 큰 PR
+
+필수 검증:
+
+- `QA Reviewer`
+- `Security Reviewer`
+- `DevOps Steward`
+- `Release Captain`
+- 변경 내용에 따라 `Spec Steward`
+
 ## PR 크기
 
 - 한 PR은 하나의 기능 또는 하나의 문제만 다룹니다.
@@ -107,6 +184,7 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 ## 필수 체크
 
 - 작업 시작 전 [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md) 기준으로 범위를 먼저 고정
+- PR 위험도(`Light` / `Standard` / `High-risk`)를 먼저 고정
 - 요구사항 변경 시 `requirements.md`, `acceptance-criteria.md`, `traceability.md` 갱신
 - API 변경 시 `api-spec.md` 갱신
 - UI 변경 시 `ui-spec.md` 갱신
@@ -119,7 +197,7 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 
 ## PR 전 필수 검증 기준
 
-- `Work Start Checkpoint`의 대상 spec, 변경 범위, 테스트 방법, PR 범위가 정리되어 있다.
+- `Work Start Checkpoint`의 대상 spec, 위험도, 변경 범위, 테스트 방법, PR 범위가 정리되어 있다.
 - PR 주 목적이 한 문장으로 설명된다.
 - 변경 파일이 `PR 범위 경계`의 같은 PR 허용 조건 안에 있다.
 - CI/운영/템플릿/광범위한 문서 정리는 기능 PR과 분리되어 있다.
@@ -130,8 +208,9 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - API 변경이 있으면 `api-spec.md`가 갱신되어 있다.
 - UI 변경이 있으면 `ui-spec.md`가 갱신되어 있다.
 - 문서/백엔드/프론트 변경 범위에 맞는 CI 체크리스트가 확인되어 있다.
-- 담당 에이전트 검사 결과가 `PASS`다.
-- PR 생성 후 `scripts/pr-review-gate.sh <PR_NUMBER>` 실행 계획이 있다.
+- `Light`는 작성자 확인과 관련 CI만 통과하면 된다.
+- `Standard`는 담당 에이전트와 `QA Reviewer` 검토가 완료되어야 한다.
+- `High-risk`는 `scripts/pr-review-gate.sh <PR_NUMBER>` 실행 계획이 있다.
 - Gemini API 또는 외부 API 사용 시 `Security Reviewer` 검토가 완료되어 있다.
 - 문서와 구현이 불일치하는 상태로 PR을 생성하지 않는다.
 
@@ -141,7 +220,7 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - 실패 Issue에는 유형 라벨을 붙인다. 기본 분류는 `ci-failure`, `contract-drift`, `test-gap`, `deploy-risk`다.
 - Issue에는 실패 PR, 실패 체크, 핵심 로그, 관련 `REQ/AC/TC`, 수정 계획을 남긴다.
 - 수정은 같은 브랜치에서 진행하고 다시 담당 에이전트 검사를 받는다.
-- 자체 리뷰가 `REQUEST_CHANGES`이면 PR 실패 Issue를 만들고 같은 브랜치에서 수정 후 다시 리뷰한다.
+- `High-risk` PR의 자체 리뷰가 `REQUEST_CHANGES`이면 PR 실패 Issue를 만들고 같은 브랜치에서 수정 후 다시 리뷰한다.
 
 ## 리뷰 기준
 

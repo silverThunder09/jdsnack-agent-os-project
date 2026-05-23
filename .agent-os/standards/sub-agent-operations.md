@@ -31,6 +31,18 @@ MVP 1차 기본 에이전트:
 5. 작업 종료 시 다음 에이전트가 이어받을 수 있도록 handoff 내용을 남깁니다.
 6. 구현보다 문서, 계약, 검증 기준을 우선합니다.
 
+## 위험도별 기본 운영
+
+모든 PR에 모든 에이전트를 붙이지 않습니다.
+
+| 위험도 | 기본 검증자 | 원칙 |
+|---|---|---|
+| `Light` | 작성자 | 작은 변경은 빠르게 통과시킨다 |
+| `Standard` | 담당 에이전트, `QA Reviewer` | 일반 기능 변경은 QA까지 본다 |
+| `High-risk` | `QA Reviewer`, `Security Reviewer`, `DevOps Steward`, `Release Captain` | 보안/배포/외부 연동은 풀 플로우를 적용한다 |
+
+`Spec Steward`는 요구사항, API/UI 계약, traceability가 직접 바뀌는 경우에만 기본 검증자에 추가합니다.
+
 ## 1. Spec Steward
 
 역할:
@@ -252,7 +264,7 @@ MVP 1차 기본 에이전트:
 
 ## 에이전트 간 작업 순서
 
-기본 작업 흐름:
+`High-risk` 기본 작업 흐름:
 
 1. `Spec Steward`: 요구사항, 수용 기준, 계약 문서 정리
 2. `Backend Engineer` / `Frontend Engineer`: 계약 문서를 기준으로 병렬 구현

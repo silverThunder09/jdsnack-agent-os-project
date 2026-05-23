@@ -66,6 +66,7 @@ has_ops=0
 has_security=0
 has_docker=0
 has_scripts=0
+risk_level="Light"
 
 while IFS= read -r file; do
   case "$file" in
@@ -118,6 +119,12 @@ if [ "${#agents[@]}" -eq 0 ]; then
   add_agent "QA Reviewer"
 fi
 
+if [ "$has_github" -eq 1 ] || [ "$has_docker" -eq 1 ] || [ "$has_security" -eq 1 ] || [ "$has_ops" -eq 1 ]; then
+  risk_level="High-risk"
+elif [ "$has_backend" -eq 1 ] || [ "$has_frontend" -eq 1 ] || [ "$has_specs" -eq 1 ]; then
+  risk_level="Standard"
+fi
+
 if [ "$has_backend" -eq 1 ] && [ "$has_frontend" -eq 1 ]; then
   warnings+=("backend/** 와 frontend/** 변경이 같은 PR에 있습니다. PR 범위 예외 사유가 필요합니다.")
 fi
@@ -161,6 +168,10 @@ echo
 echo "## 변경 파일"
 echo
 sed 's/^/- /' "$files_path"
+echo
+echo "## 위험도 추정"
+echo
+echo "- ${risk_level}"
 echo
 echo "## 필수 리뷰 에이전트"
 echo

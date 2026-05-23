@@ -3,13 +3,41 @@
 ## 목적
 
 JDSnack의 변경은 직접 `main`에 푸시하지 않습니다.
-모든 변경은 **작업 브랜치 -> 커밋 -> 담당 에이전트 검사 -> PR -> 실패 이슈화 -> 수정 루프 -> main 머지** 순서로 처리합니다.
+모든 변경은 위험도에 따라 `Light`, `Standard`, `High-risk` 흐름 중 하나를 따릅니다.
 
-## 기본 흐름
+## 시작 판단
+
+작업 시작 시 먼저 이 PR의 위험도를 결정합니다.
+
+- `Light`: 작고 안전한 변경
+- `Standard`: 일반 기능/로직/API/UI 변경
+- `High-risk`: 보안/외부 API/배포/DB/인증/CI 영향 변경
+
+## `Light` 흐름
+
+1. 작업 브랜치를 생성합니다.
+2. [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md)에 `Light`로 기록합니다.
+3. 변경을 구현합니다.
+4. 관련 테스트 또는 관련 CI만 확인합니다.
+5. 커밋합니다.
+6. PR을 생성합니다.
+7. 작성자 확인과 CI 통과 후 머지합니다.
+
+## `Standard` 흐름
+
+1. 작업 브랜치를 생성합니다.
+2. 체크포인트에 `Standard`로 기록합니다.
+3. 관련 문서를 확인하고 구현합니다.
+4. 관련 로컬 테스트를 통과시킵니다.
+5. 담당 에이전트와 `QA Reviewer` 기준으로 검토합니다.
+6. 커밋 후 PR을 생성합니다.
+7. 관련 CI가 통과하면 머지합니다.
+
+## `High-risk` 흐름
 
 1. 작업 브랜치를 생성합니다.
    - 기본 형식: `codex/<scope>-<short-description>`
-2. [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md) 기준으로 범위와 테스트 계획을 먼저 고정합니다.
+2. [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md) 기준으로 위험도, 범위와 테스트 계획을 먼저 고정합니다.
 3. 변경을 구현하고 로컬 테스트를 통과시킵니다.
 4. 테스트 통과 후 커밋합니다.
 5. 변경 범위에 맞는 담당 에이전트가 검사합니다.
@@ -22,6 +50,14 @@ JDSnack의 변경은 직접 `main`에 푸시하지 않습니다.
 12. 다시 테스트하고 담당 에이전트 검사를 받습니다.
 13. PR이 통과하면 `Squash and merge`로 `main`에 합칩니다.
 14. `main`에 반영되면 GitHub Actions가 최종 워크플로우를 실행합니다.
+
+## 위험도별 리뷰 기준
+
+| 위험도 | 기본 리뷰어 | 비고 |
+|---|---|---|
+| `Light` | 작성자 | 관련 CI 통과 중심 |
+| `Standard` | 담당 에이전트, `QA Reviewer` | 보안 이슈가 있으면 `Security Reviewer` 추가 |
+| `High-risk` | `QA Reviewer`, `Security Reviewer`, `DevOps Steward`, `Release Captain` | 변경 내용에 따라 `Spec Steward` 추가 |
 
 ## 담당 에이전트 매핑
 
@@ -46,7 +82,7 @@ JDSnack의 변경은 직접 `main`에 푸시하지 않습니다.
 
 ## 자체 리뷰 게이트
 
-PR 생성 후에는 [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md)를 따릅니다.
+`High-risk` PR 생성 후에는 [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md)를 따릅니다.
 
 ```sh
 ./scripts/pr-review-gate.sh <PR_NUMBER>
@@ -72,13 +108,13 @@ Issue에는 아래 내용을 기록합니다.
 - 담당 에이전트
 - 수정 계획
 
-Issue 생성 후에는 같은 브랜치에서 수정하고 다시 테스트 후 커밋합니다.
+`High-risk` PR은 Issue 생성 후 같은 브랜치에서 수정하고 다시 테스트 후 커밋합니다.
 
 ## 머지 조건
 
 - GitHub Actions 통과
-- 담당 에이전트 최종 `PASS`
-- 자체 리뷰 게이트 통과
+- 위험도에 맞는 리뷰 통과
+- `High-risk`는 자체 리뷰 게이트 통과
 - PR 범위 경계 통과
 - PR 리뷰 승인
 - 머지 금지 조건 없음
