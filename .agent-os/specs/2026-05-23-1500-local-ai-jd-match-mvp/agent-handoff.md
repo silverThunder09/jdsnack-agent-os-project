@@ -21,6 +21,7 @@
 - `backend/src/main/java/com/jdsnack/match/GeminiMatchPreviewProvider.java`
 - `backend/src/main/java/com/jdsnack/match/MatchPreviewService.java`
 - `backend/src/test/java/com/jdsnack/match/MatchPreviewAiLocalModeControllerTest.java`
+- `backend/src/test/java/com/jdsnack/match/MatchPreviewFixtureModeControllerTest.java`
 - `frontend/src/hooks/useMatchPreview.ts`
 - `frontend/src/App.tsx`
 
@@ -42,6 +43,7 @@
 ## Risks
 
 - 실제 Gemini JD 매칭 smoke는 `GEMINI_API_KEY`가 준비된 로컬 환경에서만 검증 가능하다.
+- `fixture` 회귀는 테스트 코드로 고정했지만, 브라우저 기준 JD 비교 smoke는 아직 QA 확인이 필요하다.
 
 ## Next Agent
 

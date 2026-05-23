@@ -22,6 +22,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-jdbc'
     implementation 'org.apache.pdfbox:pdfbox:3.0.5'
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
+    implementation 'org.jsoup:jsoup:1.18.3'
     runtimeOnly 'com.h2database:h2'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

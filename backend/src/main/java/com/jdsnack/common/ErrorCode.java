@@ -31,6 +31,18 @@ public enum ErrorCode {
             HttpStatus.BAD_REQUEST,
             "올바른 JD 링크 형식을 입력해주세요."
     ),
+    JD_FETCH_EMPTY_CONTENT(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "JD 링크에서 본문을 충분히 추출하지 못했습니다. JD 텍스트를 직접 붙여넣어 주세요."
+    ),
+    JD_FETCH_UNSUPPORTED_SOURCE(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "현재 JD 링크 형식은 자동 수집을 지원하지 않습니다. JD 텍스트를 직접 붙여넣어 주세요."
+    ),
+    JD_FETCH_FAILED(
+            HttpStatus.BAD_GATEWAY,
+            "JD 링크를 불러오지 못했습니다. 잠시 후 다시 시도해주세요."
+    ),
     UNSUPPORTED_FILE_TYPE(
             HttpStatus.BAD_REQUEST,
             "PDF 또는 DOCX 파일만 업로드할 수 있습니다."
