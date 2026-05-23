@@ -38,6 +38,7 @@ jdsnack-agent-os/
 - 기술 스택: `.agent-os/product/tech-stack.md`
 - 1차 MVP 기본 계약: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/`
 - 1.5차 MVP 업로드 + fixture 확장: `.agent-os/specs/2026-05-22-1650-resume-upload-fixture-mvp/`
+- 다음 설계 단계: `.agent-os/specs/2026-05-23-0900-jd-intake-mvp/`
 - API 상세 문서: `.agent-os/specs/2026-05-22-1650-resume-upload-fixture-mvp/api-spec.md`
 - ERD 상세 문서: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/erd.md`
 - 아키텍처 상세 문서: `docs/architecture/`
@@ -85,7 +86,7 @@ jdsnack-agent-os/
 
 ## 다음 구현 우선순위
 
-1. JD 입력과 JD 비교 분석 흐름 설계
+1. JD 입력 MVP 문서 기준으로 API/UI 구현
 2. 2차 MVP에서 서버 기반 AI 분석 계약과 보안 정책 확정
 3. 브라우저 기반 업로드 스모크 자동화
 4. 분리 컨테이너 운영용 reverse proxy / ingress 설정 문서화
