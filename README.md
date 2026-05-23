@@ -103,10 +103,10 @@ jdsnack-agent-os/
 
 ## 다음 구현 우선순위
 
-1. 브라우저 기반 업로드 스모크 자동화
+1. JD 링크 수집 안정화: `.agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp/`
 2. 분리 컨테이너 운영용 reverse proxy / ingress 설정 문서화
 3. 운영 배포용 Gemini 보안/재시도 정책 확장
-4. JD 링크 수집 정책 설계 또는 수동 JD 저장 UX 확장
+4. 수동 JD 저장 UX 확장
 
 ## 로컬 통합 실행
 

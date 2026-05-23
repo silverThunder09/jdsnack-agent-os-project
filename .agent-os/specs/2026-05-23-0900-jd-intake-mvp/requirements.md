@@ -58,5 +58,5 @@
 ## 후속 단계
 
 - 2차 MVP에서 AI 기반 이력서-JD 비교 분석 API 고도화
-- JD 링크 자동 수집 정책 검토
+- JD 링크 자동 수집 안정화: `.agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp/`
 - JD 적합도 점수, 요약, 갭 분석, 보완 제안 생성
