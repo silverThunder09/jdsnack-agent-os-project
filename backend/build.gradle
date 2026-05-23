@@ -30,3 +30,32 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+sourceSets {
+    googleTest {
+        java.srcDir 'src/googleTest/java'
+        resources.srcDir 'src/googleTest/resources'
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+configurations {
+    googleTestImplementation.extendsFrom testImplementation
+    googleTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.register('googleTest', Test) {
+    description = 'Runs local-only Gemini API smoke tests. Requires GEMINI_API_KEY from the environment.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.googleTest.output.classesDirs
+    classpath = sourceSets.googleTest.runtimeClasspath
+    useJUnitPlatform()
+
+    doFirst {
+        if (!System.getenv('GEMINI_API_KEY')) {
+            throw new GradleException('GEMINI_API_KEY is required for googleTest. Load it through scripts/google-test.sh.')
+        }
+    }
+}

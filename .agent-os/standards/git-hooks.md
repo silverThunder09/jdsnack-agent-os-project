@@ -95,7 +95,9 @@ echo "$changed" | grep -q 'requirements.md' && {
 예시 명령:
 
 ```sh
+cd backend
 ./gradlew test
+cd ../frontend
 npm run build
 ```
 
