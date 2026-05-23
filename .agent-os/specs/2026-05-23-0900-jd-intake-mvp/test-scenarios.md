@@ -74,3 +74,50 @@
 - 기대 결과:
   - JD 결과 카드가 렌더링된다
   - `matchingScore`와 결과 요약이 보인다
+
+## 후속 검증 시나리오: JD 링크 자동 수집 확장
+
+> 아래 시나리오는 초기 JD 입력 MVP 범위 밖이다. 공식 수용 기준과 상세 테스트는 `.agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp/`를 따른다.
+
+## `TC-09` 정적 careers 페이지 JD 링크 수집 성공
+
+- 대응 AC: 없음. 후속 확장 smoke 용도
+- 절차:
+  - `POST /api/jd/fetch`에 정적 HTML 기반 careers 페이지 링크를 보낸다
+  - 예: `https://www.telktia.com/careers/backend-engineer`
+- 기대 결과:
+  - `200`을 반환한다
+  - `jdText`, `sourceUrl`, `title`, `fetchMode`가 포함된다
+  - `jdText`는 비어 있지 않다
+
+## `TC-10` Ashby 링크 자동 수집 미지원 처리
+
+- 대응 AC: 없음. 후속 확장 smoke 용도
+- 절차:
+  - `POST /api/jd/fetch`에 Ashby 채용 링크를 보낸다
+  - 예: `https://jobs.ashbyhq.com/teamworks/086d25e7-8742-4534-a110-b5df687ce794/`
+- 기대 결과:
+  - `422`를 반환한다
+  - 에러 코드는 `JD_FETCH_UNSUPPORTED_SOURCE`다
+  - 메시지는 JD 텍스트 직접 붙여넣기 안내를 포함한다
+
+## `TC-11` 지원 대상처럼 보이지만 fetch 실패하는 링크 처리
+
+- 대응 AC: 없음. 후속 확장 smoke 용도
+- 절차:
+  - `POST /api/jd/fetch`에 fetch 단계에서 실패하는 실제 JD 링크를 보낸다
+  - 예: `https://productive.io/careers/backend-engineer/`
+- 기대 결과:
+  - `502`를 반환한다
+  - 에러 코드는 `JD_FETCH_FAILED`다
+
+## `TC-12` JD 링크 자동 수집 결과 품질 확인
+
+- 대응 AC: 없음. 후속 확장 smoke 용도
+- 절차:
+  - `POST /api/jd/fetch`에 정적 HTML 기반 careers 페이지 링크를 보낸다
+  - 반환된 `jdText`를 눈으로 확인한다
+- 기대 결과:
+  - JD 본문이 최소 한 단락 이상 추출된다
+  - 메뉴, 푸터, 마케팅 문구가 과도하게 섞이지 않는다
+  - 공고 제목과 핵심 요구사항을 사람이 식별할 수 있다

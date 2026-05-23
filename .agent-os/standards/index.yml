@@ -49,3 +49,4 @@ active_specs:
   - .agent-os/specs/2026-05-23-0900-jd-intake-mvp
   - .agent-os/specs/2026-05-23-1300-local-ai-resume-analysis-mvp
   - .agent-os/specs/2026-05-23-1500-local-ai-jd-match-mvp
+  - .agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp
