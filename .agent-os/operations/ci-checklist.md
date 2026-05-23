@@ -4,7 +4,7 @@
 
 아직 백엔드와 프론트엔드 코드가 완성되지 않았더라도, CI가 무엇을 검증해야 하는지 먼저 문서 계약으로 고정합니다.
 
-1차 MVP의 CI 목표는 **문서 계약, 입력 검증, 빌드 가능성**을 자동으로 확인하는 것입니다.
+현재 CI 목표는 **문서 계약, 1.5차 MVP fixture 흐름, 빌드 가능성**을 자동으로 확인하는 것입니다.
 
 ## 현재 단계
 
@@ -13,6 +13,7 @@
 - `.github/workflows/backend-ci.yml`에서 백엔드 테스트와 `bootJar` 빌드를 검증합니다.
 - `.github/workflows/frontend-ci.yml`에서 프론트엔드 린트, 테스트, 빌드를 검증합니다.
 - `.github/workflows/container.yml`에서 compose 기반 스모크 테스트를 함께 검증합니다.
+- compose 기반 통합 검증은 `fixture` 모드 기준으로 텍스트/PDF/DOCX 흐름을 확인합니다.
 - 보호 브랜치 required check와 충돌하지 않도록 백엔드/프론트 CI는 경로 필터 없이 항상 실행합니다.
 
 ## 권장 트리거
@@ -53,9 +54,11 @@
 - 단위 테스트
 - `GET /api/health`
 - `POST /api/diagnose` 입력 검증
-- 정상 입력 시 `501 AI_ANALYSIS_NOT_ENABLED`
+- `stub` 모드 정상 입력 시 `501 AI_ANALYSIS_NOT_ENABLED`
+- `fixture` 모드 정상 입력 시 fixture 결과
 - 정확히 50자와 정확히 10,000자 경계값 검증
 - `resumeText` 누락, `null`, 공백 문자만 있는 입력 검증
+- `POST /api/diagnose/file` 업로드 검증과 fixture 오류 코드 검증
 
 대표 명령 후보:
 
@@ -90,7 +93,7 @@ npm run build
 도입 시점:
 
 - 백엔드와 프론트엔드가 연결된 뒤
-- 현재는 1차 MVP 기준 시나리오부터 적용한다.
+- 현재는 1.5차 MVP fixture 기준 시나리오를 적용한다.
 
 검증 대상:
 
@@ -100,7 +103,12 @@ npm run build
 - 빈 입력 요청 시 `EMPTY_RESUME`
 - 50자 미만 요청 시 `TEXT_TOO_SHORT`
 - 10,000자 초과 요청 시 `TEXT_TOO_LONG`
-- 정상 길이 요청 시 `AI_ANALYSIS_NOT_ENABLED`
+- 정상 길이 텍스트 요청 시 fixture 결과
+- PDF 업로드 fixture 결과
+- DOCX 업로드 fixture 결과
+- TXT 업로드 `UNSUPPORTED_FILE_TYPE`
+- 깨진 PDF 업로드 `FILE_TEXT_EXTRACTION_FAILED`
+- fixture 없음 업로드 `FIXTURE_NOT_FOUND`
 
 현재 실행 기준:
 

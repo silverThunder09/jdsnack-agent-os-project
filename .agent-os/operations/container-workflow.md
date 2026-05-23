@@ -17,6 +17,7 @@ JDSnack은 로컬 실행과 배포 환경 차이를 줄이기 위해 Dockerfile 
 - 프론트 포트: `5173`
 - 헬스체크: `GET /api/health`
 - 외부 AI 비밀값: 1차 MVP에서는 없음
+- compose 기본 진단 모드: `fixture`
 
 ## 컨테이너 빌드 조건
 
@@ -49,7 +50,7 @@ docker compose up --build
 ## GitHub Actions 흐름
 
 - PR에서는 문서 하네스, 백엔드 테스트, 컨테이너 빌드와 `/api/health` 검증을 함께 실행합니다.
-- PR에서는 `docker compose` 기반 스모크 테스트로 프론트 프록시와 `POST /api/diagnose` 흐름도 함께 확인합니다.
+- PR에서는 `docker compose` 기반 스모크 테스트로 프론트 프록시, `POST /api/diagnose`, `POST /api/diagnose/file` 흐름도 함께 확인합니다.
 - `main` 반영 후 모든 push에서도 같은 컨테이너 검증을 다시 실행합니다.
 - 컨테이너 빌드 실패 시 PR 실패 Issue와 같은 형식으로 Issue를 생성합니다.
 
