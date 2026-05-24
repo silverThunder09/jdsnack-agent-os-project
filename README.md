@@ -2,7 +2,7 @@
 
 JDSnack은 개발자 이력서와 JD를 AI로 분석해 개선 피드백과 매칭 인사이트를 제공하는 것을 목표로 하는 웹 서비스 프로젝트입니다.
 
-현재 활성 기획은 커스텀 에이전트 TOML 전환입니다. 과거 MVP 명세는 토큰 낭비를 줄이기 위해 `.agent-os/archive/specs/`에 보관합니다.
+현재 활성 기획은 사람인 JD 수집 안정화입니다. 과거 MVP 명세는 토큰 낭비를 줄이기 위해 `.agent-os/archive/specs/`에 보관합니다.
 
 이 저장소는 서비스 코드와 문서 하네스를 함께 관리합니다. 쉽게 말하면, `backend/`와 `frontend/`가 실제 제품을 만들고, `.agent-os/`와 `docs/`가 그 제품을 어떻게 만들지 정해주는 설계도 역할을 합니다.
 
@@ -39,10 +39,10 @@ jdsnack-agent-os/
 - 제품 목적: `.agent-os/product/mission.md`
 - 로드맵: `.agent-os/product/roadmap.md`
 - 기술 스택: `.agent-os/product/tech-stack.md`
-- 현재 활성 spec: `.agent-os/specs/2026-05-24-custom-agent-toml/`
+- 현재 활성 spec: `.agent-os/specs/2026-05-24-saramin-jd-scraping-stabilization/`
 - 보관 spec: `.agent-os/archive/specs/`
 - 커스텀 에이전트: `.codex/agents/*.toml`
-- API 상세 문서: `.agent-os/specs/2026-05-24-custom-agent-toml/api-spec.md`
+- API 상세 문서: `.agent-os/specs/2026-05-24-saramin-jd-scraping-stabilization/api-spec.md`
 - 아키텍처 상세 문서: `docs/architecture/`
 - CI 기준 문서: `.agent-os/operations/ci-checklist.md`
 - CD 기준 문서: `.agent-os/operations/cd-checklist.md`
@@ -103,7 +103,7 @@ jdsnack-agent-os/
 
 ## 다음 구현 우선순위
 
-1. JD 링크 수집 안정화: `.agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp/`
+1. 사람인 JD 수집 안정화: `.agent-os/specs/2026-05-24-saramin-jd-scraping-stabilization/`
 2. 분리 컨테이너 운영용 reverse proxy / ingress 설정 문서화
 3. 운영 배포용 Gemini 보안/재시도 정책 확장
 4. 수동 JD 저장 UX 확장
