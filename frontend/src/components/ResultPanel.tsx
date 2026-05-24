@@ -36,9 +36,9 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
 
         {result.status === 'idle' ? (
           <StatusMessage
-            badge="Ready"
-            title={result.title}
-            message={result.message}
+            badge="Report"
+            title="리포트 대기 중"
+            message="이력서와 JD를 입력하면 리포트가 표시됩니다."
             tone="neutral"
           />
         ) : null}
@@ -55,9 +55,9 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
         {result.status === 'success' && result.diagnosis ? (
           <div className="analysis-result">
             <section className="report-hero-card">
-              <div className="analysis-score-card">
-                <span>분석 점수</span>
+              <div className="analysis-score-card analysis-score-card--circle">
                 <strong>{result.diagnosis.score}점</strong>
+                <span>종합 점수</span>
               </div>
               <div className="report-summary-card">
                 <span className="report-summary-label">핵심 요약</span>
@@ -97,21 +97,10 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
           <StatusMessage
             badge="Action Needed"
             title={result.title}
-            message={result.message}
+            message={`${result.message} 이력서 내용을 확인한 뒤 다시 요청해 주세요.`}
             tone="danger"
           />
         ) : null}
-
-        <div className="result-meta">
-          <div className="result-meta-card">
-            <span>응답 모드</span>
-            <strong>Stub / Fixture / AI Local</strong>
-          </div>
-          <div className="result-meta-card">
-            <span>클라이언트 검증 기준</span>
-            <strong>빈 입력 / 50자 미만 / 10,000자 초과</strong>
-          </div>
-        </div>
       </section>
     )
   },
