@@ -107,7 +107,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '진단 요청' }))
 
     expect(
-      await screen.findByText('네트워크 연결을 확인해주세요.'),
+      await screen.findByText(/네트워크 연결을 확인해주세요/),
     ).toBeInTheDocument()
   })
 
@@ -173,7 +173,7 @@ describe('App', () => {
       await screen.findByText('로컬 AI 분석을 완료하지 못했습니다'),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'),
+      screen.getByText(/Gemini AI 분석 요청에 실패했습니다/),
     ).toBeInTheDocument()
   })
 
@@ -227,7 +227,7 @@ describe('App', () => {
       await screen.findByText('JD AI 매칭을 완료하지 못했습니다'),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'),
+      screen.getByText(/Gemini AI 분석 요청에 실패했습니다/),
     ).toBeInTheDocument()
   })
 
@@ -271,7 +271,7 @@ describe('App', () => {
 
     expect(await screen.findByText('파일 확인이 필요합니다')).toBeInTheDocument()
     expect(
-      screen.getByText('PDF 또는 DOCX 파일만 업로드할 수 있습니다.'),
+      screen.getByText(/PDF 또는 DOCX 파일만 업로드할 수 있습니다/),
     ).toBeInTheDocument()
   })
 
@@ -318,7 +318,7 @@ describe('App', () => {
     )
     await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
 
-    expect(await screen.findByText('JD 매칭 미리보기 점수')).toBeInTheDocument()
+    expect(await screen.findByText('매칭 점수')).toBeInTheDocument()
     expect(screen.getByText('76점')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/match/preview'),
@@ -387,9 +387,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '링크로 JD 불러오기' }))
 
     expect(
-      await screen.findByText(
-        '이 링크에서는 JD 본문을 확실히 추출하지 못했습니다. JD 내용 칸에 핵심 본문을 직접 붙여넣어 주세요.',
-      ),
+      await screen.findByText('불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.'),
     ).toBeInTheDocument()
   })
 

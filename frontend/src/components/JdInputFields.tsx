@@ -61,6 +61,9 @@ export function JdInputFields({
   onJdUrlChange,
   onJdFetch,
 }: JdInputFieldsProps) {
+  const shouldOpenLinkAssist =
+    Boolean(jdUrl) || Boolean(jdUrlError) || jdFetchStatus !== 'idle'
+
   return (
     <div className="jd-input-group">
       <div className="resume-input-group">
@@ -77,9 +80,7 @@ export function JdInputFields({
           aria-describedby={jdTextError ? 'jd-text-error' : 'jd-text-helper'}
           aria-invalid={Boolean(jdTextError)}
         />
-        <p className="resume-helper" id="jd-text-helper">
-          JD 비교의 기본 경로는 직접 붙여넣기입니다. 링크 자동 수집이 실패해도 이 칸에서 바로 이어서 진행할 수 있습니다.
-        </p>
+        <p className="resume-helper" id="jd-text-helper">주요 업무, 자격요건, 우대사항이 보이면 충분합니다.</p>
         {jdTextError ? (
           <p className="resume-error" id="jd-text-error" role="alert">
             {jdTextError}
@@ -87,7 +88,8 @@ export function JdInputFields({
         ) : null}
       </div>
 
-      <div className="jd-link-card">
+      <details className="jd-link-card" open={shouldOpenLinkAssist}>
+        <summary>필요 시 링크로 JD 불러오기</summary>
         <div className="jd-url-group">
           <label className="resume-label" htmlFor="jd-url">
             JD 링크
@@ -114,23 +116,29 @@ export function JdInputFields({
             </button>
           </div>
           <p className="resume-helper" id="jd-url-helper">
-            사람인 JD 링크는 자동 본문 수집을 먼저 시도합니다. 실패하면 직접 붙여넣기 방식으로 바로 복구할 수 있습니다.
+            실패하면 JD 본문을 직접 붙여넣어 주세요.
           </p>
           {jdUrlError ? (
             <p className="resume-error" id="jd-url-error" role="alert">
-              {jdUrlError}
-            </p>
-          ) : null}
+            {jdUrlError}
+          </p>
+        ) : null}
         </div>
 
-        <StatusMessage
-          badge={getBadge(jdFetchStatus)}
-          title={jdFetchTitle}
-          message={jdFetchMessage}
-          tone={getTone(jdFetchStatus)}
-          withLoadingBar={jdFetchStatus === 'fetching'}
-        />
-      </div>
+        {jdFetchStatus !== 'idle' ? (
+          <StatusMessage
+            badge={getBadge(jdFetchStatus)}
+            title={jdFetchTitle}
+            message={
+              jdFetchStatus === 'fetch-error'
+                ? '불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.'
+                : jdFetchMessage
+            }
+            tone={getTone(jdFetchStatus)}
+            withLoadingBar={jdFetchStatus === 'fetching'}
+          />
+        ) : null}
+      </details>
     </div>
   )
 }
