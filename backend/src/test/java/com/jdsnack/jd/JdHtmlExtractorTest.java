@@ -200,6 +200,16 @@ class JdHtmlExtractorTest {
     }
 
     @Test
+    void shortSaraminCandidateThrowsEmptyContent() throws IOException {
+        String html = fixture("jd/fixtures/saramin-short-content.html");
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=333333"));
+
+        assertEquals("JD_FETCH_EMPTY_CONTENT", exception.errorCode().name());
+    }
+
+    @Test
     void privacyAndFooterOnlyFixtureThrowsUnsupportedSource() throws IOException {
         String html = fixture("jd/fixtures/saramin-privacy-footer-only.html");
 
