@@ -4,6 +4,7 @@
 
 - 로컬 통합 실행은 백엔드를 `ai-local` 모드로 띄워야 한다.
 - fixture 모드는 기본 통합 실행 경로가 아니라 테스트 안전망으로 유지한다.
+- CI smoke는 외부 키 없이 실행되므로 fixture mode override를 허용한다.
 
 ## `REQ-02` 로컬 `.env` 기반 Gemini 설정
 

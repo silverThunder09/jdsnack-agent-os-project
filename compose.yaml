@@ -7,7 +7,7 @@ services:
       - path: .env
         required: false
     environment:
-      JDSNACK_DIAGNOSIS_MODE: ai-local
+      JDSNACK_DIAGNOSIS_MODE: ${JDSNACK_DIAGNOSIS_MODE:-ai-local}
     ports:
       - "8080:8080"
 

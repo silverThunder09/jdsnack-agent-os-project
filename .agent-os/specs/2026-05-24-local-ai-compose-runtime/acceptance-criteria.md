@@ -2,7 +2,8 @@
 
 ## `AC-01` compose ai-local 모드
 
-- `compose.yaml`의 백엔드 환경 변수는 `JDSNACK_DIAGNOSIS_MODE=ai-local`이어야 한다.
+- `compose.yaml`의 백엔드 기본 환경 변수는 `JDSNACK_DIAGNOSIS_MODE=ai-local`이어야 한다.
+- CI smoke는 `JDSNACK_DIAGNOSIS_MODE=fixture`로 override할 수 있어야 한다.
 
 ## `AC-02` 선택적 `.env` 참조
 

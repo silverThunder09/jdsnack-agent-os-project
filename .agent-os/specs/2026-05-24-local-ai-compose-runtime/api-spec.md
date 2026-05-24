@@ -5,8 +5,10 @@
 `docker compose up --build`는 백엔드를 `ai-local` 모드로 실행한다.
 
 ```yaml
-JDSNACK_DIAGNOSIS_MODE: ai-local
+JDSNACK_DIAGNOSIS_MODE: ${JDSNACK_DIAGNOSIS_MODE:-ai-local}
 ```
+
+CI smoke는 외부 키 없이 안정적으로 검증하기 위해 `JDSNACK_DIAGNOSIS_MODE=fixture`로 override한다.
 
 ## Environment Contract
 

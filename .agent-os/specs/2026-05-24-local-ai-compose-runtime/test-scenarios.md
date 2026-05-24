@@ -7,7 +7,7 @@
   - `docker compose config --no-interpolate`를 실행한다.
 - 기대 결과:
   - compose 설정이 유효하다.
-  - 백엔드 환경 변수에 `JDSNACK_DIAGNOSIS_MODE=ai-local`이 포함된다.
+  - 백엔드 환경 변수에 `JDSNACK_DIAGNOSIS_MODE=${JDSNACK_DIAGNOSIS_MODE:-ai-local}`이 포함된다.
   - 실제 `.env` 값은 출력하지 않는다.
 
 ## `TC-02` `.env` 미추적 확인
@@ -26,3 +26,4 @@
   - PR에서 Docs Harness, Backend CI, Frontend CI, Container Flow를 확인한다.
 - 기대 결과:
   - `.env`가 없는 CI 환경에서도 필수 체크가 통과한다.
+  - compose smoke는 `fixture` override로 기존 fixture 검증을 유지한다.
