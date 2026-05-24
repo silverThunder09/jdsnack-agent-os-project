@@ -140,6 +140,76 @@ class JdHtmlExtractorTest {
     }
 
     @Test
+    void extractsSaraminFixtureAndDetectsSourceSite() throws IOException {
+        String html = fixture("jd/fixtures/saramin-backend-engineer.html");
+
+        JdFetchResponse response = extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=123456");
+
+        assertEquals("백엔드 엔지니어 채용", response.title());
+        assertEquals("saramin", response.sourceSite());
+        assertEquals(
+                "Spring Boot 기반 API 설계와 운영을 담당합니다. MySQL, Redis, 메시지 큐 기반 서비스 개발 경험이 필요합니다. 테스트 자동화와 장애 대응 경험을 우대합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
+    void prefersSaraminRecruitDetailOverAiMatchPanel() throws IOException {
+        String html = fixture("jd/fixtures/saramin-ai-match-noise.html");
+
+        JdFetchResponse response = extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=222222");
+
+        assertEquals("saramin", response.sourceSite());
+        assertEquals(
+                "백엔드 서비스 아키텍처를 설계하고 운영합니다. Java, Spring Boot 기반 서비스 개발 경험이 필요합니다. 장애 대응과 테스트 자동화 경험을 우대합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
+    void extractsSaraminDdContentInsteadOfAiMatchIntro() throws IOException {
+        String html = fixture("jd/fixtures/saramin-ai-match-dd-content.html");
+
+        JdFetchResponse response = extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=53849067");
+
+        assertEquals("saramin", response.sourceSite());
+        assertEquals(
+                "Java/JSP 기반 웹 서비스를 개발합니다. Spring Framework와 Oracle 또는 MySQL 경험이 필요합니다. 협업과 유지보수 경험을 우대합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
+    void rejectsSaraminBadRequestErrorPage() throws IOException {
+        String html = fixture("jd/fixtures/saramin-http-bad-request.html");
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=53849067"));
+
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", exception.errorCode().name());
+    }
+
+    @Test
+    void rejectsSaraminAiMatchIntroOnlyPage() throws IOException {
+        String html = fixture("jd/fixtures/saramin-ai-match-intro-only.html");
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=53849067"));
+
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", exception.errorCode().name());
+    }
+
+    @Test
+    void privacyAndFooterOnlyFixtureThrowsUnsupportedSource() throws IOException {
+        String html = fixture("jd/fixtures/saramin-privacy-footer-only.html");
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=999999"));
+
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", exception.errorCode().name());
+    }
+
+    @Test
     void emptyCandidateThrowsEmptyContent() {
         String html = """
                 <html>
