@@ -99,4 +99,20 @@ class JdFetchControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error.code").value("JD_FETCH_UNSUPPORTED_SOURCE"));
     }
+
+    @Test
+    void fetchFailureReturnsBadGateway() throws Exception {
+        given(jdFetchService.fetch(any()))
+                .willThrow(new ApiException(ErrorCode.JD_FETCH_FAILED));
+
+        mockMvc.perform(post("/api/jd/fetch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "jdUrl": "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=123456"
+                                }
+                                """))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("JD_FETCH_FAILED"));
+    }
 }
