@@ -35,6 +35,15 @@ public class JdHtmlExtractor {
             "[id*=detail]",
             "div"
     );
+    private static final List<String> SARAMIN_CANDIDATE_SELECTORS = List.of(
+            ".recruit_detail",
+            ".recruit_view",
+            ".wrap_jv_cont",
+            ".jv_cont",
+            ".job-description",
+            "#content .recruit_detail",
+            "#content .job-description"
+    );
     private static final Set<String> PRIORITY_HINTS = Set.of(
             "job", "description", "detail", "posting", "position", "role", "opening", "hiring",
             "jd", "requirement", "qualification", "responsibility", "about", "overview",
@@ -94,12 +103,30 @@ public class JdHtmlExtractor {
             "[id*=cta]",
             "[id*=apply]"
     );
+    private static final List<String> SARAMIN_NOISE_SELECTORS = List.of(
+            "[class*=ai_match]",
+            "[class*=aimatch]",
+            "[class*=ai-recommend]",
+            "[class*=recommend]",
+            "[class*=similar_recruit]",
+            "[class*=other_recruit]",
+            "[class*=advert]",
+            "[id*=ai_match]",
+            "[id*=aimatch]",
+            "[id*=recommend]",
+            "[id*=similar]"
+    );
+    private static final Set<String> SARAMIN_NOISE_HINTS = Set.of(
+            "ai매치", "ai match", "매치율", "추천공고", "유사공고", "다른 공고", "다른채용", "공고를 추천",
+            "similar jobs", "recommended jobs", "recommended role", "match score"
+    );
 
     public JdFetchResponse extract(String html, String sourceUrl) {
         Document document = Jsoup.parse(html, sourceUrl);
-        sanitize(document);
+        String sourceSite = detectSourceSite(sourceUrl);
+        sanitize(document, sourceSite);
 
-        Element candidate = findCandidate(document);
+        Element candidate = findCandidate(document, sourceSite);
         if (candidate == null) {
             throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
         }
@@ -118,23 +145,52 @@ public class JdHtmlExtractor {
                 sourceUrl,
                 title,
                 FETCH_MODE,
-                detectSourceSite(sourceUrl)
+                sourceSite
         );
     }
 
-    private void sanitize(Document document) {
+    private void sanitize(Document document, String sourceSite) {
         document.select("script, style, noscript, nav, footer, header, form, button, svg, aside").remove();
         for (String selector : NOISE_SELECTORS) {
             document.select(selector).remove();
         }
+        if ("saramin".equals(sourceSite)) {
+            for (String selector : SARAMIN_NOISE_SELECTORS) {
+                document.select(selector).remove();
+            }
+        }
         document.select("[class], [id]").removeIf(this::isNoiseContainer);
     }
 
-    private Element findCandidate(Document document) {
+    private Element findCandidate(Document document, String sourceSite) {
+        if ("saramin".equals(sourceSite)) {
+            Element saraminCandidate = findSiteSpecificCandidate(document, SARAMIN_CANDIDATE_SELECTORS);
+            if (saraminCandidate != null) {
+                return saraminCandidate;
+            }
+        }
+
         Elements candidates = new Elements();
         Set<Element> seen = new LinkedHashSet<>();
 
         for (String selector : CANDIDATE_SELECTORS) {
+            for (Element element : document.select(selector)) {
+                if (seen.add(element)) {
+                    candidates.add(element);
+                }
+            }
+        }
+
+        return candidates.stream()
+                .filter(this::hasMeaningfulText)
+                .max(Comparator.comparingInt(this::scoreCandidate))
+                .orElse(null);
+    }
+
+    private Element findSiteSpecificCandidate(Document document, List<String> selectors) {
+        Elements candidates = new Elements();
+        Set<Element> seen = new LinkedHashSet<>();
+        for (String selector : selectors) {
             for (Element element : document.select(selector)) {
                 if (seen.add(element)) {
                     candidates.add(element);
@@ -218,6 +274,11 @@ public class JdHtmlExtractor {
                 return true;
             }
         }
+        for (String hint : SARAMIN_NOISE_HINTS) {
+            if (attributes.contains(hint)) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -280,6 +341,11 @@ public class JdHtmlExtractor {
 
         for (String hint : NOISE_HINTS) {
             if (normalized.contains(hint) && normalized.length() < 120) {
+                return true;
+            }
+        }
+        for (String hint : SARAMIN_NOISE_HINTS) {
+            if (normalized.contains(hint) && normalized.length() < 160) {
                 return true;
             }
         }
