@@ -102,6 +102,33 @@ class JdFetchServiceTest {
     }
 
     @Test
+    void interruptedFetchReturnsBadGateway() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
+        doThrow(new InterruptedException("interrupted"))
+                .when(httpClient)
+                .send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> service.fetch(new JdFetchRequest("https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=123456")));
+
+        assertEquals("JD_FETCH_FAILED", exception.errorCode().name());
+    }
+
+    @Test
+    void nonSuccessfulHttpStatusReturnsBadGateway() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(302, "<html><body>redirect</body></html>"));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> service.fetch(new JdFetchRequest("https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=123456")));
+
+        assertEquals("JD_FETCH_FAILED", exception.errorCode().name());
+    }
+
+    @Test
     void oversizedResponseReturnsBadGateway() throws Exception {
         HttpClient httpClient = mock(HttpClient.class);
         JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
