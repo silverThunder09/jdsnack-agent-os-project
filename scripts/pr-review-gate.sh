@@ -80,7 +80,7 @@ while IFS= read -r file; do
       add_agent "Frontend Engineer"
       add_agent "QA Reviewer"
       ;;
-    .agent-os/specs/*|docs/api/*|docs/architecture/*)
+    .agent-os/specs/*|docs/architecture/*)
       has_specs=1
       add_agent "Spec Steward"
       add_agent "QA Reviewer"

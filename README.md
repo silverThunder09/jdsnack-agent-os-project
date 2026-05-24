@@ -47,10 +47,7 @@ jdsnack-agent-os/
 ├── .codex/
 │   └── agents/
 ├── docs/
-│   ├── api/
-│   ├── erd/
-│   ├── architecture/
-│   └── troubleshooting/
+│   └── architecture/
 ├── backend/
 ├── frontend/
 └── scripts/
