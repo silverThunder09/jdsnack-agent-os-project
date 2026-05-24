@@ -127,13 +127,13 @@ docs(pr): tighten pr scope rules
 
 ## PR 제목
 
-커밋 메시지와 같은 형식을 사용하되, 요약은 한국어로 작성합니다.
+커밋 메시지와 같은 Conventional Commits 형식을 사용합니다.
 
 ```text
 <type>(<scope>): <summary>
 ```
 
-`type(scope)` 접두어는 영어를 유지하고, `<summary>`는 한국어로 씁니다.
+`type(scope)` 접두어는 영어를 사용하고, `<summary>`는 작업 맥락에 맞는 언어를 선택합니다.
 
 예시:
 
@@ -142,13 +142,15 @@ feat(api): 이력서 진단 API 추가
 docs(harness): Git 운영 규칙 추가
 fix(jd): 사람인 AI매치 노이즈 제거
 test(jd): 사람인 fixture 검증 추가
+feat(frontend): add resume upload flow
+docs(pr): tighten pr scope rules
 ```
 
 예외:
 
 - API path, 에러 코드, 클래스명, 브랜치명은 영어를 유지합니다.
 - 외부 도구가 생성한 고정 check 이름은 영어를 유지할 수 있습니다.
-- PR 본문은 `.github/pull_request_template.md`의 한국어 섹션을 채웁니다.
+- PR 본문은 `.github/pull_request_template.md`를 기준으로 채웁니다.
 
 ## PR 본문 템플릿
 

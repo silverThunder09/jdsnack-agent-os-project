@@ -2,7 +2,7 @@
 
 - TBD
 
-<!-- PR 제목은 `docs(spec): 사람인 JD 수집 안정화 스펙 추가`처럼 type(scope)는 영어, 요약은 한국어로 작성합니다. -->
+<!-- PR 제목은 Conventional Commits 형식(type(scope): summary)을 사용합니다. -->
 
 ## 범위 판단
 
