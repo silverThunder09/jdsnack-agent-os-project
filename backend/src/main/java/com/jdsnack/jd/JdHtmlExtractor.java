@@ -74,6 +74,11 @@ public class JdHtmlExtractor {
             "privacy", "privacy policy", "terms of service", "customer support", "help center",
             "copyright", "all rights reserved"
     );
+    private static final Set<String> ERROR_PAGE_HINTS = Set.of(
+            "http_bad_request", "bad request", "잘못된 요청", "요청하신 페이지를 찾을 수 없습니다",
+            "비정상적인 접근", "정상적인 경로로 접근", "서비스 이용에 불편을 드려 죄송합니다",
+            "오류가 발생하였습니다", "error", "접속이 제한"
+    );
     private static final List<String> NOISE_SELECTORS = List.of(
             "[hidden]",
             "[aria-hidden=true]",
@@ -134,6 +139,9 @@ public class JdHtmlExtractor {
 
         String title = extractTitle(document);
         String jdText = trimDuplicatedTitlePrefix(extractCandidateText(candidate, title, sourceSite), title);
+        if (looksLikeErrorPage(document, jdText, title)) {
+            throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
+        }
         if (jdText.length() < MIN_CONTENT_LENGTH) {
             throw new ApiException(ErrorCode.JD_FETCH_EMPTY_CONTENT);
         }
@@ -515,5 +523,15 @@ public class JdHtmlExtractor {
         }
 
         return disqualifyingCount < jdSignalCount;
+    }
+
+    private boolean looksLikeErrorPage(Document document, String jdText, String title) {
+        String combined = normalize(title + " " + jdText + " " + document.title()).toLowerCase(Locale.ROOT);
+        for (String hint : ERROR_PAGE_HINTS) {
+            if (combined.contains(hint)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
