@@ -14,3 +14,11 @@
 
 - `AGENTS.md`는 커스텀 에이전트 위치를 `.codex/agents/`로 안내해야 한다.
 - 활성 spec은 항상 최신 기획 1개만 유지한다.
+
+## `REQ-04` 쓰레드별 중복 호출 방지
+
+- 계획 쓰레드는 기본적으로 `Spec Steward`만 호출해야 한다.
+- 개발 쓰레드는 변경 대상에 따라 `Backend Engineer` 또는 `Frontend Engineer` 중 하나를 기본 호출해야 한다.
+- 검증 쓰레드는 기본적으로 `QA Reviewer`만 호출해야 한다.
+- `Security Reviewer`, `DevOps Steward`, `Release Captain`은 해당 위험이 실제로 있을 때만 조건부로 호출해야 한다.
+- handoff가 있으면 다음 쓰레드는 handoff를 먼저 읽고 같은 검토를 반복하지 않아야 한다.

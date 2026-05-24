@@ -29,7 +29,7 @@ JDSnack의 변경은 직접 `main`에 푸시하지 않습니다.
 2. 체크포인트에 `Standard`로 기록합니다.
 3. 관련 문서를 확인하고 구현합니다.
 4. 관련 로컬 테스트를 통과시킵니다.
-5. 담당 에이전트와 `QA Reviewer` 기준으로 검토합니다.
+5. 현재 쓰레드의 기본 에이전트 기준으로 검토합니다.
 6. 커밋 후 PR을 생성합니다.
 7. 관련 CI가 통과하면 머지합니다.
 
@@ -56,18 +56,23 @@ JDSnack의 변경은 직접 `main`에 푸시하지 않습니다.
 | 위험도 | 기본 리뷰어 | 비고 |
 |---|---|---|
 | `Light` | 작성자 | 관련 CI 통과 중심 |
-| `Standard` | 담당 에이전트, `QA Reviewer` | 보안 이슈가 있으면 `Security Reviewer` 추가 |
-| `High-risk` | `QA Reviewer`, `Security Reviewer`, `DevOps Steward`, `Release Captain` | 변경 내용에 따라 `Spec Steward` 추가 |
+| `Standard` | 현재 쓰레드 기본 에이전트 | 검증 쓰레드로 넘어갈 때만 `QA Reviewer`가 본다 |
+| `High-risk` | 현재 쓰레드 기본 에이전트, 필요한 조건부 에이전트 | 보안/배포/릴리즈 위험이 있을 때만 추가 |
 
 ## 담당 에이전트 매핑
 
-| 변경 범위 | 필수 검사 에이전트 |
+| 변경 범위 | 기본 검사 에이전트 |
 |---|---|
-| 요구사항, API/UI 계약 | `Spec Steward`, `QA Reviewer` |
-| `backend/**` | `Backend Engineer`, `QA Reviewer` |
-| `frontend/**` | `Frontend Engineer`, `QA Reviewer` |
-| `.github/**`, CI/CD, Docker | `DevOps Steward`, `Release Captain` |
-| 외부 AI, 비밀값, 로그 정책 | `Security Reviewer`, `QA Reviewer` |
+| 요구사항, API/UI 계약 | `Spec Steward` |
+| `backend/**` | `Backend Engineer` |
+| `frontend/**` | `Frontend Engineer` |
+| 최종 검증 | `QA Reviewer` |
+| `.github/**`, CI/CD, Docker | `DevOps Steward` |
+| 외부 AI, 비밀값, 로그 정책 | `Security Reviewer` |
+| PR/머지/릴리즈 판단 | `Release Captain` |
+
+한 PR에서 여러 범위가 섞여도 같은 쓰레드에서 모든 에이전트를 중복 호출하지 않습니다.
+각 쓰레드는 자신의 기본 에이전트로 처리하고, 다음 쓰레드는 handoff를 입력으로 이어받습니다.
 
 ## PR 생성 조건
 

@@ -9,6 +9,8 @@
 - `.codex/agents/*.toml` 추가
 - `.agent-os/agents/*.md` 제거
 - `AGENTS.md`, `README.md`, `sub-agent-operations.md` 참조 최신화
+- 계획, 개발, 검증 쓰레드별 기본 에이전트 1개 원칙 문서화
+- 조건부 에이전트 호출 기준 문서화
 - 활성 spec 최신화
 
 ## 제외 범위
