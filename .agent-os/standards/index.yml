@@ -1,6 +1,11 @@
 # JDSnack Agent OS 표준 문서 인덱스
 
 documents:
+  product:
+    - .agent-os/product/mission.md
+    - .agent-os/product/roadmap.md
+    - .agent-os/product/tech-stack.md
+    - .agent-os/product/glossary.md
   harness:
     - .agent-os/standards/codex-harness.md
     - .agent-os/standards/sub-agent-operations.md

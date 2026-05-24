@@ -31,11 +31,13 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 
 ## 커밋 메시지 규칙
 
-커밋 메시지는 Conventional Commits를 기본으로 사용합니다.
+커밋 메시지는 Conventional Commits를 기본으로 사용하되, 요약은 한국어로 작성합니다.
 
 ```text
 <type>(<scope>): <summary>
 ```
+
+`type(scope)` 접두어는 영어를 유지하고, `<summary>`는 한국어로 씁니다.
 
 예시:
 
@@ -87,6 +89,7 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 ## 금지
 
 - `wip`, `temp`, `fix stuff`, `update` 같은 의미 없는 커밋 메시지
+- 영어 요약만 있는 PR 제목 또는 커밋 메시지
 - 문서 계약 변경 없는 API 변경
 - 테스트 시나리오 없는 수용 기준 변경
 - 여러 기능을 한 PR에 섞는 변경

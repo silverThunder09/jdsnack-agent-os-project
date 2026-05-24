@@ -39,6 +39,7 @@ jdsnack-agent-os/
 - 제품 목적: `.agent-os/product/mission.md`
 - 로드맵: `.agent-os/product/roadmap.md`
 - 기술 스택: `.agent-os/product/tech-stack.md`
+- 프로젝트 용어집: `.agent-os/product/glossary.md`
 - 현재 활성 spec: `.agent-os/specs/2026-05-24-saramin-jd-scraping-stabilization/`
 - 보관 spec: `.agent-os/archive/specs/`
 - 커스텀 에이전트: `.codex/agents/*.toml`
@@ -100,6 +101,7 @@ jdsnack-agent-os/
 2. 요구사항, 수용 기준, 테스트 시나리오를 맞춥니다.
 3. API/UI 계약을 기준으로 구현합니다.
 4. 구현 후 문서와 테스트가 같은 말을 하는지 확인합니다.
+5. PR 제목과 본문은 한국어로 작성합니다.
 
 ## 다음 구현 우선순위
 
