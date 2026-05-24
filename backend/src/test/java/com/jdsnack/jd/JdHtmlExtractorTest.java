@@ -140,6 +140,30 @@ class JdHtmlExtractorTest {
     }
 
     @Test
+    void extractsSaraminFixtureAndDetectsSourceSite() throws IOException {
+        String html = fixture("jd/fixtures/saramin-backend-engineer.html");
+
+        JdFetchResponse response = extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=123456");
+
+        assertEquals("백엔드 엔지니어 채용", response.title());
+        assertEquals("saramin", response.sourceSite());
+        assertEquals(
+                "Spring Boot 기반 API 설계와 운영을 담당합니다. MySQL, Redis, 메시지 큐 기반 서비스 개발 경험이 필요합니다. 테스트 자동화와 장애 대응 경험을 우대합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
+    void privacyAndFooterOnlyFixtureThrowsUnsupportedSource() throws IOException {
+        String html = fixture("jd/fixtures/saramin-privacy-footer-only.html");
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=999999"));
+
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", exception.errorCode().name());
+    }
+
+    @Test
     void emptyCandidateThrowsEmptyContent() {
         String html = """
                 <html>

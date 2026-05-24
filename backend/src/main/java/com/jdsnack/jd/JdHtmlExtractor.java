@@ -60,6 +60,11 @@ public class JdHtmlExtractor {
             "개발", "설계", "운영", "경험", "필요", "우대", "자격", "요건", "책임", "역할",
             "서비스", "플랫폼", "백엔드", "테스트", "배포", "장애", "협업", "구현", "분석"
     );
+    private static final Set<String> DISQUALIFYING_HINTS = Set.of(
+            "개인정보", "개인정보처리방침", "이용약관", "고객센터", "채용 절차", "채용절차", "유의사항",
+            "privacy", "privacy policy", "terms of service", "customer support", "help center",
+            "copyright", "all rights reserved"
+    );
     private static final List<String> NOISE_SELECTORS = List.of(
             "[hidden]",
             "[aria-hidden=true]",
@@ -104,12 +109,16 @@ public class JdHtmlExtractor {
         if (jdText.length() < MIN_CONTENT_LENGTH) {
             throw new ApiException(ErrorCode.JD_FETCH_EMPTY_CONTENT);
         }
+        if (!hasMinimumJdQuality(jdText)) {
+            throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
+        }
 
         return new JdFetchResponse(
                 jdText,
                 sourceUrl,
                 title,
-                FETCH_MODE
+                FETCH_MODE,
+                detectSourceSite(sourceUrl)
         );
     }
 
@@ -403,5 +412,36 @@ public class JdHtmlExtractor {
             }
         }
         return text;
+    }
+
+    private String detectSourceSite(String sourceUrl) {
+        String normalized = sourceUrl == null ? "" : sourceUrl.toLowerCase(Locale.ROOT);
+        if (normalized.contains("saramin.co.kr")) {
+            return "saramin";
+        }
+        return "unknown";
+    }
+
+    private boolean hasMinimumJdQuality(String text) {
+        String normalized = text.toLowerCase(Locale.ROOT);
+        int jdSignalCount = 0;
+        for (String hint : JD_CONTENT_HINTS) {
+            if (containsHint(normalized, hint)) {
+                jdSignalCount++;
+            }
+        }
+
+        if (jdSignalCount == 0) {
+            return false;
+        }
+
+        int disqualifyingCount = 0;
+        for (String hint : DISQUALIFYING_HINTS) {
+            if (containsHint(normalized, hint)) {
+                disqualifyingCount++;
+            }
+        }
+
+        return disqualifyingCount < jdSignalCount;
     }
 }

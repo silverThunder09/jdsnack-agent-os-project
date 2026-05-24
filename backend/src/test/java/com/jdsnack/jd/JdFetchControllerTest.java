@@ -33,7 +33,8 @@ class JdFetchControllerTest {
                         "Spring Boot 기반 REST API 개발과 운영 경험이 필요합니다. 테스트 자동화와 배포 경험이 있으면 좋습니다.",
                         "https://example.com/jobs/backend",
                         "Backend Engineer",
-                        "static-html"
+                        "static-html",
+                        "saramin"
                 ));
 
         mockMvc.perform(post("/api/jd/fetch")
@@ -47,7 +48,8 @@ class JdFetchControllerTest {
                 .andExpect(jsonPath("$.data.jdText").isString())
                 .andExpect(jsonPath("$.data.sourceUrl").value("https://example.com/jobs/backend"))
                 .andExpect(jsonPath("$.data.title").value("Backend Engineer"))
-                .andExpect(jsonPath("$.data.fetchMode").value("static-html"));
+                .andExpect(jsonPath("$.data.fetchMode").value("static-html"))
+                .andExpect(jsonPath("$.data.sourceSite").value("saramin"));
     }
 
     @Test
