@@ -3,8 +3,11 @@ services:
     build:
       context: ./backend
     container_name: jdsnack-backend
+    env_file:
+      - path: .env
+        required: false
     environment:
-      JDSNACK_DIAGNOSIS_MODE: fixture
+      JDSNACK_DIAGNOSIS_MODE: ${JDSNACK_DIAGNOSIS_MODE:-ai-local}
     ports:
       - "8080:8080"
 

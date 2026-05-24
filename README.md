@@ -2,7 +2,7 @@
 
 JDSnack은 개발자 이력서와 JD를 AI로 분석해 개선 피드백과 매칭 인사이트를 제공하는 것을 목표로 하는 웹 서비스 프로젝트입니다.
 
-현재 활성 기획은 JD 링크 수집 안정화입니다. 과거 MVP 명세는 토큰 낭비를 줄이기 위해 `.agent-os/archive/specs/`에 보관합니다.
+현재 활성 기획은 로컬 AI compose 런타임 전환입니다. 과거 MVP 명세는 토큰 낭비를 줄이기 위해 `.agent-os/archive/specs/`에 보관합니다.
 
 이 저장소는 서비스 코드와 문서 하네스를 함께 관리합니다. 쉽게 말하면, `backend/`와 `frontend/`가 실제 제품을 만들고, `.agent-os/`와 `docs/`가 그 제품을 어떻게 만들지 정해주는 설계도 역할을 합니다.
 
@@ -37,9 +37,9 @@ jdsnack-agent-os/
 - 제품 목적: `.agent-os/product/mission.md`
 - 로드맵: `.agent-os/product/roadmap.md`
 - 기술 스택: `.agent-os/product/tech-stack.md`
-- 현재 활성 spec: `.agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp/`
+- 현재 활성 spec: `.agent-os/specs/2026-05-24-local-ai-compose-runtime/`
 - 보관 spec: `.agent-os/archive/specs/`
-- API 상세 문서: `.agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp/api-spec.md`
+- API 상세 문서: `.agent-os/specs/2026-05-24-local-ai-compose-runtime/api-spec.md`
 - 아키텍처 상세 문서: `docs/architecture/`
 - CI 기준 문서: `.agent-os/operations/ci-checklist.md`
 - CD 기준 문서: `.agent-os/operations/cd-checklist.md`
@@ -112,6 +112,8 @@ jdsnack-agent-os/
 ```bash
 docker compose up --build
 ```
+
+`compose.yaml`의 기본 백엔드 모드는 `ai-local`입니다. 로컬 실사용 전 루트 `.env`에 `GEMINI_API_KEY`를 준비해야 하며, `.env`는 커밋하지 않습니다.
 
 접속 주소:
 

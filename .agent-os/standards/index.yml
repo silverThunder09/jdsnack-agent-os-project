@@ -45,6 +45,6 @@ documents:
     - scripts/smoke-test.sh
     - scripts/google-test.sh
 active_specs:
-  - .agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp
+  - .agent-os/specs/2026-05-24-local-ai-compose-runtime
 archived_specs:
   - .agent-os/archive/specs
