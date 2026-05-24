@@ -124,7 +124,7 @@ public class JdHtmlExtractor {
     private static final Set<String> SARAMIN_NOISE_HINTS = Set.of(
             "ai매치", "ai match", "매치율", "추천공고", "유사공고", "다른 공고", "다른채용", "공고를 추천",
             "similar jobs", "recommended jobs", "recommended role", "match score",
-            "사람인 인공지능 기술 기반으로 맞춤 공고를 추천해드리는 사람인의 채용정보제공 서비스입니다"
+            "사람인 인공지능 기술 기반", "맞춤 공고를 추천해드리는", "채용정보제공 서비스입니다"
     );
 
     public JdFetchResponse extract(String html, String sourceUrl) {
@@ -138,11 +138,18 @@ public class JdHtmlExtractor {
         }
 
         String title = extractTitle(document);
+        String candidateText = normalize(candidate.text());
         String jdText = trimDuplicatedTitlePrefix(extractCandidateText(candidate, title, sourceSite), title);
         if (looksLikeErrorPage(document, jdText, title)) {
             throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
         }
+        if ("saramin".equals(sourceSite) && jdText.isBlank() && !candidateText.isBlank()) {
+            throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
+        }
         if (jdText.length() < MIN_CONTENT_LENGTH) {
+            if ("saramin".equals(sourceSite) && containsSaraminNoise(candidateText)) {
+                throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
+            }
             throw new ApiException(ErrorCode.JD_FETCH_EMPTY_CONTENT);
         }
         if (!hasMinimumJdQuality(jdText)) {
@@ -320,8 +327,12 @@ public class JdHtmlExtractor {
             return normalize(String.join(" ", refinedParts));
         }
 
-        if (!paragraphParts.isEmpty()) {
+        if (!paragraphParts.isEmpty() && hasMeaningfulJdSignals(paragraphParts)) {
             return normalize(String.join(" ", trimPromotionalLead(paragraphParts)));
+        }
+
+        if ("saramin".equals(sourceSite)) {
+            return "";
         }
 
         return normalize(sanitizedCandidate.text());
@@ -504,12 +515,7 @@ public class JdHtmlExtractor {
 
     private boolean hasMinimumJdQuality(String text) {
         String normalized = text.toLowerCase(Locale.ROOT);
-        int jdSignalCount = 0;
-        for (String hint : JD_CONTENT_HINTS) {
-            if (containsHint(normalized, hint)) {
-                jdSignalCount++;
-            }
-        }
+        int jdSignalCount = countJdSignals(normalized);
 
         if (jdSignalCount == 0) {
             return false;
@@ -525,10 +531,41 @@ public class JdHtmlExtractor {
         return disqualifyingCount < jdSignalCount;
     }
 
+    private boolean hasMeaningfulJdSignals(List<String> parts) {
+        int signalCount = 0;
+        for (String part : parts) {
+            signalCount += countJdSignals(part.toLowerCase(Locale.ROOT));
+            if (signalCount >= 2) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int countJdSignals(String normalized) {
+        int jdSignalCount = 0;
+        for (String hint : JD_CONTENT_HINTS) {
+            if (containsHint(normalized, hint)) {
+                jdSignalCount++;
+            }
+        }
+        return jdSignalCount;
+    }
+
     private boolean looksLikeErrorPage(Document document, String jdText, String title) {
         String combined = normalize(title + " " + jdText + " " + document.title()).toLowerCase(Locale.ROOT);
         for (String hint : ERROR_PAGE_HINTS) {
             if (combined.contains(hint)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsSaraminNoise(String text) {
+        String normalized = text.toLowerCase(Locale.ROOT);
+        for (String hint : SARAMIN_NOISE_HINTS) {
+            if (normalized.contains(hint)) {
                 return true;
             }
         }

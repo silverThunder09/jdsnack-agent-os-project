@@ -190,6 +190,16 @@ class JdHtmlExtractorTest {
     }
 
     @Test
+    void rejectsSaraminAiMatchIntroOnlyPage() throws IOException {
+        String html = fixture("jd/fixtures/saramin-ai-match-intro-only.html");
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=53849067"));
+
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", exception.errorCode().name());
+    }
+
+    @Test
     void privacyAndFooterOnlyFixtureThrowsUnsupportedSource() throws IOException {
         String html = fixture("jd/fixtures/saramin-privacy-footer-only.html");
 
