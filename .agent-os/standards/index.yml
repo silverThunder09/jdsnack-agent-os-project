@@ -53,6 +53,6 @@ documents:
     - .codex/agents/devops-steward.toml
     - .codex/agents/release-captain.toml
 active_specs:
-  - .agent-os/specs/2026-05-24-custom-agent-toml
+  - .agent-os/specs/2026-05-24-saramin-jd-scraping-stabilization
 archived_specs:
   - .agent-os/archive/specs
