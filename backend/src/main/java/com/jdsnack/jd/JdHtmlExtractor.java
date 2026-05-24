@@ -118,7 +118,8 @@ public class JdHtmlExtractor {
     );
     private static final Set<String> SARAMIN_NOISE_HINTS = Set.of(
             "ai매치", "ai match", "매치율", "추천공고", "유사공고", "다른 공고", "다른채용", "공고를 추천",
-            "similar jobs", "recommended jobs", "recommended role", "match score"
+            "similar jobs", "recommended jobs", "recommended role", "match score",
+            "사람인 인공지능 기술 기반으로 맞춤 공고를 추천해드리는 사람인의 채용정보제공 서비스입니다"
     );
 
     public JdFetchResponse extract(String html, String sourceUrl) {
@@ -132,7 +133,7 @@ public class JdHtmlExtractor {
         }
 
         String title = extractTitle(document);
-        String jdText = trimDuplicatedTitlePrefix(extractCandidateText(candidate, title), title);
+        String jdText = trimDuplicatedTitlePrefix(extractCandidateText(candidate, title, sourceSite), title);
         if (jdText.length() < MIN_CONTENT_LENGTH) {
             throw new ApiException(ErrorCode.JD_FETCH_EMPTY_CONTENT);
         }
@@ -282,14 +283,19 @@ public class JdHtmlExtractor {
         return false;
     }
 
-    private String extractCandidateText(Element candidate, String title) {
+    private String extractCandidateText(Element candidate, String title, String sourceSite) {
         Element sanitizedCandidate = candidate.clone();
         removeNestedNoise(sanitizedCandidate);
         removeDuplicatedHeadings(sanitizedCandidate, title);
 
+        String blockSelector = "p, li";
+        if ("saramin".equals(sourceSite)) {
+            blockSelector = "dd, p, li, .jv_cont > div, .wrap_jv_cont > div, .cont";
+        }
+
         List<String> paragraphParts = new ArrayList<>();
         List<String> parts = new ArrayList<>();
-        for (Element block : sanitizedCandidate.select("p, li")) {
+        for (Element block : sanitizedCandidate.select(blockSelector)) {
             String text = normalize(block.text());
             if (text.isBlank()) {
                 continue;

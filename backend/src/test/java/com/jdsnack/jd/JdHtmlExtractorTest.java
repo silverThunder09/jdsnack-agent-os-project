@@ -167,6 +167,19 @@ class JdHtmlExtractorTest {
     }
 
     @Test
+    void extractsSaraminDdContentInsteadOfAiMatchIntro() throws IOException {
+        String html = fixture("jd/fixtures/saramin-ai-match-dd-content.html");
+
+        JdFetchResponse response = extractor.extract(html, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=53849067");
+
+        assertEquals("saramin", response.sourceSite());
+        assertEquals(
+                "Java/JSP 기반 웹 서비스를 개발합니다. Spring Framework와 Oracle 또는 MySQL 경험이 필요합니다. 협업과 유지보수 경험을 우대합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
     void privacyAndFooterOnlyFixtureThrowsUnsupportedSource() throws IOException {
         String html = fixture("jd/fixtures/saramin-privacy-footer-only.html");
 
