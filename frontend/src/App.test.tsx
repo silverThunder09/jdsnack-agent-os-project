@@ -61,9 +61,7 @@ describe('App', () => {
         '풀스택 경험은 분명하지만 프로젝트 성과를 수치로 더 드러내면 설득력이 커집니다.',
       ),
     ).toBeInTheDocument()
-    expect(
-      screen.getByRole('region', { name: '분석 기준 이력서 본문' }),
-    ).toHaveTextContent(validResumeText)
+    expect(screen.getByText('분석 기준 원문 보기')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
@@ -220,7 +218,7 @@ describe('App', () => {
       'Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구합니다.',
     )
     await user.type(
-      screen.getByRole('textbox', { name: 'JD 링크 (선택)' }),
+      screen.getByRole('textbox', { name: 'JD 링크' }),
       'https://example.com/jobs/backend',
     )
     await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
@@ -284,7 +282,7 @@ describe('App', () => {
 
     await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
     await user.type(screen.getByLabelText('JD 내용'), 'a'.repeat(80))
-    await user.type(screen.getByLabelText('JD 링크 (선택)'), 'not-a-url')
+    await user.type(screen.getByLabelText('JD 링크'), 'not-a-url')
     await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -315,7 +313,7 @@ describe('App', () => {
     await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
     await user.type(screen.getByLabelText('JD 내용'), 'b'.repeat(100))
     await user.type(
-      screen.getByLabelText('JD 링크 (선택)'),
+      screen.getByLabelText('JD 링크'),
       'https://example.com/jobs/backend',
     )
     await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
@@ -328,6 +326,71 @@ describe('App', () => {
         method: 'POST',
       }),
     )
+  })
+
+  it('JD 링크 자동 불러오기는 textarea를 채운다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      json: async () => ({
+        success: true,
+        data: {
+          jdText:
+            '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요합니다.',
+          sourceUrl: 'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+          title: '백엔드 엔지니어 채용',
+          fetchMode: 'static-html',
+          sourceSite: 'saramin',
+        },
+        timestamp: '2026-05-25T10:00:00.000+09:00',
+      }),
+    } as Response)
+
+    render(<App />)
+
+    await user.type(
+      screen.getByLabelText('JD 링크'),
+      'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+    )
+    await user.click(screen.getByRole('button', { name: '링크로 JD 불러오기' }))
+
+    expect(await screen.findByText('JD 본문을 불러왔습니다')).toBeInTheDocument()
+    expect(screen.getByLabelText('JD 내용')).toHaveValue(
+      '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요합니다.',
+    )
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/jd/fetch'),
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    )
+  })
+
+  it('JD 링크 자동 불러오기 실패 시 직접 붙여넣기 안내를 보여준다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      json: async () => ({
+        success: false,
+        error: {
+          code: 'JD_FETCH_UNSUPPORTED_SOURCE',
+          message: '지원하지 않는 JD 소스입니다.',
+        },
+        timestamp: '2026-05-25T10:00:00.000+09:00',
+      }),
+    } as Response)
+
+    render(<App />)
+
+    await user.type(
+      screen.getByLabelText('JD 링크'),
+      'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+    )
+    await user.click(screen.getByRole('button', { name: '링크로 JD 불러오기' }))
+
+    expect(
+      await screen.findByText(
+        '이 링크에서는 JD 본문을 확실히 추출하지 못했습니다. JD 내용 칸에 핵심 본문을 직접 붙여넣어 주세요.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('저장된 이력서를 다시 불러온다', () => {

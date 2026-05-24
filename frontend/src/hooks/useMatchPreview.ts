@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NetworkError, previewMatch } from '../services/api'
+import { fetchJdFromUrl, NetworkError, previewMatch } from '../services/api'
 import type { ApiErrorCode, MatchPreviewRequest, ResultState } from '../types/diagnosis'
 
 const idleState: ResultState = {
@@ -23,6 +23,48 @@ const textValidationMessages = {
 }
 
 const invalidUrlMessage = '올바른 JD 링크 형식을 입력해주세요.'
+
+type JdFetchStatus = 'idle' | 'fetching' | 'fetched' | 'fetch-error'
+
+interface JdFetchState {
+  status: JdFetchStatus
+  title: string
+  message: string
+}
+
+const jdFetchIdleState: JdFetchState = {
+  status: 'idle',
+  title: 'JD 링크에서 본문을 불러올 수 있습니다',
+  message:
+    '채용공고 링크를 넣고 불러오기를 누르면 자동 수집을 먼저 시도합니다. 실패하면 아래 JD 본문 칸에 직접 붙여넣으면 됩니다.',
+}
+
+const jdFetchLoadingState: JdFetchState = {
+  status: 'fetching',
+  title: 'JD 링크에서 본문을 불러오고 있습니다',
+  message:
+    '사람인 정적 HTML 기준으로 공고 본문을 확인하고 있습니다. 실패하면 직접 붙여넣기 안내로 이어집니다.',
+}
+
+function getJdFetchErrorMessage(code: ApiErrorCode, fallbackMessage: string): string {
+  if (code === 'JD_FETCH_UNSUPPORTED_SOURCE') {
+    return '이 링크에서는 JD 본문을 확실히 추출하지 못했습니다. JD 내용 칸에 핵심 본문을 직접 붙여넣어 주세요.'
+  }
+
+  if (code === 'JD_FETCH_EMPTY_CONTENT') {
+    return '링크는 읽었지만 JD 본문이 충분하지 않았습니다. 주요 업무와 자격요건을 직접 붙여넣어 주세요.'
+  }
+
+  if (code === 'JD_FETCH_FAILED') {
+    return 'JD 링크를 지금은 읽어오지 못했습니다. 잠시 후 다시 시도하거나 JD 본문을 직접 붙여넣어 주세요.'
+  }
+
+  if (code === 'INVALID_JD_URL') {
+    return invalidUrlMessage
+  }
+
+  return fallbackMessage
+}
 
 function isValidHttpUrl(value: string): boolean {
   try {
@@ -61,9 +103,11 @@ export function validateJdUrl(value: string): string {
 
 export function useMatchPreview() {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isFetchingJd, setIsFetchingJd] = useState(false)
   const [jdTextError, setJdTextError] = useState('')
   const [jdUrlError, setJdUrlError] = useState('')
   const [result, setResult] = useState<ResultState>(idleState)
+  const [jdFetchState, setJdFetchState] = useState<JdFetchState>(jdFetchIdleState)
 
   const clearErrors = () => {
     setJdTextError('')
@@ -72,6 +116,10 @@ export function useMatchPreview() {
 
   const resetResult = () => {
     setResult(idleState)
+  }
+
+  const resetJdFetchState = () => {
+    setJdFetchState(jdFetchIdleState)
   }
 
   const handleValidationError = (code: ApiErrorCode, message: string) => {
@@ -171,11 +219,78 @@ export function useMatchPreview() {
     }
   }
 
+  const fetchJd = async (
+    jdUrl: string,
+    handlers: {
+      onFetched: (jdText: string) => void
+      onBeforeChange?: () => void
+    },
+  ) => {
+    const nextUrlError = validateJdUrl(jdUrl)
+
+    if (nextUrlError) {
+      setJdUrlError(nextUrlError)
+      setJdFetchState({
+        status: 'fetch-error',
+        title: 'JD 링크 형식을 확인해 주세요',
+        message: nextUrlError,
+      })
+      return
+    }
+
+    clearErrors()
+    handlers.onBeforeChange?.()
+    setIsFetchingJd(true)
+    setJdFetchState(jdFetchLoadingState)
+
+    try {
+      const outcome = await fetchJdFromUrl(jdUrl.trim())
+
+      if (outcome.kind === 'success') {
+        handlers.onFetched(outcome.result.jdText)
+        setJdFetchState({
+          status: 'fetched',
+          title: 'JD 본문을 불러왔습니다',
+          message: '자동 수집된 본문을 JD 내용 칸에 채웠습니다. 필요하면 문구를 다듬은 뒤 비교를 진행해 주세요.',
+        })
+        return
+      }
+
+      const message = getJdFetchErrorMessage(outcome.code, outcome.message)
+      if (outcome.code === 'INVALID_JD_URL') {
+        setJdUrlError(message)
+      }
+
+      setJdFetchState({
+        status: 'fetch-error',
+        title: 'JD 링크에서 본문을 가져오지 못했습니다',
+        message,
+      })
+    } catch (error) {
+      const message =
+        error instanceof NetworkError
+          ? error.message
+          : 'JD 링크를 읽는 중 서버 오류가 발생했습니다. 직접 붙여넣기로 이어서 진행해 주세요.'
+
+      setJdFetchState({
+        status: 'fetch-error',
+        title: 'JD 링크에서 본문을 가져오지 못했습니다',
+        message,
+      })
+    } finally {
+      setIsFetchingJd(false)
+    }
+  }
+
   return {
     clearErrors,
+    fetchJd,
     isSubmitting,
+    isFetchingJd,
+    jdFetchState,
     jdTextError,
     jdUrlError,
+    resetJdFetchState,
     resetResult,
     result,
     submit,

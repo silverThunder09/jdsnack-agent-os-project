@@ -38,9 +38,13 @@ function App() {
   } = useDiagnose()
   const {
     clearErrors: clearJdErrors,
+    fetchJd,
+    isFetchingJd,
     isSubmitting: isPreviewSubmitting,
+    jdFetchState,
     jdTextError,
     jdUrlError,
+    resetJdFetchState,
     resetResult: resetPreviewResult,
     result: previewResult,
     submit: submitPreview,
@@ -58,6 +62,14 @@ function App() {
     inputMode === 'text'
       ? trimmedLength >= MIN_LENGTH && trimmedLength <= MAX_LENGTH
       : Boolean(resumeSourceForPreview)
+  const activeStep =
+    previewResult.status === 'success' ||
+    previewResult.status === 'loading' ||
+    previewResult.status === 'error'
+      ? 3
+      : jdText.trim() || jdUrl.trim() || result.status === 'success'
+        ? 2
+        : 1
 
   useEffect(() => {
     window.localStorage.setItem(LOCAL_STORAGE_KEY, resumeText)
@@ -109,6 +121,9 @@ function App() {
     if (jdTextError || jdUrlError) {
       clearJdErrors()
     }
+    if (jdFetchState.status !== 'idle') {
+      resetJdFetchState()
+    }
     if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
       resetPreviewResult()
     }
@@ -119,9 +134,25 @@ function App() {
     if (jdTextError || jdUrlError) {
       clearJdErrors()
     }
+    if (jdFetchState.status !== 'idle') {
+      resetJdFetchState()
+    }
     if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
       resetPreviewResult()
     }
+  }
+
+  const handleJdFetch = async () => {
+    await fetchJd(jdUrl, {
+      onBeforeChange: () => {
+        if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
+          resetPreviewResult()
+        }
+      },
+      onFetched: (nextJdText) => {
+        setJdText(nextJdText)
+      },
+    })
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -153,12 +184,12 @@ function App() {
       <main className="page">
         <section className="hero-card">
           <div className="hero-copy">
-            <p className="hero-eyebrow">JDSnack 1차 MVP</p>
-            <h1>이력서 분석 흐름을 먼저 완성합니다</h1>
+            <p className="hero-eyebrow">JDSnack Report Flow</p>
+            <h1>이력서에서 JD 비교까지 리포트 흐름으로 정리합니다</h1>
             <p className="hero-description">
-              이력서 입력, 길이 검증, fixture 분석, 로컬 AI 분석까지 한 화면에서
-              안정적으로 확인할 수 있습니다. 사용자 키 입력 없이 서버 환경변수
-              기반 분석 흐름을 검증합니다.
+              이력서 입력, JD 본문 준비, 분석 리포트를 한 화면에서 단계형으로
+              이어서 확인할 수 있습니다. 먼저 분석 결과를 읽고, 다음에 JD 비교를
+              이어가는 흐름이 더 잘 보이도록 정리했습니다.
             </p>
           </div>
           <div className="hero-stats" aria-label="현재 MVP 범위">
@@ -171,17 +202,45 @@ function App() {
               <strong>Stub / Fixture / AI Local</strong>
             </div>
             <div className="stat-card">
-              <span className="stat-label">현재 응답</span>
-              <strong>200 분석 결과 / JD 매칭 결과</strong>
+              <span className="stat-label">현재 화면 흐름</span>
+              <strong>이력서 입력 / JD 입력 / 분석 리포트</strong>
             </div>
           </div>
+        </section>
+
+        <section className="stepper-card" aria-label="현재 진행 단계">
+          <ol className="flow-steps">
+            {[
+              ['이력서', '이력서 입력과 1차 분석'],
+              ['JD', 'JD 본문 준비와 링크 보조'],
+              ['리포트', '분석 결과와 JD 비교 확인'],
+            ].map(([label, description], index) => {
+              const stepNumber = index + 1
+              const state =
+                activeStep === stepNumber
+                  ? 'current'
+                  : activeStep > stepNumber
+                    ? 'complete'
+                    : 'upcoming'
+
+              return (
+                <li key={label} className={`flow-step flow-step--${state}`}>
+                  <span className="flow-step__index">{stepNumber}</span>
+                  <div>
+                    <strong>{label}</strong>
+                    <p>{description}</p>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
         </section>
 
         <section className="workspace-grid">
           <form className="panel input-panel" onSubmit={handleSubmit}>
             <div className="panel-header">
               <div>
-                <p className="panel-eyebrow">Resume Input</p>
+                <p className="panel-eyebrow">Step 1</p>
                 <h2>
                   {inputMode === 'text'
                     ? '이력서 내용을 붙여넣어 주세요'
@@ -237,8 +296,8 @@ function App() {
         <section className="panel jd-panel">
           <div className="panel-header">
             <div>
-              <p className="panel-eyebrow">JD Intake</p>
-              <h2>JD 입력과 비교 요청 형식을 준비합니다</h2>
+              <p className="panel-eyebrow">Step 2</p>
+              <h2>JD 본문을 준비하고 비교 기준을 맞춥니다</h2>
             </div>
             <div className="counter-box" aria-live="polite">
               <span>이력서 연결 상태</span>
@@ -261,10 +320,15 @@ function App() {
             <JdInputFields
               jdText={jdText}
               jdUrl={jdUrl}
+              jdFetchStatus={jdFetchState.status}
+              jdFetchTitle={jdFetchState.title}
+              jdFetchMessage={jdFetchState.message}
               jdTextError={jdTextError}
               jdUrlError={jdUrlError}
+              isFetchingJd={isFetchingJd}
               onJdTextChange={handleJdTextChange}
               onJdUrlChange={handleJdUrlChange}
+              onJdFetch={handleJdFetch}
             />
 
             <div className="action-row jd-action-row">
@@ -283,7 +347,7 @@ function App() {
           {previewResult.status === 'success' && previewResult.matchPreview ? (
             <div className="analysis-result jd-preview-result">
               <StatusMessage
-                badge="Preview Result"
+                badge="Step 3"
                 title={previewResult.title}
                 message={previewResult.message}
                 tone="success"

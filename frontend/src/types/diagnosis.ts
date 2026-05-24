@@ -9,6 +9,9 @@ export type ApiErrorCode =
   | 'JD_TEXT_TOO_SHORT'
   | 'JD_TEXT_TOO_LONG'
   | 'INVALID_JD_URL'
+  | 'JD_FETCH_EMPTY_CONTENT'
+  | 'JD_FETCH_UNSUPPORTED_SOURCE'
+  | 'JD_FETCH_FAILED'
   | 'UNSUPPORTED_FILE_TYPE'
   | 'FILE_TEXT_EXTRACTION_FAILED'
   | 'GEMINI_API_KEY_MISSING'
@@ -48,6 +51,14 @@ export interface MatchPreviewResult {
   suggestions: string[]
 }
 
+export interface JdFetchResult {
+  jdText: string
+  sourceUrl: string
+  title: string
+  fetchMode: string
+  sourceSite: string
+}
+
 export interface ApiError {
   code: ApiErrorCode
   message: string
@@ -75,6 +86,17 @@ export type MatchPreviewOutcome =
   | {
       kind: 'success'
       result: MatchPreviewResult
+    }
+  | {
+      kind: 'validation-error' | 'error'
+      code: ApiErrorCode
+      message: string
+    }
+
+export type JdFetchOutcome =
+  | {
+      kind: 'success'
+      result: JdFetchResult
     }
   | {
       kind: 'validation-error' | 'error'
