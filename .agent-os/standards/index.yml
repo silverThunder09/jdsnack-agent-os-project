@@ -44,7 +44,15 @@ documents:
     - scripts/pr-review-gate.sh
     - scripts/smoke-test.sh
     - scripts/google-test.sh
+  custom_agents:
+    - .codex/agents/spec-steward.toml
+    - .codex/agents/backend-engineer.toml
+    - .codex/agents/frontend-engineer.toml
+    - .codex/agents/qa-reviewer.toml
+    - .codex/agents/security-reviewer.toml
+    - .codex/agents/devops-steward.toml
+    - .codex/agents/release-captain.toml
 active_specs:
-  - .agent-os/specs/2026-05-24-local-ai-compose-runtime
+  - .agent-os/specs/2026-05-24-custom-agent-toml
 archived_specs:
   - .agent-os/archive/specs
