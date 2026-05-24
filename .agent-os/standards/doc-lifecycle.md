@@ -17,6 +17,8 @@
 - 현재 구현 중인 기능 문서
 - `requirements`, `acceptance-criteria`, `test-scenarios`, `traceability`를 갖춘 상태
 - `specs/YYYY-MM-DD-<slug>/`에 위치
+- 활성 spec은 항상 최신 기획 1개만 유지합니다.
+- 이전 spec은 구현 여부와 관계없이 `.agent-os/archive/specs/`로 이동합니다.
 
 ### 3. 안정화
 
@@ -63,4 +65,4 @@
 ## 레거시 문서 처리
 
 - 기존의 상세 문서는 당장 삭제하지 않습니다.
-- 대신 새 상위 문서에서 역할을 재정의하고, 필요한 경우 `레거시 상세 문서`로 표시합니다.
+- 대신 `.agent-os/archive/specs/`로 이동하고, 필요한 경우 `레거시 상세 문서`로 표시합니다.

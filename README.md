@@ -2,7 +2,7 @@
 
 JDSnack은 개발자 이력서와 JD를 AI로 분석해 개선 피드백과 매칭 인사이트를 제공하는 것을 목표로 하는 웹 서비스 프로젝트입니다.
 
-현재 구현은 네 단계로 나뉩니다. 1차 MVP는 no-key 서비스 뼈대, 1.5차 MVP는 fixture 기반 업로드 분석, 2차 MVP는 로컬 전용 `ai-local` Gemini 이력서 분석, 다음 단계는 로컬 전용 JD AI 매칭 확장입니다.
+현재 활성 기획은 JD 링크 수집 안정화입니다. 과거 MVP 명세는 토큰 낭비를 줄이기 위해 `.agent-os/archive/specs/`에 보관합니다.
 
 이 저장소는 서비스 코드와 문서 하네스를 함께 관리합니다. 쉽게 말하면, `backend/`와 `frontend/`가 실제 제품을 만들고, `.agent-os/`와 `docs/`가 그 제품을 어떻게 만들지 정해주는 설계도 역할을 합니다.
 
@@ -16,6 +16,7 @@ jdsnack-agent-os/
 ├── .agent-os/
 │   ├── product/
 │   ├── specs/
+│   ├── archive/
 │   ├── standards/
 │   ├── operations/
 │   └── agents/
@@ -36,13 +37,9 @@ jdsnack-agent-os/
 - 제품 목적: `.agent-os/product/mission.md`
 - 로드맵: `.agent-os/product/roadmap.md`
 - 기술 스택: `.agent-os/product/tech-stack.md`
-- 1차 MVP 기본 계약: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/`
-- 1.5차 MVP 업로드 + fixture 확장: `.agent-os/specs/2026-05-22-1650-resume-upload-fixture-mvp/`
-- 다음 설계 단계: `.agent-os/specs/2026-05-23-0900-jd-intake-mvp/`
-- 2차 MVP AI 이력서 분석: `.agent-os/specs/2026-05-23-1300-local-ai-resume-analysis-mvp/`
-- 2.5차 MVP AI JD 매칭: `.agent-os/specs/2026-05-23-1500-local-ai-jd-match-mvp/`
-- API 상세 문서: `.agent-os/specs/2026-05-22-1650-resume-upload-fixture-mvp/api-spec.md`
-- ERD 상세 문서: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/erd.md`
+- 현재 활성 spec: `.agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp/`
+- 보관 spec: `.agent-os/archive/specs/`
+- API 상세 문서: `.agent-os/specs/2026-05-24-jd-link-fetch-stabilization-mvp/api-spec.md`
 - 아키텍처 상세 문서: `docs/architecture/`
 - CI 기준 문서: `.agent-os/operations/ci-checklist.md`
 - CD 기준 문서: `.agent-os/operations/cd-checklist.md`

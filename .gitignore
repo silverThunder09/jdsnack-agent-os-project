@@ -32,6 +32,10 @@ pids
 # Dependencies
 node_modules/
 
+# Build and tool caches
+build/
+.gradle/
+
 # Temporary files
 *.tmp
 *.temp
