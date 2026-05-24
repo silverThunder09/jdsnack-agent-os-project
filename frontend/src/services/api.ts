@@ -4,6 +4,8 @@ import type {
   DiagnoseOutcome,
   DiagnoseRequest,
   DiagnosisResult,
+  JdFetchOutcome,
+  JdFetchResult,
   MatchPreviewOutcome,
   MatchPreviewRequest,
   MatchPreviewResult,
@@ -28,6 +30,9 @@ const KNOWN_ERROR_CODES: ApiErrorCode[] = [
   'JD_TEXT_TOO_SHORT',
   'JD_TEXT_TOO_LONG',
   'INVALID_JD_URL',
+  'JD_FETCH_EMPTY_CONTENT',
+  'JD_FETCH_UNSUPPORTED_SOURCE',
+  'JD_FETCH_FAILED',
   'UNSUPPORTED_FILE_TYPE',
   'FILE_TEXT_EXTRACTION_FAILED',
   'GEMINI_API_KEY_MISSING',
@@ -178,6 +183,50 @@ export async function previewMatch(
     payload.error.code === 'JD_TEXT_TOO_LONG' ||
     payload.error.code === 'INVALID_JD_URL'
   ) {
+    return {
+      kind: 'validation-error',
+      code: payload.error.code,
+      message: payload.error.message,
+    }
+  }
+
+  return {
+    kind: 'error',
+    code: payload.error.code,
+    message: payload.error.message,
+  }
+}
+
+export async function fetchJdFromUrl(jdUrl: string): Promise<JdFetchOutcome> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/jd/fetch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ jdUrl }),
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<JdFetchResult>(response)
+
+  if (payload?.success && payload.data) {
+    return {
+      kind: 'success',
+      result: payload.data,
+    }
+  }
+
+  if (!payload?.error || !KNOWN_ERROR_CODES.includes(payload.error.code)) {
+    throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+  }
+
+  if (payload.error.code === 'INVALID_JD_URL') {
     return {
       kind: 'validation-error',
       code: payload.error.code,

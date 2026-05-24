@@ -8,6 +8,8 @@ interface ResultPanelProps {
 
 export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
   function ResultPanel({ result }, ref) {
+    const improvements = result.diagnosis?.improvements ?? []
+
     return (
       <section
         ref={ref}
@@ -17,8 +19,8 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
       >
         <div className="panel-header">
           <div>
-            <p className="panel-eyebrow">Result State</p>
-            <h2>현재 요청 상태</h2>
+            <p className="panel-eyebrow">Analysis Report</p>
+            <h2>분석 리포트</h2>
           </div>
         </div>
 
@@ -52,20 +54,20 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
 
         {result.status === 'success' && result.diagnosis ? (
           <div className="analysis-result">
-            <StatusMessage
-              badge="Analysis Result"
-              title={result.title}
-              message={result.message}
-              tone="success"
-            />
+            <section className="report-hero-card">
+              <div className="analysis-score-card">
+                <span>분석 점수</span>
+                <strong>{result.diagnosis.score}점</strong>
+              </div>
+              <div className="report-summary-card">
+                <span className="report-summary-label">핵심 요약</span>
+                <h3>{result.title}</h3>
+                <p>{result.message}</p>
+              </div>
+            </section>
 
-            <div className="analysis-score-card">
-              <span>분석 점수</span>
-              <strong>{result.diagnosis.score}점</strong>
-            </div>
-
-            <div className="analysis-feedback-grid">
-              <section className="analysis-feedback-card">
+            <div className="analysis-feedback-grid analysis-feedback-grid--report">
+              <section className="analysis-feedback-card analysis-feedback-card--strength">
                 <h3>강점</h3>
                 <ul>
                   {result.diagnosis.strengths.map((strength) => (
@@ -74,20 +76,20 @@ export const ResultPanel = forwardRef<HTMLElement, ResultPanelProps>(
                 </ul>
               </section>
 
-              <section className="analysis-feedback-card">
-                <h3>개선 포인트</h3>
+              <section className="analysis-feedback-card analysis-feedback-card--improve">
+                <h3>부족한 역량과 개선 제안</h3>
                 <ul>
-                  {result.diagnosis.improvements.map((improvement) => (
+                  {improvements.map((improvement) => (
                     <li key={improvement}>{improvement}</li>
                   ))}
                 </ul>
               </section>
             </div>
 
-            <section className="analysis-source-card" aria-label="분석 기준 이력서 본문">
-              <h3>분석 기준 본문</h3>
+            <details className="analysis-source-card" aria-label="분석 기준 이력서 본문">
+              <summary>분석 기준 원문 보기</summary>
               <p>{result.diagnosis.sourceText}</p>
-            </section>
+            </details>
           </div>
         ) : null}
 
