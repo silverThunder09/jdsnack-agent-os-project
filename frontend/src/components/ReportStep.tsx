@@ -29,6 +29,28 @@ function buildSubmissionGuide({
   return `${highlight}를 전면에 두고, ${gap}는 이번 제출본에서 바로 보강하세요. ${action}`
 }
 
+function buildRevisedResume({
+  resumePreviewText,
+  strengths,
+  gaps,
+  suggestions,
+}: {
+  resumePreviewText: string
+  strengths: string[]
+  gaps: string[]
+  suggestions: string[]
+}) {
+  return [
+    'JD 맞춤 이력서 수정 제안본',
+    '',
+    `핵심 강점: ${strengths[0] ?? 'JD와 연결되는 경험을 맨 앞에 배치하세요.'}`,
+    `보완 필요: ${gaps[0] ?? '부족한 요구사항을 프로젝트 경험으로 보강하세요.'}`,
+    `수정 방향: ${suggestions[0] ?? '성과, 규모, 사용 기술을 한 문장에 함께 적어 주세요.'}`,
+    '',
+    `원본 기반 요약: ${resumePreviewText}`,
+  ].join('\n')
+}
+
 function getSafePercent(value: number, fallback: number) {
   if (!Number.isFinite(value)) {
     return fallback
@@ -55,6 +77,12 @@ export function ReportStep({
   const experienceFit = getSafePercent(score, 85)
   const qualificationFit = getSafePercent(score - 8, 78)
   const preferredFit = getSafePercent(score + 2, 90)
+  const revisedResume = buildRevisedResume({
+    resumePreviewText,
+    strengths,
+    gaps,
+    suggestions,
+  })
 
   return (
     <section id="report-step" className="report-workspace">
@@ -117,24 +145,19 @@ export function ReportStep({
           <section className="report-main-grid">
             <article className="report-document-card">
               <div className="document-card__header">
-                <h2>AI 추천 수정 이력서</h2>
+                <h2>원본과 수정본 비교</h2>
                 <span>JD 맞춤 개선 초안</span>
               </div>
-              <div className="resume-paper">
-                <h3>핵심 요약</h3>
-                <p>{previewResult.message}</p>
-                <h3>강조할 강점</h3>
-                <ul>
-                  {strengths.map((strength) => (
-                    <li key={strength}>{strength}</li>
-                  ))}
-                </ul>
-                <h3>보완할 부분</h3>
-                <ul>
-                  {gaps.map((gap) => (
-                    <li key={gap}>{gap}</li>
-                  ))}
-                </ul>
+              <div className="resume-compare-grid">
+                <section className="resume-paper resume-paper--original">
+                  <h3>원본 이력서</h3>
+                  <p>{resumePreviewText}</p>
+                </section>
+
+                <section className="resume-paper resume-paper--revised">
+                  <h3>AI 수정 제안본</h3>
+                  <p>{revisedResume}</p>
+                </section>
               </div>
             </article>
 

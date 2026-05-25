@@ -60,8 +60,12 @@ describe('App', () => {
     )
     await user.click(screen.getByRole('button', { name: 'AI 진단 시작하기' }))
 
-    expect(await screen.findByLabelText('JD 내용')).toBeInTheDocument()
+    expect(await screen.findByLabelText('주요업무')).toBeInTheDocument()
     expect(screen.getByText('채용 공고를 입력해주세요')).toBeInTheDocument()
+    expect(screen.getByLabelText('주요업무')).toBeInTheDocument()
+    expect(screen.getByLabelText('자격조건')).toBeInTheDocument()
+    expect(screen.getByLabelText('우대사항')).toBeInTheDocument()
+    expect(screen.getByLabelText('경력사항')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
@@ -138,7 +142,7 @@ describe('App', () => {
     await user.upload(input, file)
     await user.click(screen.getByRole('button', { name: 'AI 진단 시작하기' }))
 
-    expect(await screen.findByLabelText('JD 내용')).toBeInTheDocument()
+    expect(await screen.findByLabelText('주요업무')).toBeInTheDocument()
     expect(screen.getByText('채용 공고를 입력해주세요')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/diagnose/file'),
@@ -212,10 +216,10 @@ describe('App', () => {
       validResumeText,
     )
     await user.click(screen.getByRole('button', { name: 'AI 진단 시작하기' }))
-    await screen.findByLabelText('JD 내용')
+    await screen.findByLabelText('주요업무')
 
     await user.type(
-      screen.getByRole('textbox', { name: 'JD 내용' }),
+      screen.getByRole('textbox', { name: '주요업무' }),
       'Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구합니다.',
     )
     await user.type(
@@ -284,7 +288,7 @@ describe('App', () => {
 
     await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
     await goToJdStep(user)
-    await user.type(screen.getByLabelText('JD 내용'), 'a'.repeat(80))
+    await user.type(screen.getByLabelText('주요업무'), 'a'.repeat(80))
     await user.type(screen.getByLabelText('JD 링크'), 'not-a-url')
     await user.click(screen.getByRole('button', { name: '분석 리포트 생성' }))
 
@@ -313,7 +317,7 @@ describe('App', () => {
 
     await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
     await goToJdStep(user)
-    await user.type(screen.getByLabelText('JD 내용'), 'b'.repeat(100))
+    await user.type(screen.getByLabelText('주요업무'), 'b'.repeat(100))
     await user.type(
       screen.getByLabelText('JD 링크'),
       'https://example.com/jobs/backend',
@@ -323,7 +327,7 @@ describe('App', () => {
     expect(await screen.findByText('종합 매칭 점수')).toBeInTheDocument()
     expect(screen.getByText('76점')).toBeInTheDocument()
     expect(screen.getByText('세부 적합도 분석')).toBeInTheDocument()
-    expect(screen.getByText('AI 추천 수정 이력서')).toBeInTheDocument()
+    expect(screen.getByText('원본과 수정본 비교')).toBeInTheDocument()
     expect(screen.getByText('최종 제출용 정리')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/match/preview'),
@@ -360,13 +364,13 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'JD 미리보기' }))
 
     expect(await screen.findByText('JD 본문을 불러왔습니다')).toBeInTheDocument()
-    expect(screen.getByLabelText('JD 내용')).toHaveValue(
+    expect(screen.getByLabelText('주요업무')).toHaveValue(
       '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요합니다.',
     )
-    expect(screen.getByLabelText('JD 내용')).toHaveClass('jd-textarea--autofilled')
+    expect(screen.getByLabelText('주요업무')).toHaveClass('jd-textarea--autofilled')
     expect(
-      screen.getByText('자동으로 불러온 초안입니다. 필요한 부분만 가볍게 다듬어 주세요.'),
-    ).toBeInTheDocument()
+      screen.getAllByText('자동으로 불러온 초안입니다. 필요한 부분만 다듬어 주세요.'),
+    ).toHaveLength(4)
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/jd/fetch'),
       expect.objectContaining({
@@ -410,12 +414,12 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'JD 미리보기' }))
     await screen.findByText('JD 본문을 불러왔습니다')
 
-    const jdTextarea = screen.getByLabelText('JD 내용')
+    const jdTextarea = screen.getByLabelText('주요업무')
     await user.type(jdTextarea, ' 추가 메모')
 
     expect(jdTextarea).not.toHaveClass('jd-textarea--autofilled')
     expect(
-      screen.getByText('주요 업무, 자격요건, 우대사항이 보이면 충분합니다.'),
+      screen.getByText('담당 업무, 프로젝트 범위, 역할을 입력합니다.'),
     ).toBeInTheDocument()
   })
 
@@ -491,7 +495,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'JD 미리보기' }))
     await screen.findByText('JD 본문을 불러왔습니다')
 
-    const jdTextarea = screen.getByLabelText('JD 내용')
+    const jdTextarea = screen.getByLabelText('주요업무')
     await user.clear(jdTextarea)
     await user.type(
       jdTextarea,
@@ -510,11 +514,52 @@ describe('App', () => {
             value: validResumeText,
           },
           jdText:
-            '수정한 JD 본문입니다. Spring Boot 기반 API 운영과 테스트 자동화 경험을 요구합니다.',
+            '[주요업무]\n수정한 JD 본문입니다. Spring Boot 기반 API 운영과 테스트 자동화 경험을 요구합니다.',
           jdUrl: 'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
         }),
       }),
     )
+  })
+
+  it('JD 링크 자동 불러오기는 빈 섹션만 채운다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      json: async () => ({
+        success: true,
+        data: {
+          jdText: '섹션화된 JD 본문입니다.',
+          sections: {
+            responsibilities: '서버 API 설계와 운영을 담당합니다.',
+            qualifications: 'Java와 Spring Boot 실무 경험이 필요합니다.',
+            preferredQualifications: 'AWS 운영 경험을 우대합니다.',
+            experience: '경력 3년 이상을 기대합니다.',
+          },
+          sourceUrl: 'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+          title: '백엔드 엔지니어 채용',
+          fetchMode: 'static-html',
+          sourceSite: 'saramin',
+        },
+        timestamp: '2026-05-25T10:00:00.000+09:00',
+      }),
+    } as Response)
+
+    render(<App />)
+
+    await goToJdStep(user)
+    await user.type(screen.getByLabelText('주요업무'), '직접 입력한 주요업무입니다.')
+    await user.type(
+      screen.getByLabelText('JD 링크'),
+      'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+    )
+    await user.click(screen.getByRole('button', { name: 'JD 미리보기' }))
+
+    expect(await screen.findByText('JD 본문을 불러왔습니다')).toBeInTheDocument()
+    expect(screen.getByLabelText('주요업무')).toHaveValue('직접 입력한 주요업무입니다.')
+    expect(screen.getByLabelText('자격조건')).toHaveValue(
+      'Java와 Spring Boot 실무 경험이 필요합니다.',
+    )
+    expect(screen.getByLabelText('우대사항')).toHaveValue('AWS 운영 경험을 우대합니다.')
+    expect(screen.getByLabelText('경력사항')).toHaveValue('경력 3년 이상을 기대합니다.')
   })
 
   it('JD 링크 실패 후에도 기존 JD textarea 값은 유지된다', async () => {
@@ -534,7 +579,7 @@ describe('App', () => {
 
     await goToJdStep(user)
     await user.type(
-      screen.getByLabelText('JD 내용'),
+      screen.getByLabelText('주요업무'),
       '기존 JD 본문입니다. 주요 업무와 자격요건이 정리되어 있습니다.',
     )
     await user.type(
@@ -544,7 +589,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'JD 미리보기' }))
 
     expect(await screen.findByText('불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.')).toBeInTheDocument()
-    expect(screen.getByLabelText('JD 내용')).toHaveValue(
+    expect(screen.getByLabelText('주요업무')).toHaveValue(
       '기존 JD 본문입니다. 주요 업무와 자격요건이 정리되어 있습니다.',
     )
   })
@@ -589,10 +634,10 @@ describe('App', () => {
 
     await user.upload(input, file)
     await user.click(screen.getByRole('button', { name: 'AI 진단 시작하기' }))
-    await screen.findByLabelText('JD 내용')
+    await screen.findByLabelText('주요업무')
 
     await user.type(
-      screen.getByLabelText('JD 내용'),
+      screen.getByLabelText('주요업무'),
       'Spring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.',
     )
     await user.click(screen.getByRole('button', { name: '분석 리포트 생성' }))
@@ -607,7 +652,8 @@ describe('App', () => {
             type: 'FILE',
             value: 'PDF에서 추출된 이력서 본문입니다. Spring Boot와 MySQL 운영 경험이 있습니다.',
           },
-          jdText: 'Spring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.',
+          jdText:
+            '[주요업무]\nSpring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.',
           jdUrl: '',
         }),
       }),

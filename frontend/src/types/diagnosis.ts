@@ -43,6 +43,13 @@ export interface MatchPreviewRequest {
   jdUrl?: string
 }
 
+export interface JdSections {
+  responsibilities: string
+  qualifications: string
+  preferredQualifications: string
+  experience: string
+}
+
 export interface MatchPreviewResult {
   matchingScore: number
   summary: string
@@ -57,6 +64,7 @@ export interface JdFetchResult {
   title: string
   fetchMode: string
   sourceSite: string
+  sections?: Partial<JdSections>
 }
 
 export interface ApiError {
