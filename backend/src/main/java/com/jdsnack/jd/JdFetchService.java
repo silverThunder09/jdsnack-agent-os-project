@@ -8,11 +8,15 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class JdFetchService {
@@ -42,23 +46,16 @@ public class JdFetchService {
         String jdUrl = uri.toString();
 
         try {
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(uri)
-                    .timeout(Duration.ofSeconds(15))
-                    .header("User-Agent", "JDSnack/1.0")
-                    .header("Accept", "text/html,application/xhtml+xml")
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+            String html = fetchHtml(buildPageRequest(uri));
+            try {
+                return jdHtmlExtractor.extract(html, jdUrl);
+            } catch (ApiException exception) {
+                if (!shouldTrySaraminAjaxFallback(exception, uri)) {
+                    throw exception;
+                }
+                String ajaxHtml = fetchHtml(buildSaraminAjaxRequest(uri));
+                return jdHtmlExtractor.extract(ajaxHtml, jdUrl);
             }
-            if (response.body() == null || response.body().length() > MAX_RESPONSE_BODY_LENGTH) {
-                throw new ApiException(ErrorCode.JD_FETCH_FAILED);
-            }
-
-            return jdHtmlExtractor.extract(response.body(), jdUrl);
         } catch (ApiException exception) {
             throw exception;
         } catch (IOException exception) {
@@ -67,6 +64,103 @@ public class JdFetchService {
             Thread.currentThread().interrupt();
             throw new ApiException(ErrorCode.JD_FETCH_FAILED, exception);
         }
+    }
+
+    private HttpRequest buildPageRequest(URI uri) {
+        return HttpRequest.newBuilder()
+                .uri(uri)
+                .timeout(Duration.ofSeconds(15))
+                .header("User-Agent", "Mozilla/5.0 (compatible; JDSnack/1.0)")
+                .header("Accept", "text/html,application/xhtml+xml")
+                .header("Accept-Language", "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
+                .GET()
+                .build();
+    }
+
+    private HttpRequest buildSaraminAjaxRequest(URI uri) {
+        URI ajaxUri = URI.create(uri.getScheme() + "://" + uri.getHost() + "/zf_user/jobs/relay/view-ajax");
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("rec_idx", requireQueryParam(uri, "rec_idx"));
+        form.put("rec_seq", "0");
+        form.put("view_type", queryParamOrDefault(uri, "view_type", "search"));
+        form.put("t_ref", queryParamOrDefault(uri, "t_ref", "search"));
+        form.put("t_ref_content", queryParamOrDefault(uri, "t_ref_content", "generic"));
+        form.put("search_uuid", queryParamOrDefault(uri, "search_uuid", ""));
+        form.put("searchType", queryParamOrDefault(uri, "searchType", ""));
+        form.put("searchword", queryParamOrDefault(uri, "searchword", ""));
+
+        return HttpRequest.newBuilder()
+                .uri(ajaxUri)
+                .timeout(Duration.ofSeconds(15))
+                .header("User-Agent", "Mozilla/5.0 (compatible; JDSnack/1.0)")
+                .header("Accept", "text/html, */*; q=0.01")
+                .header("Accept-Language", "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
+                .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .header("Referer", uri.toString())
+                .POST(HttpRequest.BodyPublishers.ofString(encodeForm(form)))
+                .build();
+    }
+
+    private String fetchHtml(HttpRequest httpRequest) throws IOException, InterruptedException {
+        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+        }
+        if (response.body() == null || response.body().length() > MAX_RESPONSE_BODY_LENGTH) {
+            throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+        }
+        return response.body();
+    }
+
+    private boolean shouldTrySaraminAjaxFallback(ApiException exception, URI uri) {
+        return (exception.errorCode() == ErrorCode.JD_FETCH_EMPTY_CONTENT
+                || exception.errorCode() == ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE)
+                && isSaraminRelayView(uri)
+                && !queryParamOrDefault(uri, "rec_idx", "").isBlank();
+    }
+
+    private boolean isSaraminRelayView(URI uri) {
+        String path = uri.getPath() == null ? "" : uri.getPath();
+        return isSupportedHost(uri.getHost()) && path.equals("/zf_user/jobs/relay/view");
+    }
+
+    private String requireQueryParam(URI uri, String name) {
+        String value = queryParamOrDefault(uri, name, "");
+        if (value.isBlank()) {
+            throw new ApiException(ErrorCode.INVALID_JD_URL);
+        }
+        return value;
+    }
+
+    private String queryParamOrDefault(URI uri, String name, String defaultValue) {
+        String rawQuery = uri.getRawQuery();
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return defaultValue;
+        }
+
+        for (String pair : rawQuery.split("&")) {
+            int separatorIndex = pair.indexOf('=');
+            String key = separatorIndex >= 0 ? pair.substring(0, separatorIndex) : pair;
+            if (!key.equals(name)) {
+                continue;
+            }
+            return separatorIndex >= 0 ? pair.substring(separatorIndex + 1) : "";
+        }
+        return defaultValue;
+    }
+
+    private String encodeForm(Map<String, String> form) {
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, String> entry : form.entrySet()) {
+            if (builder.length() > 0) {
+                builder.append('&');
+            }
+            builder.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8));
+            builder.append('=');
+            builder.append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
+        }
+        return builder.toString();
     }
 
     private URI validateUrl(JdFetchRequest request) {

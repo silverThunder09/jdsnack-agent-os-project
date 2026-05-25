@@ -15,9 +15,13 @@ import javax.net.ssl.SSLSession;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class JdFetchServiceTest {
@@ -45,6 +49,48 @@ class JdFetchServiceTest {
 
         assertEquals("saramin", response.sourceSite());
         assertEquals("static-html", response.fetchMode());
+    }
+
+    @Test
+    void saraminRelayViewFallsBackToAjaxWhenStaticPageHasNoJobDetail() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, """
+                        <html>
+                          <head><title>[(주)테스트] 백엔드 개발자 채용 - 사람인</title></head>
+                          <body>
+                            <div class="jview_wing">사람인 인공지능 기술 기반으로 맞춤 공고를 추천해드리는 서비스입니다.</div>
+                          </body>
+                        </html>
+                        """))
+                .thenReturn(response(200, """
+                        <div class="wrap_jv_cont">
+                          <h1 class="tit_job">백엔드 개발자 채용</h1>
+                          <div class="jv_cont jv_summary">
+                            <div class="cont">
+                              <dl><dt>담당업무</dt><dd>Spring Boot 기반 API 설계와 Java 서비스 개발을 담당합니다.</dd></dl>
+                              <dl><dt>자격요건</dt><dd>MySQL 운영 경험과 REST API 구현 경험이 필요합니다.</dd></dl>
+                              <dl><dt>우대사항</dt><dd>테스트 자동화와 배포 경험을 우대합니다.</dd></dl>
+                            </div>
+                          </div>
+                        </div>
+                        """));
+
+        JdFetchResponse response = service.fetch(new JdFetchRequest(
+                "https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=search&rec_idx=53864907&t_ref=search&t_ref_content=generic"
+        ));
+
+        assertEquals("saramin", response.sourceSite());
+        assertEquals("static-html", response.fetchMode());
+        assertTrue(response.jdText().contains("Spring Boot 기반 API 설계"));
+
+        var requestCaptor = forClass(HttpRequest.class);
+        verify(httpClient, times(2)).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        HttpRequest ajaxRequest = requestCaptor.getAllValues().get(1);
+        assertEquals("POST", ajaxRequest.method());
+        assertEquals("/zf_user/jobs/relay/view-ajax", ajaxRequest.uri().getPath());
     }
 
     @Test
