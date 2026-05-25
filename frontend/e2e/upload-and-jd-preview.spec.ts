@@ -127,6 +127,13 @@ test('JD 링크 불러오기 성공 후 매칭 결과까지 확인한다', async
 
   await expect(page.getByText('JD 본문을 불러왔습니다')).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'JD 내용' })).toHaveValue(fetchedJdText)
+  await expect(page.locator('.status-message[aria-live="polite"]')).toContainText(
+    'JD 본문을 불러왔습니다',
+  )
+
+  await page
+    .getByRole('textbox', { name: 'JD 내용' })
+    .fill('수정한 JD 본문입니다. Spring Boot와 MySQL 운영 경험, 테스트 자동화 경험을 요구합니다.')
 
   await page.getByRole('button', { name: 'JD 비교 미리보기' }).click()
 
@@ -157,6 +164,9 @@ test('JD 링크 실패 후 직접 입력으로 매칭 결과까지 복구한다'
   await expect(
     page.getByText('불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.'),
   ).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText(
+    '불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.',
+  )
   await expect(jdTextarea).toHaveValue(jdText)
 
   await page.getByRole('button', { name: 'JD 비교 미리보기' }).click()

@@ -13,8 +13,15 @@ export function StatusMessage({
   tone,
   withLoadingBar = false,
 }: StatusMessageProps) {
+  const accessibilityProps =
+    tone === 'danger'
+      ? { role: 'alert' as const }
+      : tone === 'success' || tone === 'active'
+        ? { 'aria-live': 'polite' as const }
+        : {}
+
   return (
-    <div className={`status-message status-message--${tone}`}>
+    <div className={`status-message status-message--${tone}`} {...accessibilityProps}>
       <span className="status-badge">{badge}</span>
       <h3>{title}</h3>
       <p>{message}</p>

@@ -24,8 +24,9 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: '진단 요청' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      '이력서 내용을 입력해주세요.',
+    expect(screen.getByText('이력서 내용을 입력해주세요.')).toHaveAttribute(
+      'role',
+      'alert',
     )
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
@@ -239,8 +240,9 @@ describe('App', () => {
     await user.click(screen.getByRole('tab', { name: 'DOCX' }))
     await user.click(screen.getByRole('button', { name: '진단 요청' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'DOCX 파일을 선택해주세요.',
+    expect(screen.getByText('DOCX 파일을 선택해주세요.')).toHaveAttribute(
+      'role',
+      'alert',
     )
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
@@ -285,8 +287,9 @@ describe('App', () => {
     await user.type(screen.getByLabelText('JD 링크'), 'not-a-url')
     await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      '올바른 JD 링크 형식을 입력해주세요.',
+    expect(screen.getByText('올바른 JD 링크 형식을 입력해주세요.')).toHaveAttribute(
+      'role',
+      'alert',
     )
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
@@ -363,6 +366,10 @@ describe('App', () => {
         method: 'POST',
       }),
     )
+    expect(screen.getByText('JD 본문을 불러왔습니다').closest('.status-message')).toHaveAttribute(
+      'aria-live',
+      'polite',
+    )
   })
 
   it('JD 링크 자동 불러오기 실패 시 직접 붙여넣기 안내를 보여준다', async () => {
@@ -389,6 +396,76 @@ describe('App', () => {
     expect(
       await screen.findByText('불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.'),
     ).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.',
+    )
+  })
+
+  it('자동 채움 후 사용자가 수정한 JD 본문으로 매칭을 요청한다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: true,
+          data: {
+            jdText:
+              '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요합니다.',
+            sourceUrl: 'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+            title: '백엔드 엔지니어 채용',
+            fetchMode: 'static-html',
+            sourceSite: 'saramin',
+          },
+          timestamp: '2026-05-25T10:00:00.000+09:00',
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: true,
+          data: {
+            matchingScore: 76,
+            summary: '자동 채움 후 수정한 JD 본문으로 미리보기를 생성했습니다.',
+            strengths: ['Spring Boot 관련 표현이 JD와 겹칩니다.'],
+            gaps: ['배포 경험 근거가 더 필요합니다.'],
+            suggestions: ['운영 경험의 성과를 더 구체적으로 적어 주세요.'],
+          },
+          timestamp: '2026-05-25T10:01:00.000+09:00',
+        }),
+      } as Response)
+
+    render(<App />)
+
+    await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
+    await user.type(
+      screen.getByLabelText('JD 링크'),
+      'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+    )
+    await user.click(screen.getByRole('button', { name: '링크로 JD 불러오기' }))
+    await screen.findByText('JD 본문을 불러왔습니다')
+
+    const jdTextarea = screen.getByLabelText('JD 내용')
+    await user.clear(jdTextarea)
+    await user.type(
+      jdTextarea,
+      '수정한 JD 본문입니다. Spring Boot 기반 API 운영과 테스트 자동화 경험을 요구합니다.',
+    )
+    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
+
+    expect(await screen.findByText('76점')).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      expect.stringContaining('/api/match/preview'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          resumeSource: {
+            type: 'TEXT',
+            value: validResumeText,
+          },
+          jdText:
+            '수정한 JD 본문입니다. Spring Boot 기반 API 운영과 테스트 자동화 경험을 요구합니다.',
+          jdUrl: 'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+        }),
+      }),
+    )
   })
 
   it('JD 링크 실패 후에도 기존 JD textarea 값은 유지된다', async () => {

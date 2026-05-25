@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-- Spec
+- Frontend
 
 ## Source Documents
 
@@ -25,6 +25,9 @@
 - `AGENTS.md`
 - `.agent-os/standards/index.yml`
 - `README.md`
+- `frontend/src/components/StatusMessage.tsx`
+- `frontend/src/App.test.tsx`
+- `frontend/e2e/upload-and-jd-preview.spec.ts`
 
 ## Decisions Made
 
@@ -36,9 +39,9 @@
 
 ## Change Requests
 
-- `Frontend Engineer`: 링크 수집 성공/실패 후 JD textarea와 매칭 CTA 흐름을 확인한다.
+- `Frontend Engineer`: JD 링크 상태 메시지 접근성과 자동 채움 후 수정 흐름을 테스트로 유지한다.
 - `Backend Engineer`: 기존 JD fetch와 match preview 계약을 유지한다.
-- `QA Reviewer`: 브라우저 기준 성공 흐름과 실패 후 복구 흐름을 검증한다.
+- `QA Reviewer`: 브라우저 기준 성공 흐름, 실패 후 복구 흐름, 자동 채움 후 수정 요청 흐름을 검증한다.
 
 ## Open Questions
 
@@ -48,7 +51,8 @@
 
 - 실제 사람인 HTML 변경으로 링크 수집 성공률은 변동될 수 있다.
 - 이번 spec은 실패 시 직접 입력 복구를 필수 경로로 둔다.
+- Playwright smoke는 로컬 포트 바인딩이 가능한 환경에서 실행되어야 한다.
 
 ## Next Agent
 
-- `Frontend Engineer`
+- `QA Reviewer`
