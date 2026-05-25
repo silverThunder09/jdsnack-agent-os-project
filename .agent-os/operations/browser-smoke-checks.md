@@ -20,13 +20,24 @@
 8. 깨진 PDF 업로드는 `FILE_TEXT_EXTRACTION_FAILED`를 반환한다.
 9. fixture가 없는 업로드는 `FIXTURE_NOT_FOUND`를 반환한다.
 
+### Playwright 브라우저 smoke 기준
+
+1. PDF 업로드 후 JD 직접 입력으로 매칭 리포트를 확인한다.
+2. JD 링크 불러오기 성공 시 JD textarea가 자동 채워진다.
+3. 자동 채움된 JD 본문으로 `JD 비교 미리보기`를 실행하면 매칭 리포트가 표시된다.
+4. JD 링크 불러오기 실패 시 `JD 본문을 직접 붙여넣어 주세요.` 안내가 표시된다.
+5. JD 링크 실패 후에도 기존 JD textarea 값이 유지되고 직접 입력으로 매칭 리포트를 확인할 수 있다.
+
 ## 실행 방식
 
-현재 스모크 체크는 Playwright 같은 전용 브라우저 러너 대신, `docker compose`로 프론트/백엔드를 함께 띄운 뒤 프론트 진입점과 프록시 응답, 텍스트/파일 업로드 API 흐름을 검증하는 경량 스크립트로 운영한다.
+기본 컨테이너 스모크 체크는 `docker compose`로 프론트/백엔드를 함께 띄운 뒤 프론트 진입점과 프록시 응답, 텍스트/파일 업로드 API 흐름을 검증하는 경량 스크립트로 운영한다.
+
+Playwright smoke는 실제 외부 사이트와 Gemini를 호출하지 않고 route mock으로 화면 연결 흐름만 검증한다. CI 필수화는 별도 운영 PR에서 결정한다.
 
 실행 스크립트:
 
 - [scripts/smoke-test.sh](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/scripts/smoke-test.sh)
+- `cd frontend && npm run test:e2e`
 
 ## 로컬 실행 순서
 
@@ -50,5 +61,5 @@ docker compose down
 
 ## 향후 확장
 
-- 2차 MVP에서 실제 브라우저 러너 도입 검토
-- 결과 카드의 점수/요약/피드백 시각 요소 검증 추가
+- Playwright smoke를 CI 필수 체크로 승격
+- 실제 브라우저 통합 smoke와 route mock smoke 분리

@@ -7,6 +7,8 @@ const fixturePdf = path.resolve(currentDir, 'fixtures/resume-fixture.pdf')
 const fixtureDocx = path.resolve(currentDir, 'fixtures/resume-fixture.docx')
 const jdText =
   'Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구합니다.'
+const fetchedJdText =
+  '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요합니다.'
 const resumeSummary = '백엔드 중심 경험은 분명하지만 성과 수치가 더 필요합니다.'
 
 async function mockFixtureFlow(page: import('@playwright/test').Page) {
@@ -49,6 +51,43 @@ async function mockFixtureFlow(page: import('@playwright/test').Page) {
   })
 }
 
+async function mockJdFetchSuccess(page: import('@playwright/test').Page) {
+  await page.route('**/api/jd/fetch', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          jdText: fetchedJdText,
+          sourceUrl: 'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+          title: '백엔드 엔지니어 채용',
+          fetchMode: 'static-html',
+          sourceSite: 'saramin',
+        },
+        timestamp: '2026-05-25T10:02:00.000+09:00',
+      }),
+    })
+  })
+}
+
+async function mockJdFetchFailure(page: import('@playwright/test').Page) {
+  await page.route('**/api/jd/fetch', async (route) => {
+    await route.fulfill({
+      status: 422,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: {
+          code: 'JD_FETCH_UNSUPPORTED_SOURCE',
+          message: '지원하지 않는 JD 소스입니다.',
+        },
+        timestamp: '2026-05-25T10:03:00.000+09:00',
+      }),
+    })
+  })
+}
+
 test('PDF 업로드 후 JD 매칭 결과까지 확인한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await page.goto('/')
@@ -65,8 +104,65 @@ test('PDF 업로드 후 JD 매칭 결과까지 확인한다', async ({ page }) =
   await page.getByRole('button', { name: 'JD 비교 미리보기' }).click()
 
   await expect(page.getByText('JD 비교 미리보기를 만들었습니다')).toBeVisible()
-  await expect(page.getByText('JD 매칭 미리보기 점수')).toBeVisible()
+  await expect(page.getByText('매칭 점수')).toBeVisible()
   await expect(page.locator('.jd-preview-result')).toContainText(/점/)
+})
+
+test('JD 링크 불러오기 성공 후 매칭 결과까지 확인한다', async ({ page }) => {
+  await mockFixtureFlow(page)
+  await mockJdFetchSuccess(page)
+  await page.goto('/')
+
+  await page.getByRole('tab', { name: 'PDF' }).click()
+  await page.locator('#resume-file').setInputFiles(fixturePdf)
+  await page.getByRole('button', { name: '진단 요청' }).click()
+
+  await expect(page.getByText('이력서 분석 결과입니다')).toBeVisible()
+
+  await page.getByText('필요 시 링크로 JD 불러오기').click()
+  await page.getByRole('textbox', { name: 'JD 링크' }).fill(
+    'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
+  )
+  await page.getByRole('button', { name: '링크로 JD 불러오기' }).click()
+
+  await expect(page.getByText('JD 본문을 불러왔습니다')).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'JD 내용' })).toHaveValue(fetchedJdText)
+
+  await page.getByRole('button', { name: 'JD 비교 미리보기' }).click()
+
+  await expect(page.getByText('JD 비교 미리보기를 만들었습니다')).toBeVisible()
+  await expect(page.getByText('매칭 점수')).toBeVisible()
+  await expect(page.locator('.jd-preview-result')).toContainText('76점')
+})
+
+test('JD 링크 실패 후 직접 입력으로 매칭 결과까지 복구한다', async ({ page }) => {
+  await mockFixtureFlow(page)
+  await mockJdFetchFailure(page)
+  await page.goto('/')
+
+  await page.getByRole('tab', { name: 'PDF' }).click()
+  await page.locator('#resume-file').setInputFiles(fixturePdf)
+  await page.getByRole('button', { name: '진단 요청' }).click()
+
+  await expect(page.getByText('이력서 분석 결과입니다')).toBeVisible()
+
+  const jdTextarea = page.getByRole('textbox', { name: 'JD 내용' })
+  await jdTextarea.fill(jdText)
+  await page.getByText('필요 시 링크로 JD 불러오기').click()
+  await page.getByRole('textbox', { name: 'JD 링크' }).fill(
+    'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=2',
+  )
+  await page.getByRole('button', { name: '링크로 JD 불러오기' }).click()
+
+  await expect(
+    page.getByText('불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.'),
+  ).toBeVisible()
+  await expect(jdTextarea).toHaveValue(jdText)
+
+  await page.getByRole('button', { name: 'JD 비교 미리보기' }).click()
+
+  await expect(page.getByText('JD 비교 미리보기를 만들었습니다')).toBeVisible()
+  await expect(page.locator('.jd-preview-result')).toContainText('76점')
 })
 
 test('DOCX 업로드 후 fixture 분석 결과를 확인한다', async ({ page }) => {
@@ -80,7 +176,8 @@ test('DOCX 업로드 후 fixture 분석 결과를 확인한다', async ({ page }
   await expect(page.getByText('이력서 분석 결과입니다')).toBeVisible()
   await expect(page.getByText(resumeSummary)).toBeVisible()
   await expect(page.getByText('78점')).toBeVisible()
-  await expect(page.getByRole('region', { name: '분석 기준 이력서 본문' })).toContainText(
-    'Experienced backend engineer with Spring Boot REST API development',
-  )
+  await page.getByText('분석 기준 원문 보기').click()
+  await expect(
+    page.getByText('Experienced backend engineer with Spring Boot REST API development'),
+  ).toBeVisible()
 })
