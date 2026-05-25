@@ -40,6 +40,7 @@ public class JdHtmlExtractor {
             ".recruit_view",
             ".wrap_jv_cont",
             ".jv_cont",
+            ".user_content",
             ".job-description",
             "#content .recruit_detail",
             "#content .job-description"
@@ -305,7 +306,7 @@ public class JdHtmlExtractor {
 
         String blockSelector = "p, li";
         if ("saramin".equals(sourceSite)) {
-            blockSelector = "dd, p, li, .jv_cont > div, .wrap_jv_cont > div, .cont";
+            blockSelector = "dt, dd, pre, p, li, .jv_cont > div, .wrap_jv_cont > div, .cont";
         }
 
         List<String> paragraphParts = new ArrayList<>();

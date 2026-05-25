@@ -94,6 +94,55 @@ class JdFetchServiceTest {
     }
 
     @Test
+    void saraminRelayViewLoadsDetailIframeWhenAjaxUsesIframeContent() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, """
+                        <html>
+                          <head><title>[(주)테스트] 자바 클라이언트 개발 - 사람인</title></head>
+                          <body>
+                            <div class="jview_wing">사람인 인공지능 기술 기반으로 맞춤 공고를 추천해드리는 서비스입니다.</div>
+                          </body>
+                        </html>
+                        """))
+                .thenReturn(response(200, """
+                        <div class="wrap_jv_cont">
+                          <div class="jv_cont jv_detail">
+                            <iframe class="iframe_content" src="/zf_user/jobs/relay/view-detail?rec_idx=53815724&rec_seq=0&t_ref=search"></iframe>
+                          </div>
+                        </div>
+                        """))
+                .thenReturn(response(200, """
+                        <html>
+                          <body>
+                            <div class="user_content">
+                              <h3>주요업무</h3>
+                              <pre>LG U+ 기업메시징 자바 클라이언트 아키텍처 설계 및 개발을 담당합니다.</pre>
+                              <h3>자격요건</h3>
+                              <pre>Java 17, Spring Boot 3, Gradle 기반 상용 서비스 개발 및 운영 경험이 필요합니다.</pre>
+                              <h3>우대사항</h3>
+                              <pre>JUnit5 테스트 자동화와 Pull Request 기반 코드리뷰 경험을 우대합니다.</pre>
+                            </div>
+                          </body>
+                        </html>
+                        """));
+
+        JdFetchResponse response = service.fetch(new JdFetchRequest(
+                "https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=search&rec_idx=53815724&t_ref=search&t_ref_content=generic"
+        ));
+
+        assertEquals("saramin", response.sourceSite());
+        assertTrue(response.jdText().contains("기업메시징 자바 클라이언트"));
+        assertTrue(response.jdText().contains("Spring Boot 3"));
+
+        var requestCaptor = forClass(HttpRequest.class);
+        verify(httpClient, times(3)).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals("/zf_user/jobs/relay/view-detail", requestCaptor.getAllValues().get(2).uri().getPath());
+    }
+
+    @Test
     void localhostUrlIsRejected() {
         JdFetchService service = new JdFetchService(mock(HttpClient.class), new JdHtmlExtractor());
 

@@ -2,6 +2,8 @@ package com.jdsnack.jd;
 
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Element;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -54,6 +56,11 @@ public class JdFetchService {
                     throw exception;
                 }
                 String ajaxHtml = fetchHtml(buildSaraminAjaxRequest(uri));
+                String detailUrl = extractSaraminDetailIframeUrl(ajaxHtml, uri);
+                if (!detailUrl.isBlank()) {
+                    String detailHtml = fetchHtml(buildDetailRequest(URI.create(detailUrl), uri));
+                    return jdHtmlExtractor.extract(detailHtml, jdUrl);
+                }
                 return jdHtmlExtractor.extract(ajaxHtml, jdUrl);
             }
         } catch (ApiException exception) {
@@ -99,6 +106,18 @@ public class JdFetchService {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .header("Referer", uri.toString())
                 .POST(HttpRequest.BodyPublishers.ofString(encodeForm(form)))
+                .build();
+    }
+
+    private HttpRequest buildDetailRequest(URI uri, URI refererUri) {
+        return HttpRequest.newBuilder()
+                .uri(uri)
+                .timeout(Duration.ofSeconds(15))
+                .header("User-Agent", "Mozilla/5.0 (compatible; JDSnack/1.0)")
+                .header("Accept", "text/html,application/xhtml+xml")
+                .header("Accept-Language", "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
+                .header("Referer", refererUri.toString())
+                .GET()
                 .build();
     }
 
@@ -161,6 +180,25 @@ public class JdFetchService {
             builder.append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
         }
         return builder.toString();
+    }
+
+    private String extractSaraminDetailIframeUrl(String html, URI pageUri) {
+        Element iframe = Jsoup.parse(html, pageUri.toString()).selectFirst("iframe.iframe_content[src*=/zf_user/jobs/relay/view-detail]");
+        if (iframe == null) {
+            return "";
+        }
+
+        String src = iframe.attr("src").trim();
+        if (src.isBlank()) {
+            return "";
+        }
+
+        URI detailUri = pageUri.resolve(src);
+        if (!isSupportedHost(detailUri.getHost()) || !"/zf_user/jobs/relay/view-detail".equals(detailUri.getPath())) {
+            return "";
+        }
+
+        return detailUri.toString();
     }
 
     private URI validateUrl(JdFetchRequest request) {
