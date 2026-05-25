@@ -35,6 +35,8 @@ node_modules/
 # Build and tool caches
 build/
 .gradle/
+frontend/test-results/
+frontend/playwright-report/
 
 # Temporary files
 *.tmp
