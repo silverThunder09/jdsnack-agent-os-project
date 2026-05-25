@@ -61,9 +61,6 @@ export function JdInputFields({
   onJdUrlChange,
   onJdFetch,
 }: JdInputFieldsProps) {
-  const shouldOpenLinkAssist =
-    Boolean(jdUrl) || Boolean(jdUrlError) || jdFetchStatus !== 'idle'
-
   return (
     <div className="jd-input-group">
       <div className="resume-input-group">
@@ -88,7 +85,7 @@ export function JdInputFields({
         ) : null}
       </div>
 
-      <details className="jd-link-card" open={shouldOpenLinkAssist}>
+      <details className="jd-link-card" open>
         <summary>필요 시 링크로 JD 불러오기</summary>
         <div className="jd-url-group">
           <label className="resume-label" htmlFor="jd-url">
