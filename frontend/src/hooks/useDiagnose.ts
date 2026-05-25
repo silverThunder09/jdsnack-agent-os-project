@@ -72,7 +72,7 @@ export function useDiagnose() {
         message: outcome.result.summary,
         diagnosis: outcome.result,
       })
-      return
+      return true
     }
 
     if (outcome.kind === 'not-enabled') {
@@ -82,7 +82,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return
+      return false
     }
 
     if (outcome.kind === 'validation-error') {
@@ -93,7 +93,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return
+      return false
     }
 
     if (
@@ -106,7 +106,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return
+      return false
     }
 
     if (
@@ -120,7 +120,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return
+      return false
     }
 
     setResult({
@@ -129,6 +129,7 @@ export function useDiagnose() {
       message: outcome.message,
       code: outcome.code,
     })
+    return false
   }
 
   const handleRequest = async (request: Promise<Awaited<ReturnType<typeof diagnoseResume>>>) => {
@@ -138,7 +139,7 @@ export function useDiagnose() {
 
     try {
       const outcome = await request
-      handleOutcome(outcome)
+      return handleOutcome(outcome)
     } catch (error) {
       const message =
         error instanceof NetworkError
@@ -150,6 +151,7 @@ export function useDiagnose() {
         title: '요청을 완료하지 못했습니다',
         message,
       })
+      return false
     } finally {
       setIsSubmitting(false)
     }
@@ -165,10 +167,10 @@ export function useDiagnose() {
         title: '입력 확인이 필요합니다',
         message: validationError,
       })
-      return
+      return false
     }
 
-    await handleRequest(diagnoseResume({ resumeText }))
+    return handleRequest(diagnoseResume({ resumeText }))
   }
 
   const submitFile = async (mode: ResumeInputMode, file: File | null) => {
@@ -181,10 +183,10 @@ export function useDiagnose() {
         title: '파일 확인이 필요합니다',
         message: validationError,
       })
-      return
+      return false
     }
 
-    await handleRequest(diagnoseResumeFile(file as File))
+    return handleRequest(diagnoseResumeFile(file as File))
   }
 
   return {

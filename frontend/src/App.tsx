@@ -87,22 +87,6 @@ function App() {
     }
   }, [result.status])
 
-  useEffect(() => {
-    if (result.status === 'success') {
-      setCurrentStep((step) => Math.max(step, 2))
-    }
-  }, [result.status])
-
-  useEffect(() => {
-    if (
-      previewResult.status === 'loading' ||
-      previewResult.status === 'success' ||
-      previewResult.status === 'error'
-    ) {
-      setCurrentStep(3)
-    }
-  }, [previewResult.status])
-
   const handleResumeChange = (nextValue: string) => {
     setResumeText(nextValue)
 
@@ -176,17 +160,24 @@ function App() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    const goToJdStepOnSuccess = (wasSuccessful: boolean) => {
+      if (wasSuccessful) {
+        setCurrentStep((step) => Math.max(step, 2))
+      }
+    }
+
     if (inputMode === 'text') {
-      await submit(resumeText)
+      goToJdStepOnSuccess(await submit(resumeText))
       return
     }
 
-    await submitFile(inputMode, resumeFile)
+    goToJdStepOnSuccess(await submitFile(inputMode, resumeFile))
   }
 
   const handleJdPreviewSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    setCurrentStep(3)
     await submitPreview({
       resumeSource: {
         type: inputMode === 'text' ? 'TEXT' : 'FILE',
