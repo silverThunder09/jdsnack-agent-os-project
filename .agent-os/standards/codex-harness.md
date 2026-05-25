@@ -33,6 +33,14 @@
 - 디렉토리와 파일명은 역할 중심으로 단순하게 유지합니다.
 - 오래된 계획은 `archive/`로 이동하고 현재 활성 문서만 전면에 둡니다.
 
+### 5. 탐색 표면을 줄인다
+
+- 작업 시작 시 active spec, 관련 코드 폴더, 관련 테스트만 읽습니다.
+- 기본 탐색은 `rg --files`와 `rg`로 수행합니다.
+- `frontend/node_modules`, `frontend/dist`, `backend/build`, `backend/.gradle`, `.agent-os/archive`, `.git`는 기본 탐색에서 제외합니다.
+- archive는 사용자가 직접 요청하거나 active spec이 명시적으로 참조할 때만 읽습니다.
+- 컨텍스트가 커지면 추가 탐색보다 현재 읽은 파일과 결정사항 요약을 우선합니다.
+
 ## 필수 작업 순서
 
 `requirements -> acceptance-criteria -> test-scenarios -> implementation -> verification`
@@ -51,6 +59,7 @@
 - 테스트 시나리오 없는 acceptance criteria 추가
 - 암묵적 구조 변경
 - 반복 피드백을 구두로만 남기고 표준으로 승격하지 않는 것
+- 전체 `find .`, 전체 `ls -R`, archive 전체 탐색으로 컨텍스트를 낭비하는 것
 
 ## 승격 규칙
 
