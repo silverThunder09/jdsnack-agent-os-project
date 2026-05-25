@@ -58,6 +58,6 @@ documents:
     - .codex/agents/devops-steward.toml
     - .codex/agents/release-captain.toml
 active_specs:
-  - .agent-os/specs/2026-05-24-saramin-jd-scraping-stabilization
+  - .agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization
 archived_specs:
   - .agent-os/archive/specs
