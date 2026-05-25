@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { fetchJdFromUrl, NetworkError, previewMatch } from '../services/api'
-import type { ApiErrorCode, MatchPreviewRequest, ResultState } from '../types/diagnosis'
+import type {
+  ApiErrorCode,
+  JdFetchResult,
+  MatchPreviewRequest,
+  ResultState,
+} from '../types/diagnosis'
 
 const idleState: ResultState = {
   status: 'idle',
@@ -222,7 +227,7 @@ export function useMatchPreview() {
   const fetchJd = async (
     jdUrl: string,
     handlers: {
-      onFetched: (jdText: string) => void
+      onFetched: (result: JdFetchResult) => void
       onBeforeChange?: () => void
     },
   ) => {
@@ -247,11 +252,11 @@ export function useMatchPreview() {
       const outcome = await fetchJdFromUrl(jdUrl.trim())
 
       if (outcome.kind === 'success') {
-        handlers.onFetched(outcome.result.jdText)
+        handlers.onFetched(outcome.result)
         setJdFetchState({
           status: 'fetched',
           title: 'JD 본문을 불러왔습니다',
-          message: '자동 수집된 본문을 JD 내용 칸에 채웠습니다. 필요하면 문구를 다듬은 뒤 비교를 진행해 주세요.',
+          message: '자동 수집된 본문을 비어 있는 JD 섹션에 채웠습니다. 필요하면 각 칸을 다듬은 뒤 비교를 진행해 주세요.',
         })
         return
       }

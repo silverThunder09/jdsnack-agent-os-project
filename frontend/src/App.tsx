@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useMatchPreview } from './hooks/useMatchPreview'
-import type { ResumeInputMode } from './types/diagnosis'
+import type { JdFetchResult, JdSections, ResumeInputMode } from './types/diagnosis'
 import { AppShell } from './components/AppShell'
 import { JdStep } from './components/JdStep'
 import { ReportStep } from './components/ReportStep'
@@ -13,6 +13,12 @@ const LOCAL_STORAGE_KEY = 'jdsnack.resume-text'
 const MIN_LENGTH = 50
 const MAX_LENGTH = 10_000
 const REPORT_PREVIEW_LIMIT = 320
+const emptyJdSections: JdSections = {
+  responsibilities: '',
+  qualifications: '',
+  preferredQualifications: '',
+  experience: '',
+}
 
 function toPreviewText(value: string): string {
   const trimmed = value.trim().replace(/\s+/g, ' ')
@@ -22,6 +28,79 @@ function toPreviewText(value: string): string {
   }
 
   return `${trimmed.slice(0, REPORT_PREVIEW_LIMIT)}...`
+}
+
+function joinJdSections(sections: JdSections): string {
+  return [
+    ['주요업무', sections.responsibilities],
+    ['자격조건', sections.qualifications],
+    ['우대사항', sections.preferredQualifications],
+    ['경력사항', sections.experience],
+  ]
+    .filter(([, value]) => value.trim())
+    .map(([label, value]) => `[${label}]\n${value.trim()}`)
+    .join('\n\n')
+}
+
+function pickSectionValue(text: string, starts: string[], stops: string[]) {
+  const normalized = text.replace(/\r/g, '')
+  const startPattern = starts.join('|')
+  const stopPattern = stops.join('|')
+  const match = normalized.match(
+    new RegExp(`(?:${startPattern})\\s*[:：]?\\s*([\\s\\S]*?)(?=\\n\\s*(?:${stopPattern})\\s*[:：]?|$)`, 'i'),
+  )
+
+  return match?.[1]?.trim() ?? ''
+}
+
+function classifyJdText(jdText: string): JdSections {
+  const responsibilities = pickSectionValue(
+    jdText,
+    ['주요\\s*업무', '담당\\s*업무', '업무\\s*내용', '직무\\s*내용'],
+    ['자격\\s*요건', '자격\\s*조건', '지원\\s*자격', '우대\\s*사항', '경력\\s*사항', '근무\\s*조건'],
+  )
+  const qualifications = pickSectionValue(
+    jdText,
+    ['자격\\s*요건', '자격\\s*조건', '지원\\s*자격', '필수\\s*요건'],
+    ['우대\\s*사항', '경력\\s*사항', '근무\\s*조건', '주요\\s*업무', '담당\\s*업무'],
+  )
+  const preferredQualifications = pickSectionValue(
+    jdText,
+    ['우대\\s*사항', '우대\\s*요건', '우대\\s*조건'],
+    ['경력\\s*사항', '근무\\s*조건', '주요\\s*업무', '담당\\s*업무', '자격\\s*요건'],
+  )
+  const experience = pickSectionValue(
+    jdText,
+    ['경력\\s*사항', '경력\\s*요건', '경력'],
+    ['우대\\s*사항', '근무\\s*조건', '주요\\s*업무', '담당\\s*업무', '자격\\s*요건'],
+  )
+
+  return {
+    responsibilities: responsibilities || jdText.trim(),
+    qualifications,
+    preferredQualifications,
+    experience,
+  }
+}
+
+function mergeFetchedSections(current: JdSections, fetched: JdFetchResult): JdSections {
+  const fallback = classifyJdText(fetched.jdText)
+  const next = fetched.sections ?? fallback
+
+  return {
+    responsibilities: current.responsibilities.trim()
+      ? current.responsibilities
+      : (next.responsibilities ?? fallback.responsibilities),
+    qualifications: current.qualifications.trim()
+      ? current.qualifications
+      : (next.qualifications ?? fallback.qualifications),
+    preferredQualifications: current.preferredQualifications.trim()
+      ? current.preferredQualifications
+      : (next.preferredQualifications ?? fallback.preferredQualifications),
+    experience: current.experience.trim()
+      ? current.experience
+      : (next.experience ?? fallback.experience),
+  }
 }
 
 function App() {
@@ -34,7 +113,7 @@ function App() {
     return window.localStorage.getItem(LOCAL_STORAGE_KEY) ?? ''
   })
   const [resumeFile, setResumeFile] = useState<File | null>(null)
-  const [jdText, setJdText] = useState('')
+  const [jdSections, setJdSections] = useState<JdSections>(emptyJdSections)
   const [jdUrl, setJdUrl] = useState('')
   const [isJdAutofilled, setIsJdAutofilled] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
@@ -73,6 +152,7 @@ function App() {
     inputMode === 'text'
       ? trimmedLength >= MIN_LENGTH && trimmedLength <= MAX_LENGTH
       : Boolean(resumeSourceForPreview)
+  const jdText = joinJdSections(jdSections)
   const derivedStep =
     previewResult.status === 'success' ||
     previewResult.status === 'loading' ||
@@ -134,8 +214,11 @@ function App() {
     }
   }
 
-  const handleJdTextChange = (nextValue: string) => {
-    setJdText(nextValue)
+  const handleJdSectionChange = (section: keyof JdSections, nextValue: string) => {
+    setJdSections((current) => ({
+      ...current,
+      [section]: nextValue,
+    }))
     setIsJdAutofilled(false)
     if (jdTextError || jdUrlError) {
       clearJdErrors()
@@ -168,8 +251,8 @@ function App() {
           resetPreviewResult()
         }
       },
-      onFetched: (nextJdText) => {
-        setJdText(nextJdText)
+      onFetched: (fetched) => {
+        setJdSections((current) => mergeFetchedSections(current, fetched))
         setIsJdAutofilled(true)
       },
     })
@@ -237,7 +320,7 @@ function App() {
 
         {currentStep === 2 ? (
           <JdStep
-            jdText={jdText}
+            jdSections={jdSections}
             jdUrl={jdUrl}
             isJdAutofilled={isJdAutofilled}
             jdFetchStatus={jdFetchState.status}
@@ -248,7 +331,7 @@ function App() {
             isFetchingJd={isFetchingJd}
             isPreviewSubmitting={isPreviewSubmitting}
             canPreviewWithCurrentSource={canPreviewWithCurrentSource}
-            onJdTextChange={handleJdTextChange}
+            onJdSectionChange={handleJdSectionChange}
             onJdUrlChange={handleJdUrlChange}
             onJdFetch={handleJdFetch}
             onSubmit={handleJdPreviewSubmit}

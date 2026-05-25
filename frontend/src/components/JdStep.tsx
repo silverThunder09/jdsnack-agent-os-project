@@ -1,11 +1,12 @@
 import type { FormEvent } from 'react'
 import { DiagnoseButton } from './DiagnoseButton'
 import { JdInputFields } from './JdInputFields'
+import type { JdSections } from '../types/diagnosis'
 
 type JdFetchStatus = 'idle' | 'fetching' | 'fetched' | 'fetch-error'
 
 interface JdStepProps {
-  jdText: string
+  jdSections: JdSections
   jdUrl: string
   isJdAutofilled: boolean
   jdFetchStatus: JdFetchStatus
@@ -16,7 +17,7 @@ interface JdStepProps {
   isFetchingJd: boolean
   isPreviewSubmitting: boolean
   canPreviewWithCurrentSource: boolean
-  onJdTextChange: (value: string) => void
+  onJdSectionChange: (section: keyof JdSections, value: string) => void
   onJdUrlChange: (value: string) => void
   onJdFetch: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -24,7 +25,7 @@ interface JdStepProps {
 }
 
 export function JdStep({
-  jdText,
+  jdSections,
   jdUrl,
   isJdAutofilled,
   jdFetchStatus,
@@ -35,7 +36,7 @@ export function JdStep({
   isFetchingJd,
   isPreviewSubmitting,
   canPreviewWithCurrentSource,
-  onJdTextChange,
+  onJdSectionChange,
   onJdUrlChange,
   onJdFetch,
   onSubmit,
@@ -51,7 +52,7 @@ export function JdStep({
 
       <form className="jd-form" onSubmit={onSubmit}>
         <JdInputFields
-          jdText={jdText}
+          jdSections={jdSections}
           jdUrl={jdUrl}
           isJdAutofilled={isJdAutofilled}
           jdFetchStatus={jdFetchStatus}
@@ -60,7 +61,7 @@ export function JdStep({
           jdTextError={jdTextError}
           jdUrlError={jdUrlError}
           isFetchingJd={isFetchingJd}
-          onJdTextChange={onJdTextChange}
+          onJdSectionChange={onJdSectionChange}
           onJdUrlChange={onJdUrlChange}
           onJdFetch={onJdFetch}
         />

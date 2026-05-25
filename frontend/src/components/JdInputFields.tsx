@@ -1,9 +1,10 @@
 import { StatusMessage } from './StatusMessage'
+import type { JdSections } from '../types/diagnosis'
 
 type JdFetchStatus = 'idle' | 'fetching' | 'fetched' | 'fetch-error'
 
 interface JdInputFieldsProps {
-  jdText: string
+  jdSections: JdSections
   jdUrl: string
   isJdAutofilled: boolean
   jdTextError: string
@@ -12,7 +13,7 @@ interface JdInputFieldsProps {
   jdFetchTitle: string
   jdFetchMessage: string
   isFetchingJd: boolean
-  onJdTextChange: (value: string) => void
+  onJdSectionChange: (section: keyof JdSections, value: string) => void
   onJdUrlChange: (value: string) => void
   onJdFetch: () => void
 }
@@ -50,7 +51,7 @@ function getBadge(status: JdFetchStatus): string {
 }
 
 export function JdInputFields({
-  jdText,
+  jdSections,
   jdUrl,
   isJdAutofilled,
   jdTextError,
@@ -59,10 +60,42 @@ export function JdInputFields({
   jdFetchTitle,
   jdFetchMessage,
   isFetchingJd,
-  onJdTextChange,
+  onJdSectionChange,
   onJdUrlChange,
   onJdFetch,
 }: JdInputFieldsProps) {
+  const sectionItems: Array<{
+    key: keyof JdSections
+    label: string
+    helper: string
+    placeholder: string
+  }> = [
+    {
+      key: 'responsibilities',
+      label: '주요업무',
+      helper: '담당 업무, 프로젝트 범위, 역할을 입력합니다.',
+      placeholder: '예: 백엔드 API 설계 및 운영, 서비스 성능 개선...',
+    },
+    {
+      key: 'qualifications',
+      label: '자격조건',
+      helper: '필수 기술, 학력, 자격 요건을 입력합니다.',
+      placeholder: '예: Java/Spring 3년 이상, REST API 개발 경험...',
+    },
+    {
+      key: 'preferredQualifications',
+      label: '우대사항',
+      helper: '우대 기술, 도메인 경험, 협업 경험을 입력합니다.',
+      placeholder: '예: AWS 운영 경험, MSA 아키텍처 경험...',
+    },
+    {
+      key: 'experience',
+      label: '경력사항',
+      helper: '요구 경력, 고용 형태, 연차 조건을 입력합니다.',
+      placeholder: '예: 경력 3~7년, 정규직, 유관 업무 경험...',
+    },
+  ]
+
   return (
     <div className="jd-input-group">
       <section className="jd-link-panel" aria-label="JD 링크 첨부">
@@ -122,31 +155,36 @@ export function JdInputFields({
         <span>OR 직접 입력</span>
       </div>
 
-      <div className="resume-input-group">
-        <label className="resume-label" htmlFor="jd-text">
-          JD 내용
-        </label>
-        <textarea
-          id="jd-text"
-          className={`resume-textarea jd-textarea${jdTextError ? ' resume-textarea--error' : ''}${isJdAutofilled ? ' jd-textarea--autofilled' : ''}`}
-          name="jdText"
-          placeholder="주요 업무, 자격요건, 우대사항이 보이도록 JD 본문을 붙여넣어 주세요."
-          value={jdText}
-          onChange={(event) => onJdTextChange(event.target.value)}
-          aria-describedby={jdTextError ? 'jd-text-error' : 'jd-text-helper'}
-          aria-invalid={Boolean(jdTextError)}
-        />
-        <p className="resume-helper" id="jd-text-helper">
-          {isJdAutofilled
-            ? '자동으로 불러온 초안입니다. 필요한 부분만 가볍게 다듬어 주세요.'
-            : '주요 업무, 자격요건, 우대사항이 보이면 충분합니다.'}
-        </p>
-        {jdTextError ? (
-          <p className="resume-error" id="jd-text-error" role="alert">
-            {jdTextError}
-          </p>
-        ) : null}
+      <div className="jd-section-grid">
+        {sectionItems.map((item) => (
+          <div className="resume-input-group jd-section-field" key={item.key}>
+            <label className="resume-label" htmlFor={`jd-${item.key}`}>
+              {item.label}
+            </label>
+            <textarea
+              id={`jd-${item.key}`}
+              className={`resume-textarea jd-textarea${jdTextError ? ' resume-textarea--error' : ''}${isJdAutofilled ? ' jd-textarea--autofilled' : ''}`}
+              name={item.key}
+              placeholder={item.placeholder}
+              value={jdSections[item.key]}
+              onChange={(event) => onJdSectionChange(item.key, event.target.value)}
+              aria-describedby={jdTextError ? 'jd-text-error' : `jd-${item.key}-helper`}
+              aria-invalid={Boolean(jdTextError)}
+            />
+            <p className="resume-helper" id={`jd-${item.key}-helper`}>
+              {isJdAutofilled
+                ? '자동으로 불러온 초안입니다. 필요한 부분만 다듬어 주세요.'
+                : item.helper}
+            </p>
+          </div>
+        ))}
       </div>
+
+      {jdTextError ? (
+        <p className="resume-error" id="jd-text-error" role="alert">
+          {jdTextError}
+        </p>
+      ) : null}
     </div>
   )
 }
