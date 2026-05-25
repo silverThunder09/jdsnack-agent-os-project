@@ -5,6 +5,7 @@ type JdFetchStatus = 'idle' | 'fetching' | 'fetched' | 'fetch-error'
 interface JdInputFieldsProps {
   jdText: string
   jdUrl: string
+  isJdAutofilled: boolean
   jdTextError: string
   jdUrlError: string
   jdFetchStatus: JdFetchStatus
@@ -51,6 +52,7 @@ function getBadge(status: JdFetchStatus): string {
 export function JdInputFields({
   jdText,
   jdUrl,
+  isJdAutofilled,
   jdTextError,
   jdUrlError,
   jdFetchStatus,
@@ -63,64 +65,43 @@ export function JdInputFields({
 }: JdInputFieldsProps) {
   return (
     <div className="jd-input-group">
-      <div className="resume-input-group">
-        <label className="resume-label" htmlFor="jd-text">
-          JD 내용
-        </label>
-        <textarea
-          id="jd-text"
-          className={`resume-textarea jd-textarea${jdTextError ? ' resume-textarea--error' : ''}`}
-          name="jdText"
-          placeholder="주요 업무, 자격요건, 우대사항이 보이도록 JD 본문을 붙여넣어 주세요."
-          value={jdText}
-          onChange={(event) => onJdTextChange(event.target.value)}
-          aria-describedby={jdTextError ? 'jd-text-error' : 'jd-text-helper'}
-          aria-invalid={Boolean(jdTextError)}
-        />
-        <p className="resume-helper" id="jd-text-helper">주요 업무, 자격요건, 우대사항이 보이면 충분합니다.</p>
-        {jdTextError ? (
-          <p className="resume-error" id="jd-text-error" role="alert">
-            {jdTextError}
-          </p>
-        ) : null}
-      </div>
-
-      <details className="jd-link-card" open>
-        <summary>필요 시 링크로 JD 불러오기</summary>
-        <div className="jd-url-group">
-          <label className="resume-label" htmlFor="jd-url">
+      <section className="jd-link-panel" aria-label="JD 링크 첨부">
+        <div className="section-title-row">
+          <h2>JD 링크 첨부</h2>
+          <span>사람인 링크 우선 지원</span>
+        </div>
+        <div className="jd-url-row">
+          <label className="sr-only" htmlFor="jd-url">
             JD 링크
           </label>
-          <div className="jd-url-row">
-            <input
-              id="jd-url"
-              className={`jd-url-input${jdUrlError ? ' jd-url-input--error' : ''}`}
-              name="jdUrl"
-              type="text"
-              placeholder="https://www.saramin.co.kr/..."
-              value={jdUrl}
-              onChange={(event) => onJdUrlChange(event.target.value)}
-              aria-describedby={jdUrlError ? 'jd-url-error' : 'jd-url-helper'}
-              aria-invalid={Boolean(jdUrlError)}
-            />
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={onJdFetch}
-              disabled={isFetchingJd}
-            >
-              {isFetchingJd ? '불러오는 중...' : '링크로 JD 불러오기'}
-            </button>
-          </div>
-          <p className="resume-helper" id="jd-url-helper">
-            실패하면 JD 본문을 직접 붙여넣어 주세요.
-          </p>
-          {jdUrlError ? (
-            <p className="resume-error" id="jd-url-error" role="alert">
+          <input
+            id="jd-url"
+            className={`jd-url-input${jdUrlError ? ' jd-url-input--error' : ''}`}
+            name="jdUrl"
+            type="text"
+            placeholder="https://www.saramin.co.kr/..."
+            value={jdUrl}
+            onChange={(event) => onJdUrlChange(event.target.value)}
+            aria-describedby={jdUrlError ? 'jd-url-error' : 'jd-url-helper'}
+            aria-invalid={Boolean(jdUrlError)}
+          />
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onJdFetch}
+            disabled={isFetchingJd}
+          >
+            {isFetchingJd ? '불러오는 중...' : 'JD 미리보기'}
+          </button>
+        </div>
+        <p className="resume-helper" id="jd-url-helper">
+          링크 수집이 실패하면 아래에 JD 본문을 직접 붙여넣어 주세요.
+        </p>
+        {jdUrlError ? (
+          <p className="resume-error" id="jd-url-error" role="alert">
             {jdUrlError}
           </p>
         ) : null}
-        </div>
 
         {jdFetchStatus !== 'idle' ? (
           <StatusMessage
@@ -135,7 +116,37 @@ export function JdInputFields({
             withLoadingBar={jdFetchStatus === 'fetching'}
           />
         ) : null}
-      </details>
+      </section>
+
+      <div className="jd-divider">
+        <span>OR 직접 입력</span>
+      </div>
+
+      <div className="resume-input-group">
+        <label className="resume-label" htmlFor="jd-text">
+          JD 내용
+        </label>
+        <textarea
+          id="jd-text"
+          className={`resume-textarea jd-textarea${jdTextError ? ' resume-textarea--error' : ''}${isJdAutofilled ? ' jd-textarea--autofilled' : ''}`}
+          name="jdText"
+          placeholder="주요 업무, 자격요건, 우대사항이 보이도록 JD 본문을 붙여넣어 주세요."
+          value={jdText}
+          onChange={(event) => onJdTextChange(event.target.value)}
+          aria-describedby={jdTextError ? 'jd-text-error' : 'jd-text-helper'}
+          aria-invalid={Boolean(jdTextError)}
+        />
+        <p className="resume-helper" id="jd-text-helper">
+          {isJdAutofilled
+            ? '자동으로 불러온 초안입니다. 필요한 부분만 가볍게 다듬어 주세요.'
+            : '주요 업무, 자격요건, 우대사항이 보이면 충분합니다.'}
+        </p>
+        {jdTextError ? (
+          <p className="resume-error" id="jd-text-error" role="alert">
+            {jdTextError}
+          </p>
+        ) : null}
+      </div>
     </div>
   )
 }
