@@ -6,6 +6,10 @@ import App from './App'
 const validResumeText =
   '백엔드와 프론트엔드를 함께 다루며 프로젝트를 설계하고 운영한 경험이 있습니다. 사용자 흐름을 개선하고 테스트 자동화를 정리했습니다.'
 
+async function goToJdStep(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^2\s*JD 입력$/ }))
+}
+
 describe('App', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
@@ -56,13 +60,8 @@ describe('App', () => {
     )
     await user.click(screen.getByRole('button', { name: '진단 요청' }))
 
-    expect(await screen.findByText('82점')).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        '풀스택 경험은 분명하지만 프로젝트 성과를 수치로 더 드러내면 설득력이 커집니다.',
-      ),
-    ).toBeInTheDocument()
-    expect(screen.getByText('분석 기준 원문 보기')).toBeInTheDocument()
+    expect(await screen.findByLabelText('JD 내용')).toBeInTheDocument()
+    expect(screen.getByText('이력서 연결됨')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
@@ -139,7 +138,8 @@ describe('App', () => {
     await user.upload(input, file)
     await user.click(screen.getByRole('button', { name: '진단 요청' }))
 
-    expect(await screen.findByText('78점')).toBeInTheDocument()
+    expect(await screen.findByLabelText('JD 내용')).toBeInTheDocument()
+    expect(screen.getByText('이력서 연결됨')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/diagnose/file'),
       expect.objectContaining({
@@ -212,7 +212,7 @@ describe('App', () => {
       validResumeText,
     )
     await user.click(screen.getByRole('button', { name: '진단 요청' }))
-    await screen.findByText('백엔드 중심 경험은 분명하지만 성과 수치가 더 필요합니다.')
+    await screen.findByLabelText('JD 내용')
 
     await user.type(
       screen.getByRole('textbox', { name: 'JD 내용' }),
@@ -222,7 +222,7 @@ describe('App', () => {
       screen.getByRole('textbox', { name: 'JD 링크' }),
       'https://example.com/jobs/backend',
     )
-    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
+    await user.click(screen.getByRole('button', { name: 'AI 분석 리포트 생성' }))
 
     expect(
       await screen.findByText('JD AI 매칭을 완료하지 못했습니다'),
@@ -283,14 +283,12 @@ describe('App', () => {
     render(<App />)
 
     await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
+    await goToJdStep(user)
     await user.type(screen.getByLabelText('JD 내용'), 'a'.repeat(80))
     await user.type(screen.getByLabelText('JD 링크'), 'not-a-url')
-    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
+    await user.click(screen.getByRole('button', { name: 'AI 분석 리포트 생성' }))
 
-    expect(screen.getByText('올바른 JD 링크 형식을 입력해주세요.')).toHaveAttribute(
-      'role',
-      'alert',
-    )
+    expect(screen.getByRole('alert')).toHaveTextContent('올바른 JD 링크 형식을 입력해주세요.')
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
 
@@ -314,12 +312,13 @@ describe('App', () => {
     render(<App />)
 
     await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
+    await goToJdStep(user)
     await user.type(screen.getByLabelText('JD 내용'), 'b'.repeat(100))
     await user.type(
       screen.getByLabelText('JD 링크'),
       'https://example.com/jobs/backend',
     )
-    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
+    await user.click(screen.getByRole('button', { name: 'AI 분석 리포트 생성' }))
 
     expect(await screen.findByText('매칭 점수')).toBeInTheDocument()
     expect(screen.getByText('76점')).toBeInTheDocument()
@@ -350,6 +349,7 @@ describe('App', () => {
 
     render(<App />)
 
+    await goToJdStep(user)
     await user.type(
       screen.getByLabelText('JD 링크'),
       'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
@@ -387,6 +387,7 @@ describe('App', () => {
 
     render(<App />)
 
+    await goToJdStep(user)
     await user.type(
       screen.getByLabelText('JD 링크'),
       'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
@@ -435,6 +436,7 @@ describe('App', () => {
     render(<App />)
 
     await user.type(screen.getByRole('textbox', { name: '이력서 내용' }), validResumeText)
+    await goToJdStep(user)
     await user.type(
       screen.getByLabelText('JD 링크'),
       'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
@@ -448,7 +450,7 @@ describe('App', () => {
       jdTextarea,
       '수정한 JD 본문입니다. Spring Boot 기반 API 운영과 테스트 자동화 경험을 요구합니다.',
     )
-    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
+    await user.click(screen.getByRole('button', { name: 'AI 분석 리포트 생성' }))
 
     expect(await screen.findByText('76점')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenLastCalledWith(
@@ -483,6 +485,7 @@ describe('App', () => {
 
     render(<App />)
 
+    await goToJdStep(user)
     await user.type(
       screen.getByLabelText('JD 내용'),
       '기존 JD 본문입니다. 주요 업무와 자격요건이 정리되어 있습니다.',
@@ -539,13 +542,13 @@ describe('App', () => {
 
     await user.upload(input, file)
     await user.click(screen.getByRole('button', { name: '진단 요청' }))
-    await screen.findByText('79점')
+    await screen.findByLabelText('JD 내용')
 
     await user.type(
       screen.getByLabelText('JD 내용'),
       'Spring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.',
     )
-    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
+    await user.click(screen.getByRole('button', { name: 'AI 분석 리포트 생성' }))
 
     expect(await screen.findByText('81점')).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenLastCalledWith(

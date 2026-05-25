@@ -27,6 +27,7 @@ function App() {
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [jdText, setJdText] = useState('')
   const [jdUrl, setJdUrl] = useState('')
+  const [currentStep, setCurrentStep] = useState(1)
   const {
     clearInlineError,
     inlineError,
@@ -62,7 +63,7 @@ function App() {
     inputMode === 'text'
       ? trimmedLength >= MIN_LENGTH && trimmedLength <= MAX_LENGTH
       : Boolean(resumeSourceForPreview)
-  const activeStep =
+  const derivedStep =
     previewResult.status === 'success' ||
     previewResult.status === 'loading' ||
     previewResult.status === 'error'
@@ -70,6 +71,7 @@ function App() {
       : jdText.trim() || jdUrl.trim() || result.status === 'success'
         ? 2
         : 1
+  const activeStep = Math.max(currentStep, derivedStep)
 
   useEffect(() => {
     window.localStorage.setItem(LOCAL_STORAGE_KEY, resumeText)
@@ -158,17 +160,24 @@ function App() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    const goToJdStepOnSuccess = (wasSuccessful: boolean) => {
+      if (wasSuccessful) {
+        setCurrentStep((step) => Math.max(step, 2))
+      }
+    }
+
     if (inputMode === 'text') {
-      await submit(resumeText)
+      goToJdStepOnSuccess(await submit(resumeText))
       return
     }
 
-    await submitFile(inputMode, resumeFile)
+    goToJdStepOnSuccess(await submitFile(inputMode, resumeFile))
   }
 
   const handleJdPreviewSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    setCurrentStep(3)
     await submitPreview({
       resumeSource: {
         type: inputMode === 'text' ? 'TEXT' : 'FILE',
@@ -182,12 +191,18 @@ function App() {
   return (
     <div className="app-shell">
       <main className="page">
+        <header className="product-header">
+          <p className="product-kicker">JDSnack AI Matching</p>
+          <h1>이력서와 채용공고를 한 번에 비교하세요</h1>
+          <p>이력서를 준비하고, JD를 불러온 뒤, 마지막 페이지에서 AI 매칭 리포트를 확인합니다.</p>
+        </header>
+
         <section className="stepper-card" aria-label="현재 진행 단계">
           <ol className="flow-steps">
-            {['이력서', 'JD', '리포트'].map((label, index) => {
+            {['이력서 작성', 'JD 입력', 'AI 분석 리포트'].map((label, index) => {
               const stepNumber = index + 1
               const state =
-                activeStep === stepNumber
+                currentStep === stepNumber
                   ? 'current'
                   : activeStep > stepNumber
                     ? 'complete'
@@ -195,21 +210,31 @@ function App() {
 
               return (
                 <li key={label} className={`flow-step flow-step--${state}`}>
-                  <span className="flow-step__index">{stepNumber}</span>
-                  <strong>{label}</strong>
+                  <button
+                    type="button"
+                    className="flow-step__button"
+                    onClick={() => setCurrentStep(stepNumber)}
+                    disabled={stepNumber === 3 && activeStep < 3}
+                  >
+                    <span className="flow-step__index">{stepNumber}</span>
+                    <strong>{label}</strong>
+                  </button>
                 </li>
               )
             })}
           </ol>
         </section>
 
-        <section className="tool-layout">
-          <div className="input-stack">
-            <form className="panel input-panel" onSubmit={handleSubmit}>
+        <section className="wizard-stage">
+          {currentStep === 1 ? (
+            <form className="panel input-panel wizard-panel wizard-panel--resume" onSubmit={handleSubmit}>
               <div className="panel-header">
                 <div>
                   <p className="panel-eyebrow">Step 1</p>
-                  <h2>이력서 입력</h2>
+                  <h2>이력서 작성</h2>
+                  <p className="panel-description">
+                    텍스트를 붙여넣거나 PDF/DOCX에서 이력서 본문을 추출합니다.
+                  </p>
                 </div>
                 <p className="inline-counter" aria-live="polite">
                   {inputMode === 'text'
@@ -242,14 +267,30 @@ function App() {
 
               <div className="action-row action-row--right">
                 <DiagnoseButton isSubmitting={isSubmitting} />
+                {inputMode === 'text' && trimmedLength >= MIN_LENGTH ? (
+                  <button className="ghost-button" type="button" onClick={() => setCurrentStep(2)}>
+                    JD 입력으로 이동
+                  </button>
+                ) : null}
               </div>
-            </form>
 
-            <section className="panel jd-panel">
+              {result.status !== 'idle' && result.status !== 'success' ? (
+                <div className="inline-result">
+                  <ResultPanel ref={resultRef} result={result} />
+                </div>
+              ) : null}
+            </form>
+          ) : null}
+
+          {currentStep === 2 ? (
+            <section className="panel jd-panel wizard-panel wizard-panel--jd">
               <div className="panel-header">
                 <div>
                   <p className="panel-eyebrow">Step 2</p>
                   <h2>JD 입력</h2>
+                  <p className="panel-description">
+                    JD 본문을 붙여넣거나 사람인 링크를 불러와 공고 본문을 자동 채웁니다.
+                  </p>
                 </div>
                 <p className="inline-counter" aria-live="polite">
                   {canPreviewWithCurrentSource ? '이력서 연결됨' : '이력서 필요'}
@@ -272,91 +313,108 @@ function App() {
                 />
 
                 <div className="action-row action-row--right jd-action-row">
+                  <button className="ghost-button" type="button" onClick={() => setCurrentStep(1)}>
+                    이력서 수정
+                  </button>
                   <DiagnoseButton
                     isSubmitting={isPreviewSubmitting}
-                    idleLabel="JD 비교 미리보기"
-                    loadingLabel="JD 비교 생성 중..."
+                    idleLabel="AI 분석 리포트 생성"
+                    loadingLabel="AI 리포트 생성 중..."
                     disabled={!canPreviewWithCurrentSource}
                   />
                 </div>
               </form>
             </section>
-          </div>
+          ) : null}
 
-          <div className="report-column">
-            <ResultPanel ref={resultRef} result={result} />
-
-            {previewResult.status === 'success' && previewResult.matchPreview ? (
-              <section className="panel analysis-result jd-preview-result">
-                <div className="panel-header">
-                  <div>
-                    <p className="panel-eyebrow">Match Report</p>
-                    <h2>JD 매칭 리포트</h2>
+          {currentStep === 3 ? (
+            <div className="report-column wizard-panel wizard-panel--report">
+              {previewResult.status === 'success' && previewResult.matchPreview ? (
+                <section className="panel analysis-result jd-preview-result">
+                  <div className="panel-header">
+                    <div>
+                      <p className="panel-eyebrow">Step 3</p>
+                      <h2>이력서 + JD AI 분석 리포트</h2>
+                      <p className="panel-description">
+                        이력서와 채용공고 사이의 강점, 부족한 역량, 개선 제안을 요약했습니다.
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <section className="report-hero-card">
-                  <div className="analysis-score-card analysis-score-card--circle">
-                    <strong>{previewResult.matchPreview.matchingScore}점</strong>
-                    <span>매칭 점수</span>
-                  </div>
-                  <div className="report-summary-card">
-                    <span className="report-summary-label">핵심 요약</span>
-                    <h3>{previewResult.title}</h3>
-                    <p>{previewResult.message}</p>
-                  </div>
-                </section>
+                  <section className="report-hero-card">
+                    <div className="analysis-score-card analysis-score-card--circle">
+                      <strong>{previewResult.matchPreview.matchingScore}점</strong>
+                      <span>매칭 점수</span>
+                    </div>
+                    <div className="report-summary-card">
+                      <span className="report-summary-label">핵심 요약</span>
+                      <h3>{previewResult.title}</h3>
+                      <p>{previewResult.message}</p>
+                    </div>
+                  </section>
 
-                <div className="analysis-feedback-grid">
-                  <section className="analysis-feedback-card analysis-feedback-card--strength">
-                    <h3>강점</h3>
+                  <div className="analysis-feedback-grid">
+                    <section className="analysis-feedback-card analysis-feedback-card--strength">
+                      <h3>강점</h3>
+                      <ul>
+                        {previewResult.matchPreview.strengths.map((strength) => (
+                          <li key={strength}>{strength}</li>
+                        ))}
+                      </ul>
+                    </section>
+
+                    <section className="analysis-feedback-card analysis-feedback-card--improve">
+                      <h3>보완 포인트</h3>
+                      <ul>
+                        {previewResult.matchPreview.gaps.map((gap) => (
+                          <li key={gap}>{gap}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  </div>
+
+                  <section className="analysis-feedback-card analysis-feedback-card--suggestion">
+                    <h3>개선 제안</h3>
                     <ul>
-                      {previewResult.matchPreview.strengths.map((strength) => (
-                        <li key={strength}>{strength}</li>
+                      {previewResult.matchPreview.suggestions.map((suggestion) => (
+                        <li key={suggestion}>{suggestion}</li>
                       ))}
                     </ul>
                   </section>
 
-                  <section className="analysis-feedback-card analysis-feedback-card--improve">
-                    <h3>보완 포인트</h3>
-                    <ul>
-                      {previewResult.matchPreview.gaps.map((gap) => (
-                        <li key={gap}>{gap}</li>
-                      ))}
-                    </ul>
-                  </section>
-                </div>
-
-                <section className="analysis-feedback-card analysis-feedback-card--suggestion">
-                  <h3>개선 제안</h3>
-                  <ul>
-                    {previewResult.matchPreview.suggestions.map((suggestion) => (
-                      <li key={suggestion}>{suggestion}</li>
-                    ))}
-                  </ul>
+                  <div className="action-row action-row--center">
+                    <button className="ghost-button" type="button" onClick={() => setCurrentStep(2)}>
+                      JD 다시 수정
+                    </button>
+                    <button className="ghost-button" type="button" onClick={() => setCurrentStep(1)}>
+                      이력서 다시 수정
+                    </button>
+                  </div>
                 </section>
-              </section>
-            ) : null}
+              ) : (
+                <ResultPanel ref={resultRef} result={result} />
+              )}
 
-            {previewResult.status === 'loading' ? (
-              <StatusMessage
-                badge="Preparing"
-                title={previewResult.title}
-                message={previewResult.message}
-                tone="active"
-                withLoadingBar
-              />
-            ) : null}
+              {previewResult.status === 'loading' ? (
+                <StatusMessage
+                  badge="Preparing"
+                  title={previewResult.title}
+                  message={previewResult.message}
+                  tone="active"
+                  withLoadingBar
+                />
+              ) : null}
 
-            {previewResult.status === 'error' ? (
-              <StatusMessage
-                badge="Check Input"
-                title={previewResult.title}
-                message={`${previewResult.message} JD 본문을 직접 붙여넣어 주세요.`}
-                tone="danger"
-              />
-            ) : null}
-          </div>
+              {previewResult.status === 'error' ? (
+                <StatusMessage
+                  badge="Check Input"
+                  title={previewResult.title}
+                  message={`${previewResult.message} JD 본문을 직접 붙여넣어 주세요.`}
+                  tone="danger"
+                />
+              ) : null}
+            </div>
+          ) : null}
         </section>
       </main>
     </div>
