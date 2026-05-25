@@ -34,6 +34,8 @@
 
 Playwright smoke는 실제 외부 사이트와 Gemini를 호출하지 않고 route mock으로 화면 연결 흐름만 검증한다. CI 필수화는 별도 운영 PR에서 결정한다.
 
+`ai-local` 수동 smoke는 사용자가 직접 설정한 로컬 `.env`와 Gemini API Key로 화면에서 실제 AI 결과를 확인하는 절차다. 이 검증은 CI에 포함하지 않고 `.agent-os/operations/gemini-local-test-policy.md`를 기준으로 수행한다.
+
 실행 스크립트:
 
 - [scripts/smoke-test.sh](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/scripts/smoke-test.sh)
@@ -63,3 +65,4 @@ docker compose down
 
 - Playwright smoke를 CI 필수 체크로 승격
 - 실제 브라우저 통합 smoke와 route mock smoke 분리
+- 운영 배포용 Gemini 연동 검증은 별도 정책으로 분리
