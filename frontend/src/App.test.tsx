@@ -391,6 +391,102 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
+  it('JD 링크 실패 후에도 기존 JD textarea 값은 유지된다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      json: async () => ({
+        success: false,
+        error: {
+          code: 'JD_FETCH_FAILED',
+          message: 'JD 링크를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+        },
+        timestamp: '2026-05-25T10:00:00.000+09:00',
+      }),
+    } as Response)
+
+    render(<App />)
+
+    await user.type(
+      screen.getByLabelText('JD 내용'),
+      '기존 JD 본문입니다. 주요 업무와 자격요건이 정리되어 있습니다.',
+    )
+    await user.type(
+      screen.getByLabelText('JD 링크'),
+      'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=2',
+    )
+    await user.click(screen.getByRole('button', { name: '링크로 JD 불러오기' }))
+
+    expect(await screen.findByText('불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.')).toBeInTheDocument()
+    expect(screen.getByLabelText('JD 내용')).toHaveValue(
+      '기존 JD 본문입니다. 주요 업무와 자격요건이 정리되어 있습니다.',
+    )
+  })
+
+  it('PDF 분석 성공 후 추출된 sourceText로 JD 매칭을 요청할 수 있다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: true,
+          data: {
+            score: 79,
+            summary: '파일 이력서 분석이 완료되었습니다.',
+            strengths: ['Spring Boot 경험이 보입니다.'],
+            improvements: ['성과 수치를 보강해 주세요.'],
+            sourceText: 'PDF에서 추출된 이력서 본문입니다. Spring Boot와 MySQL 운영 경험이 있습니다.',
+          },
+          timestamp: '2026-05-25T10:00:00.000+09:00',
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: true,
+          data: {
+            matchingScore: 81,
+            summary: '추출된 이력서 본문과 JD가 잘 맞습니다.',
+            strengths: ['Spring Boot 경험이 JD와 겹칩니다.'],
+            gaps: ['대용량 트래픽 경험 근거가 약합니다.'],
+            suggestions: ['성과와 규모를 함께 적어 보세요.'],
+          },
+          timestamp: '2026-05-25T10:00:00.000+09:00',
+        }),
+      } as Response)
+
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: 'PDF' }))
+    const input = screen.getByLabelText('PDF 이력서 파일')
+    const file = new File(['dummy pdf'], 'resume.pdf', {
+      type: 'application/pdf',
+    })
+
+    await user.upload(input, file)
+    await user.click(screen.getByRole('button', { name: '진단 요청' }))
+    await screen.findByText('79점')
+
+    await user.type(
+      screen.getByLabelText('JD 내용'),
+      'Spring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.',
+    )
+    await user.click(screen.getByRole('button', { name: 'JD 비교 미리보기' }))
+
+    expect(await screen.findByText('81점')).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      expect.stringContaining('/api/match/preview'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          resumeSource: {
+            type: 'FILE',
+            value: 'PDF에서 추출된 이력서 본문입니다. Spring Boot와 MySQL 운영 경험이 있습니다.',
+          },
+          jdText: 'Spring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.',
+          jdUrl: '',
+        }),
+      }),
+    )
+  })
+
   it('저장된 이력서를 다시 불러온다', () => {
     window.localStorage.setItem('jdsnack.resume-text', validResumeText)
 
