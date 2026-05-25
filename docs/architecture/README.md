@@ -11,4 +11,5 @@
 
 ## 관련 문서
 
-- 상세 기능 아키텍처: `.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/architecture.md`
+- 활성 기능 명세: `.agent-os/specs/`
+- 보관 기능 명세: `.agent-os/archive/specs/`
