@@ -143,6 +143,57 @@ class JdFetchServiceTest {
     }
 
     @Test
+    void saraminRelayViewLoadsDirectDetailWhenAjaxHasNoJobDetail() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, """
+                        <html>
+                          <head><title>[(주)이노시스컴퍼니] JAVA 신입/경력 개발자 모집 - 사람인</title></head>
+                          <body>
+                            <div class="jview_wing">사람인 인공지능 기술 기반으로 맞춤 공고를 추천해드리는 서비스입니다.</div>
+                            <footer>개인정보 보호 채용 절차 안내</footer>
+                          </body>
+                        </html>
+                        """))
+                .thenReturn(response(200, """
+                        <div class="relay-empty">
+                          <p>개인정보 보호 채용 절차 안내와 AI매치 추천공고만 표시됩니다.</p>
+                        </div>
+                        """))
+                .thenReturn(response(200, """
+                        <html>
+                          <body>
+                            <div class="user_content">
+                              <h3>주요업무</h3>
+                              <pre>JAVA 기반 기업 메시징 서비스 클라이언트와 서버 API를 개발합니다.</pre>
+                              <h3>자격요건</h3>
+                              <pre>Java, Spring Framework, SQL 기반 웹 서비스 개발 경험이 필요합니다.</pre>
+                              <h3>우대사항</h3>
+                              <pre>운영 환경 장애 대응과 Git 기반 협업 경험을 우대합니다.</pre>
+                            </div>
+                          </body>
+                        </html>
+                        """));
+
+        JdFetchResponse response = service.fetch(new JdFetchRequest(
+                "https://www.saramin.co.kr/zf_user/jobs/relay/view?view_type=search&rec_idx=53815724&location=ts&searchword=%EC%9E%90%EB%B0%94&searchType=recently&paid_fl=n&search_uuid=ffa67e8c-4ae8-4f89-94ea-2dd1cedaa968&t_ref=search&t_ref_content=generic#seq=0"
+        ));
+
+        assertEquals("saramin", response.sourceSite());
+        assertTrue(response.jdText().contains("기업 메시징 서비스"));
+        assertTrue(response.jdText().contains("Spring Framework"));
+
+        var requestCaptor = forClass(HttpRequest.class);
+        verify(httpClient, times(3)).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        HttpRequest detailRequest = requestCaptor.getAllValues().get(2);
+        assertEquals("GET", detailRequest.method());
+        assertEquals("/zf_user/jobs/relay/view-detail", detailRequest.uri().getPath());
+        assertEquals("rec_idx=53815724&rec_seq=0&t_ref=search&t_ref_content=generic", detailRequest.uri().getQuery());
+    }
+
+    @Test
     void localhostUrlIsRejected() {
         JdFetchService service = new JdFetchService(mock(HttpClient.class), new JdHtmlExtractor());
 
