@@ -12,3 +12,4 @@
 | `REQ-03` 이력서 입력 경로 유지 | `AC-04` | `TC-09` | `api-spec.md`, `ui-spec.md` |
 | `REQ-01` JD 링크 성공 흐름 연결 | `AC-01`, `AC-02` | `TC-10` | `api-spec.md`, `ui-spec.md` |
 | `REQ-03` 이력서 입력 경로 유지 | `AC-04` | `TC-11` | `api-spec.md`, `ui-spec.md` |
+| `REQ-05` 구현 범위 제한 | `AC-05` | `TC-12`, `TC-13` | `plan.md` |

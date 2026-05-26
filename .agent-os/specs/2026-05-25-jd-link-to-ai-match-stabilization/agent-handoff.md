@@ -6,42 +6,43 @@
 
 ## Current Phase
 
-- Frontend
+- DevOps
 
 ## Source Documents
 
-- `requirements.md`
-- `acceptance-criteria.md`
-- `api-spec.md`
-- `ui-spec.md`
 - `test-scenarios.md`
 - `traceability.md`
 - `plan.md`
+- `.agent-os/operations/container-workflow.md`
+- `.agent-os/operations/deploy-runbook.md`
 
 ## Changed Files
 
-- `.agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization/**`
-- `.agent-os/archive/specs/2026-05-24-saramin-jd-scraping-stabilization/**`
-- `AGENTS.md`
-- `.agent-os/standards/index.yml`
+- `compose.local.yaml`
+- `compose.prod.yaml`
 - `README.md`
-- `frontend/src/components/StatusMessage.tsx`
-- `frontend/src/App.test.tsx`
-- `frontend/e2e/upload-and-jd-preview.spec.ts`
+- `.github/workflows/container.yml`
+- `.agent-os/operations/container-workflow.md`
+- `.agent-os/operations/deploy-runbook.md`
+- `.agent-os/operations/browser-smoke-checks.md`
+- `.agent-os/operations/gemini-local-test-policy.md`
+- `.agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization/plan.md`
+- `.agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization/test-scenarios.md`
+- `.agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization/traceability.md`
 
 ## Decisions Made
 
-- 새 API는 추가하지 않는다.
-- `POST /api/jd/fetch` 성공 결과의 `jdText`를 JD textarea에 자동 반영한다.
-- `POST /api/jd/fetch` 실패 시 기존 JD textarea 값을 보존한다.
-- 실패 복구 행동은 `JD 본문을 직접 붙여넣어 주세요.`로 고정한다.
-- `POST /api/match/preview` 응답 계약은 유지한다.
+- 로컬 개발/검증은 `compose.local.yaml`에서 `build:`로 소스 이미지를 빌드한다.
+- 배포/운영 실행은 `compose.prod.yaml`에서 `image:`로 GHCR 이미지를 pull한다.
+- Docker image 경로는 소문자 registry 이름인 `ghcr.io/silverthunder09/...`를 사용한다.
+- `main` push 후 backend/frontend 이미지를 `latest`와 `<git-sha>` 태그로 GHCR에 push한다.
+- `docker compose config`는 secret을 출력할 수 있으므로 `--no-env-resolution`을 기본 검증 옵션으로 둔다.
 
 ## Change Requests
 
-- `Frontend Engineer`: JD 링크 상태 메시지 접근성과 자동 채움 후 수정 흐름을 테스트로 유지한다.
-- `Backend Engineer`: 기존 JD fetch와 match preview 계약을 유지한다.
-- `QA Reviewer`: 브라우저 기준 성공 흐름, 실패 후 복구 흐름, 자동 채움 후 수정 요청 흐름을 검증한다.
+- `QA Reviewer`: `compose.local.yaml`과 `compose.prod.yaml` config 검증을 확인한다.
+- `DevOps Steward`: main push 후 GHCR publish와 prod compose pull 동작을 GitHub Actions에서 확인한다.
+- `Release Captain`: PR 본문에 로컬 build compose와 배포 pull compose 분리 이유를 명시한다.
 
 ## Open Questions
 
@@ -49,9 +50,9 @@
 
 ## Risks
 
-- 실제 사람인 HTML 변경으로 링크 수집 성공률은 변동될 수 있다.
-- 이번 spec은 실패 시 직접 입력 복구를 필수 경로로 둔다.
-- Playwright smoke는 로컬 포트 바인딩이 가능한 환경에서 실행되어야 한다.
+- GHCR package 권한이나 owner 대소문자 문제로 image push/pull이 실패할 수 있다.
+- `docker compose config`를 기본 옵션으로 실행하면 `.env` secret이 출력될 수 있다.
+- 실제 배포 플랫폼은 아직 확정하지 않았으므로 이번 변경은 image pull 가능한 compose 기준까지만 보장한다.
 
 ## Next Agent
 

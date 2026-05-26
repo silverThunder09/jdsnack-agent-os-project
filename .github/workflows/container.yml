@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   backend-container:
@@ -73,15 +74,62 @@ jobs:
       - name: Start compose stack
         env:
           JDSNACK_DIAGNOSIS_MODE: fixture
-        run: docker compose up --build -d
+        run: docker compose -f compose.local.yaml up --build -d
 
       - name: Run smoke test
         run: bash ./scripts/smoke-test.sh
 
       - name: Print compose logs
         if: failure()
-        run: docker compose logs --no-color
+        run: docker compose -f compose.local.yaml logs --no-color
 
       - name: Stop compose stack
         if: always()
-        run: docker compose down -v
+        run: docker compose -f compose.local.yaml down -v
+
+  publish-images:
+    name: Publish images to GHCR
+    runs-on: ubuntu-latest
+    needs:
+      - backend-container
+      - compose-smoke
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/silverthunder09/jdsnack-backend:latest
+            ghcr.io/silverthunder09/jdsnack-backend:${{ github.sha }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/silverthunder09/jdsnack-frontend:latest
+            ghcr.io/silverthunder09/jdsnack-frontend:${{ github.sha }}
+
+      - name: Verify prod compose can pull pushed images
+        env:
+          JDSNACK_IMAGE_TAG: ${{ github.sha }}
+        run: docker compose -f compose.prod.yaml pull

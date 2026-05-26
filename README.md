@@ -68,10 +68,10 @@ jdsnack-agent-os/
 
 ## 로컬 실행
 
-루트 디렉토리에서 프론트와 백엔드를 함께 실행합니다.
+루트 디렉토리에서 프론트와 백엔드를 함께 실행합니다. 로컬 개발/검증은 소스에서 이미지를 빌드하는 `compose.local.yaml`을 사용합니다.
 
 ```bash
-docker compose up --build
+docker compose -f compose.local.yaml up --build
 ```
 
 접속 주소:
@@ -81,6 +81,19 @@ docker compose up --build
 - 헬스체크: `http://localhost:8080/api/health`
 
 `ai-local` 모드에서 실제 Gemini 호출을 확인하려면 루트 `.env`에 `GEMINI_API_KEY`가 필요합니다. `.env`는 로컬 전용이며 커밋하지 않습니다.
+
+## 배포 실행 기준
+
+배포/운영 실행은 registry에 올라간 이미지를 pull하는 `compose.prod.yaml`을 사용합니다. 배포 compose에는 `build:`를 두지 않습니다.
+
+```bash
+docker compose -f compose.prod.yaml pull
+docker compose -f compose.prod.yaml up -d
+```
+
+기본 이미지 태그는 `latest`이며, 특정 커밋 이미지를 확인할 때는 `JDSNACK_IMAGE_TAG=<git-sha>`를 지정합니다.
+
+`docker compose config`는 `env_file` 값을 해석하면 secret이 출력될 수 있으므로, 결과를 PR/이슈/채팅에 붙여넣지 않습니다. 설정 구조만 확인할 때는 `--no-env-resolution`을 사용합니다.
 
 ## 개발 원칙
 
