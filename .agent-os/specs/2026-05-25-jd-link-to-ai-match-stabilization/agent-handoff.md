@@ -6,43 +6,34 @@
 
 ## Current Phase
 
-- DevOps
+- Backend
 
 ## Source Documents
 
+- `requirements.md`
+- `acceptance-criteria.md`
+- `api-spec.md`
 - `test-scenarios.md`
 - `traceability.md`
 - `plan.md`
-- `.agent-os/operations/container-workflow.md`
-- `.agent-os/operations/deploy-runbook.md`
 
 ## Changed Files
 
-- `compose.local.yaml`
-- `compose.prod.yaml`
-- `README.md`
-- `.github/workflows/container.yml`
-- `.agent-os/operations/container-workflow.md`
-- `.agent-os/operations/deploy-runbook.md`
-- `.agent-os/operations/browser-smoke-checks.md`
-- `.agent-os/operations/gemini-local-test-policy.md`
-- `.agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization/plan.md`
-- `.agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization/test-scenarios.md`
-- `.agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization/traceability.md`
+- `backend/src/main/java/com/jdsnack/jd/JdFetchService.java`
+- `backend/src/test/java/com/jdsnack/jd/JdFetchServiceTest.java`
+- `.agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization/agent-handoff.md`
 
 ## Decisions Made
 
-- 로컬 개발/검증은 `compose.local.yaml`에서 `build:`로 소스 이미지를 빌드한다.
-- 배포/운영 실행은 `compose.prod.yaml`에서 `image:`로 GHCR 이미지를 pull한다.
-- Docker image 경로는 소문자 registry 이름인 `ghcr.io/silverthunder09/...`를 사용한다.
-- `main` push 후 backend/frontend 이미지를 `latest`와 `<git-sha>` 태그로 GHCR에 push한다.
-- `docker compose config`는 secret을 출력할 수 있으므로 `--no-env-resolution`을 기본 검증 옵션으로 둔다.
+- 기존 `POST /api/jd/fetch` 계약은 유지한다.
+- 사람인 relay view 정적 페이지가 개인정보/AI매치/푸터성 내용만 반환하면 `view-ajax` fallback을 먼저 시도한다.
+- `view-ajax`에 상세 iframe이 없거나 JD 본문을 추출하지 못하면 `rec_idx` 기반 `view-detail` 직접 조회를 추가 시도한다.
+- 직접 상세 조회도 실패하면 기존 fallback 실패 원인을 유지한다.
 
 ## Change Requests
 
-- `QA Reviewer`: `compose.local.yaml`과 `compose.prod.yaml` config 검증을 확인한다.
-- `DevOps Steward`: main push 후 GHCR publish와 prod compose pull 동작을 GitHub Actions에서 확인한다.
-- `Release Captain`: PR 본문에 로컬 build compose와 배포 pull compose 분리 이유를 명시한다.
+- `QA Reviewer`: 사람인 실제 링크에서 JD 본문 자동 채움과 실패 시 직접 입력 복구 흐름을 확인한다.
+- `Frontend Engineer`: 실패 메시지는 기존처럼 `JD 본문을 직접 붙여넣어 주세요.` 기준을 유지한다.
 
 ## Open Questions
 
@@ -50,9 +41,9 @@
 
 ## Risks
 
-- GHCR package 권한이나 owner 대소문자 문제로 image push/pull이 실패할 수 있다.
-- `docker compose config`를 기본 옵션으로 실행하면 `.env` secret이 출력될 수 있다.
-- 실제 배포 플랫폼은 아직 확정하지 않았으므로 이번 변경은 image pull 가능한 compose 기준까지만 보장한다.
+- 사람인 HTML 구조가 다시 변경되면 fixture 기준은 통과해도 실제 링크 성공률은 변동될 수 있다.
+- 브라우저 렌더링, 로그인 우회, anti-bot 우회는 이번 범위에 포함하지 않는다.
+- 실제 외부 사이트 네트워크 상태는 로컬/CI 환경에 따라 다를 수 있다.
 
 ## Next Agent
 

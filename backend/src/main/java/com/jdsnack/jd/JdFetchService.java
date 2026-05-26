@@ -55,13 +55,7 @@ public class JdFetchService {
                 if (!shouldTrySaraminAjaxFallback(exception, uri)) {
                     throw exception;
                 }
-                String ajaxHtml = fetchHtml(buildSaraminAjaxRequest(uri));
-                String detailUrl = extractSaraminDetailIframeUrl(ajaxHtml, uri);
-                if (!detailUrl.isBlank()) {
-                    String detailHtml = fetchHtml(buildDetailRequest(URI.create(detailUrl), uri));
-                    return jdHtmlExtractor.extract(detailHtml, jdUrl);
-                }
-                return jdHtmlExtractor.extract(ajaxHtml, jdUrl);
+                return fetchSaraminFallback(uri, jdUrl, exception);
             }
         } catch (ApiException exception) {
             throw exception;
@@ -82,6 +76,53 @@ public class JdFetchService {
                 .header("Accept-Language", "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
                 .GET()
                 .build();
+    }
+
+    private JdFetchResponse fetchSaraminFallback(URI uri, String jdUrl, ApiException originalException)
+            throws IOException, InterruptedException {
+        ApiException lastException = originalException;
+
+        try {
+            String ajaxHtml = fetchHtml(buildSaraminAjaxRequest(uri));
+            String detailUrl = extractSaraminDetailIframeUrl(ajaxHtml, uri);
+            if (!detailUrl.isBlank()) {
+                String detailHtml = fetchHtml(buildDetailRequest(URI.create(detailUrl), uri));
+                return jdHtmlExtractor.extract(detailHtml, jdUrl);
+            }
+            return jdHtmlExtractor.extract(ajaxHtml, jdUrl);
+        } catch (ApiException exception) {
+            lastException = exception;
+            if (!isSaraminFallbackable(exception)) {
+                throw exception;
+            }
+        }
+
+        try {
+            String detailHtml = fetchHtml(buildDetailRequest(buildSaraminDirectDetailUri(uri), uri));
+            return jdHtmlExtractor.extract(detailHtml, jdUrl);
+        } catch (ApiException exception) {
+            if (!isSaraminFallbackable(exception)) {
+                throw exception;
+            }
+            throw lastException;
+        }
+    }
+
+    private boolean isSaraminFallbackable(ApiException exception) {
+        return exception.errorCode() == ErrorCode.JD_FETCH_EMPTY_CONTENT
+                || exception.errorCode() == ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE
+                || exception.errorCode() == ErrorCode.JD_FETCH_FAILED;
+    }
+
+    private URI buildSaraminDirectDetailUri(URI uri) {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("rec_idx", requireQueryParam(uri, "rec_idx"));
+        query.put("rec_seq", "0");
+        query.put("t_ref", queryParamOrDefault(uri, "t_ref", "search"));
+        query.put("t_ref_content", queryParamOrDefault(uri, "t_ref_content", "generic"));
+
+        String encodedQuery = encodeForm(query);
+        return URI.create(uri.getScheme() + "://" + uri.getHost() + "/zf_user/jobs/relay/view-detail?" + encodedQuery);
     }
 
     private HttpRequest buildSaraminAjaxRequest(URI uri) {
