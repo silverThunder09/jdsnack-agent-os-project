@@ -114,3 +114,24 @@
 - 기대 결과:
   - 키 누락 안내가 표시된다.
   - 키 누락은 보안 실패가 아니라 정상적인 설정 실패로 판단한다.
+
+## `TC-12` 로컬 build compose 검증
+
+- 대응 AC: `AC-05`
+- 절차:
+  - `docker compose -f compose.local.yaml config --no-env-resolution`를 실행한다.
+  - PR 컨테이너 smoke에서 `compose.local.yaml`로 서비스를 올린다.
+- 기대 결과:
+  - backend/frontend가 `build:` 기준으로 구성된다.
+  - PR 검증은 registry image pull 없이 로컬 소스 빌드로 수행된다.
+
+## `TC-13` 배포 pull compose 검증
+
+- 대응 AC: `AC-05`
+- 절차:
+  - `docker compose -f compose.prod.yaml config --no-env-resolution`를 실행한다.
+  - main 반영 후 push된 이미지 태그로 `docker compose -f compose.prod.yaml pull`을 실행한다.
+- 기대 결과:
+  - backend/frontend가 `image:` 기준으로 구성된다.
+  - `compose.prod.yaml`에는 `build:`가 없다.
+  - `JDSNACK_IMAGE_TAG`로 `latest` 또는 `<git-sha>` 이미지를 선택할 수 있다.

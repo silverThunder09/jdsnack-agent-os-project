@@ -30,7 +30,7 @@
 
 ## 실행 방식
 
-기본 컨테이너 스모크 체크는 `docker compose`로 프론트/백엔드를 함께 띄운 뒤 프론트 진입점과 프록시 응답, 텍스트/파일 업로드 API 흐름을 검증하는 경량 스크립트로 운영한다.
+기본 컨테이너 스모크 체크는 `compose.local.yaml`로 프론트/백엔드를 함께 띄운 뒤 프론트 진입점과 프록시 응답, 텍스트/파일 업로드 API 흐름을 검증하는 경량 스크립트로 운영한다.
 
 Playwright smoke는 실제 외부 사이트와 Gemini를 호출하지 않고 route mock으로 화면 연결 흐름만 검증한다. CI 필수화는 별도 운영 PR에서 결정한다.
 
@@ -44,9 +44,9 @@ Playwright smoke는 실제 외부 사이트와 Gemini를 호출하지 않고 rou
 ## 로컬 실행 순서
 
 ```sh
-docker compose up --build -d
+docker compose -f compose.local.yaml up --build -d
 ./scripts/smoke-test.sh
-docker compose down
+docker compose -f compose.local.yaml down
 ```
 
 기본 URL:

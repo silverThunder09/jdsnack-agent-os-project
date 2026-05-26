@@ -47,7 +47,7 @@ Gemini 실호출 검증은 운영 AI 연동이 아니라, 로컬에서 외부 AP
 실행:
 
 ```sh
-docker compose up --build
+docker compose -f compose.local.yaml up --build
 ```
 
 브라우저 확인:
