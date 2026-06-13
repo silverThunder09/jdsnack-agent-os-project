@@ -29,7 +29,7 @@ JDSnack은 개발자 이력서와 채용공고(JD)를 비교해 이력서 개선
 - AI: Gemini API, 로컬 `ai-local` 모드
 - Test/Fixture: H2, JUnit, Vitest, Playwright
 - Runtime: Docker Compose 분리 컨테이너
-- Docs Harness: `.agent-os/`, `AGENTS.md`, 커스텀 Codex agents
+- Docs Harness: `.agent-os/`, `AGENTS.md`
 
 ## 저장소 구조
 
@@ -44,8 +44,6 @@ jdsnack-agent-os/
 │   ├── archive/
 │   ├── standards/
 │   └── operations/
-├── .codex/
-│   └── agents/
 ├── docs/
 │   └── architecture/
 ├── backend/
@@ -62,7 +60,6 @@ jdsnack-agent-os/
 - 용어집: `.agent-os/product/glossary.md`
 - 활성 기능 명세: `.agent-os/specs/`
 - 보관 기능 명세: `.agent-os/archive/specs/`
-- 커스텀 에이전트: `.codex/agents/*.toml`
 - 아키텍처 문서: `docs/architecture/`
 - 변경 이력: `CHANGELOG.md`
 
@@ -101,4 +98,6 @@ docker compose -f compose.prod.yaml up -d
 2. 기능 변경은 `REQ -> AC -> TC -> API/UI -> 구현/테스트` 순서로 맞춥니다.
 3. API/UI 계약 변경은 관련 spec 문서와 함께 수정합니다.
 4. 커밋과 PR 제목은 Conventional Commits 형식을 따릅니다.
-5. 완료 후 테스트 결과와 handoff를 남깁니다.
+5. 문서 계획, PR, 리뷰, 머지는 클로드가 담당합니다.
+6. 코덱스는 구현, 리뷰 기반 코드 수정, 테스트, 별도 지시된 자동 배포를 담당합니다.
+7. 완료 후 테스트 결과와 PR 요약을 남깁니다.
