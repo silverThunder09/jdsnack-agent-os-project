@@ -35,14 +35,8 @@
 - `TC`: Test Case의 약자입니다. 테스트 시나리오를 뜻합니다.
 - `Traceability`: `REQ -> AC -> TC -> 계약/구현` 연결을 추적하는 문서입니다.
 
-## 에이전트/운영
+## 운영
 
-- `Handoff`: 다음 에이전트가 이어받기 위한 작업 인수인계 문서입니다.
 - `Review Gate`: PR이 범위, 문서, CI, 리뷰 기준을 통과했는지 확인하는 자체 검증 절차입니다.
-- `Spec Steward`: 요구사항, 수용 기준, API/UI 계약, traceability를 정리하는 계획 담당 에이전트입니다.
-- `Backend Engineer`: 백엔드 구현과 백엔드 테스트를 담당하는 개발 에이전트입니다.
-- `Frontend Engineer`: 프론트엔드 구현과 프론트 테스트를 담당하는 개발 에이전트입니다.
-- `QA Reviewer`: 문서, 구현, 테스트의 불일치를 검증하는 검증 에이전트입니다.
-- `Security Reviewer`: 비밀값, 외부 API, 로그, 개인정보 정책을 검토하는 보안 에이전트입니다.
-- `DevOps Steward`: CI/CD, Docker, compose, 배포 흐름을 관리하는 운영 에이전트입니다.
-- `Release Captain`: PR, 머지, 릴리즈 완료 조건을 확인하는 릴리즈 에이전트입니다.
+- `Planning Thread`: JDSnack의 단일 작업 스레드입니다. 계획, 변경, 검증 기록을 한 흐름에서 관리합니다.
+- `Session Switch`: 주제가 바뀔 때 새 세션을 시작해 컨텍스트 오염을 줄이는 운영 방식입니다.
