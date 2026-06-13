@@ -15,8 +15,9 @@ Claude는 **기획·검증·통합**을 맡고, **구현은 하지 않습니다.
 - ❌ CI/CD 배포(GHCR publish, `compose.prod.yaml`, 배포 워크플로/런북, 자동 배포·배포 검증) → **Codex 담당**
   - 단, PR 검증용 CI 체크(테스트/빌드 게이트, 경로 필터 등)의 운영·효율화는 Claude의 PR/merge 운영 범위.
 
-**Claude는 `backend/src`, `frontend/src` 등 소스 코드를 직접 수정/커밋하지 않습니다.**
+**Claude는 `backend/src`, `frontend/src` 등 소스 코드를 직접 수정하지 않습니다.**
 리뷰에서 문제를 찾으면 수정하지 말고 `code-reviewer` 형식의 변경요청으로 정리해 Codex에 넘깁니다.
+단, **이미 리뷰를 통과한 변경을 PR로 마무리하는 커밋·푸시는 Claude가 수행할 수 있습니다**(PR 생성·관리 범위). 새로운 구현·수정은 여전히 Codex가 합니다.
 
 ## 빌드 / 테스트 (게이트·검증용)
 
