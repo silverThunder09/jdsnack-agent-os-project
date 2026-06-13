@@ -4,6 +4,12 @@
 
 PR은 코드 리뷰 요청이 아니라 **문서, 테스트, 구현이 일치하는지 검증하는 단위**입니다.
 
+## 실행 주체
+
+- PR 계획, 생성, 본문 작성, 리뷰 대응 판단은 클로드가 담당합니다.
+- 코덱스는 PR 규칙을 참고하되 PR 생성과 리뷰 판단을 직접 수행하지 않습니다.
+- 코덱스는 클로드 리뷰 결과를 바탕으로 코드 수정, 테스트, 자동 배포 지시가 있을 때만 실행합니다.
+
 ## 시작 분기
 
 모든 PR을 같은 강도로 검증하지 않습니다.
@@ -17,8 +23,8 @@ PR은 코드 리뷰 요청이 아니라 **문서, 테스트, 구현이 일치하
 기본 원칙:
 
 - `Light`는 빠르게 검증합니다.
-- `Standard`는 담당 에이전트와 `QA Reviewer` 중심으로 검증합니다.
-- `High-risk`는 기존 풀 플로우를 적용합니다.
+- `Standard`는 관련 테스트와 CI 중심으로 검증합니다.
+- `High-risk`는 자체 리뷰 게이트와 추가 수동 검증을 적용합니다.
 
 ## PR 위험도 기준
 
@@ -54,9 +60,9 @@ PR은 코드 리뷰 요청이 아니라 **문서, 테스트, 구현이 일치하
 
 필수 검증:
 
-- 담당 에이전트
-- `QA Reviewer`
+- 관련 테스트
 - 관련 CI
+- 문서/계약 일치 확인
 
 ### `High-risk`
 
@@ -75,11 +81,10 @@ PR은 코드 리뷰 요청이 아니라 **문서, 테스트, 구현이 일치하
 
 필수 검증:
 
-- `QA Reviewer`
-- `Security Reviewer`
-- `DevOps Steward`
-- `Release Captain`
-- 변경 내용에 따라 `Spec Steward`
+- 관련 테스트
+- 관련 CI
+- 자체 리뷰 게이트
+- 보안, 배포, 외부 API 영향 수동 확인
 
 ## PR 크기
 
@@ -98,7 +103,6 @@ PR의 주 목적은 PR 본문에 한 문장으로 설명할 수 있어야 합니
 - 그 구현을 검증하는 테스트
 - 그 구현과 직접 연결된 `requirements.md`, `acceptance-criteria.md`, `test-scenarios.md`, `traceability.md`
 - API/UI 계약이 바뀐 경우의 `api-spec.md`, `ui-spec.md`
-- 같은 기능을 다음 에이전트가 이어받기 위한 handoff
 
 별도 PR로 분리해야 하는 변경:
 
@@ -182,7 +186,6 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - [ ] CI 체크리스트 확인
 - [ ] 컨테이너 영향 확인
 - [ ] 수동 검증
-- [ ] 에이전트 handoff 확인
 
 ## 영향 범위
 
@@ -202,7 +205,6 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - UI 변경 시 `ui-spec.md` 갱신
 - 테스트 기준 변경 시 `test-scenarios.md` 갱신
 - 완료 기준은 [standards/definition-of-done.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/definition-of-done.md)를 따름
-- 서브 에이전트 작업은 [standards/sub-agent-operations.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/sub-agent-operations.md)를 따름
 - CI 기준은 [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md)를 따름
 - PR 자동 운영 루프는 [pr-automation-loop.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-automation-loop.md)를 따름
 - PR 생성 후 자체 리뷰는 [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md)를 따름
@@ -221,9 +223,9 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - UI 변경이 있으면 `ui-spec.md`가 갱신되어 있다.
 - 문서/백엔드/프론트 변경 범위에 맞는 CI 체크리스트가 확인되어 있다.
 - `Light`는 작성자 확인과 관련 CI만 통과하면 된다.
-- `Standard`는 담당 에이전트와 `QA Reviewer` 검토가 완료되어야 한다.
+- `Standard`는 관련 테스트와 CI 검증이 완료되어야 한다.
 - `High-risk`는 `scripts/pr-review-gate.sh <PR_NUMBER>` 실행 계획이 있다.
-- Gemini API 또는 외부 API 사용 시 `Security Reviewer` 검토가 완료되어 있다.
+- Gemini API 또는 외부 API 사용 시 보안 영향이 확인되어 있다.
 - 문서와 구현이 불일치하는 상태로 PR을 생성하지 않는다.
 
 ## PR 실패 처리
@@ -231,7 +233,7 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - GitHub Actions 또는 리뷰가 실패하면 `.github/ISSUE_TEMPLATE/pr-failure.yml` 형식으로 Issue를 생성한다.
 - 실패 Issue에는 유형 라벨을 붙인다. 기본 분류는 `ci-failure`, `contract-drift`, `test-gap`, `deploy-risk`다.
 - Issue에는 실패 PR, 실패 체크, 핵심 로그, 관련 `REQ/AC/TC`, 수정 계획을 남긴다.
-- 수정은 같은 브랜치에서 진행하고 다시 담당 에이전트 검사를 받는다.
+- 수정은 같은 브랜치에서 진행하고 다시 자체 리뷰와 테스트를 수행한다.
 - `High-risk` PR의 자체 리뷰가 `REQUEST_CHANGES`이면 PR 실패 Issue를 만들고 같은 브랜치에서 수정 후 다시 리뷰한다.
 
 ## 리뷰 기준
@@ -245,8 +247,7 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 5. 계층 경계가 유지되는가
 6. CI/CD 영향이 별도 PR 또는 명확한 예외로 기록되었는가
 7. 배포/운영 영향이 별도 PR 또는 명확한 예외로 기록되었는가
-8. 에이전트 handoff가 다음 작업자가 이어받을 만큼 충분한가
-9. PR 본문의 handoff 요약이 실제 handoff 내용과 맞는가
+8. PR 본문에 남은 위험과 후속 작업이 충분히 적혀 있는가
 
 리뷰 결정은 아래 셋 중 하나만 사용합니다.
 
@@ -262,4 +263,4 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - 한 PR에 여러 목적 혼합
 - 기능 PR에 CI/운영/템플릿/광범위 문서 정리를 함께 포함
 - 에러 처리 또는 검증 누락
-- 에이전트 권한 위반 또는 handoff 누락
+- 자체 리뷰 게이트 누락 또는 `REQUEST_CHANGES` 미해결

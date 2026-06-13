@@ -4,6 +4,12 @@
 
 머지는 “코드 합치기”가 아니라 **완료 정의를 통과한 변경만 기준 브랜치에 반영하는 절차**입니다.
 
+## 실행 주체
+
+- 머지 판단, 머지 실행, 머지 후 운영 기록은 클로드가 담당합니다.
+- 코덱스는 머지를 직접 수행하지 않습니다.
+- 코덱스는 머지 전 리뷰 결과에 따른 코드 수정, 테스트, 사용자가 지시한 자동 배포 작업만 수행합니다.
+
 ## 기본 전략
 
 - 기본 브랜치는 `main`입니다.
@@ -16,7 +22,6 @@
 - PR 주 목적이 하나이고 변경 범위가 [pr-rules.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-rules.md)의 `PR 범위 경계`를 통과
 - PR 본문 체크리스트 완료
 - 작업 시작 체크포인트와 PR 범위 판단이 일치
-- 담당 에이전트 검사 `PASS`
 - [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md) 기준 자체 리뷰 결과가 `PASS` 또는 허용 가능한 `COMMENT`
 - 관련 문서 최신화
 - 테스트 통과
@@ -24,7 +29,6 @@
 - 충돌 없음
 - 저장소 보호 규칙이 요구하는 승인 수 충족
 - 배포 영향이 있으면 `cd-checklist.md`, `deploy-runbook.md`, `release-checklist.md` 확인
-- 서브 에이전트 작업이면 handoff 확인
 - PR 실패 Issue가 있으면 해결 또는 후속 이슈 연결 확인
 
 ## Squash 커밋 메시지
@@ -57,7 +61,6 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 - 보안 정보 노출
 - 배포 절차 미확인 상태에서 운영 영향 있는 변경
 - 문서와 구현 불일치
-- 에이전트 권한 위반 또는 handoff 누락
 - 자체 리뷰 결과 `REQUEST_CHANGES` 존재
 - 해결되지 않은 PR 실패 Issue 존재
 
@@ -68,7 +71,6 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 - CI/CD 기준이 바뀌었으면 [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md) 또는 [cd-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/cd-checklist.md) 갱신
 - 배포 대상이면 [release-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/release-checklist.md) 확인
 - 장애 가능성이 있으면 [incident-playbook.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/incident-playbook.md) 확인
-- 다음 작업이 있으면 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/agent-handoff-template.md) 기준 handoff 확인
 - 머지 후 짧은 운영 기록으로 무엇을 머지했고 어떤 체크를 통과했는지 남김
 
 ## 핫픽스 예외

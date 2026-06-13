@@ -3,15 +3,17 @@
 ## 목적
 
 JDSnack의 변경은 직접 `main`에 푸시하지 않습니다.
-모든 변경은 위험도에 따라 `Light`, `Standard`, `High-risk` 흐름 중 하나를 따릅니다.
+모든 변경은 현재 기획 스레드에서 범위, 위험도, 검증 결과를 정리한 뒤 PR로 반영합니다.
+
+주제가 바뀌면 새 세션을 시작합니다.
 
 ## 시작 판단
 
 작업 시작 시 먼저 이 PR의 위험도를 결정합니다.
 
-- `Light`: 작고 안전한 변경
-- `Standard`: 일반 기능/로직/API/UI 변경
-- `High-risk`: 보안/외부 API/배포/DB/인증/CI 영향 변경
+- `Light`: 작고 위험이 낮은 변경
+- `Standard`: 일반적인 기능/로직/API/UI 변경
+- `High-risk`: 보안, 외부 API, 배포, DB, 인증, CI/CD 영향이 있는 변경
 
 ## `Light` 흐름
 
@@ -29,50 +31,34 @@ JDSnack의 변경은 직접 `main`에 푸시하지 않습니다.
 2. 체크포인트에 `Standard`로 기록합니다.
 3. 관련 문서를 확인하고 구현합니다.
 4. 관련 로컬 테스트를 통과시킵니다.
-5. 현재 쓰레드의 기본 에이전트 기준으로 검토합니다.
+5. 현재 기획 스레드에서 변경 범위와 테스트 결과를 확인합니다.
 6. 커밋 후 PR을 생성합니다.
 7. 관련 CI가 통과하면 머지합니다.
 
 ## `High-risk` 흐름
 
 1. 작업 브랜치를 생성합니다.
-   - 기본 형식: `codex/<scope>-<short-description>`
-2. [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md) 기준으로 위험도, 범위와 테스트 계획을 먼저 고정합니다.
+2. 체크포인트 기준으로 위험도, 범위와 테스트 계획을 먼저 고정합니다.
 3. 변경을 구현하고 로컬 테스트를 통과시킵니다.
 4. 테스트 통과 후 커밋합니다.
-5. 변경 범위에 맞는 담당 에이전트가 검사합니다.
-6. 담당 에이전트가 `PASS`를 주면 PR을 생성합니다.
-7. PR 본문은 `.github/pull_request_template.md`와 `pr-rules.md`를 따릅니다.
-8. `scripts/pr-review-gate.sh <PR_NUMBER>`로 자체 리뷰 게이트를 실행합니다.
-9. 담당 에이전트가 `PASS`, `COMMENT`, `REQUEST_CHANGES` 중 하나로 리뷰합니다.
-10. PR 검사 또는 리뷰가 실패하면 GitHub Issue를 생성합니다.
-11. Issue를 기준으로 같은 브랜치에서 수정합니다.
-12. 다시 테스트하고 담당 에이전트 검사를 받습니다.
-13. PR이 통과하면 `Squash and merge`로 `main`에 합칩니다.
-14. `main`에 반영되면 GitHub Actions가 최종 워크플로우를 실행합니다.
+5. `scripts/pr-review-gate.sh <PR_NUMBER>`로 자체 리뷰 게이트를 실행합니다.
+6. 자체 리뷰 결과를 `PASS`, `COMMENT`, `REQUEST_CHANGES` 중 하나로 기록합니다.
+7. PR 검사 또는 리뷰가 실패하면 GitHub Issue를 생성합니다.
+8. Issue를 기준으로 같은 브랜치에서 수정합니다.
+9. 다시 테스트하고 자체 리뷰를 반복합니다.
+10. PR이 통과하면 `Squash and merge`로 `main`에 합칩니다.
+11. `main`에 반영되면 GitHub Actions가 최종 워크플로우를 실행합니다.
 
-## 위험도별 리뷰 기준
+## 변경 범위별 확인 기준
 
-| 위험도 | 기본 리뷰어 | 비고 |
-|---|---|---|
-| `Light` | 작성자 | 관련 CI 통과 중심 |
-| `Standard` | 현재 쓰레드 기본 에이전트 | 검증 쓰레드로 넘어갈 때만 `QA Reviewer`가 본다 |
-| `High-risk` | 현재 쓰레드 기본 에이전트, 필요한 조건부 에이전트 | 보안/배포/릴리즈 위험이 있을 때만 추가 |
-
-## 담당 에이전트 매핑
-
-| 변경 범위 | 기본 검사 에이전트 |
+| 변경 범위 | 기본 확인 |
 |---|---|
-| 요구사항, API/UI 계약 | `Spec Steward` |
-| `backend/**` | `Backend Engineer` |
-| `frontend/**` | `Frontend Engineer` |
-| 최종 검증 | `QA Reviewer` |
-| `.github/**`, CI/CD, Docker | `DevOps Steward` |
-| 외부 AI, 비밀값, 로그 정책 | `Security Reviewer` |
-| PR/머지/릴리즈 판단 | `Release Captain` |
-
-한 PR에서 여러 범위가 섞여도 같은 쓰레드에서 모든 에이전트를 중복 호출하지 않습니다.
-각 쓰레드는 자신의 기본 에이전트로 처리하고, 다음 쓰레드는 handoff를 입력으로 이어받습니다.
+| 요구사항, API/UI 계약 | active spec과 traceability 일치 |
+| `backend/**` | 백엔드 테스트와 API 계약 일치 |
+| `frontend/**` | 프론트 테스트와 UI 계약 일치 |
+| `.github/**`, CI/CD, Docker | CI/CD 체크리스트와 실행 결과 |
+| 외부 AI, 비밀값, 로그 정책 | 보안 정책과 secret 노출 여부 |
+| PR/머지/릴리즈 판단 | PR 규칙, 머지 규칙, 릴리즈 체크리스트 |
 
 ## PR 생성 조건
 
@@ -81,23 +67,8 @@ JDSnack의 변경은 직접 `main`에 푸시하지 않습니다.
 - 변경 파일이 `pr-rules.md`의 `PR 범위 경계`를 통과해야 합니다.
 - CI, 운영, 템플릿, 광범위 문서 정리는 기능 PR과 분리해야 합니다.
 - 관련 문서와 테스트가 갱신되어야 합니다.
-- 담당 에이전트가 `PASS`를 줘야 합니다.
 - 로컬에서 가능한 검증을 통과해야 합니다.
 - PR 본문에 `REQ`, `AC`, `TC`, 변경 문서, 검증 결과가 연결되어야 합니다.
-
-## 자체 리뷰 게이트
-
-`High-risk` PR 생성 후에는 [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md)를 따릅니다.
-
-```sh
-./scripts/pr-review-gate.sh <PR_NUMBER>
-```
-
-자체 리뷰 결과:
-
-- `PASS`: 머지 가능
-- `COMMENT`: 머지는 가능하지만 후속 개선 필요
-- `REQUEST_CHANGES`: 머지 금지, 실패 Issue 생성 후 수정 필요
 
 ## PR 실패 처리
 
@@ -110,7 +81,6 @@ Issue에는 아래 내용을 기록합니다.
 - 실패한 체크 이름
 - 실패 로그 핵심
 - 관련 `REQ`, `AC`, `TC`
-- 담당 에이전트
 - 수정 계획
 
 `High-risk` PR은 Issue 생성 후 같은 브랜치에서 수정하고 다시 테스트 후 커밋합니다.
@@ -131,6 +101,5 @@ Issue에는 아래 내용을 기록합니다.
 
 - 문서 하네스 검증
 - 백엔드 CI
+- 프론트엔드 CI
 - 컨테이너 빌드와 `/api/health` 검증
-
-배포 자동화는 컨테이너 빌드가 안정화된 뒤 별도 워크플로우로 승격합니다.
