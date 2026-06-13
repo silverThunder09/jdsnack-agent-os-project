@@ -21,7 +21,7 @@
 ## 변경 허용
 
 - 이번 문서 PR: `.agent-os/specs/**`, `AGENTS.md`, `.agent-os/standards/index.yml`, `README.md`
-- 개발 쓰레드: 관련 `frontend/**`, 필요 시 `backend/**`
+- 구현 확인: 관련 `frontend/**`, 필요 시 `backend/**`
 
 ## 변경 금지
 
