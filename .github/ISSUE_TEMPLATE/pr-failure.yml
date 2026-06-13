@@ -52,6 +52,6 @@ body:
     id: fix-plan
     attributes:
       label: Fix Plan
-      description: 수정 계획과 담당 에이전트를 입력합니다.
+      description: 수정 계획과 확인할 검증 범위를 입력합니다.
     validations:
       required: true
