@@ -54,6 +54,38 @@ async function mockFixtureFlow(page: import('@playwright/test').Page) {
       }),
     })
   })
+
+  await page.route('**/api/interview/preview', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          questions: [
+            {
+              question: 'Spring Boot API 설계 경험을 설명해 주세요.',
+              category: 'technical',
+              keypoints: '설계 이유, 테스트 방식, 운영 결과를 함께 말하세요.',
+            },
+            {
+              question: '배포 경험에서 가장 어려웠던 문제는 무엇이었나요?',
+              category: 'experience',
+              keypoints: '문제 상황, 본인 역할, 해결 과정, 결과 수치를 준비하세요.',
+            },
+            {
+              question: '요구사항이 바뀌었을 때 어떻게 협업했나요?',
+              category: 'behavioral',
+              keypoints: '소통 방식, 우선순위 조정, 배운 점을 짧게 정리하세요.',
+            },
+          ],
+          strategy: '기술 질문은 의사결정 근거와 검증 방법 중심으로 답변하세요.',
+          summary: '백엔드 직무 맥락의 모의 면접 질문을 생성했습니다.',
+        },
+        timestamp: '2026-06-13T10:04:00.000+09:00',
+      }),
+    })
+  })
 }
 
 async function mockJdFetchSuccess(page: import('@playwright/test').Page) {
@@ -109,6 +141,31 @@ test('PDF 업로드 후 JD 매칭 결과까지 확인한다', async ({ page }) =
   await expect(page.getByRole('heading', { name: '매칭 분석 리포트' })).toBeVisible()
   await expect(page.getByText('종합 매칭 점수')).toBeVisible()
   await expect(page.getByText('76점')).toBeVisible()
+})
+
+test('매칭 리포트 후 모의 면접 질문을 생성한다', async ({ page }) => {
+  await mockFixtureFlow(page)
+  await page.goto('/')
+
+  await page.getByRole('tab', { name: 'PDF' }).click()
+  await page.locator('#resume-file').setInputFiles(fixturePdf)
+  await page.getByRole('button', { name: 'AI 진단 시작하기' }).click()
+
+  await expectJdStepReady(page)
+
+  await page.getByRole('textbox', { name: '대상 직무' }).fill('백엔드 개발자')
+  await page.getByRole('textbox', { name: '주요업무' }).fill(jdText)
+  await page.getByRole('button', { name: '분석 리포트 생성' }).click()
+
+  await expect(page.getByRole('heading', { name: '매칭 분석 리포트' })).toBeVisible()
+  await page.getByRole('button', { name: '모의 면접 질문 생성' }).click()
+
+  await expect(page.getByRole('heading', { name: '모의 면접 질문', exact: true })).toBeVisible()
+  await expect(page.getByText('Spring Boot API 설계 경험을 설명해 주세요.')).toBeVisible()
+  await expect(
+    page.getByText('기술 질문은 의사결정 근거와 검증 방법 중심으로 답변하세요.'),
+  ).toBeVisible()
+  await expect(page.getByText('technical')).toBeVisible()
 })
 
 test('JD 링크 불러오기 성공 후 매칭 결과까지 확인한다', async ({ page }) => {
