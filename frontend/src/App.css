@@ -864,6 +864,51 @@ button:disabled {
   margin-top: 1rem;
 }
 
+.interview-preview-card {
+  margin-top: 1rem;
+}
+
+.interview-result {
+  display: grid;
+  gap: 1rem;
+}
+
+.interview-question-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.interview-question-card {
+  padding: 1rem;
+  border: 1px solid #dbe4ef;
+  border-radius: 16px;
+  background: #fbfdff;
+}
+
+.interview-question-card span {
+  display: inline-flex;
+  margin-bottom: 0.75rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(31, 122, 224, 0.11);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.interview-question-card h3 {
+  margin: 0 0 0.65rem;
+  color: var(--primary-dark);
+  font-size: 1rem;
+}
+
+.interview-question-card p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.65;
+}
+
 .submission-guide {
   margin: 0.75rem 0 0;
   color: #334155;
@@ -928,6 +973,7 @@ button:disabled {
   .report-main-grid,
   .source-grid,
   .jd-section-grid,
+  .interview-question-list,
   .resume-compare-grid {
     grid-template-columns: 1fr;
   }

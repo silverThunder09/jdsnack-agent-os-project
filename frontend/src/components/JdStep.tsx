@@ -8,6 +8,7 @@ type JdFetchStatus = 'idle' | 'fetching' | 'fetched' | 'fetch-error'
 interface JdStepProps {
   jdSections: JdSections
   jdUrl: string
+  jobTitle: string
   isJdAutofilled: boolean
   jdFetchStatus: JdFetchStatus
   jdFetchTitle: string
@@ -19,6 +20,7 @@ interface JdStepProps {
   canPreviewWithCurrentSource: boolean
   onJdSectionChange: (section: keyof JdSections, value: string) => void
   onJdUrlChange: (value: string) => void
+  onJobTitleChange: (value: string) => void
   onJdFetch: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onPreviousStep: () => void
@@ -27,6 +29,7 @@ interface JdStepProps {
 export function JdStep({
   jdSections,
   jdUrl,
+  jobTitle,
   isJdAutofilled,
   jdFetchStatus,
   jdFetchTitle,
@@ -38,6 +41,7 @@ export function JdStep({
   canPreviewWithCurrentSource,
   onJdSectionChange,
   onJdUrlChange,
+  onJobTitleChange,
   onJdFetch,
   onSubmit,
   onPreviousStep,
@@ -51,6 +55,18 @@ export function JdStep({
       </div>
 
       <form className="jd-form" onSubmit={onSubmit}>
+        <label className="resume-input-group" htmlFor="job-title">
+          <span className="resume-label">대상 직무</span>
+          <input
+            id="job-title"
+            className="jd-url-input"
+            type="text"
+            value={jobTitle}
+            placeholder="예: 백엔드 개발자"
+            onChange={(event) => onJobTitleChange(event.target.value)}
+          />
+        </label>
+
         <JdInputFields
           jdSections={jdSections}
           jdUrl={jdUrl}

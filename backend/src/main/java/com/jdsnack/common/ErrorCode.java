@@ -71,6 +71,14 @@ public enum ErrorCode {
             HttpStatus.NOT_IMPLEMENTED,
             "JD 비교 분석 기능은 준비 중입니다. 현재는 JD 입력 검증만 가능합니다."
     ),
+    MOCK_INTERVIEW_NOT_ENABLED(
+            HttpStatus.NOT_IMPLEMENTED,
+            "모의 면접 질문 생성 기능은 준비 중입니다."
+    ),
+    INTERVIEW_QUESTION_GENERATION_FAILED(
+            HttpStatus.BAD_GATEWAY,
+            "모의 면접 질문 생성에 실패했습니다. 잠시 후 다시 시도해주세요."
+    ),
     FIXTURE_NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "테스트 분석 결과를 찾지 못했습니다. 다른 샘플로 다시 시도해주세요."
