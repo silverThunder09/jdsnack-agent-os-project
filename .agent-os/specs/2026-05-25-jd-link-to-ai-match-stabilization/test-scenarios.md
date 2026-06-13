@@ -128,6 +128,7 @@
 ## `TC-13` 배포 pull compose 검증
 
 - 대응 AC: `AC-05`
+- 현재 상태: 미실행. EC2 수동 배포와 운영 배포 검증은 사용자가 별도 지시할 때만 수행한다.
 - 절차:
   - `docker compose -f compose.prod.yaml config --no-env-resolution`를 실행한다.
   - main 반영 후 push된 이미지 태그로 `docker compose -f compose.prod.yaml pull`을 실행한다.
