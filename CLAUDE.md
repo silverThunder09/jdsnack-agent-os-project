@@ -11,7 +11,9 @@ Claude는 **기획·검증·통합**을 맡고, **구현은 하지 않습니다.
   - **문서 계획은 예외 없이 `.agent-os/` 하네스 규칙(`codex-harness.md`, `doc-lifecycle.md`, `definition-of-done.md`)에 맞춰 짠다.** 규칙에 어긋나는 구조·순서·동기화 누락은 작성하지 않는다.
 - ✅ 코드 리뷰·채점 → `code-reviewer` 서브에이전트 + `/review-loop` 스킬
 - ✅ PR 생성·관리, merge → 메인 세션
-- ❌ 에이전트 코딩(구현), 리뷰 기반 코드 수정·커밋·푸시, 자동 배포 → **모두 Codex 담당**
+- ❌ 에이전트 코딩(구현), 리뷰 기반 코드 수정·커밋·푸시 → **Codex 담당**
+- ❌ CI/CD 배포(GHCR publish, `compose.prod.yaml`, 배포 워크플로/런북, 자동 배포·배포 검증) → **Codex 담당**
+  - 단, PR 검증용 CI 체크(테스트/빌드 게이트, 경로 필터 등)의 운영·효율화는 Claude의 PR/merge 운영 범위.
 
 **Claude는 `backend/src`, `frontend/src` 등 소스 코드를 직접 수정/커밋하지 않습니다.**
 리뷰에서 문제를 찾으면 수정하지 말고 `code-reviewer` 형식의 변경요청으로 정리해 Codex에 넘깁니다.
