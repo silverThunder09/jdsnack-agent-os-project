@@ -64,9 +64,10 @@
 
 - 체크포인트 없이 바로 큰 수정에 들어가지 않습니다.
 - 먼저 이 작업이 `Light`, `Standard`, `High-risk` 중 무엇인지 판단합니다.
-- 계획 쓰레드는 active spec과 제품/하네스 문서만 우선 읽습니다.
-- 개발 쓰레드는 active spec, 해당 구현 폴더, 관련 테스트만 우선 읽습니다.
-- 검증 쓰레드는 PR diff, 테스트 결과, handoff를 우선 읽습니다.
+- 기획 스레드 하나에서 계획, 변경, 검증 기록을 이어갑니다.
+- 주제가 바뀌면 새 세션을 시작합니다.
+- 작업 시작 시 active spec, 해당 구현 폴더, 관련 테스트만 우선 읽습니다.
+- PR 확인 시 PR diff, 테스트 결과, 관련 spec을 우선 읽습니다.
 - `.agent-os/archive`, `frontend/node_modules`, `frontend/dist`, `backend/build`, `backend/.gradle`, `.git`는 기본 탐색에서 제외합니다.
 - PR 본문 `범위 판단`은 이 체크포인트와 같은 말을 해야 합니다.
 - 범위가 커지면 작업을 쪼개고 체크포인트를 다시 작성합니다.

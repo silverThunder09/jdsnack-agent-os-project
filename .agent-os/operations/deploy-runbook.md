@@ -40,7 +40,7 @@ JDSNACK_IMAGE_TAG=<git-sha> docker compose -f compose.prod.yaml pull
 JDSNACK_IMAGE_TAG=<git-sha> docker compose -f compose.prod.yaml up -d
 ```
 
-`GEMINI_API_KEY`는 `.env` 또는 배포 플랫폼 secret으로 주입합니다. secret 값은 로그, PR 본문, handoff에 기록하지 않습니다.
+`GEMINI_API_KEY`는 `.env` 또는 배포 플랫폼 secret으로 주입합니다. secret 값은 로그와 PR 본문에 기록하지 않습니다.
 `docker compose config` 출력에는 secret이 포함될 수 있으므로 공유하지 않습니다. 설정 구조만 확인할 때는 `--no-env-resolution`을 사용합니다.
 
 ## 실패 시 점검 순서
