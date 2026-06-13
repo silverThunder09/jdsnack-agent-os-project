@@ -29,13 +29,14 @@ JDSnack은 개발자 이력서와 채용공고(JD)를 비교해 이력서 개선
 - AI: Gemini API, 로컬 `ai-local` 모드
 - Test/Fixture: H2, JUnit, Vitest, Playwright
 - Runtime: Docker Compose 분리 컨테이너
-- Docs Harness: `.agent-os/`, `AGENTS.md`
+- Docs Harness: `.agent-os/`, `AGENTS.md`, `CLAUDE.md`, `.claude/`
 
 ## 저장소 구조
 
 ```text
 jdsnack-agent-os/
 ├── AGENTS.md
+├── CLAUDE.md
 ├── README.md
 ├── CHANGELOG.md
 ├── .agent-os/
@@ -44,6 +45,9 @@ jdsnack-agent-os/
 │   ├── archive/
 │   ├── standards/
 │   └── operations/
+├── .claude/
+│   ├── agents/
+│   └── skills/
 ├── docs/
 │   └── architecture/
 ├── backend/
@@ -53,7 +57,8 @@ jdsnack-agent-os/
 
 ## 핵심 문서
 
-- 작업 진입 지도: `AGENTS.md`
+- 작업 진입 지도(코덱스): `AGENTS.md`
+- 작업 진입 지도(클로드): `CLAUDE.md`
 - 제품 목적: `.agent-os/product/mission.md`
 - 로드맵: `.agent-os/product/roadmap.md`
 - 기술 스택: `.agent-os/product/tech-stack.md`
