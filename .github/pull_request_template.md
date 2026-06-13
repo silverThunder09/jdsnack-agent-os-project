@@ -3,6 +3,7 @@
 - TBD
 
 <!-- PR 제목은 Conventional Commits 형식(type(scope): summary)을 사용합니다. -->
+<!-- PR 계획, 본문 작성, 리뷰, 머지 판단은 클로드 담당입니다. 코덱스는 리뷰 기반 코드 수정과 테스트만 담당합니다. -->
 
 ## 범위 판단
 
@@ -20,23 +21,6 @@
 - 테스트 시나리오:
 - API/UI 명세:
 
-## 담당 에이전트 검사
-
-- [ ] Spec Steward
-- [ ] Backend Engineer
-- [ ] Frontend Engineer
-- [ ] QA Reviewer
-- [ ] Security Reviewer
-- [ ] DevOps Steward
-- [ ] Release Captain
-
-## Handoff 요약
-
-- 현재 단계:
-- 다음 에이전트:
-- 남은 위험:
-- 변경 요청:
-
 ## 검증
 
 - [ ] 문서 갱신
@@ -45,7 +29,6 @@
 - [ ] CI 체크리스트 확인
 - [ ] 컨테이너 영향 확인
 - [ ] 수동 검증
-- [ ] 에이전트 handoff 확인
 - [ ] PR Review Gate 실행
 
 ## 영향 범위
@@ -59,7 +42,6 @@
 ## 자체 리뷰 결과
 
 - Review Gate 명령: `./scripts/pr-review-gate.sh <PR_NUMBER>`
-- 필수 리뷰 에이전트:
 - 결정: PASS / COMMENT / REQUEST_CHANGES
 - 리뷰 리포트:
 
