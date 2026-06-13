@@ -5,6 +5,11 @@
 “코드가 돌아간다”는 완료가 아닙니다.  
 JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 상태**를 뜻합니다.
 
+## 역할 기준
+
+- 완료 판단, PR 리뷰, 머지 가능 여부 판단은 클로드가 담당합니다.
+- 코덱스는 구현 완료, 테스트 실행, 리뷰 기반 코드 수정 결과를 클로드가 판단할 수 있게 정리합니다.
+
 ## 완료 체크리스트
 
 모든 작업은 아래 항목을 충족해야 완료로 간주합니다.
@@ -19,7 +24,6 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - 배포 영향이 있으면 CD 체크리스트가 확인되었다.
 - 변경 이유가 `standards/` 문서와 충돌하지 않는다.
 - 커밋, PR, 머지 규칙이 Git 운영 표준과 충돌하지 않는다.
-- 서브 에이전트 작업이면 handoff가 남아 있다.
 - PR 작업이면 [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md) 기준 자체 리뷰 결과가 남아 있다.
 
 ## 문서별 완료 조건
@@ -53,12 +57,6 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - 배포 영향이 있으면 [cd-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/cd-checklist.md) 갱신
 - PR/머지 규칙과 충돌하지 않는지 확인
 
-### 서브 에이전트 작업
-
-- [sub-agent-operations.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/sub-agent-operations.md)의 수정 권한을 지켰다.
-- 작업 종료 시 [agent-handoff-template.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/agent-handoff-template.md) 형식으로 handoff를 남겼다.
-- 영역 밖 변경 필요 사항은 직접 수정하지 않고 변경 요청으로 남겼다.
-
 ## 리뷰 기준
 
 리뷰에서는 아래를 코드 버그와 같은 급으로 취급합니다.
@@ -69,5 +67,4 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - 구현과 문서의 계약 불일치
 - CI/CD 체크 누락
 - 커밋/PR/머지 규칙 누락
-- 서브 에이전트 권한 위반 또는 handoff 누락
 - 자체 리뷰 게이트 누락 또는 `REQUEST_CHANGES` 미해결

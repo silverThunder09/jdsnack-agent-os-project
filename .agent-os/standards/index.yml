@@ -8,7 +8,6 @@ documents:
     - .agent-os/product/glossary.md
   harness:
     - .agent-os/standards/codex-harness.md
-    - .agent-os/standards/sub-agent-operations.md
     - .agent-os/standards/doc-lifecycle.md
     - .agent-os/standards/definition-of-done.md
   engineering:
@@ -32,8 +31,6 @@ documents:
     - .agent-os/operations/container-workflow.md
     - .agent-os/operations/deploy-runbook.md
     - .agent-os/operations/incident-playbook.md
-    - .agent-os/operations/agent-handoff-template.md
-    - .agent-os/operations/agent-review-report-template.md
     - .agent-os/operations/pr-rules.md
     - .agent-os/operations/pr-review-gate.md
     - .agent-os/operations/merge-rules.md
@@ -50,14 +47,6 @@ documents:
     - scripts/pr-review-gate.sh
     - scripts/smoke-test.sh
     - scripts/google-test.sh
-  custom_agents:
-    - .codex/agents/spec-steward.toml
-    - .codex/agents/backend-engineer.toml
-    - .codex/agents/frontend-engineer.toml
-    - .codex/agents/qa-reviewer.toml
-    - .codex/agents/security-reviewer.toml
-    - .codex/agents/devops-steward.toml
-    - .codex/agents/release-captain.toml
 active_specs:
   - .agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization
 archived_specs:

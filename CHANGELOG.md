@@ -5,8 +5,7 @@
 - 리포트 UX 개선을 적용해 이력서 분석과 JD 매칭 결과 화면의 정보 구조를 정리
 - 커밋/PR 제목 규칙을 Conventional Commits 형식 중심으로 복원
 - 프로젝트 용어집과 탐색 제외 규칙을 추가해 에이전트 탐색 비용을 축소
-- 커스텀 에이전트를 `.codex/agents/*.toml` 형식으로 전환
-- 쓰레드별 기본 에이전트 1개 원칙을 문서화
+- 단일 기획 스레드 운영과 주제별 세션 교체 기준을 문서화
 - 사람인 JD 수집 안정화 스펙과 fixture 검증 기준을 추가
 - 로컬 `ai-local` compose 런타임 기준을 정리
 - 오래된 spec 보관과 빌드 산출물 탐색 제외 기준을 강화
@@ -35,7 +34,7 @@
 - 백엔드 CI와 컨테이너 빌드 GitHub Actions 추가
 - 컨테이너 workflow에 실행 및 `/api/health` 검증 조건 추가
 - `backend/Dockerfile` 기반 컨테이너 흐름 추가
-- 서브 에이전트 리뷰 결과를 반영해 health API 추적 매핑과 경계값 테스트 문서화
+- health API 추적 매핑과 경계값 테스트 문서화
 - 문서 하네스 CI를 `REQ/AC/TC` 완전 매핑 검사로 강화
 - 문서 하네스 GitHub Actions 워크플로우 추가
 - 문서형 CI/CD v0 기준 추가
@@ -54,4 +53,4 @@
 - 제품 문서, 기능 명세, 표준, 운영 문서를 `.agent-os/` 아래로 재배치
 - API, ERD, 아키텍처 상세 문서를 `docs/` 아래로 복사
 - 루트 `README.md`, `AGENTS.md`, `config.yml`을 현재 저장소 구조에 맞게 갱신
-- `DevOps Steward` 에이전트 문서 추가
+- 초기 운영 문서 추가
