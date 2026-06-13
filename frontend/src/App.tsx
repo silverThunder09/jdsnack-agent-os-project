@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDiagnose } from './hooks/useDiagnose'
+import { useInterviewPreview } from './hooks/useInterviewPreview'
 import { useMatchPreview } from './hooks/useMatchPreview'
 import type { JdFetchResult, JdSections, ResumeInputMode } from './types/diagnosis'
 import { AppShell } from './components/AppShell'
@@ -115,6 +116,7 @@ function App() {
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [jdSections, setJdSections] = useState<JdSections>(emptyJdSections)
   const [jdUrl, setJdUrl] = useState('')
+  const [jobTitle, setJobTitle] = useState('')
   const [isJdAutofilled, setIsJdAutofilled] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const {
@@ -139,6 +141,12 @@ function App() {
     result: previewResult,
     submit: submitPreview,
   } = useMatchPreview()
+  const {
+    isSubmitting: isInterviewSubmitting,
+    resetResult: resetInterviewResult,
+    result: interviewResult,
+    submit: submitInterview,
+  } = useInterviewPreview()
   const resultRef = useRef<HTMLElement>(null)
   const trimmedLength = resumeText.trim().length
   const trimmedResumeText = resumeText.trim()
@@ -229,6 +237,9 @@ function App() {
     if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
       resetPreviewResult()
     }
+    if (interviewResult.status !== 'idle' && interviewResult.status !== 'loading') {
+      resetInterviewResult()
+    }
   }
 
   const handleJdUrlChange = (nextValue: string) => {
@@ -241,6 +252,16 @@ function App() {
     }
     if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
       resetPreviewResult()
+    }
+    if (interviewResult.status !== 'idle' && interviewResult.status !== 'loading') {
+      resetInterviewResult()
+    }
+  }
+
+  const handleJobTitleChange = (nextValue: string) => {
+    setJobTitle(nextValue)
+    if (interviewResult.status !== 'idle' && interviewResult.status !== 'loading') {
+      resetInterviewResult()
     }
   }
 
@@ -289,6 +310,17 @@ function App() {
     })
   }
 
+  const handleInterviewSubmit = async () => {
+    await submitInterview({
+      resumeSource: {
+        type: inputMode === 'text' ? 'TEXT' : 'FILE',
+        value: resumeSourceForPreview,
+      },
+      jobTitle: jobTitle.trim(),
+      jdText,
+    })
+  }
+
   return (
     <AppShell>
       <StepProgress
@@ -322,6 +354,7 @@ function App() {
           <JdStep
             jdSections={jdSections}
             jdUrl={jdUrl}
+            jobTitle={jobTitle}
             isJdAutofilled={isJdAutofilled}
             jdFetchStatus={jdFetchState.status}
             jdFetchTitle={jdFetchState.title}
@@ -333,6 +366,7 @@ function App() {
             canPreviewWithCurrentSource={canPreviewWithCurrentSource}
             onJdSectionChange={handleJdSectionChange}
             onJdUrlChange={handleJdUrlChange}
+            onJobTitleChange={handleJobTitleChange}
             onJdFetch={handleJdFetch}
             onSubmit={handleJdPreviewSubmit}
             onPreviousStep={() => setCurrentStep(1)}
@@ -343,9 +377,12 @@ function App() {
           <ReportStep
             result={result}
             previewResult={previewResult}
+            interviewResult={interviewResult}
             resultRef={resultRef}
             resumePreviewText={resumePreviewText}
             jdPreviewText={jdPreviewText}
+            isInterviewSubmitting={isInterviewSubmitting}
+            onInterviewSubmit={handleInterviewSubmit}
             onJdEdit={() => setCurrentStep(2)}
             onResumeEdit={() => setCurrentStep(1)}
           />

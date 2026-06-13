@@ -6,9 +6,12 @@ import type { ResultState } from '../types/diagnosis'
 interface ReportStepProps {
   result: ResultState
   previewResult: ResultState
+  interviewResult: ResultState
   resultRef: RefObject<HTMLElement | null>
   resumePreviewText: string
   jdPreviewText: string
+  isInterviewSubmitting: boolean
+  onInterviewSubmit: () => void
   onResumeEdit: () => void
   onJdEdit: () => void
 }
@@ -62,9 +65,12 @@ function getSafePercent(value: number, fallback: number) {
 export function ReportStep({
   result,
   previewResult,
+  interviewResult,
   resultRef,
   resumePreviewText,
   jdPreviewText,
+  isInterviewSubmitting,
+  onInterviewSubmit,
   onResumeEdit,
   onJdEdit,
 }: ReportStepProps) {
@@ -175,6 +181,57 @@ export function ReportStep({
           <section className="analysis-feedback-card analysis-feedback-card--submission">
             <h2>최종 제출용 정리</h2>
             <p className="submission-guide">{buildSubmissionGuide(matchPreview)}</p>
+          </section>
+
+          <section className="analysis-feedback-card interview-preview-card" aria-live="polite">
+            <div className="document-card__header">
+              <div>
+                <h2>모의 면접 질문</h2>
+                <span>이력서와 JD 맥락으로 예상 질문을 생성합니다.</span>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={onInterviewSubmit}
+                disabled={isInterviewSubmitting}
+              >
+                {isInterviewSubmitting ? '질문 생성 중...' : '모의 면접 질문 생성'}
+              </button>
+            </div>
+
+            {interviewResult.status === 'loading' ? (
+              <StatusMessage
+                badge="Preparing"
+                title={interviewResult.title}
+                message={interviewResult.message}
+                tone="active"
+                withLoadingBar
+              />
+            ) : null}
+
+            {interviewResult.status === 'error' ? (
+              <StatusMessage
+                badge="Retry"
+                title={interviewResult.title}
+                message={interviewResult.message}
+                tone="danger"
+              />
+            ) : null}
+
+            {interviewResult.status === 'success' && interviewResult.interviewPreview ? (
+              <div className="interview-result">
+                <p className="submission-guide">{interviewResult.interviewPreview.strategy}</p>
+                <div className="interview-question-list">
+                  {interviewResult.interviewPreview.questions.map((question) => (
+                    <article className="interview-question-card" key={question.question}>
+                      <span>{question.category}</span>
+                      <h3>{question.question}</h3>
+                      <p>{question.keypoints}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <details className="analysis-source-card">

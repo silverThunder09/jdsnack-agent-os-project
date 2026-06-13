@@ -5,9 +5,75 @@ import App from './App'
 
 const validResumeText =
   '백엔드와 프론트엔드를 함께 다루며 프로젝트를 설계하고 운영한 경험이 있습니다. 사용자 흐름을 개선하고 테스트 자동화를 정리했습니다.'
+const interviewJobTitle = '백엔드 개발자'
+const interviewJdText =
+  'Spring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.'
 
 async function goToJdStep(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getAllByRole('button', { name: /JD 분석/ })[0])
+}
+
+async function prepareReportAndRequestInterview(
+  user: ReturnType<typeof userEvent.setup>,
+  interviewResponse: unknown,
+) {
+  vi.mocked(globalThis.fetch)
+    .mockResolvedValueOnce({
+      json: async () => ({
+        success: true,
+        data: {
+          score: 82,
+          summary: '이력서 분석이 완료되었습니다.',
+          strengths: ['Spring Boot 경험이 보입니다.'],
+          improvements: ['성과 수치를 보강해 주세요.'],
+          sourceText: validResumeText,
+        },
+        timestamp: '2026-06-13T10:00:00.000+09:00',
+      }),
+    } as Response)
+    .mockResolvedValueOnce({
+      json: async () => ({
+        success: true,
+        data: {
+          matchingScore: 84,
+          summary: 'JD와 이력서가 잘 맞습니다.',
+          strengths: ['Spring Boot 경험이 JD와 겹칩니다.'],
+          gaps: ['운영 지표 근거가 약합니다.'],
+          suggestions: ['장애 대응 결과를 수치로 보강해 보세요.'],
+        },
+        timestamp: '2026-06-13T10:00:00.000+09:00',
+      }),
+    } as Response)
+    .mockResolvedValueOnce({
+      json: async () => interviewResponse,
+    } as Response)
+
+  render(<App />)
+
+  await user.type(
+    screen.getByRole('textbox', { name: '이력서 내용' }),
+    validResumeText,
+  )
+  await user.click(screen.getByRole('button', { name: 'AI 진단 시작하기' }))
+  await screen.findByLabelText('주요업무')
+
+  await user.type(screen.getByLabelText('대상 직무'), interviewJobTitle)
+  await user.type(screen.getByLabelText('주요업무'), interviewJdText)
+  await user.click(screen.getByRole('button', { name: '분석 리포트 생성' }))
+  await screen.findByText('84점')
+
+  await user.click(screen.getByRole('button', { name: '모의 면접 질문 생성' }))
+}
+
+async function expectInterviewInputsPreserved(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'JD 다시 수정' }))
+  expect(screen.getByLabelText('대상 직무')).toHaveValue(interviewJobTitle)
+  expect(screen.getByLabelText('주요업무')).toHaveValue(interviewJdText)
+
+  await user.click(screen.getByRole('button', { name: /이력서 입력/ }))
+  expect(screen.getByRole('textbox', { name: '이력서 내용' })).toHaveValue(
+    validResumeText,
+  )
 }
 
 describe('App', () => {
@@ -658,6 +724,159 @@ describe('App', () => {
         }),
       }),
     )
+  })
+
+  it('매칭 리포트 후 모의 면접 질문을 생성한다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: true,
+          data: {
+            score: 82,
+            summary: '이력서 분석이 완료되었습니다.',
+            strengths: ['Spring Boot 경험이 보입니다.'],
+            improvements: ['성과 수치를 보강해 주세요.'],
+            sourceText: validResumeText,
+          },
+          timestamp: '2026-06-13T10:00:00.000+09:00',
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: true,
+          data: {
+            matchingScore: 84,
+            summary: 'JD와 이력서가 잘 맞습니다.',
+            strengths: ['Spring Boot 경험이 JD와 겹칩니다.'],
+            gaps: ['운영 지표 근거가 약합니다.'],
+            suggestions: ['장애 대응 결과를 수치로 보강해 보세요.'],
+          },
+          timestamp: '2026-06-13T10:00:00.000+09:00',
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          success: true,
+          data: {
+            questions: [
+              {
+                question: 'Spring Boot API 설계 경험을 설명해 주세요.',
+                category: 'technical',
+                keypoints: '설계 이유, 테스트 방식, 운영 결과를 함께 말하세요.',
+              },
+            ],
+            strategy: '기술 의사결정과 검증 과정을 중심으로 답변하세요.',
+            summary: '백엔드 직무 질문을 생성했습니다.',
+          },
+          timestamp: '2026-06-13T10:00:00.000+09:00',
+        }),
+      } as Response)
+
+    render(<App />)
+
+    await user.type(
+      screen.getByRole('textbox', { name: '이력서 내용' }),
+      validResumeText,
+    )
+    await user.click(screen.getByRole('button', { name: 'AI 진단 시작하기' }))
+    await screen.findByLabelText('주요업무')
+
+    await user.type(screen.getByLabelText('대상 직무'), '백엔드 개발자')
+    await user.type(
+      screen.getByLabelText('주요업무'),
+      'Spring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.',
+    )
+    await user.click(screen.getByRole('button', { name: '분석 리포트 생성' }))
+    await screen.findByText('84점')
+
+    await user.click(screen.getByRole('button', { name: '모의 면접 질문 생성' }))
+
+    expect(
+      await screen.findByText('Spring Boot API 설계 경험을 설명해 주세요.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('설계 이유, 테스트 방식, 운영 결과를 함께 말하세요.'),
+    ).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      expect.stringContaining('/api/interview/preview'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          resumeSource: {
+            type: 'TEXT',
+            value: validResumeText,
+          },
+          jobTitle: '백엔드 개발자',
+          jdText:
+            '[주요업무]\nSpring Boot 기반 REST API 개발과 운영 경험, MySQL, 테스트 자동화 경험을 요구합니다.',
+        }),
+      }),
+    )
+  })
+
+  it('모의 면접 validation-error는 에러를 표시하고 입력값을 보존한다', async () => {
+    const user = userEvent.setup()
+
+    await prepareReportAndRequestInterview(user, {
+      success: false,
+      error: {
+        code: 'TEXT_TOO_SHORT',
+        message: '이력서 내용이 너무 짧습니다. 최소 50자 이상 입력해주세요.',
+      },
+      timestamp: '2026-06-13T10:00:00.000+09:00',
+    })
+
+    expect(
+      await screen.findByText('모의 면접 질문 생성을 완료하지 못했습니다'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('이력서 내용이 너무 짧습니다. 최소 50자 이상 입력해주세요.'),
+    ).toBeInTheDocument()
+
+    await expectInterviewInputsPreserved(user)
+  })
+
+  it('모의 면접 준비중 응답은 에러를 표시하고 입력값을 보존한다', async () => {
+    const user = userEvent.setup()
+
+    await prepareReportAndRequestInterview(user, {
+      success: false,
+      error: {
+        code: 'MOCK_INTERVIEW_NOT_ENABLED',
+        message: '모의 면접 질문 생성 기능은 준비 중입니다.',
+      },
+      timestamp: '2026-06-13T10:00:00.000+09:00',
+    })
+
+    expect(
+      await screen.findByText('모의 면접 질문 생성은 준비 중입니다'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('모의 면접 질문 생성 기능은 준비 중입니다.')).toBeInTheDocument()
+
+    await expectInterviewInputsPreserved(user)
+  })
+
+  it('모의 면접 Gemini 실패는 에러를 표시하고 입력값을 보존한다', async () => {
+    const user = userEvent.setup()
+
+    await prepareReportAndRequestInterview(user, {
+      success: false,
+      error: {
+        code: 'GEMINI_API_REQUEST_FAILED',
+        message: 'Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
+      },
+      timestamp: '2026-06-13T10:00:00.000+09:00',
+    })
+
+    expect(
+      await screen.findByText('모의 면접 질문 생성을 완료하지 못했습니다'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Gemini AI 분석 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'),
+    ).toBeInTheDocument()
+
+    await expectInterviewInputsPreserved(user)
   })
 
   it('저장된 이력서를 다시 불러온다', () => {

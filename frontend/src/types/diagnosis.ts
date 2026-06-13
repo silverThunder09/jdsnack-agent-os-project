@@ -20,6 +20,8 @@ export type ApiErrorCode =
   | 'FIXTURE_NOT_FOUND'
   | 'AI_ANALYSIS_NOT_ENABLED'
   | 'JD_MATCH_PREVIEW_NOT_ENABLED'
+  | 'MOCK_INTERVIEW_NOT_ENABLED'
+  | 'INTERVIEW_QUESTION_GENERATION_FAILED'
   | 'INTERNAL_ERROR'
 
 export interface DiagnoseRequest {
@@ -56,6 +58,27 @@ export interface MatchPreviewResult {
   strengths: string[]
   gaps: string[]
   suggestions: string[]
+}
+
+export interface InterviewPreviewRequest {
+  resumeSource: {
+    type: 'TEXT' | 'FILE'
+    value: string
+  }
+  jobTitle?: string
+  jdText?: string
+}
+
+export interface InterviewQuestion {
+  question: string
+  category: 'experience' | 'technical' | 'behavioral'
+  keypoints: string
+}
+
+export interface InterviewPreviewResult {
+  questions: InterviewQuestion[]
+  strategy: string
+  summary: string
 }
 
 export interface JdFetchResult {
@@ -101,6 +124,17 @@ export type MatchPreviewOutcome =
       message: string
     }
 
+export type InterviewPreviewOutcome =
+  | {
+      kind: 'success'
+      result: InterviewPreviewResult
+    }
+  | {
+      kind: 'validation-error' | 'not-enabled' | 'error'
+      code: ApiErrorCode
+      message: string
+    }
+
 export type JdFetchOutcome =
   | {
       kind: 'success'
@@ -119,4 +153,5 @@ export interface ResultState {
   code?: ApiErrorCode
   diagnosis?: DiagnosisResult
   matchPreview?: MatchPreviewResult
+  interviewPreview?: InterviewPreviewResult
 }

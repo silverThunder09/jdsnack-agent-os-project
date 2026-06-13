@@ -4,6 +4,9 @@ import type {
   DiagnoseOutcome,
   DiagnoseRequest,
   DiagnosisResult,
+  InterviewPreviewOutcome,
+  InterviewPreviewRequest,
+  InterviewPreviewResult,
   JdFetchOutcome,
   JdFetchResult,
   MatchPreviewOutcome,
@@ -41,6 +44,8 @@ const KNOWN_ERROR_CODES: ApiErrorCode[] = [
   'FIXTURE_NOT_FOUND',
   'AI_ANALYSIS_NOT_ENABLED',
   'JD_MATCH_PREVIEW_NOT_ENABLED',
+  'MOCK_INTERVIEW_NOT_ENABLED',
+  'INTERVIEW_QUESTION_GENERATION_FAILED',
   'INTERNAL_ERROR',
 ]
 
@@ -229,6 +234,64 @@ export async function fetchJdFromUrl(jdUrl: string): Promise<JdFetchOutcome> {
   if (payload.error.code === 'INVALID_JD_URL') {
     return {
       kind: 'validation-error',
+      code: payload.error.code,
+      message: payload.error.message,
+    }
+  }
+
+  return {
+    kind: 'error',
+    code: payload.error.code,
+    message: payload.error.message,
+  }
+}
+
+export async function previewInterview(
+  request: InterviewPreviewRequest,
+): Promise<InterviewPreviewOutcome> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/interview/preview`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<InterviewPreviewResult>(response)
+
+  if (payload?.success && payload.data) {
+    return {
+      kind: 'success',
+      result: payload.data,
+    }
+  }
+
+  if (!payload?.error || !KNOWN_ERROR_CODES.includes(payload.error.code)) {
+    throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+  }
+
+  if (
+    payload.error.code === 'EMPTY_RESUME' ||
+    payload.error.code === 'TEXT_TOO_SHORT' ||
+    payload.error.code === 'TEXT_TOO_LONG'
+  ) {
+    return {
+      kind: 'validation-error',
+      code: payload.error.code,
+      message: payload.error.message,
+    }
+  }
+
+  if (payload.error.code === 'MOCK_INTERVIEW_NOT_ENABLED') {
+    return {
+      kind: 'not-enabled',
       code: payload.error.code,
       message: payload.error.message,
     }
