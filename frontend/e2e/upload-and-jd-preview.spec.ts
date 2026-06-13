@@ -11,6 +11,11 @@ const fetchedJdText =
   '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요합니다.'
 const resumeSummary = '백엔드 중심 경험은 분명하지만 성과 수치가 더 필요합니다.'
 
+async function expectJdStepReady(page: import('@playwright/test').Page) {
+  await expect(page.getByRole('heading', { name: '채용 공고를 입력해주세요' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: '주요업무' })).toBeVisible()
+}
+
 async function mockFixtureFlow(page: import('@playwright/test').Page) {
   await page.route('**/api/diagnose/file', async (route) => {
     await route.fulfill({
@@ -94,18 +99,16 @@ test('PDF 업로드 후 JD 매칭 결과까지 확인한다', async ({ page }) =
 
   await page.getByRole('tab', { name: 'PDF' }).click()
   await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('button', { name: '진단 요청' }).click()
+  await page.getByRole('button', { name: 'AI 진단 시작하기' }).click()
 
-  await expect(page.getByText('이력서 분석 결과입니다')).toBeVisible()
-  await expect(page.getByText(resumeSummary)).toBeVisible()
-  await expect(page.getByText('78점')).toBeVisible()
+  await expectJdStepReady(page)
 
-  await page.getByRole('textbox', { name: 'JD 내용' }).fill(jdText)
-  await page.getByRole('button', { name: 'JD 비교 미리보기' }).click()
+  await page.getByRole('textbox', { name: '주요업무' }).fill(jdText)
+  await page.getByRole('button', { name: '분석 리포트 생성' }).click()
 
-  await expect(page.getByText('JD 비교 미리보기를 만들었습니다')).toBeVisible()
-  await expect(page.getByText('매칭 점수')).toBeVisible()
-  await expect(page.locator('.jd-preview-result')).toContainText(/점/)
+  await expect(page.getByRole('heading', { name: '매칭 분석 리포트' })).toBeVisible()
+  await expect(page.getByText('종합 매칭 점수')).toBeVisible()
+  await expect(page.getByText('76점')).toBeVisible()
 })
 
 test('JD 링크 불러오기 성공 후 매칭 결과까지 확인한다', async ({ page }) => {
@@ -115,31 +118,30 @@ test('JD 링크 불러오기 성공 후 매칭 결과까지 확인한다', async
 
   await page.getByRole('tab', { name: 'PDF' }).click()
   await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('button', { name: '진단 요청' }).click()
+  await page.getByRole('button', { name: 'AI 진단 시작하기' }).click()
 
-  await expect(page.getByText('이력서 분석 결과입니다')).toBeVisible()
+  await expectJdStepReady(page)
 
-  await page.getByText('필요 시 링크로 JD 불러오기').click()
   await page.getByRole('textbox', { name: 'JD 링크' }).fill(
     'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
   )
-  await page.getByRole('button', { name: '링크로 JD 불러오기' }).click()
+  await page.getByRole('button', { name: 'JD 미리보기' }).click()
 
   await expect(page.getByText('JD 본문을 불러왔습니다')).toBeVisible()
-  await expect(page.getByRole('textbox', { name: 'JD 내용' })).toHaveValue(fetchedJdText)
+  await expect(page.getByRole('textbox', { name: '주요업무' })).toHaveValue(fetchedJdText)
   await expect(page.locator('.status-message[aria-live="polite"]')).toContainText(
     'JD 본문을 불러왔습니다',
   )
 
   await page
-    .getByRole('textbox', { name: 'JD 내용' })
+    .getByRole('textbox', { name: '주요업무' })
     .fill('수정한 JD 본문입니다. Spring Boot와 MySQL 운영 경험, 테스트 자동화 경험을 요구합니다.')
 
-  await page.getByRole('button', { name: 'JD 비교 미리보기' }).click()
+  await page.getByRole('button', { name: '분석 리포트 생성' }).click()
 
-  await expect(page.getByText('JD 비교 미리보기를 만들었습니다')).toBeVisible()
-  await expect(page.getByText('매칭 점수')).toBeVisible()
-  await expect(page.locator('.jd-preview-result')).toContainText('76점')
+  await expect(page.getByRole('heading', { name: '매칭 분석 리포트' })).toBeVisible()
+  await expect(page.getByText('종합 매칭 점수')).toBeVisible()
+  await expect(page.getByText('76점')).toBeVisible()
 })
 
 test('JD 링크 실패 후 직접 입력으로 매칭 결과까지 복구한다', async ({ page }) => {
@@ -149,17 +151,16 @@ test('JD 링크 실패 후 직접 입력으로 매칭 결과까지 복구한다'
 
   await page.getByRole('tab', { name: 'PDF' }).click()
   await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('button', { name: '진단 요청' }).click()
+  await page.getByRole('button', { name: 'AI 진단 시작하기' }).click()
 
-  await expect(page.getByText('이력서 분석 결과입니다')).toBeVisible()
+  await expectJdStepReady(page)
 
-  const jdTextarea = page.getByRole('textbox', { name: 'JD 내용' })
+  const jdTextarea = page.getByRole('textbox', { name: '주요업무' })
   await jdTextarea.fill(jdText)
-  await page.getByText('필요 시 링크로 JD 불러오기').click()
   await page.getByRole('textbox', { name: 'JD 링크' }).fill(
     'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=2',
   )
-  await page.getByRole('button', { name: '링크로 JD 불러오기' }).click()
+  await page.getByRole('button', { name: 'JD 미리보기' }).click()
 
   await expect(
     page.getByText('불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.'),
@@ -169,25 +170,19 @@ test('JD 링크 실패 후 직접 입력으로 매칭 결과까지 복구한다'
   )
   await expect(jdTextarea).toHaveValue(jdText)
 
-  await page.getByRole('button', { name: 'JD 비교 미리보기' }).click()
+  await page.getByRole('button', { name: '분석 리포트 생성' }).click()
 
-  await expect(page.getByText('JD 비교 미리보기를 만들었습니다')).toBeVisible()
-  await expect(page.locator('.jd-preview-result')).toContainText('76점')
+  await expect(page.getByRole('heading', { name: '매칭 분석 리포트' })).toBeVisible()
+  await expect(page.getByText('76점')).toBeVisible()
 })
 
-test('DOCX 업로드 후 fixture 분석 결과를 확인한다', async ({ page }) => {
+test('DOCX 업로드 후 JD 입력 단계로 이동한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await page.goto('/')
 
   await page.getByRole('tab', { name: 'DOCX' }).click()
   await page.locator('#resume-file').setInputFiles(fixtureDocx)
-  await page.getByRole('button', { name: '진단 요청' }).click()
+  await page.getByRole('button', { name: 'AI 진단 시작하기' }).click()
 
-  await expect(page.getByText('이력서 분석 결과입니다')).toBeVisible()
-  await expect(page.getByText(resumeSummary)).toBeVisible()
-  await expect(page.getByText('78점')).toBeVisible()
-  await page.getByText('분석 기준 원문 보기').click()
-  await expect(
-    page.getByText('Experienced backend engineer with Spring Boot REST API development'),
-  ).toBeVisible()
+  await expectJdStepReady(page)
 })
