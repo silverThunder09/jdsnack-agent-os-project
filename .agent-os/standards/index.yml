@@ -48,6 +48,6 @@ documents:
     - scripts/smoke-test.sh
     - scripts/google-test.sh
 active_specs:
-  - .agent-os/specs/2026-05-25-jd-link-to-ai-match-stabilization
+  - .agent-os/specs/2026-06-13-resume-mock-interview-questions
 archived_specs:
   - .agent-os/archive/specs
