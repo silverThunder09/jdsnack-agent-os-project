@@ -42,20 +42,20 @@ else
   checks_failed=0
 fi
 
-agents=()
+review_scopes=()
 warnings=()
 
-add_agent() {
-  local agent="$1"
+add_review_scope() {
+  local scope="$1"
   local existing
-  if [ "${#agents[@]}" -gt 0 ]; then
-    for existing in "${agents[@]}"; do
-      if [ "$existing" = "$agent" ]; then
+  if [ "${#review_scopes[@]}" -gt 0 ]; then
+    for existing in "${review_scopes[@]}"; do
+      if [ "$existing" = "$scope" ]; then
         return
       fi
     done
   fi
-  agents+=("$agent")
+  review_scopes+=("$scope")
 }
 
 has_backend=0
@@ -72,51 +72,51 @@ while IFS= read -r file; do
   case "$file" in
     backend/*)
       has_backend=1
-      add_agent "Backend Engineer"
-      add_agent "QA Reviewer"
+      add_review_scope "Backend/API contract"
+      add_review_scope "Test coverage"
       ;;
     frontend/*)
       has_frontend=1
-      add_agent "Frontend Engineer"
-      add_agent "QA Reviewer"
+      add_review_scope "Frontend/UI contract"
+      add_review_scope "Test coverage"
       ;;
     .agent-os/specs/*|docs/architecture/*)
       has_specs=1
-      add_agent "Spec Steward"
-      add_agent "QA Reviewer"
+      add_review_scope "Spec/traceability"
+      add_review_scope "Test coverage"
       ;;
     .github/*|.github/workflows/*)
       has_github=1
-      add_agent "DevOps Steward"
-      add_agent "Release Captain"
+      add_review_scope "CI/CD"
+      add_review_scope "Release impact"
       ;;
     Dockerfile|docker-compose*.yml|docker/*)
       has_docker=1
-      add_agent "DevOps Steward"
-      add_agent "Release Captain"
+      add_review_scope "Container/runtime"
+      add_review_scope "Release impact"
       ;;
     scripts/*)
       has_scripts=1
-      add_agent "DevOps Steward"
-      add_agent "Release Captain"
+      add_review_scope "Automation scripts"
+      add_review_scope "Release impact"
       ;;
     .agent-os/operations/*|.agent-os/standards/git-*|.agent-os/standards/definition-of-done.md)
       has_ops=1
-      add_agent "Release Captain"
+      add_review_scope "Operations policy"
       ;;
   esac
 
   case "$file" in
     *security*|*.env*|*secret*|*gemini*|*Gemini*|*log*|*Log*)
       has_security=1
-      add_agent "Security Reviewer"
-      add_agent "QA Reviewer"
+      add_review_scope "Security/secrets"
+      add_review_scope "Test coverage"
       ;;
   esac
 done < "$files_path"
 
-if [ "${#agents[@]}" -eq 0 ]; then
-  add_agent "QA Reviewer"
+if [ "${#review_scopes[@]}" -eq 0 ]; then
+  add_review_scope "General review"
 fi
 
 if [ "$has_github" -eq 1 ] || [ "$has_docker" -eq 1 ] || [ "$has_security" -eq 1 ] || [ "$has_ops" -eq 1 ]; then
@@ -145,8 +145,6 @@ required_sections=(
   "## 변경 요약"
   "## 범위 판단"
   "## 연결 문서"
-  "## 담당 에이전트 검사"
-  "## Handoff 요약"
   "## 검증"
   "## 리뷰 포인트"
 )
@@ -173,9 +171,9 @@ echo "## 위험도 추정"
 echo
 echo "- ${risk_level}"
 echo
-echo "## 필수 리뷰 에이전트"
+echo "## 필수 확인 범위"
 echo
-printf '%s\n' "${agents[@]}" | sed 's/^/- /'
+printf '%s\n' "${review_scopes[@]}" | sed 's/^/- /'
 echo
 echo "## PR 본문 섹션 확인"
 echo
@@ -204,4 +202,32 @@ fi
 echo
 echo "## 리뷰 리포트 템플릿"
 echo
-cat .agent-os/operations/agent-review-report-template.md
+cat <<'REPORT'
+# Review Result
+
+## Decision
+- PASS / COMMENT / REQUEST_CHANGES
+
+## Scope Check
+- PR 목적:
+- 변경 파일 범위:
+- 범위 위반 여부:
+
+## Contract Check
+- REQ/AC/TC:
+- API/UI 문서:
+
+## Test Check
+- 로컬 테스트:
+- CI 결과:
+- 누락 테스트:
+
+## Findings
+- P0:
+- P1:
+- P2:
+- P3:
+
+## Required Fixes
+- 수정 필요 항목:
+REPORT
