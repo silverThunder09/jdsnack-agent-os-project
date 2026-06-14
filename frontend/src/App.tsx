@@ -1,34 +1,27 @@
+import type { FormEvent, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
 import { useMatchPreview } from './hooks/useMatchPreview'
-import type { JdFetchResult, JdSections, ResumeInputMode } from './types/diagnosis'
+import type { JdFetchResult, JdSections, ResumeInputMode, ResultState } from './types/diagnosis'
 import { AppShell } from './components/AppShell'
-import { JdStep } from './components/JdStep'
-import { ReportStep } from './components/ReportStep'
-import { ResumeStep } from './components/ResumeStep'
-import { StepProgress } from './components/StepProgress'
+import { DiagnoseButton } from './components/DiagnoseButton'
+import { JdInputFields } from './components/JdInputFields'
+import { ResumeFileInput } from './components/ResumeFileInput'
+import { ResumeInput } from './components/ResumeInput'
+import { ResumeModeTabs } from './components/ResumeModeTabs'
+import { StatusMessage } from './components/StatusMessage'
 import './App.css'
 
 const LOCAL_STORAGE_KEY = 'jdsnack.resume-text'
 const MIN_LENGTH = 50
 const MAX_LENGTH = 10_000
-const REPORT_PREVIEW_LIMIT = 320
+
 const emptyJdSections: JdSections = {
   responsibilities: '',
   qualifications: '',
   preferredQualifications: '',
   experience: '',
-}
-
-function toPreviewText(value: string): string {
-  const trimmed = value.trim().replace(/\s+/g, ' ')
-
-  if (trimmed.length <= REPORT_PREVIEW_LIMIT) {
-    return trimmed
-  }
-
-  return `${trimmed.slice(0, REPORT_PREVIEW_LIMIT)}...`
 }
 
 function joinJdSections(sections: JdSections): string {
@@ -104,6 +97,221 @@ function mergeFetchedSections(current: JdSections, fetched: JdFetchResult): JdSe
   }
 }
 
+function EmptyPanel({ title, message }: { title: string; message: string }) {
+  return (
+    <StatusMessage
+      badge="Ready"
+      title={title}
+      message={message}
+      tone="neutral"
+    />
+  )
+}
+
+function ResumeResultPanel({
+  result,
+  resultRef,
+}: {
+  result: ResultState
+  resultRef: RefObject<HTMLElement | null>
+}) {
+  const diagnosis = result.diagnosis
+
+  return (
+    <section className="dashboard-panel" aria-live="polite" ref={resultRef} tabIndex={-1}>
+      <div className="dashboard-panel__header">
+        <span>Resume</span>
+        <h2>이력서 진단</h2>
+      </div>
+
+      {result.status === 'idle' ? (
+        <EmptyPanel
+          title="아직 결과가 없습니다"
+          message="좌측 입력 레일에서 이력서 진단을 실행하세요."
+        />
+      ) : null}
+
+      {result.status === 'loading' ? (
+        <StatusMessage
+          badge="Processing"
+          title={result.title}
+          message={result.message}
+          tone="active"
+          withLoadingBar
+        />
+      ) : null}
+
+      {result.status === 'not-enabled' ? (
+        <StatusMessage badge="Not Enabled" title={result.title} message={result.message} tone="success" />
+      ) : null}
+
+      {result.status === 'error' ? (
+        <StatusMessage
+          badge="Action Needed"
+          title={result.title}
+          message={`${result.message} 이력서 내용을 확인한 뒤 다시 요청해 주세요.`}
+          tone="danger"
+        />
+      ) : null}
+
+      {result.status === 'success' && diagnosis ? (
+        <div className="dashboard-result">
+          <div className="score-strip">
+            <strong>{diagnosis.score}점</strong>
+            <p>{diagnosis.summary}</p>
+          </div>
+          <div className="panel-list-grid">
+            <section>
+              <h3>강점</h3>
+              <ul>
+                {diagnosis.strengths.map((strength) => (
+                  <li key={strength}>{strength}</li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h3>개선 제안</h3>
+              <ul>
+                {diagnosis.improvements.map((improvement) => (
+                  <li key={improvement}>{improvement}</li>
+                ))}
+              </ul>
+            </section>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function MatchResultPanel({ result }: { result: ResultState }) {
+  const matchPreview = result.matchPreview
+
+  return (
+    <section className="dashboard-panel" aria-live="polite">
+      <div className="dashboard-panel__header">
+        <span>JD Match</span>
+        <h2>JD 매칭</h2>
+      </div>
+
+      {result.status === 'idle' ? (
+        <EmptyPanel
+          title="아직 결과가 없습니다"
+          message="이력서와 JD를 준비한 뒤 JD 매칭을 실행하세요."
+        />
+      ) : null}
+
+      {result.status === 'loading' ? (
+        <StatusMessage
+          badge="Preparing"
+          title={result.title}
+          message={result.message}
+          tone="active"
+          withLoadingBar
+        />
+      ) : null}
+
+      {result.status === 'error' ? (
+        <StatusMessage
+          badge="Check Input"
+          title={result.title}
+          message={`${result.message} 입력값은 보존됩니다.`}
+          tone="danger"
+        />
+      ) : null}
+
+      {result.status === 'success' && matchPreview ? (
+        <div className="dashboard-result">
+          <div className="score-strip score-strip--match">
+            <strong>{matchPreview.matchingScore}점</strong>
+            <p>{matchPreview.summary}</p>
+          </div>
+          <div className="panel-list-grid">
+            <section>
+              <h3>강점</h3>
+              <ul>
+                {matchPreview.strengths.map((strength) => (
+                  <li key={strength}>{strength}</li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h3>Gap</h3>
+              <ul>
+                {matchPreview.gaps.map((gap) => (
+                  <li key={gap}>{gap}</li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h3>제안</h3>
+              <ul>
+                {matchPreview.suggestions.map((suggestion) => (
+                  <li key={suggestion}>{suggestion}</li>
+                ))}
+              </ul>
+            </section>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function InterviewResultPanel({ result }: { result: ResultState }) {
+  const interviewPreview = result.interviewPreview
+
+  return (
+    <section className="dashboard-panel" aria-live="polite">
+      <div className="dashboard-panel__header">
+        <span>Interview</span>
+        <h2>모의 면접 질문</h2>
+      </div>
+
+      {result.status === 'idle' ? (
+        <EmptyPanel
+          title="아직 결과가 없습니다"
+          message="이력서와 선택 직무 맥락으로 면접 질문을 생성하세요."
+        />
+      ) : null}
+
+      {result.status === 'loading' ? (
+        <StatusMessage
+          badge="Preparing"
+          title={result.title}
+          message={result.message}
+          tone="active"
+          withLoadingBar
+        />
+      ) : null}
+
+      {result.status === 'error' ? (
+        <StatusMessage
+          badge="Retry"
+          title={result.title}
+          message={`${result.message} 입력값은 보존됩니다.`}
+          tone="danger"
+        />
+      ) : null}
+
+      {result.status === 'success' && interviewPreview ? (
+        <div className="dashboard-result interview-result">
+          <p className="submission-guide">{interviewPreview.strategy}</p>
+          <div className="interview-question-list">
+            {interviewPreview.questions.map((question) => (
+              <article className="interview-question-card" key={question.question}>
+                <span>{question.category}</span>
+                <h3>{question.question}</h3>
+                <p>{question.keypoints}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 function App() {
   const [inputMode, setInputMode] = useState<ResumeInputMode>('text')
   const [resumeText, setResumeText] = useState(() => {
@@ -118,7 +326,6 @@ function App() {
   const [jdUrl, setJdUrl] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [isJdAutofilled, setIsJdAutofilled] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1)
   const {
     clearInlineError,
     inlineError,
@@ -156,26 +363,11 @@ function App() {
       : result.status === 'success' && result.diagnosis?.sourceText
         ? result.diagnosis.sourceText
         : ''
-  const canPreviewWithCurrentSource =
+  const canUseCurrentSource =
     inputMode === 'text'
       ? trimmedLength >= MIN_LENGTH && trimmedLength <= MAX_LENGTH
       : Boolean(resumeSourceForPreview)
   const jdText = joinJdSections(jdSections)
-  const derivedStep =
-    previewResult.status === 'success' ||
-    previewResult.status === 'loading' ||
-    previewResult.status === 'error'
-      ? 3
-      : jdText.trim() || jdUrl.trim() || result.status === 'success'
-        ? 2
-        : 1
-  const activeStep = Math.max(currentStep, derivedStep)
-  const resumePreviewText = resumeSourceForPreview
-    ? toPreviewText(resumeSourceForPreview)
-    : '이력서 본문을 준비하면 여기에서 대조 기준으로 보여드립니다.'
-  const jdPreviewText = jdText.trim()
-    ? toPreviewText(jdText)
-    : 'JD 본문을 준비하면 여기에서 대조 기준으로 보여드립니다.'
 
   useEffect(() => {
     window.localStorage.setItem(LOCAL_STORAGE_KEY, resumeText)
@@ -253,9 +445,6 @@ function App() {
     if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
       resetPreviewResult()
     }
-    if (interviewResult.status !== 'idle' && interviewResult.status !== 'loading') {
-      resetInterviewResult()
-    }
   }
 
   const handleJobTitleChange = (nextValue: string) => {
@@ -279,27 +468,19 @@ function App() {
     })
   }
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleResumeSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    const goToJdStepOnSuccess = (wasSuccessful: boolean) => {
-      if (wasSuccessful) {
-        setCurrentStep((step) => Math.max(step, 2))
-      }
-    }
-
     if (inputMode === 'text') {
-      goToJdStepOnSuccess(await submit(resumeText))
+      await submit(resumeText)
       return
     }
 
-    goToJdStepOnSuccess(await submitFile(inputMode, resumeFile))
+    await submitFile(inputMode, resumeFile)
   }
 
-  const handleJdPreviewSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleJdPreviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-
-    setCurrentStep(3)
     await submitPreview({
       resumeSource: {
         type: inputMode === 'text' ? 'TEXT' : 'FILE',
@@ -323,70 +504,102 @@ function App() {
 
   return (
     <AppShell>
-      <StepProgress
-        currentStep={currentStep}
-        activeStep={activeStep}
-        onStepChange={setCurrentStep}
-      />
+      <section className="dashboard-layout" aria-label="JDSnack 분석 대시보드">
+        <aside className="input-rail" aria-label="입력 영역">
+          <div className="rail-header">
+            <h1>AI 이력서 분석 대시보드</h1>
+            <p>이력서, JD, 면접 질문을 한 화면에서 실행하고 결과를 바로 확인합니다.</p>
+          </div>
 
-      <section className="wizard-stage">
-        {currentStep === 1 ? (
-          <ResumeStep
-            inputMode={inputMode}
-            resumeText={resumeText}
-            resumeFile={resumeFile}
-            trimmedLength={trimmedLength}
-            maxLength={MAX_LENGTH}
-            minLength={MIN_LENGTH}
-            inlineError={inlineError}
-            isSubmitting={isSubmitting}
-            result={result}
-            resultRef={resultRef}
-            onModeChange={handleModeChange}
-            onResumeChange={handleResumeChange}
-            onFileChange={handleFileChange}
-            onSubmit={handleSubmit}
-            onNextStep={() => setCurrentStep(2)}
-          />
-        ) : null}
+          <form className="rail-card" onSubmit={handleResumeSubmit}>
+            <div className="rail-section-header">
+              <h2>이력서</h2>
+              <span>{trimmedLength.toLocaleString()} / {MAX_LENGTH.toLocaleString()}</span>
+            </div>
+            <ResumeModeTabs mode={inputMode} onChange={handleModeChange} />
+            {inputMode === 'text' ? (
+              <ResumeInput
+                value={resumeText}
+                onChange={handleResumeChange}
+                minLength={MIN_LENGTH}
+                maxLength={MAX_LENGTH}
+                currentLength={trimmedLength}
+                errorMessage={inlineError}
+              />
+            ) : (
+              <ResumeFileInput
+                mode={inputMode}
+                file={resumeFile}
+                errorMessage={inlineError}
+                onChange={handleFileChange}
+              />
+            )}
+            <DiagnoseButton
+              isSubmitting={isSubmitting}
+              idleLabel="이력서 진단"
+              loadingLabel="이력서 확인 중..."
+            />
+          </form>
 
-        {currentStep === 2 ? (
-          <JdStep
-            jdSections={jdSections}
-            jdUrl={jdUrl}
-            jobTitle={jobTitle}
-            isJdAutofilled={isJdAutofilled}
-            jdFetchStatus={jdFetchState.status}
-            jdFetchTitle={jdFetchState.title}
-            jdFetchMessage={jdFetchState.message}
-            jdTextError={jdTextError}
-            jdUrlError={jdUrlError}
-            isFetchingJd={isFetchingJd}
-            isPreviewSubmitting={isPreviewSubmitting}
-            canPreviewWithCurrentSource={canPreviewWithCurrentSource}
-            onJdSectionChange={handleJdSectionChange}
-            onJdUrlChange={handleJdUrlChange}
-            onJobTitleChange={handleJobTitleChange}
-            onJdFetch={handleJdFetch}
-            onSubmit={handleJdPreviewSubmit}
-            onPreviousStep={() => setCurrentStep(1)}
-          />
-        ) : null}
+          <form className="rail-card" onSubmit={handleJdPreviewSubmit}>
+            <div className="rail-section-header">
+              <h2>JD</h2>
+              <span>링크 또는 직접 입력</span>
+            </div>
+            <JdInputFields
+              jdSections={jdSections}
+              jdUrl={jdUrl}
+              isJdAutofilled={isJdAutofilled}
+              jdFetchStatus={jdFetchState.status}
+              jdFetchTitle={jdFetchState.title}
+              jdFetchMessage={jdFetchState.message}
+              jdTextError={jdTextError}
+              jdUrlError={jdUrlError}
+              isFetchingJd={isFetchingJd}
+              onJdSectionChange={handleJdSectionChange}
+              onJdUrlChange={handleJdUrlChange}
+              onJdFetch={handleJdFetch}
+            />
+            <DiagnoseButton
+              isSubmitting={isPreviewSubmitting}
+              idleLabel="JD 매칭"
+              loadingLabel="매칭 중..."
+              disabled={!canUseCurrentSource}
+            />
+          </form>
 
-        {currentStep === 3 ? (
-          <ReportStep
-            result={result}
-            previewResult={previewResult}
-            interviewResult={interviewResult}
-            resultRef={resultRef}
-            resumePreviewText={resumePreviewText}
-            jdPreviewText={jdPreviewText}
-            isInterviewSubmitting={isInterviewSubmitting}
-            onInterviewSubmit={handleInterviewSubmit}
-            onJdEdit={() => setCurrentStep(2)}
-            onResumeEdit={() => setCurrentStep(1)}
-          />
-        ) : null}
+          <section className="rail-card">
+            <div className="rail-section-header">
+              <h2>모의 면접</h2>
+              <span>선택 맥락</span>
+            </div>
+            <label className="resume-input-group" htmlFor="job-title">
+              <span className="resume-label">대상 직무</span>
+              <input
+                id="job-title"
+                className="jd-url-input"
+                type="text"
+                value={jobTitle}
+                placeholder="예: 백엔드 개발자"
+                onChange={(event) => handleJobTitleChange(event.target.value)}
+              />
+            </label>
+            <button
+              className="diagnose-button"
+              type="button"
+              disabled={!canUseCurrentSource || isInterviewSubmitting}
+              onClick={handleInterviewSubmit}
+            >
+              {isInterviewSubmitting ? '질문 생성 중...' : '면접 질문 생성'}
+            </button>
+          </section>
+        </aside>
+
+        <section className="results-stack" aria-label="결과 영역">
+          <ResumeResultPanel result={result} resultRef={resultRef} />
+          <MatchResultPanel result={previewResult} />
+          <InterviewResultPanel result={interviewResult} />
+        </section>
       </section>
     </AppShell>
   )
