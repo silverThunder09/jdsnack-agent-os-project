@@ -77,6 +77,25 @@ export function AppShell({
             </button>
           ))}
         </nav>
+
+        <div className="saas-sidebar__profile" aria-label="계정 정보">
+          <div className="plan-card">
+            <strong>프로 플랜</strong>
+            <span>만료일 2025.06.30</span>
+            <button type="button" className="plan-card__manage" disabled aria-disabled="true">
+              플랜 관리
+            </button>
+          </div>
+          <div className="profile-row">
+            <span className="profile-avatar" aria-hidden="true">
+              HJ
+            </span>
+            <div className="profile-row__info">
+              <strong>김현준</strong>
+              <span>hyunjun.kim@example.com</span>
+            </div>
+          </div>
+        </div>
       </aside>
 
       <div className="saas-main">
@@ -94,7 +113,13 @@ export function AppShell({
               <strong>JDSnack</strong>
             </a>
           </div>
-          <span className="saas-help-pill">도움말</span>
+          <div className="saas-topbar__right">
+            <span className="saas-help-pill">도움말</span>
+            <span className="saas-bell" aria-label="알림 3개">
+              🔔
+              <span className="saas-bell__badge">3</span>
+            </span>
+          </div>
         </header>
 
         <main className="saas-content">{children}</main>

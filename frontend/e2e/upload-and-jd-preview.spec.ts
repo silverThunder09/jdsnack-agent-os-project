@@ -6,9 +6,9 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const fixturePdf = path.resolve(currentDir, 'fixtures/resume-fixture.pdf')
 const fixtureDocx = path.resolve(currentDir, 'fixtures/resume-fixture.docx')
 const jdText =
-  'Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구합니다.'
+  'Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구하며 협업과 문서화 역량을 중요하게 봅니다.'
 const fetchedJdText =
-  '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요합니다.'
+  '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요하고 테스트 자동화와 협업 경험을 우대합니다.'
 
 async function mockFixtureFlow(page: import('@playwright/test').Page) {
   await page.route('**/api/diagnose/file', async (route) => {
@@ -104,28 +104,29 @@ async function mockJdFetchFailure(page: import('@playwright/test').Page) {
   })
 }
 
-test('PDF 업로드 후 통합 분석 결과를 확인한다', async ({ page }) => {
+test('PDF 업로드 + JD 붙여넣기 후 JD 적합도 결과를 확인한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await page.goto('/')
 
-  await page.getByRole('tab', { name: 'PDF' }).click()
+  await page.getByRole('tab', { name: 'JD 내용 붙여넣기' }).click()
+  await page.getByLabel('JD 내용 붙여넣기').fill(jdText)
   await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('textbox', { name: '주요업무' }).fill(jdText)
-  await page.getByRole('button', { name: '분석 시작' }).click()
+  await page.getByRole('button', { name: '분석 시작하기 →' }).click()
 
-  await expect(page.getByText('78점')).toBeVisible()
   await expect(page.getByText('76점')).toBeVisible()
+  await expect(page.getByText('Spring Boot 관련 표현이 JD와 겹칩니다.')).toBeVisible()
 })
 
-test('모의 면접 목적지에서 질문을 생성한다', async ({ page }) => {
+test('분석 후 모의 면접 목적지에서 질문을 생성한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await page.goto('/')
 
-  await page.getByRole('tab', { name: 'DOCX' }).click()
+  await page.getByRole('tab', { name: 'JD 내용 붙여넣기' }).click()
+  await page.getByLabel('JD 내용 붙여넣기').fill(jdText)
   await page.locator('#resume-file').setInputFiles(fixtureDocx)
-  await page.getByRole('textbox', { name: '주요업무' }).fill(jdText)
-  await page.getByRole('button', { name: '분석 시작' }).click()
-  await expect(page.getByText('78점')).toBeVisible()
+  await page.getByRole('button', { name: '분석 시작하기 →' }).click()
+  await expect(page.getByText('76점')).toBeVisible()
+
   await page.getByRole('button', { name: '모의 면접' }).click()
   await page.getByLabel('대상 직무').fill('백엔드 개발자')
   await page.getByRole('button', { name: '면접 질문 생성' }).click()
@@ -136,38 +137,39 @@ test('모의 면접 목적지에서 질문을 생성한다', async ({ page }) =>
   ).toBeVisible()
 })
 
-test('JD 링크 불러오기 성공 후 통합 분석으로 이어진다', async ({ page }) => {
+test('JD 링크 불러오기 성공 후 분석으로 이어진다', async ({ page }) => {
   await mockFixtureFlow(page)
   await mockJdFetchSuccess(page)
   await page.goto('/')
 
-  await page.getByRole('tab', { name: 'PDF' }).click()
+  await page
+    .getByLabel('채용 공고 URL')
+    .fill('https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1')
+  await page.getByRole('button', { name: 'JD 불러오기' }).click()
+
+  await page.getByRole('tab', { name: 'JD 내용 붙여넣기' }).click()
+  await expect(page.getByLabel('JD 내용 붙여넣기')).toHaveValue(fetchedJdText)
+
   await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('textbox', { name: 'JD 링크' }).fill(
-    'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
-  )
-  await page.getByRole('button', { name: 'JD 미리보기' }).click()
-
-  await expect(page.getByText('JD 본문을 불러왔습니다')).toBeVisible()
-  await expect(page.getByRole('textbox', { name: '주요업무' })).toHaveValue(fetchedJdText)
-
-  await page.getByRole('button', { name: '분석 시작' }).click()
+  await page.getByRole('button', { name: '분석 시작하기 →' }).click()
   await expect(page.getByText('76점')).toBeVisible()
 })
 
-test('JD 링크 실패 후 직접 입력으로 복구한다', async ({ page }) => {
+test('JD 링크 실패 후 직접 붙여넣기로 복구한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await mockJdFetchFailure(page)
   await page.goto('/')
 
-  await page.getByRole('tab', { name: 'PDF' }).click()
-  await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('textbox', { name: '주요업무' }).fill(jdText)
-  await page.getByRole('textbox', { name: 'JD 링크' }).fill(
-    'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=2',
-  )
-  await page.getByRole('button', { name: 'JD 미리보기' }).click()
+  await page
+    .getByLabel('채용 공고 URL')
+    .fill('https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=2')
+  await page.getByRole('button', { name: 'JD 불러오기' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('JD 링크에서 본문을 가져오지 못했습니다')
-  await expect(page.getByRole('textbox', { name: '주요업무' })).toHaveValue(jdText)
+  await expect(page.getByRole('alert')).toContainText('붙여넣어')
+
+  await page.getByRole('tab', { name: 'JD 내용 붙여넣기' }).click()
+  await page.getByLabel('JD 내용 붙여넣기').fill(jdText)
+  await page.locator('#resume-file').setInputFiles(fixturePdf)
+  await page.getByRole('button', { name: '분석 시작하기 →' }).click()
+  await expect(page.getByText('76점')).toBeVisible()
 })
