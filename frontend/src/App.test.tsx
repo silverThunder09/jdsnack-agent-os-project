@@ -162,4 +162,46 @@ describe('새로운 분석 시작 페이지', () => {
     expect(await screen.findByText('장애 대응 경험을 설명해 주세요.')).toBeInTheDocument()
     expect(screen.getByText('기술 선택 이유와 검증 방식을 함께 설명하세요.')).toBeInTheDocument()
   })
+
+  it('결과를 마크다운으로 내보내고 인쇄할 수 있다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(diagnosePayload()).mockResolvedValueOnce(matchPayload())
+    const createObjectURL = vi.fn(() => 'blob:mock')
+    URL.createObjectURL = createObjectURL
+    URL.revokeObjectURL = vi.fn()
+    const printSpy = vi.fn()
+    window.print = printSpy
+
+    render(<App />)
+    await fillJdAndResume(user)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
+    await screen.findByText('79점')
+
+    await user.click(screen.getByRole('button', { name: '내보내기' }))
+    expect(createObjectURL).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '인쇄' }))
+    expect(printSpy).toHaveBeenCalled()
+  })
+
+  it('JD 입력은 재마운트(새로고침) 후 복원된다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
+    await user.type(screen.getByLabelText('JD 내용 붙여넣기'), validJdText)
+
+    cleanup()
+    render(<App />)
+    await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
+    expect(screen.getByLabelText('JD 내용 붙여넣기')).toHaveValue(validJdText)
+  })
+
+  it('입력 초기화는 JD 본문을 비운다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
+    await user.type(screen.getByLabelText('JD 내용 붙여넣기'), validJdText)
+    await user.click(screen.getByRole('button', { name: '입력 초기화' }))
+    expect(screen.getByLabelText('JD 내용 붙여넣기')).toHaveValue('')
+  })
 })
