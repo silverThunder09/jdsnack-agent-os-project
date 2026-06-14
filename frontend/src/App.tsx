@@ -5,8 +5,10 @@ import { StatusMessage } from './components/StatusMessage'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
 import { useMatchPreview, validateJdText } from './hooks/useMatchPreview'
-import type { ResultState, ResumeInputMode } from './types/diagnosis'
+import type { MatchPreviewResult, ResultState, ResumeInputMode } from './types/diagnosis'
 import './App.css'
+
+const INPUT_STORAGE_KEY = 'jdsnack.analysis-input'
 
 type JdTab = 'link' | 'paste'
 type AnalysisPhase = 'input' | 'result'
@@ -63,6 +65,60 @@ const ACCURACY_TIPS = [
   '최신 이력서를 업로드해 주세요.',
   '경력 및 성과는 구체적으로 작성된 이력서일수록 정확도가 높아집니다.',
 ]
+
+const DEFAULT_OPTIONS: Record<AnalysisOptionKey, boolean> = {
+  jdMatch: true,
+  ats: true,
+  sentence: true,
+  keyword: true,
+}
+
+function loadSavedInput(): { jdText: string; options: Record<AnalysisOptionKey, boolean> } | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  try {
+    const raw = window.localStorage.getItem(INPUT_STORAGE_KEY)
+    if (!raw) {
+      return null
+    }
+    const parsed = JSON.parse(raw) as { jdText?: unknown; options?: unknown }
+    const savedOptions = (parsed.options ?? {}) as Partial<Record<AnalysisOptionKey, boolean>>
+    return {
+      jdText: typeof parsed.jdText === 'string' ? parsed.jdText : '',
+      options: { ...DEFAULT_OPTIONS, ...savedOptions },
+    }
+  } catch {
+    return null
+  }
+}
+
+function buildResultMarkdown(match: MatchPreviewResult): string {
+  const list = (items: string[]) => (items.length ? items.map((item) => `- ${item}`).join('\n') : '- (없음)')
+  return [
+    '# JDSnack 분석 결과',
+    '',
+    `## JD 적합도 점수: ${match.matchingScore}점`,
+    '',
+    '### 요약',
+    match.summary,
+    '',
+    '### 강점',
+    list(match.strengths),
+    '',
+    '### Gap',
+    list(match.gaps),
+    '',
+    '### 제안',
+    list(match.suggestions),
+    '',
+  ].join('\n')
+}
+
+function todayStamp(): string {
+  const d = new Date()
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+}
 
 function inferResumeMode(file: File): ResumeInputMode | null {
   const name = file.name.toLowerCase()
@@ -193,15 +249,12 @@ function App() {
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('input')
   const [jdTab, setJdTab] = useState<JdTab>('link')
   const [jdUrl, setJdUrl] = useState('')
-  const [jdText, setJdText] = useState('')
+  const [jdText, setJdText] = useState(() => loadSavedInput()?.jdText ?? '')
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [options, setOptions] = useState<Record<AnalysisOptionKey, boolean>>({
-    jdMatch: true,
-    ats: true,
-    sentence: true,
-    keyword: true,
-  })
+  const [options, setOptions] = useState<Record<AnalysisOptionKey, boolean>>(
+    () => loadSavedInput()?.options ?? { ...DEFAULT_OPTIONS },
+  )
   const [formError, setFormError] = useState('')
   const [submittedOptions, setSubmittedOptions] = useState<Record<AnalysisOptionKey, boolean>>({
     jdMatch: false,
@@ -240,6 +293,46 @@ function App() {
       resultRef.current?.focus()
     }
   }, [analysisPhase])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(INPUT_STORAGE_KEY, JSON.stringify({ jdText, options }))
+    } catch {
+      // localStorage 비가용 시 무시
+    }
+  }, [jdText, options])
+
+  const handleResetInput = () => {
+    setJdText('')
+    setJdUrl('')
+    setOptions({ ...DEFAULT_OPTIONS })
+    setFormError('')
+    try {
+      window.localStorage.removeItem(INPUT_STORAGE_KEY)
+    } catch {
+      // 무시
+    }
+  }
+
+  const handleExportResult = () => {
+    const match = previewResult.matchPreview
+    if (!match) {
+      return
+    }
+    const blob = new Blob([buildResultMarkdown(match)], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `jdsnack-분석결과-${todayStamp()}.md`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handlePrintResult = () => {
+    window.print()
+  }
 
   const handleJdUrlChange = (value: string) => {
     setJdUrl(value)
@@ -515,6 +608,9 @@ function App() {
               >
                 {isPreviewSubmitting ? '분석 중...' : '분석 시작하기 →'}
               </button>
+              <button type="button" className="text-button" onClick={handleResetInput}>
+                입력 초기화
+              </button>
             </div>
             <p className="start-footer">🔒 입력하신 정보는 안전하게 처리되며, 분석 후 즉시 삭제됩니다.</p>
           </section>
@@ -565,9 +661,21 @@ function App() {
           <p className="start-page__eyebrow">분석 결과</p>
           <h1>분석 결과</h1>
         </div>
-        <button type="button" className="ghost-button" onClick={handleNewAnalysis}>
-          새 분석
-        </button>
+        <div className="result-actions">
+          {submittedOptions.jdMatch && previewResult.status === 'success' ? (
+            <>
+              <button type="button" className="ghost-button" onClick={handleExportResult}>
+                내보내기
+              </button>
+              <button type="button" className="ghost-button" onClick={handlePrintResult}>
+                인쇄
+              </button>
+            </>
+          ) : null}
+          <button type="button" className="ghost-button" onClick={handleNewAnalysis}>
+            새 분석
+          </button>
+        </div>
       </header>
 
       {submittedOptions.jdMatch ? (
