@@ -1,9 +1,5 @@
-import type { FormEvent, RefObject } from 'react'
+import type { FormEvent, ReactNode, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { useDiagnose } from './hooks/useDiagnose'
-import { useInterviewPreview } from './hooks/useInterviewPreview'
-import { useMatchPreview } from './hooks/useMatchPreview'
-import type { JdFetchResult, JdSections, ResumeInputMode, ResultState } from './types/diagnosis'
 import { AppShell } from './components/AppShell'
 import { DiagnoseButton } from './components/DiagnoseButton'
 import { JdInputFields } from './components/JdInputFields'
@@ -11,6 +7,10 @@ import { ResumeFileInput } from './components/ResumeFileInput'
 import { ResumeInput } from './components/ResumeInput'
 import { ResumeModeTabs } from './components/ResumeModeTabs'
 import { StatusMessage } from './components/StatusMessage'
+import { useDiagnose } from './hooks/useDiagnose'
+import { useInterviewPreview } from './hooks/useInterviewPreview'
+import { useMatchPreview } from './hooks/useMatchPreview'
+import type { JdFetchResult, JdSections, ResumeInputMode, ResultState } from './types/diagnosis'
 import './App.css'
 
 const LOCAL_STORAGE_KEY = 'jdsnack.resume-text'
@@ -38,10 +38,11 @@ function joinJdSections(sections: JdSections): string {
 
 function pickSectionValue(text: string, starts: string[], stops: string[]) {
   const normalized = text.replace(/\r/g, '')
-  const startPattern = starts.join('|')
-  const stopPattern = stops.join('|')
   const match = normalized.match(
-    new RegExp(`(?:${startPattern})\\s*[:：]?\\s*([\\s\\S]*?)(?=\\n\\s*(?:${stopPattern})\\s*[:：]?|$)`, 'i'),
+    new RegExp(
+      `(?:${starts.join('|')})\\s*[:：]?\\s*([\\s\\S]*?)(?=\\n\\s*(?:${stops.join('|')})\\s*[:：]?|$)`,
+      'i',
+    ),
   )
 
   return match?.[1]?.trim() ?? ''
@@ -97,38 +98,71 @@ function mergeFetchedSections(current: JdSections, fetched: JdFetchResult): JdSe
   }
 }
 
-function EmptyPanel({ title, message }: { title: string; message: string }) {
+function EmptyState({ title, message }: { title: string; message: string }) {
+  return <StatusMessage badge="Ready" title={title} message={message} tone="neutral" />
+}
+
+function SummaryCard({
+  label,
+  score,
+  summary,
+  description,
+}: {
+  label: string
+  score?: number
+  summary?: string
+  description: string
+}) {
   return (
-    <StatusMessage
-      badge="Ready"
-      title={title}
-      message={message}
-      tone="neutral"
-    />
+    <article className="summary-card">
+      <span>{label}</span>
+      {typeof score === 'number' ? (
+        <>
+          <strong>{score}점</strong>
+          <p>{summary}</p>
+        </>
+      ) : (
+        <>
+          <strong className="summary-card__empty">-</strong>
+          <p>{description}</p>
+        </>
+      )}
+    </article>
   )
 }
 
-function ResumeResultPanel({
+function AnalysisPanel({
+  badge,
+  title,
+  description,
   result,
   resultRef,
+  successContent,
 }: {
+  badge: string
+  title: string
+  description: string
   result: ResultState
-  resultRef: RefObject<HTMLElement | null>
+  resultRef?: RefObject<HTMLElement | null>
+  successContent: ReactNode
 }) {
-  const diagnosis = result.diagnosis
-
   return (
-    <section className="dashboard-panel" aria-live="polite" ref={resultRef} tabIndex={-1}>
-      <div className="dashboard-panel__header">
-        <span>Resume</span>
-        <h2>이력서 진단</h2>
+    <section
+      className="preview-panel"
+      aria-live="polite"
+      ref={resultRef}
+      tabIndex={resultRef ? -1 : undefined}
+    >
+      <div className="preview-panel__header">
+        <span>{badge}</span>
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
       </div>
 
       {result.status === 'idle' ? (
-        <EmptyPanel
-          title="아직 결과가 없습니다"
-          message="좌측 입력 레일에서 이력서 진단을 실행하세요."
-        />
+        <EmptyState title="아직 결과가 없습니다" message={description} />
       ) : null}
 
       {result.status === 'loading' ? (
@@ -142,177 +176,26 @@ function ResumeResultPanel({
       ) : null}
 
       {result.status === 'not-enabled' ? (
-        <StatusMessage badge="Not Enabled" title={result.title} message={result.message} tone="success" />
-      ) : null}
-
-      {result.status === 'error' ? (
         <StatusMessage
-          badge="Action Needed"
-          title={result.title}
-          message={`${result.message} 이력서 내용을 확인한 뒤 다시 요청해 주세요.`}
-          tone="danger"
-        />
-      ) : null}
-
-      {result.status === 'success' && diagnosis ? (
-        <div className="dashboard-result">
-          <div className="score-strip">
-            <strong>{diagnosis.score}점</strong>
-            <p>{diagnosis.summary}</p>
-          </div>
-          <div className="panel-list-grid">
-            <section>
-              <h3>강점</h3>
-              <ul>
-                {diagnosis.strengths.map((strength) => (
-                  <li key={strength}>{strength}</li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h3>개선 제안</h3>
-              <ul>
-                {diagnosis.improvements.map((improvement) => (
-                  <li key={improvement}>{improvement}</li>
-                ))}
-              </ul>
-            </section>
-          </div>
-        </div>
-      ) : null}
-    </section>
-  )
-}
-
-function MatchResultPanel({ result }: { result: ResultState }) {
-  const matchPreview = result.matchPreview
-
-  return (
-    <section className="dashboard-panel" aria-live="polite">
-      <div className="dashboard-panel__header">
-        <span>JD Match</span>
-        <h2>JD 매칭</h2>
-      </div>
-
-      {result.status === 'idle' ? (
-        <EmptyPanel
-          title="아직 결과가 없습니다"
-          message="이력서와 JD를 준비한 뒤 JD 매칭을 실행하세요."
-        />
-      ) : null}
-
-      {result.status === 'loading' ? (
-        <StatusMessage
-          badge="Preparing"
+          badge="Not Enabled"
           title={result.title}
           message={result.message}
-          tone="active"
-          withLoadingBar
+          tone="success"
         />
       ) : null}
 
       {result.status === 'error' ? (
-        <StatusMessage
-          badge="Check Input"
-          title={result.title}
-          message={`${result.message} 입력값은 보존됩니다.`}
-          tone="danger"
-        />
+        <StatusMessage badge="Action Needed" title={result.title} message={result.message} tone="danger" />
       ) : null}
 
-      {result.status === 'success' && matchPreview ? (
-        <div className="dashboard-result">
-          <div className="score-strip score-strip--match">
-            <strong>{matchPreview.matchingScore}점</strong>
-            <p>{matchPreview.summary}</p>
-          </div>
-          <div className="panel-list-grid">
-            <section>
-              <h3>강점</h3>
-              <ul>
-                {matchPreview.strengths.map((strength) => (
-                  <li key={strength}>{strength}</li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h3>Gap</h3>
-              <ul>
-                {matchPreview.gaps.map((gap) => (
-                  <li key={gap}>{gap}</li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h3>제안</h3>
-              <ul>
-                {matchPreview.suggestions.map((suggestion) => (
-                  <li key={suggestion}>{suggestion}</li>
-                ))}
-              </ul>
-            </section>
-          </div>
-        </div>
-      ) : null}
-    </section>
-  )
-}
-
-function InterviewResultPanel({ result }: { result: ResultState }) {
-  const interviewPreview = result.interviewPreview
-
-  return (
-    <section className="dashboard-panel" aria-live="polite">
-      <div className="dashboard-panel__header">
-        <span>Interview</span>
-        <h2>모의 면접 질문</h2>
-      </div>
-
-      {result.status === 'idle' ? (
-        <EmptyPanel
-          title="아직 결과가 없습니다"
-          message="이력서와 선택 직무 맥락으로 면접 질문을 생성하세요."
-        />
-      ) : null}
-
-      {result.status === 'loading' ? (
-        <StatusMessage
-          badge="Preparing"
-          title={result.title}
-          message={result.message}
-          tone="active"
-          withLoadingBar
-        />
-      ) : null}
-
-      {result.status === 'error' ? (
-        <StatusMessage
-          badge="Retry"
-          title={result.title}
-          message={`${result.message} 입력값은 보존됩니다.`}
-          tone="danger"
-        />
-      ) : null}
-
-      {result.status === 'success' && interviewPreview ? (
-        <div className="dashboard-result interview-result">
-          <p className="submission-guide">{interviewPreview.strategy}</p>
-          <div className="interview-question-list">
-            {interviewPreview.questions.map((question) => (
-              <article className="interview-question-card" key={question.question}>
-                <span>{question.category}</span>
-                <h3>{question.question}</h3>
-                <p>{question.keypoints}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      {result.status === 'success' ? successContent : null}
     </section>
   )
 }
 
 function App() {
+  const [currentView, setCurrentView] = useState<'home' | 'interview'>('home')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [inputMode, setInputMode] = useState<ResumeInputMode>('text')
   const [resumeText, setResumeText] = useState(() => {
     if (typeof window === 'undefined') {
@@ -326,6 +209,7 @@ function App() {
   const [jdUrl, setJdUrl] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [isJdAutofilled, setIsJdAutofilled] = useState(false)
+  const resultRef = useRef<HTMLElement>(null)
   const {
     clearInlineError,
     inlineError,
@@ -354,20 +238,18 @@ function App() {
     result: interviewResult,
     submit: submitInterview,
   } = useInterviewPreview()
-  const resultRef = useRef<HTMLElement>(null)
+
   const trimmedLength = resumeText.trim().length
   const trimmedResumeText = resumeText.trim()
-  const resumeSourceForPreview =
-    inputMode === 'text'
-      ? trimmedResumeText
-      : result.status === 'success' && result.diagnosis?.sourceText
-        ? result.diagnosis.sourceText
-        : ''
-  const canUseCurrentSource =
+  const jdText = joinJdSections(jdSections)
+  const hasResumeSource =
     inputMode === 'text'
       ? trimmedLength >= MIN_LENGTH && trimmedLength <= MAX_LENGTH
-      : Boolean(resumeSourceForPreview)
-  const jdText = joinJdSections(jdSections)
+      : Boolean(result.status === 'success' && result.diagnosis?.sourceText)
+  const canStartAnalysis =
+    inputMode === 'text'
+      ? trimmedLength >= MIN_LENGTH && Boolean(jdText.trim())
+      : Boolean(resumeFile) && Boolean(jdText.trim())
 
   useEffect(() => {
     window.localStorage.setItem(LOCAL_STORAGE_KEY, resumeText)
@@ -377,41 +259,51 @@ function App() {
     if (
       result.status === 'success' ||
       result.status === 'not-enabled' ||
-      result.status === 'error'
+      result.status === 'error' ||
+      previewResult.status === 'success' ||
+      previewResult.status === 'error'
     ) {
       resultRef.current?.focus()
     }
-  }, [result.status])
+  }, [previewResult.status, result.status])
+
+  const resetDownstreamResults = () => {
+    if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
+      resetPreviewResult()
+    }
+    if (interviewResult.status !== 'idle' && interviewResult.status !== 'loading') {
+      resetInterviewResult()
+    }
+  }
 
   const handleResumeChange = (nextValue: string) => {
     setResumeText(nextValue)
-
     if (inlineError) {
       clearInlineError()
     }
-
     if (result.status !== 'idle' && result.status !== 'loading') {
       resetResult()
     }
+    resetDownstreamResults()
   }
 
   const handleModeChange = (nextMode: ResumeInputMode) => {
     setInputMode(nextMode)
     setResumeFile(null)
     clearInlineError()
-
     if (result.status !== 'idle' && result.status !== 'loading') {
       resetResult()
     }
+    resetDownstreamResults()
   }
 
   const handleFileChange = (nextFile: File | null) => {
     setResumeFile(nextFile)
     clearInlineError()
-
     if (result.status !== 'idle' && result.status !== 'loading') {
       resetResult()
     }
+    resetDownstreamResults()
   }
 
   const handleJdSectionChange = (section: keyof JdSections, nextValue: string) => {
@@ -426,12 +318,7 @@ function App() {
     if (jdFetchState.status !== 'idle') {
       resetJdFetchState()
     }
-    if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
-      resetPreviewResult()
-    }
-    if (interviewResult.status !== 'idle' && interviewResult.status !== 'loading') {
-      resetInterviewResult()
-    }
+    resetDownstreamResults()
   }
 
   const handleJdUrlChange = (nextValue: string) => {
@@ -442,9 +329,7 @@ function App() {
     if (jdFetchState.status !== 'idle') {
       resetJdFetchState()
     }
-    if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
-      resetPreviewResult()
-    }
+    resetDownstreamResults()
   }
 
   const handleJobTitleChange = (nextValue: string) => {
@@ -456,11 +341,7 @@ function App() {
 
   const handleJdFetch = async () => {
     await fetchJd(jdUrl, {
-      onBeforeChange: () => {
-        if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
-          resetPreviewResult()
-        }
-      },
+      onBeforeChange: resetDownstreamResults,
       onFetched: (fetched) => {
         setJdSections((current) => mergeFetchedSections(current, fetched))
         setIsJdAutofilled(true)
@@ -468,34 +349,48 @@ function App() {
     })
   }
 
-  const handleResumeSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleAnalysisSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (inputMode === 'text') {
       await submit(resumeText)
+      await submitPreview({
+        resumeSource: {
+          type: 'TEXT',
+          value: trimmedResumeText,
+        },
+        jdText,
+        jdUrl: jdUrl.trim(),
+      })
       return
     }
 
-    await submitFile(inputMode, resumeFile)
-  }
+    const diagnosisOutcome = await submitFile(inputMode, resumeFile)
 
-  const handleJdPreviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    await submitPreview({
-      resumeSource: {
-        type: inputMode === 'text' ? 'TEXT' : 'FILE',
-        value: resumeSourceForPreview,
-      },
-      jdText,
-      jdUrl: jdUrl.trim(),
-    })
+    if (diagnosisOutcome.ok && diagnosisOutcome.diagnosis?.sourceText) {
+      await submitPreview({
+        resumeSource: {
+          type: 'FILE',
+          value: diagnosisOutcome.diagnosis.sourceText,
+        },
+        jdText,
+        jdUrl: jdUrl.trim(),
+      })
+    }
   }
 
   const handleInterviewSubmit = async () => {
+    const resumeSource =
+      inputMode === 'text'
+        ? trimmedResumeText
+        : result.status === 'success' && result.diagnosis?.sourceText
+          ? result.diagnosis.sourceText
+          : ''
+
     await submitInterview({
       resumeSource: {
         type: inputMode === 'text' ? 'TEXT' : 'FILE',
-        value: resumeSourceForPreview,
+        value: resumeSource,
       },
       jobTitle: jobTitle.trim(),
       jdText,
@@ -503,104 +398,250 @@ function App() {
   }
 
   return (
-    <AppShell>
-      <section className="dashboard-layout" aria-label="JDSnack 분석 대시보드">
-        <aside className="input-rail" aria-label="입력 영역">
-          <div className="rail-header">
-            <h1>AI 이력서 분석 대시보드</h1>
-            <p>이력서, JD, 면접 질문을 한 화면에서 실행하고 결과를 바로 확인합니다.</p>
-          </div>
-
-          <form className="rail-card" onSubmit={handleResumeSubmit}>
-            <div className="rail-section-header">
-              <h2>이력서</h2>
-              <span>{trimmedLength.toLocaleString()} / {MAX_LENGTH.toLocaleString()}</span>
-            </div>
-            <ResumeModeTabs mode={inputMode} onChange={handleModeChange} />
-            {inputMode === 'text' ? (
-              <ResumeInput
-                value={resumeText}
-                onChange={handleResumeChange}
-                minLength={MIN_LENGTH}
-                maxLength={MAX_LENGTH}
-                currentLength={trimmedLength}
-                errorMessage={inlineError}
-              />
-            ) : (
-              <ResumeFileInput
-                mode={inputMode}
-                file={resumeFile}
-                errorMessage={inlineError}
-                onChange={handleFileChange}
-              />
-            )}
-            <DiagnoseButton
-              isSubmitting={isSubmitting}
-              idleLabel="이력서 진단"
-              loadingLabel="이력서 확인 중..."
-            />
-          </form>
-
-          <form className="rail-card" onSubmit={handleJdPreviewSubmit}>
-            <div className="rail-section-header">
-              <h2>JD</h2>
-              <span>링크 또는 직접 입력</span>
-            </div>
-            <JdInputFields
-              jdSections={jdSections}
-              jdUrl={jdUrl}
-              isJdAutofilled={isJdAutofilled}
-              jdFetchStatus={jdFetchState.status}
-              jdFetchTitle={jdFetchState.title}
-              jdFetchMessage={jdFetchState.message}
-              jdTextError={jdTextError}
-              jdUrlError={jdUrlError}
-              isFetchingJd={isFetchingJd}
-              onJdSectionChange={handleJdSectionChange}
-              onJdUrlChange={handleJdUrlChange}
-              onJdFetch={handleJdFetch}
-            />
-            <DiagnoseButton
-              isSubmitting={isPreviewSubmitting}
-              idleLabel="JD 매칭"
-              loadingLabel="매칭 중..."
-              disabled={!canUseCurrentSource}
-            />
-          </form>
-
-          <section className="rail-card">
-            <div className="rail-section-header">
-              <h2>모의 면접</h2>
-              <span>선택 맥락</span>
-            </div>
-            <label className="resume-input-group" htmlFor="job-title">
-              <span className="resume-label">대상 직무</span>
-              <input
-                id="job-title"
-                className="jd-url-input"
-                type="text"
-                value={jobTitle}
-                placeholder="예: 백엔드 개발자"
-                onChange={(event) => handleJobTitleChange(event.target.value)}
-              />
-            </label>
-            <button
-              className="diagnose-button"
-              type="button"
-              disabled={!canUseCurrentSource || isInterviewSubmitting}
-              onClick={handleInterviewSubmit}
-            >
-              {isInterviewSubmitting ? '질문 생성 중...' : '면접 질문 생성'}
-            </button>
+    <AppShell
+      currentView={currentView}
+      isSidebarOpen={isSidebarOpen}
+      onNavigate={(view) => {
+        setCurrentView(view)
+        setIsSidebarOpen(false)
+      }}
+      onToggleSidebar={() => setIsSidebarOpen((current) => !current)}
+    >
+      {currentView === 'home' ? (
+        <section className="home-shell" aria-label="홈 분석 화면">
+          <section className="hero-card">
+            <p className="hero-card__eyebrow">AI 기반 이력서 분석·최적화</p>
+            <h1>공고와 이력서를 연결하고, 합격 가능성을 더 선명하게 보세요.</h1>
+            <p className="hero-card__copy">
+              JD와 이력서를 한 번에 넣으면 진단 점수와 JD 적합도를 함께 보여줍니다. 입력값은
+              그대로 유지돼 바로 다듬고 다시 실행할 수 있습니다.
+            </p>
           </section>
-        </aside>
 
-        <section className="results-stack" aria-label="결과 영역">
-          <ResumeResultPanel result={result} resultRef={resultRef} />
-          <MatchResultPanel result={previewResult} />
-          <InterviewResultPanel result={interviewResult} />
+          <form className="analysis-grid" onSubmit={handleAnalysisSubmit}>
+            <section className="workspace-card" aria-label="통합 입력 영역">
+              <div className="workspace-card__header">
+                <div>
+                  <span>Integrated Input</span>
+                  <h2>한 번에 분석 준비</h2>
+                </div>
+                <p>JD 링크/본문과 이력서를 한 입력 흐름으로 정리합니다.</p>
+              </div>
+
+              <div className="workspace-card__body">
+                <section className="input-card">
+                  <div className="section-title-row">
+                    <h2>채용 공고</h2>
+                    <span>JD 링크 또는 직접 입력</span>
+                  </div>
+                  <JdInputFields
+                    jdSections={jdSections}
+                    jdUrl={jdUrl}
+                    isJdAutofilled={isJdAutofilled}
+                    jdFetchStatus={jdFetchState.status}
+                    jdFetchTitle={jdFetchState.title}
+                    jdFetchMessage={jdFetchState.message}
+                    jdTextError={jdTextError}
+                    jdUrlError={jdUrlError}
+                    isFetchingJd={isFetchingJd}
+                    onJdSectionChange={handleJdSectionChange}
+                    onJdUrlChange={handleJdUrlChange}
+                    onJdFetch={handleJdFetch}
+                  />
+                </section>
+
+                <section className="input-card">
+                  <div className="section-title-row">
+                    <h2>이력서</h2>
+                    <span>Text / PDF / DOCX</span>
+                  </div>
+                  <ResumeModeTabs mode={inputMode} onChange={handleModeChange} />
+                  {inputMode === 'text' ? (
+                    <ResumeInput
+                      value={resumeText}
+                      onChange={handleResumeChange}
+                      minLength={MIN_LENGTH}
+                      maxLength={MAX_LENGTH}
+                      currentLength={trimmedLength}
+                      errorMessage={inlineError}
+                    />
+                  ) : (
+                    <ResumeFileInput
+                      mode={inputMode}
+                      file={resumeFile}
+                      errorMessage={inlineError}
+                      onChange={handleFileChange}
+                    />
+                  )}
+                </section>
+              </div>
+
+              <div className="workspace-card__footer">
+                <DiagnoseButton
+                  isSubmitting={isSubmitting || isPreviewSubmitting}
+                  idleLabel="분석 시작"
+                  loadingLabel="분석 중..."
+                  disabled={!canStartAnalysis}
+                />
+              </div>
+            </section>
+
+            <section className="results-card" aria-label="분석 결과 영역" ref={resultRef} tabIndex={-1}>
+              <div className="results-card__header">
+                <div>
+                  <span>Outcome</span>
+                  <h2>분석 리포트</h2>
+                </div>
+                <p>이력서 진단과 JD 적합도를 나란히 읽고 다음 수정 포인트를 확인하세요.</p>
+              </div>
+
+              <div className="summary-grid">
+                <SummaryCard
+                  label="이력서 진단 점수"
+                  score={result.diagnosis?.score}
+                  summary={result.diagnosis?.summary}
+                  description="분석 전에는 점수 대신 입력 안내를 보여줍니다."
+                />
+                <SummaryCard
+                  label="JD 적합도"
+                  score={previewResult.matchPreview?.matchingScore}
+                  summary={previewResult.matchPreview?.summary}
+                  description="JD와 이력서가 함께 준비되면 적합도를 계산합니다."
+                />
+              </div>
+
+              <div className="preview-grid">
+                <AnalysisPanel
+                  badge="Resume"
+                  title="이력서 진단"
+                  description="강점과 개선 포인트를 먼저 읽어보세요."
+                  result={result}
+                  successContent={
+                    <div className="detail-list-grid">
+                      <section className="detail-card">
+                        <h3>강점</h3>
+                        <ul>
+                          {result.diagnosis?.strengths.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </section>
+                      <section className="detail-card">
+                        <h3>개선</h3>
+                        <ul>
+                          {result.diagnosis?.improvements.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </section>
+                    </div>
+                  }
+                />
+
+                <AnalysisPanel
+                  badge="JD Match"
+                  title="JD 매칭 프리뷰"
+                  description="공고 강점과 gap, 보강 제안을 함께 확인하세요."
+                  result={previewResult}
+                  successContent={
+                    <div className="detail-list-grid detail-list-grid--triple">
+                      <section className="detail-card">
+                        <h3>강점</h3>
+                        <ul>
+                          {previewResult.matchPreview?.strengths.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </section>
+                      <section className="detail-card">
+                        <h3>Gap</h3>
+                        <ul>
+                          {previewResult.matchPreview?.gaps.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </section>
+                      <section className="detail-card">
+                        <h3>제안</h3>
+                        <ul>
+                          {previewResult.matchPreview?.suggestions.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      </section>
+                    </div>
+                  }
+                />
+              </div>
+            </section>
+          </form>
         </section>
-      </section>
+      ) : (
+        <section className="interview-shell" aria-label="모의 면접 화면">
+          <section className="hero-card hero-card--compact">
+            <p className="hero-card__eyebrow">Mock Interview</p>
+            <h1>현재 이력서와 JD 맥락으로 예상 질문을 빠르게 준비하세요.</h1>
+            <p className="hero-card__copy">
+              홈에서 준비한 이력서와 JD 본문을 그대로 이어받고, 직무명만 보강해 질문 세트를
+              만듭니다.
+            </p>
+          </section>
+
+          <div className="interview-layout">
+            <section className="workspace-card">
+              <div className="workspace-card__header">
+                <div>
+                  <span>Interview Input</span>
+                  <h2>질문 생성 준비</h2>
+                </div>
+                <p>이력서와 JD 맥락은 유지되고, 대상 직무를 덧붙여 질문을 생성합니다.</p>
+              </div>
+
+              <div className="interview-form">
+                <label className="resume-input-group" htmlFor="job-title">
+                  <span className="resume-label">대상 직무</span>
+                  <input
+                    id="job-title"
+                    className="jd-url-input"
+                    type="text"
+                    value={jobTitle}
+                    placeholder="예: 백엔드 개발자"
+                    onChange={(event) => handleJobTitleChange(event.target.value)}
+                  />
+                </label>
+
+                <div className="context-note">
+                  <h3>연결된 분석 맥락</h3>
+                  <ul>
+                    <li>이력서 소스: {hasResumeSource ? '준비됨' : '먼저 홈에서 분석을 실행해 주세요.'}</li>
+                    <li>JD 본문: {jdText.trim() ? '준비됨' : '홈에서 JD를 입력해 주세요.'}</li>
+                  </ul>
+                </div>
+
+                <button
+                  className="diagnose-button"
+                  type="button"
+                  disabled={!hasResumeSource || isInterviewSubmitting}
+                  onClick={handleInterviewSubmit}
+                >
+                  {isInterviewSubmitting ? '질문 생성 중...' : '면접 질문 생성'}
+                </button>
+              </div>
+            </section>
+
+            <AnalysisPanel
+              badge="Interview"
+              title="모의 면접 질문"
+              description="질문 목록, 답변 전략, 요약을 한 번에 확인합니다."
+              result={interviewResult}
+              successContent={
+                <div className="interview-result">
+                  <p className="strategy-card">{interviewResult.interviewPreview?.strategy}</p>
+                  <div className="question-grid">
+                    {interviewResult.interviewPreview?.questions.map((question) => (
+                      <article className="question-card" key={question.question}>
+                        <span>{question.category}</span>
+                        <h3>{question.question}</h3>
+                        <p>{question.keypoints}</p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              }
+            />
+          </div>
+        </section>
+      )}
     </AppShell>
   )
 }

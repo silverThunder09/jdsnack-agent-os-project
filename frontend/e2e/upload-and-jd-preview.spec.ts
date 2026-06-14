@@ -9,12 +9,6 @@ const jdText =
   'Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구합니다.'
 const fetchedJdText =
   '백엔드 API 설계와 운영을 담당합니다. Spring Boot와 MySQL 경험이 필요합니다.'
-const resumeSummary = '백엔드 중심 경험은 분명하지만 성과 수치가 더 필요합니다.'
-
-async function expectJdInputsReady(page: import('@playwright/test').Page) {
-  await expect(page.getByLabel('입력 영역')).toBeVisible()
-  await expect(page.getByRole('textbox', { name: '주요업무' })).toBeVisible()
-}
 
 async function mockFixtureFlow(page: import('@playwright/test').Page) {
   await page.route('**/api/diagnose/file', async (route) => {
@@ -25,13 +19,12 @@ async function mockFixtureFlow(page: import('@playwright/test').Page) {
         success: true,
         data: {
           score: 78,
-          summary: resumeSummary,
+          summary: '백엔드 중심 경험은 분명하지만 성과 수치가 더 필요합니다.',
           strengths: ['Spring Boot API 구현 경험이 보입니다.'],
           improvements: ['프로젝트 결과를 수치로 보강해 주세요.'],
           sourceText:
             'Experienced backend engineer with Spring Boot REST API development, validation handling, and test automation delivery across projects.',
         },
-        timestamp: '2026-05-23T10:00:00.000+09:00',
       }),
     })
   })
@@ -50,7 +43,6 @@ async function mockFixtureFlow(page: import('@playwright/test').Page) {
           gaps: ['배포 관련 경험 또는 성과 근거가 이력서에서 약하게 보입니다.'],
           suggestions: ['배포 경험이 있다면 프로젝트 맥락, 사용 기술, 결과를 함께 적어 보세요.'],
         },
-        timestamp: '2026-05-23T10:01:00.000+09:00',
       }),
     })
   })
@@ -68,21 +60,10 @@ async function mockFixtureFlow(page: import('@playwright/test').Page) {
               category: 'technical',
               keypoints: '설계 이유, 테스트 방식, 운영 결과를 함께 말하세요.',
             },
-            {
-              question: '배포 경험에서 가장 어려웠던 문제는 무엇이었나요?',
-              category: 'experience',
-              keypoints: '문제 상황, 본인 역할, 해결 과정, 결과 수치를 준비하세요.',
-            },
-            {
-              question: '요구사항이 바뀌었을 때 어떻게 협업했나요?',
-              category: 'behavioral',
-              keypoints: '소통 방식, 우선순위 조정, 배운 점을 짧게 정리하세요.',
-            },
           ],
           strategy: '기술 질문은 의사결정 근거와 검증 방법 중심으로 답변하세요.',
           summary: '백엔드 직무 맥락의 모의 면접 질문을 생성했습니다.',
         },
-        timestamp: '2026-06-13T10:04:00.000+09:00',
       }),
     })
   })
@@ -102,7 +83,6 @@ async function mockJdFetchSuccess(page: import('@playwright/test').Page) {
           fetchMode: 'static-html',
           sourceSite: 'saramin',
         },
-        timestamp: '2026-05-25T10:02:00.000+09:00',
       }),
     })
   })
@@ -119,65 +99,50 @@ async function mockJdFetchFailure(page: import('@playwright/test').Page) {
           code: 'JD_FETCH_UNSUPPORTED_SOURCE',
           message: '지원하지 않는 JD 소스입니다.',
         },
-        timestamp: '2026-05-25T10:03:00.000+09:00',
       }),
     })
   })
 }
 
-test('PDF 업로드 후 JD 매칭 결과까지 확인한다', async ({ page }) => {
+test('PDF 업로드 후 통합 분석 결과를 확인한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await page.goto('/')
 
   await page.getByRole('tab', { name: 'PDF' }).click()
   await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('button', { name: '이력서 진단' }).click()
-
-  await expectJdInputsReady(page)
-
   await page.getByRole('textbox', { name: '주요업무' }).fill(jdText)
-  await page.getByRole('button', { name: 'JD 매칭' }).click()
+  await page.getByRole('button', { name: '분석 시작' }).click()
 
-  await expect(page.getByRole('heading', { name: 'JD 매칭' })).toBeVisible()
+  await expect(page.getByText('78점')).toBeVisible()
   await expect(page.getByText('76점')).toBeVisible()
 })
 
-test('매칭 리포트 후 모의 면접 질문을 생성한다', async ({ page }) => {
+test('모의 면접 목적지에서 질문을 생성한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await page.goto('/')
 
-  await page.getByRole('tab', { name: 'PDF' }).click()
-  await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('button', { name: '이력서 진단' }).click()
-
-  await expectJdInputsReady(page)
-
-  await page.getByRole('textbox', { name: '대상 직무' }).fill('백엔드 개발자')
+  await page.getByRole('tab', { name: 'DOCX' }).click()
+  await page.locator('#resume-file').setInputFiles(fixtureDocx)
   await page.getByRole('textbox', { name: '주요업무' }).fill(jdText)
-  await page.getByRole('button', { name: 'JD 매칭' }).click()
-
-  await expect(page.getByRole('heading', { name: 'JD 매칭' })).toBeVisible()
+  await page.getByRole('button', { name: '분석 시작' }).click()
+  await expect(page.getByText('78점')).toBeVisible()
+  await page.getByRole('button', { name: '모의 면접' }).click()
+  await page.getByLabel('대상 직무').fill('백엔드 개발자')
   await page.getByRole('button', { name: '면접 질문 생성' }).click()
 
-  await expect(page.getByRole('heading', { name: '모의 면접 질문', exact: true })).toBeVisible()
   await expect(page.getByText('Spring Boot API 설계 경험을 설명해 주세요.')).toBeVisible()
   await expect(
     page.getByText('기술 질문은 의사결정 근거와 검증 방법 중심으로 답변하세요.'),
   ).toBeVisible()
-  await expect(page.getByText('technical')).toBeVisible()
 })
 
-test('JD 링크 불러오기 성공 후 매칭 결과까지 확인한다', async ({ page }) => {
+test('JD 링크 불러오기 성공 후 통합 분석으로 이어진다', async ({ page }) => {
   await mockFixtureFlow(page)
   await mockJdFetchSuccess(page)
   await page.goto('/')
 
   await page.getByRole('tab', { name: 'PDF' }).click()
   await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('button', { name: '이력서 진단' }).click()
-
-  await expectJdInputsReady(page)
-
   await page.getByRole('textbox', { name: 'JD 링크' }).fill(
     'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1',
   )
@@ -185,61 +150,24 @@ test('JD 링크 불러오기 성공 후 매칭 결과까지 확인한다', async
 
   await expect(page.getByText('JD 본문을 불러왔습니다')).toBeVisible()
   await expect(page.getByRole('textbox', { name: '주요업무' })).toHaveValue(fetchedJdText)
-  await expect(page.locator('.status-message[aria-live="polite"]')).toContainText(
-    'JD 본문을 불러왔습니다',
-  )
 
-  await page
-    .getByRole('textbox', { name: '주요업무' })
-    .fill('수정한 JD 본문입니다. Spring Boot와 MySQL 운영 경험, 테스트 자동화 경험을 요구합니다.')
-
-  await page.getByRole('button', { name: 'JD 매칭' }).click()
-
-  await expect(page.getByRole('heading', { name: 'JD 매칭' })).toBeVisible()
+  await page.getByRole('button', { name: '분석 시작' }).click()
   await expect(page.getByText('76점')).toBeVisible()
 })
 
-test('JD 링크 실패 후 직접 입력으로 매칭 결과까지 복구한다', async ({ page }) => {
+test('JD 링크 실패 후 직접 입력으로 복구한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await mockJdFetchFailure(page)
   await page.goto('/')
 
   await page.getByRole('tab', { name: 'PDF' }).click()
   await page.locator('#resume-file').setInputFiles(fixturePdf)
-  await page.getByRole('button', { name: '이력서 진단' }).click()
-
-  await expectJdInputsReady(page)
-
-  const jdTextarea = page.getByRole('textbox', { name: '주요업무' })
-  await jdTextarea.fill(jdText)
+  await page.getByRole('textbox', { name: '주요업무' }).fill(jdText)
   await page.getByRole('textbox', { name: 'JD 링크' }).fill(
     'https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=2',
   )
   await page.getByRole('button', { name: 'JD 미리보기' }).click()
 
-  await expect(
-    page.getByText('불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.'),
-  ).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText(
-    '불러오지 못했습니다. JD 본문을 직접 붙여넣어 주세요.',
-  )
-  await expect(jdTextarea).toHaveValue(jdText)
-
-  await page.getByRole('button', { name: 'JD 매칭' }).click()
-
-  await expect(page.getByRole('heading', { name: 'JD 매칭' })).toBeVisible()
-  await expect(page.getByText('76점')).toBeVisible()
-})
-
-test('DOCX 업로드 후 대시보드 입력을 유지한다', async ({ page }) => {
-  await mockFixtureFlow(page)
-  await page.goto('/')
-
-  await page.getByRole('tab', { name: 'DOCX' }).click()
-  await page.locator('#resume-file').setInputFiles(fixtureDocx)
-  await page.getByRole('button', { name: '이력서 진단' }).click()
-
-  await expectJdInputsReady(page)
-  await expect(page.getByRole('heading', { name: '이력서 진단' })).toBeVisible()
-  await expect(page.getByText('78점')).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('JD 링크에서 본문을 가져오지 못했습니다')
+  await expect(page.getByRole('textbox', { name: '주요업무' })).toHaveValue(jdText)
 })
