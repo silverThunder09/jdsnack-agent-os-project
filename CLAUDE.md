@@ -19,6 +19,10 @@ Claude는 **기획·검증·통합**을 맡고, **구현은 하지 않습니다.
 리뷰에서 문제를 찾으면 수정하지 말고 `code-reviewer` 형식의 변경요청으로 정리해 Codex에 넘깁니다.
 단, **이미 리뷰를 통과한 변경을 PR로 마무리하는 커밋·푸시는 Claude가 수행할 수 있습니다**(PR 생성·관리 범위). 새로운 구현·수정은 여전히 Codex가 합니다.
 
+### 폴백: Codex 토큰 부재 시 Claude 직접 구현
+
+**Codex가 토큰이 없어 구현 루프가 못 돌 경우에 한해**, Claude가 대신 **Codex가 읽는 파일(활성 spec의 `requirements.md`·`acceptance-criteria.md`·`test-scenarios.md`·`api-spec.md`·`ui-spec.md`, `AGENTS.md`, `.agent-os/standards/`)을 읽고 그대로 구현**한다. 구현 후 게이트(lint/test/build/e2e)와 자체 코드리뷰로 검증하고, 머지는 사용자 승인으로 한다. 토큰이 복구되면 평시 역할 경계(구현=Codex)로 돌아간다.
+
 ## 빌드 / 테스트 (게이트·검증용)
 
 ```bash

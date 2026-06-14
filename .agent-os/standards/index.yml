@@ -48,6 +48,6 @@ documents:
     - scripts/smoke-test.sh
     - scripts/google-test.sh
 active_specs:
-  - .agent-os/specs/2026-06-14-frontend-saas-shell-redesign
+  - .agent-os/specs/2026-06-14-frontend-analysis-start-page
 archived_specs:
   - .agent-os/archive/specs
