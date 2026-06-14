@@ -1,101 +1,88 @@
-import type { FormEvent, ReactNode, RefObject } from 'react'
+import type { ChangeEvent, DragEvent, ReactNode, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
-import { DiagnoseButton } from './components/DiagnoseButton'
-import { JdInputFields } from './components/JdInputFields'
-import { ResumeFileInput } from './components/ResumeFileInput'
-import { ResumeInput } from './components/ResumeInput'
-import { ResumeModeTabs } from './components/ResumeModeTabs'
 import { StatusMessage } from './components/StatusMessage'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
-import { useMatchPreview } from './hooks/useMatchPreview'
-import type { JdFetchResult, JdSections, ResumeInputMode, ResultState } from './types/diagnosis'
+import { useMatchPreview, validateJdText } from './hooks/useMatchPreview'
+import type { ResultState, ResumeInputMode } from './types/diagnosis'
 import './App.css'
 
-const LOCAL_STORAGE_KEY = 'jdsnack.resume-text'
-const MIN_LENGTH = 50
-const MAX_LENGTH = 10_000
+type JdTab = 'link' | 'paste'
+type AnalysisPhase = 'input' | 'result'
+type AnalysisOptionKey = 'jdMatch' | 'ats' | 'sentence' | 'keyword'
 
-const emptyJdSections: JdSections = {
-  responsibilities: '',
-  qualifications: '',
-  preferredQualifications: '',
-  experience: '',
-}
+const JD_MAX_LENGTH = 30_000
 
-function joinJdSections(sections: JdSections): string {
-  return [
-    ['주요업무', sections.responsibilities],
-    ['자격조건', sections.qualifications],
-    ['우대사항', sections.preferredQualifications],
-    ['경력사항', sections.experience],
-  ]
-    .filter(([, value]) => value.trim())
-    .map(([label, value]) => `[${label}]\n${value.trim()}`)
-    .join('\n\n')
-}
+const ANALYSIS_OPTIONS: {
+  key: AnalysisOptionKey
+  label: string
+  description: string
+  recommended: boolean
+  enabled: boolean
+}[] = [
+  {
+    key: 'jdMatch',
+    label: 'JD 적합도',
+    description: '이력서와 JD의 핵심 키워드 및 역량 적합도를 분석합니다.',
+    recommended: true,
+    enabled: true,
+  },
+  {
+    key: 'ats',
+    label: 'ATS 분석',
+    description: 'ATS 통과 가능성과 포맷, 키워드 최적화 여부를 분석합니다.',
+    recommended: true,
+    enabled: false,
+  },
+  {
+    key: 'sentence',
+    label: '문장 첨삭',
+    description: '문장 표현, 가독성, 문법 및 전문성 향상을 제안합니다.',
+    recommended: false,
+    enabled: false,
+  },
+  {
+    key: 'keyword',
+    label: '키워드 분석',
+    description: '주요 키워드 누락 여부와 활용도를 분석합니다.',
+    recommended: false,
+    enabled: false,
+  },
+]
 
-function pickSectionValue(text: string, starts: string[], stops: string[]) {
-  const normalized = text.replace(/\r/g, '')
-  const match = normalized.match(
-    new RegExp(
-      `(?:${starts.join('|')})\\s*[:：]?\\s*([\\s\\S]*?)(?=\\n\\s*(?:${stops.join('|')})\\s*[:：]?|$)`,
-      'i',
-    ),
-  )
+const PROGRESS_STEPS = [
+  { title: '채용 공고(JD) 수집', description: '링크 또는 내용을 통해 JD를 분석합니다.' },
+  { title: '이력서 파싱', description: '이력서의 경력, 스킬, 경험을 추출합니다.' },
+  { title: 'AI 종합 분석', description: '적합도, ATS, 첨삭 등 항목별 분석 수행' },
+  { title: '결과 제공', description: '맞춤형 인사이트와 개선안을 제공합니다.' },
+]
 
-  return match?.[1]?.trim() ?? ''
-}
+const ACCURACY_TIPS = [
+  '원본 JD 전체 내용을 제공해 주세요.',
+  '최신 이력서를 업로드해 주세요.',
+  '경력 및 성과는 구체적으로 작성된 이력서일수록 정확도가 높아집니다.',
+]
 
-function classifyJdText(jdText: string): JdSections {
-  const responsibilities = pickSectionValue(
-    jdText,
-    ['주요\\s*업무', '담당\\s*업무', '업무\\s*내용', '직무\\s*내용'],
-    ['자격\\s*요건', '자격\\s*조건', '지원\\s*자격', '우대\\s*사항', '경력\\s*사항', '근무\\s*조건'],
-  )
-  const qualifications = pickSectionValue(
-    jdText,
-    ['자격\\s*요건', '자격\\s*조건', '지원\\s*자격', '필수\\s*요건'],
-    ['우대\\s*사항', '경력\\s*사항', '근무\\s*조건', '주요\\s*업무', '담당\\s*업무'],
-  )
-  const preferredQualifications = pickSectionValue(
-    jdText,
-    ['우대\\s*사항', '우대\\s*요건', '우대\\s*조건'],
-    ['경력\\s*사항', '근무\\s*조건', '주요\\s*업무', '담당\\s*업무', '자격\\s*요건'],
-  )
-  const experience = pickSectionValue(
-    jdText,
-    ['경력\\s*사항', '경력\\s*요건', '경력'],
-    ['우대\\s*사항', '근무\\s*조건', '주요\\s*업무', '담당\\s*업무', '자격\\s*요건'],
-  )
-
-  return {
-    responsibilities: responsibilities || jdText.trim(),
-    qualifications,
-    preferredQualifications,
-    experience,
+function inferResumeMode(file: File): ResumeInputMode | null {
+  const name = file.name.toLowerCase()
+  if (name.endsWith('.pdf')) {
+    return 'pdf'
   }
+  if (name.endsWith('.docx')) {
+    return 'docx'
+  }
+  return null
 }
 
-function mergeFetchedSections(current: JdSections, fetched: JdFetchResult): JdSections {
-  const fallback = classifyJdText(fetched.jdText)
-  const next = fetched.sections ?? fallback
-
-  return {
-    responsibilities: current.responsibilities.trim()
-      ? current.responsibilities
-      : (next.responsibilities ?? fallback.responsibilities),
-    qualifications: current.qualifications.trim()
-      ? current.qualifications
-      : (next.qualifications ?? fallback.qualifications),
-    preferredQualifications: current.preferredQualifications.trim()
-      ? current.preferredQualifications
-      : (next.preferredQualifications ?? fallback.preferredQualifications),
-    experience: current.experience.trim()
-      ? current.experience
-      : (next.experience ?? fallback.experience),
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`
   }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(0)} KB`
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function EmptyState({ title, message }: { title: string; message: string }) {
@@ -161,27 +148,14 @@ function AnalysisPanel({
         </div>
       </div>
 
-      {result.status === 'idle' ? (
-        <EmptyState title="아직 결과가 없습니다" message={description} />
-      ) : null}
+      {result.status === 'idle' ? <EmptyState title="아직 결과가 없습니다" message={description} /> : null}
 
       {result.status === 'loading' ? (
-        <StatusMessage
-          badge="Processing"
-          title={result.title}
-          message={result.message}
-          tone="active"
-          withLoadingBar
-        />
+        <StatusMessage badge="Processing" title={result.title} message={result.message} tone="active" withLoadingBar />
       ) : null}
 
       {result.status === 'not-enabled' ? (
-        <StatusMessage
-          badge="Not Enabled"
-          title={result.title}
-          message={result.message}
-          tone="success"
-        />
+        <StatusMessage badge="Not Enabled" title={result.title} message={result.message} tone="success" />
       ) : null}
 
       {result.status === 'error' ? (
@@ -193,209 +167,456 @@ function AnalysisPanel({
   )
 }
 
+function ComingSoonPanel({ title, description }: { title: string; description: string }) {
+  return (
+    <section className="preview-panel">
+      <div className="preview-panel__header">
+        <span>준비중</span>
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+      </div>
+      <StatusMessage
+        badge="Coming Soon"
+        title="준비 중인 분석입니다"
+        message="이 분석 항목은 현재 준비 중입니다. 곧 제공될 예정이에요."
+        tone="neutral"
+      />
+    </section>
+  )
+}
+
 function App() {
   const [currentView, setCurrentView] = useState<'home' | 'interview'>('home')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [inputMode, setInputMode] = useState<ResumeInputMode>('text')
-  const [resumeText, setResumeText] = useState(() => {
-    if (typeof window === 'undefined') {
-      return ''
-    }
-
-    return window.localStorage.getItem(LOCAL_STORAGE_KEY) ?? ''
-  })
-  const [resumeFile, setResumeFile] = useState<File | null>(null)
-  const [jdSections, setJdSections] = useState<JdSections>(emptyJdSections)
+  const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('input')
+  const [jdTab, setJdTab] = useState<JdTab>('link')
   const [jdUrl, setJdUrl] = useState('')
+  const [jdText, setJdText] = useState('')
+  const [resumeFile, setResumeFile] = useState<File | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [options, setOptions] = useState<Record<AnalysisOptionKey, boolean>>({
+    jdMatch: true,
+    ats: true,
+    sentence: true,
+    keyword: true,
+  })
+  const [formError, setFormError] = useState('')
+  const [submittedOptions, setSubmittedOptions] = useState<Record<AnalysisOptionKey, boolean>>({
+    jdMatch: false,
+    ats: false,
+    sentence: false,
+    keyword: false,
+  })
   const [jobTitle, setJobTitle] = useState('')
-  const [isJdAutofilled, setIsJdAutofilled] = useState(false)
   const resultRef = useRef<HTMLElement>(null)
+
+  const { result: diagnoseResult, submitFile, resetResult: resetDiagnose } = useDiagnose()
   const {
-    clearInlineError,
-    inlineError,
-    isSubmitting,
-    resetResult,
-    result,
-    submit,
-    submitFile,
-  } = useDiagnose()
-  const {
-    clearErrors: clearJdErrors,
     fetchJd,
     isFetchingJd,
     isSubmitting: isPreviewSubmitting,
     jdFetchState,
-    jdTextError,
-    jdUrlError,
-    resetJdFetchState,
-    resetResult: resetPreviewResult,
+    resetResult: resetPreview,
     result: previewResult,
     submit: submitPreview,
   } = useMatchPreview()
   const {
     isSubmitting: isInterviewSubmitting,
-    resetResult: resetInterviewResult,
     result: interviewResult,
     submit: submitInterview,
   } = useInterviewPreview()
 
-  const trimmedLength = resumeText.trim().length
-  const trimmedResumeText = resumeText.trim()
-  const jdText = joinJdSections(jdSections)
-  const hasResumeSource =
-    inputMode === 'text'
-      ? trimmedLength >= MIN_LENGTH && trimmedLength <= MAX_LENGTH
-      : Boolean(result.status === 'success' && result.diagnosis?.sourceText)
-  const canStartAnalysis =
-    inputMode === 'text'
-      ? trimmedLength >= MIN_LENGTH && Boolean(jdText.trim())
-      : Boolean(resumeFile) && Boolean(jdText.trim())
+  const trimmedJd = jdText.trim()
+  const hasResumeSource = Boolean(diagnoseResult.status === 'success' && diagnoseResult.diagnosis?.sourceText)
+  const selectedOptionKeys = ANALYSIS_OPTIONS.filter((option) => options[option.key]).map(
+    (option) => option.key,
+  )
+  const canStart = Boolean(resumeFile) && Boolean(trimmedJd) && selectedOptionKeys.length > 0
 
   useEffect(() => {
-    window.localStorage.setItem(LOCAL_STORAGE_KEY, resumeText)
-  }, [resumeText])
-
-  useEffect(() => {
-    if (
-      result.status === 'success' ||
-      result.status === 'not-enabled' ||
-      result.status === 'error' ||
-      previewResult.status === 'success' ||
-      previewResult.status === 'error'
-    ) {
+    if (analysisPhase === 'result') {
       resultRef.current?.focus()
     }
-  }, [previewResult.status, result.status])
+  }, [analysisPhase])
 
-  const resetDownstreamResults = () => {
-    if (previewResult.status !== 'idle' && previewResult.status !== 'loading') {
-      resetPreviewResult()
-    }
-    if (interviewResult.status !== 'idle' && interviewResult.status !== 'loading') {
-      resetInterviewResult()
-    }
+  const handleJdUrlChange = (value: string) => {
+    setJdUrl(value)
+    setFormError('')
   }
 
-  const handleResumeChange = (nextValue: string) => {
-    setResumeText(nextValue)
-    if (inlineError) {
-      clearInlineError()
-    }
-    if (result.status !== 'idle' && result.status !== 'loading') {
-      resetResult()
-    }
-    resetDownstreamResults()
-  }
-
-  const handleModeChange = (nextMode: ResumeInputMode) => {
-    setInputMode(nextMode)
-    setResumeFile(null)
-    clearInlineError()
-    if (result.status !== 'idle' && result.status !== 'loading') {
-      resetResult()
-    }
-    resetDownstreamResults()
-  }
-
-  const handleFileChange = (nextFile: File | null) => {
-    setResumeFile(nextFile)
-    clearInlineError()
-    if (result.status !== 'idle' && result.status !== 'loading') {
-      resetResult()
-    }
-    resetDownstreamResults()
-  }
-
-  const handleJdSectionChange = (section: keyof JdSections, nextValue: string) => {
-    setJdSections((current) => ({
-      ...current,
-      [section]: nextValue,
-    }))
-    setIsJdAutofilled(false)
-    if (jdTextError || jdUrlError) {
-      clearJdErrors()
-    }
-    if (jdFetchState.status !== 'idle') {
-      resetJdFetchState()
-    }
-    resetDownstreamResults()
-  }
-
-  const handleJdUrlChange = (nextValue: string) => {
-    setJdUrl(nextValue)
-    if (jdTextError || jdUrlError) {
-      clearJdErrors()
-    }
-    if (jdFetchState.status !== 'idle') {
-      resetJdFetchState()
-    }
-    resetDownstreamResults()
-  }
-
-  const handleJobTitleChange = (nextValue: string) => {
-    setJobTitle(nextValue)
-    if (interviewResult.status !== 'idle' && interviewResult.status !== 'loading') {
-      resetInterviewResult()
-    }
+  const handleJdTextChange = (value: string) => {
+    setJdText(value.slice(0, JD_MAX_LENGTH))
+    setFormError('')
   }
 
   const handleJdFetch = async () => {
     await fetchJd(jdUrl, {
-      onBeforeChange: resetDownstreamResults,
       onFetched: (fetched) => {
-        setJdSections((current) => mergeFetchedSections(current, fetched))
-        setIsJdAutofilled(true)
+        setJdText(fetched.jdText.slice(0, JD_MAX_LENGTH))
       },
     })
   }
 
-  const handleAnalysisSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const setFile = (file: File | null) => {
+    setResumeFile(file)
+    setFormError('')
+  }
 
-    if (inputMode === 'text') {
-      await submit(resumeText)
-      await submitPreview({
-        resumeSource: {
-          type: 'TEXT',
-          value: trimmedResumeText,
-        },
-        jdText,
-        jdUrl: jdUrl.trim(),
-      })
+  const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
+    setFile(event.target.files?.[0] ?? null)
+  }
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    setIsDragging(false)
+    const dropped = event.dataTransfer.files?.[0]
+    if (dropped) {
+      setFile(dropped)
+    }
+  }
+
+  const toggleOption = (key: AnalysisOptionKey) => {
+    setOptions((current) => ({ ...current, [key]: !current[key] }))
+    setFormError('')
+  }
+
+  const handleStartAnalysis = async () => {
+    if (!resumeFile) {
+      setFormError('이력서 파일을 업로드해 주세요.')
+      return
+    }
+    const mode = inferResumeMode(resumeFile)
+    if (!mode) {
+      setFormError('지원하지 않는 파일 형식입니다. PDF 또는 DOCX 파일을 올려 주세요.')
+      return
+    }
+    const jdError = validateJdText(jdText)
+    if (jdError) {
+      setFormError(jdError)
+      return
+    }
+    if (selectedOptionKeys.length === 0) {
+      setFormError('분석 항목을 1개 이상 선택해 주세요.')
       return
     }
 
-    const diagnosisOutcome = await submitFile(inputMode, resumeFile)
+    setFormError('')
+    setSubmittedOptions({ ...options })
+    resetDiagnose()
+    resetPreview()
+    setAnalysisPhase('result')
 
-    if (diagnosisOutcome.ok && diagnosisOutcome.diagnosis?.sourceText) {
-      await submitPreview({
-        resumeSource: {
-          type: 'FILE',
-          value: diagnosisOutcome.diagnosis.sourceText,
-        },
-        jdText,
-        jdUrl: jdUrl.trim(),
-      })
+    if (options.jdMatch) {
+      const outcome = await submitFile(mode, resumeFile)
+      if (outcome.ok && outcome.diagnosis?.sourceText) {
+        await submitPreview({
+          resumeSource: { type: 'FILE', value: outcome.diagnosis.sourceText },
+          jdText: trimmedJd,
+          jdUrl: jdUrl.trim(),
+        })
+      }
     }
+  }
+
+  const handleNewAnalysis = () => {
+    setAnalysisPhase('input')
+    resetDiagnose()
+    resetPreview()
   }
 
   const handleInterviewSubmit = async () => {
     const resumeSource =
-      inputMode === 'text'
-        ? trimmedResumeText
-        : result.status === 'success' && result.diagnosis?.sourceText
-          ? result.diagnosis.sourceText
-          : ''
-
+      diagnoseResult.status === 'success' && diagnoseResult.diagnosis?.sourceText
+        ? diagnoseResult.diagnosis.sourceText
+        : ''
     await submitInterview({
-      resumeSource: {
-        type: inputMode === 'text' ? 'TEXT' : 'FILE',
-        value: resumeSource,
-      },
+      resumeSource: { type: 'FILE', value: resumeSource },
       jobTitle: jobTitle.trim(),
-      jdText,
+      jdText: trimmedJd,
     })
   }
+
+  const renderInputView = () => (
+    <section className="start-page" aria-label="새로운 분석 시작">
+      <header className="start-page__head">
+        <p className="start-page__eyebrow">분석 시작</p>
+        <h1>새로운 분석 시작</h1>
+        <p className="start-page__sub">채용 공고와 이력서를 연결하여 합격 가능성을 높이세요.</p>
+      </header>
+
+      <div className="start-layout">
+        <div className="start-main">
+          <section className="step-card" aria-label="채용 공고 입력">
+            <h2 className="step-card__title">
+              <span className="step-badge">1</span> 채용 공고 (JD) 입력
+            </h2>
+            <div className="jd-tabs" role="tablist" aria-label="JD 입력 방식">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={jdTab === 'link'}
+                className={`jd-tab${jdTab === 'link' ? ' jd-tab--active' : ''}`}
+                onClick={() => setJdTab('link')}
+              >
+                JD 링크
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={jdTab === 'paste'}
+                className={`jd-tab${jdTab === 'paste' ? ' jd-tab--active' : ''}`}
+                onClick={() => setJdTab('paste')}
+              >
+                JD 내용 붙여넣기
+              </button>
+            </div>
+
+            {jdTab === 'link' ? (
+              <div className="jd-link-row">
+                <label className="field-label" htmlFor="jd-url">
+                  채용 공고 URL
+                </label>
+                <div className="jd-link-controls">
+                  <input
+                    id="jd-url"
+                    className="text-input"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://careers.sample.com/jobs/123456"
+                    value={jdUrl}
+                    onChange={(event) => handleJdUrlChange(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={handleJdFetch}
+                    disabled={isFetchingJd || !jdUrl.trim()}
+                  >
+                    {isFetchingJd ? '불러오는 중...' : 'JD 불러오기'}
+                  </button>
+                </div>
+                <p className="field-help">지원하는 사이트: 사람인 등 정적 채용 공고. 그 외 링크는 본문 붙여넣기로 진행하세요.</p>
+                {jdFetchState.status !== 'idle' ? (
+                  <p className={`field-help field-help--${jdFetchState.status}`} role={jdFetchState.status === 'fetch-error' ? 'alert' : undefined}>
+                    {jdFetchState.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {jdTab === 'paste' ? (
+              <div className="jd-paste-row">
+                <label className="field-label" htmlFor="jd-text">
+                  JD 내용 붙여넣기
+                </label>
+                <textarea
+                  id="jd-text"
+                  className="text-area"
+                  placeholder="채용 공고의 전체 내용을 복사하여 붙여넣어 주세요."
+                  value={jdText}
+                  onChange={(event) => handleJdTextChange(event.target.value)}
+                  rows={8}
+                />
+                <p className="char-count">
+                  {jdText.length.toLocaleString()} / {JD_MAX_LENGTH.toLocaleString()}
+                </p>
+              </div>
+            ) : null}
+
+            {jdTab === 'link' && trimmedJd ? (
+              <p className="field-help field-help--fetched">불러온 JD 본문이 준비되었습니다. ‘JD 내용 붙여넣기’ 탭에서 확인·수정할 수 있습니다.</p>
+            ) : null}
+          </section>
+
+          <section className="step-card" aria-label="이력서 업로드">
+            <h2 className="step-card__title">
+              <span className="step-badge">2</span> 이력서 업로드
+            </h2>
+            <div
+              className={`dropzone${isDragging ? ' dropzone--active' : ''}`}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setIsDragging(true)
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+            >
+              <span className="dropzone__icon" aria-hidden="true">
+                ⬆
+              </span>
+              <p className="dropzone__title">이력서 파일을 드래그하거나 클릭하여 업로드하세요</p>
+              <p className="dropzone__hint">PDF, DOCX 파일을 지원합니다. (최대 10MB)</p>
+              <label className="file-select-button" htmlFor="resume-file">
+                파일 선택
+              </label>
+              <input
+                id="resume-file"
+                className="sr-only"
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={handleFileInput}
+              />
+            </div>
+            {resumeFile ? (
+              <div className="file-chip">
+                <div className="file-chip__info">
+                  <span className="file-chip__name">{resumeFile.name}</span>
+                  <span className="file-chip__meta">{formatFileSize(resumeFile.size)}</span>
+                </div>
+                <button type="button" className="file-chip__remove" aria-label="파일 제거" onClick={() => setFile(null)}>
+                  ✕
+                </button>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="step-card" aria-label="분석 옵션 선택">
+            <h2 className="step-card__title">
+              <span className="step-badge">3</span> 분석 옵션 선택
+            </h2>
+            <p className="step-card__desc">필요한 분석 항목을 선택하세요. 선택한 항목에 따라 분석 결과가 제공됩니다.</p>
+            <div className="option-grid">
+              {ANALYSIS_OPTIONS.map((option) => (
+                <label
+                  key={option.key}
+                  className={`option-card${options[option.key] ? ' option-card--checked' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={options[option.key]}
+                    onChange={() => toggleOption(option.key)}
+                  />
+                  <span className="option-card__body">
+                    <span className="option-card__title">
+                      {option.label}
+                      {option.recommended ? <span className="option-tag option-tag--rec">추천</span> : null}
+                      {!option.enabled ? <span className="option-tag option-tag--soon">준비중</span> : null}
+                    </span>
+                    <span className="option-card__desc">{option.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {formError ? (
+              <p className="form-error" role="alert">
+                {formError}
+              </p>
+            ) : null}
+
+            <div className="start-cta">
+              <button
+                type="button"
+                className="cta-button"
+                disabled={!canStart || isPreviewSubmitting}
+                onClick={handleStartAnalysis}
+              >
+                {isPreviewSubmitting ? '분석 중...' : '분석 시작하기 →'}
+              </button>
+            </div>
+            <p className="start-footer">🔒 입력하신 정보는 안전하게 처리되며, 분석 후 즉시 삭제됩니다.</p>
+          </section>
+        </div>
+
+        <aside className="start-rail" aria-label="분석 안내">
+          <section className="rail-card">
+            <h3>분석이 이렇게 진행돼요</h3>
+            <ol className="rail-steps">
+              {PROGRESS_STEPS.map((step, index) => (
+                <li key={step.title}>
+                  <span className="rail-steps__num">{index + 1}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{step.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="rail-card">
+            <h3>💡 분석 정확도를 높이는 팁</h3>
+            <ul className="rail-tips">
+              {ACCURACY_TIPS.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="rail-card">
+            <h3>지원 가능한 파일 형식</h3>
+            <div className="format-chips">
+              <span className="format-chip">PDF</span>
+              <span className="format-chip">DOCX</span>
+            </div>
+            <p className="rail-note">최대 10MB까지 업로드 가능합니다.</p>
+          </section>
+        </aside>
+      </div>
+    </section>
+  )
+
+  const renderResultView = () => (
+    <section className="result-page" aria-label="분석 결과" ref={resultRef} tabIndex={-1}>
+      <header className="result-page__head">
+        <div>
+          <p className="start-page__eyebrow">분석 결과</p>
+          <h1>분석 결과</h1>
+        </div>
+        <button type="button" className="ghost-button" onClick={handleNewAnalysis}>
+          새 분석
+        </button>
+      </header>
+
+      {submittedOptions.jdMatch ? (
+        <div className="summary-grid">
+          <SummaryCard
+            label="JD 적합도"
+            score={previewResult.matchPreview?.matchingScore}
+            summary={previewResult.matchPreview?.summary}
+            description="JD와 이력서 적합도를 계산하고 있습니다."
+          />
+        </div>
+      ) : null}
+
+      <div className="preview-grid">
+        {submittedOptions.jdMatch ? (
+          <AnalysisPanel
+            badge="JD Match"
+            title="JD 적합도"
+            description="공고 강점과 gap, 보강 제안을 함께 확인하세요."
+            result={previewResult}
+            successContent={
+              <div className="detail-list-grid detail-list-grid--triple">
+                <section className="detail-card">
+                  <h3>강점</h3>
+                  <ul>{previewResult.matchPreview?.strengths.map((item) => <li key={item}>{item}</li>)}</ul>
+                </section>
+                <section className="detail-card">
+                  <h3>Gap</h3>
+                  <ul>{previewResult.matchPreview?.gaps.map((item) => <li key={item}>{item}</li>)}</ul>
+                </section>
+                <section className="detail-card">
+                  <h3>제안</h3>
+                  <ul>{previewResult.matchPreview?.suggestions.map((item) => <li key={item}>{item}</li>)}</ul>
+                </section>
+              </div>
+            }
+          />
+        ) : null}
+
+        {submittedOptions.ats ? <ComingSoonPanel title="ATS 분석" description="ATS 통과 가능성과 포맷 최적화." /> : null}
+        {submittedOptions.sentence ? (
+          <ComingSoonPanel title="문장 첨삭" description="문장 표현·가독성·문법 개선 제안." />
+        ) : null}
+        {submittedOptions.keyword ? (
+          <ComingSoonPanel title="키워드 분석" description="주요 키워드 누락·활용도 분석." />
+        ) : null}
+      </div>
+    </section>
+  )
 
   return (
     <AppShell
@@ -408,172 +629,18 @@ function App() {
       onToggleSidebar={() => setIsSidebarOpen((current) => !current)}
     >
       {currentView === 'home' ? (
-        <section className="home-shell" aria-label="홈 분석 화면">
-          <section className="hero-card">
-            <p className="hero-card__eyebrow">AI 기반 이력서 분석·최적화</p>
-            <h1>공고와 이력서를 연결하고, 합격 가능성을 더 선명하게 보세요.</h1>
-            <p className="hero-card__copy">
-              JD와 이력서를 한 번에 넣으면 진단 점수와 JD 적합도를 함께 보여줍니다. 입력값은
-              그대로 유지돼 바로 다듬고 다시 실행할 수 있습니다.
-            </p>
-          </section>
-
-          <form className="analysis-grid" onSubmit={handleAnalysisSubmit}>
-            <section className="workspace-card" aria-label="통합 입력 영역">
-              <div className="workspace-card__header">
-                <div>
-                  <span>Integrated Input</span>
-                  <h2>한 번에 분석 준비</h2>
-                </div>
-                <p>JD 링크/본문과 이력서를 한 입력 흐름으로 정리합니다.</p>
-              </div>
-
-              <div className="workspace-card__body">
-                <section className="input-card">
-                  <div className="section-title-row">
-                    <h2>채용 공고</h2>
-                    <span>JD 링크 또는 직접 입력</span>
-                  </div>
-                  <JdInputFields
-                    jdSections={jdSections}
-                    jdUrl={jdUrl}
-                    isJdAutofilled={isJdAutofilled}
-                    jdFetchStatus={jdFetchState.status}
-                    jdFetchTitle={jdFetchState.title}
-                    jdFetchMessage={jdFetchState.message}
-                    jdTextError={jdTextError}
-                    jdUrlError={jdUrlError}
-                    isFetchingJd={isFetchingJd}
-                    onJdSectionChange={handleJdSectionChange}
-                    onJdUrlChange={handleJdUrlChange}
-                    onJdFetch={handleJdFetch}
-                  />
-                </section>
-
-                <section className="input-card">
-                  <div className="section-title-row">
-                    <h2>이력서</h2>
-                    <span>Text / PDF / DOCX</span>
-                  </div>
-                  <ResumeModeTabs mode={inputMode} onChange={handleModeChange} />
-                  {inputMode === 'text' ? (
-                    <ResumeInput
-                      value={resumeText}
-                      onChange={handleResumeChange}
-                      minLength={MIN_LENGTH}
-                      maxLength={MAX_LENGTH}
-                      currentLength={trimmedLength}
-                      errorMessage={inlineError}
-                    />
-                  ) : (
-                    <ResumeFileInput
-                      mode={inputMode}
-                      file={resumeFile}
-                      errorMessage={inlineError}
-                      onChange={handleFileChange}
-                    />
-                  )}
-                </section>
-              </div>
-
-              <div className="workspace-card__footer">
-                <DiagnoseButton
-                  isSubmitting={isSubmitting || isPreviewSubmitting}
-                  idleLabel="분석 시작"
-                  loadingLabel="분석 중..."
-                  disabled={!canStartAnalysis}
-                />
-              </div>
-            </section>
-
-            <section className="results-card" aria-label="분석 결과 영역" ref={resultRef} tabIndex={-1}>
-              <div className="results-card__header">
-                <div>
-                  <span>Outcome</span>
-                  <h2>분석 리포트</h2>
-                </div>
-                <p>이력서 진단과 JD 적합도를 나란히 읽고 다음 수정 포인트를 확인하세요.</p>
-              </div>
-
-              <div className="summary-grid">
-                <SummaryCard
-                  label="이력서 진단 점수"
-                  score={result.diagnosis?.score}
-                  summary={result.diagnosis?.summary}
-                  description="분석 전에는 점수 대신 입력 안내를 보여줍니다."
-                />
-                <SummaryCard
-                  label="JD 적합도"
-                  score={previewResult.matchPreview?.matchingScore}
-                  summary={previewResult.matchPreview?.summary}
-                  description="JD와 이력서가 함께 준비되면 적합도를 계산합니다."
-                />
-              </div>
-
-              <div className="preview-grid">
-                <AnalysisPanel
-                  badge="Resume"
-                  title="이력서 진단"
-                  description="강점과 개선 포인트를 먼저 읽어보세요."
-                  result={result}
-                  successContent={
-                    <div className="detail-list-grid">
-                      <section className="detail-card">
-                        <h3>강점</h3>
-                        <ul>
-                          {result.diagnosis?.strengths.map((item) => <li key={item}>{item}</li>)}
-                        </ul>
-                      </section>
-                      <section className="detail-card">
-                        <h3>개선</h3>
-                        <ul>
-                          {result.diagnosis?.improvements.map((item) => <li key={item}>{item}</li>)}
-                        </ul>
-                      </section>
-                    </div>
-                  }
-                />
-
-                <AnalysisPanel
-                  badge="JD Match"
-                  title="JD 매칭 프리뷰"
-                  description="공고 강점과 gap, 보강 제안을 함께 확인하세요."
-                  result={previewResult}
-                  successContent={
-                    <div className="detail-list-grid detail-list-grid--triple">
-                      <section className="detail-card">
-                        <h3>강점</h3>
-                        <ul>
-                          {previewResult.matchPreview?.strengths.map((item) => <li key={item}>{item}</li>)}
-                        </ul>
-                      </section>
-                      <section className="detail-card">
-                        <h3>Gap</h3>
-                        <ul>
-                          {previewResult.matchPreview?.gaps.map((item) => <li key={item}>{item}</li>)}
-                        </ul>
-                      </section>
-                      <section className="detail-card">
-                        <h3>제안</h3>
-                        <ul>
-                          {previewResult.matchPreview?.suggestions.map((item) => <li key={item}>{item}</li>)}
-                        </ul>
-                      </section>
-                    </div>
-                  }
-                />
-              </div>
-            </section>
-          </form>
-        </section>
+        analysisPhase === 'input' ? (
+          renderInputView()
+        ) : (
+          renderResultView()
+        )
       ) : (
         <section className="interview-shell" aria-label="모의 면접 화면">
           <section className="hero-card hero-card--compact">
             <p className="hero-card__eyebrow">Mock Interview</p>
             <h1>현재 이력서와 JD 맥락으로 예상 질문을 빠르게 준비하세요.</h1>
             <p className="hero-card__copy">
-              홈에서 준비한 이력서와 JD 본문을 그대로 이어받고, 직무명만 보강해 질문 세트를
-              만듭니다.
+              분석에서 추출한 이력서 본문과 JD를 그대로 이어받고, 직무명만 보강해 질문 세트를 만듭니다.
             </p>
           </section>
 
@@ -584,7 +651,7 @@ function App() {
                   <span>Interview Input</span>
                   <h2>질문 생성 준비</h2>
                 </div>
-                <p>이력서와 JD 맥락은 유지되고, 대상 직무를 덧붙여 질문을 생성합니다.</p>
+                <p>분석 단계에서 만든 이력서·JD 맥락을 이어받아 질문을 생성합니다.</p>
               </div>
 
               <div className="interview-form">
@@ -592,11 +659,11 @@ function App() {
                   <span className="resume-label">대상 직무</span>
                   <input
                     id="job-title"
-                    className="jd-url-input"
+                    className="text-input"
                     type="text"
                     value={jobTitle}
                     placeholder="예: 백엔드 개발자"
-                    onChange={(event) => handleJobTitleChange(event.target.value)}
+                    onChange={(event) => setJobTitle(event.target.value)}
                   />
                 </label>
 
@@ -604,7 +671,7 @@ function App() {
                   <h3>연결된 분석 맥락</h3>
                   <ul>
                     <li>이력서 소스: {hasResumeSource ? '준비됨' : '먼저 홈에서 분석을 실행해 주세요.'}</li>
-                    <li>JD 본문: {jdText.trim() ? '준비됨' : '홈에서 JD를 입력해 주세요.'}</li>
+                    <li>JD 본문: {trimmedJd ? '준비됨' : '홈에서 JD를 입력해 주세요.'}</li>
                   </ul>
                 </div>
 
