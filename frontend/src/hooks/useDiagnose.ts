@@ -72,7 +72,10 @@ export function useDiagnose() {
         message: outcome.result.summary,
         diagnosis: outcome.result,
       })
-      return true
+      return {
+        ok: true as const,
+        diagnosis: outcome.result,
+      }
     }
 
     if (outcome.kind === 'not-enabled') {
@@ -82,7 +85,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return false
+      return { ok: false as const }
     }
 
     if (outcome.kind === 'validation-error') {
@@ -93,7 +96,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return false
+      return { ok: false as const }
     }
 
     if (
@@ -106,7 +109,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return false
+      return { ok: false as const }
     }
 
     if (
@@ -120,7 +123,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return false
+      return { ok: false as const }
     }
 
     setResult({
@@ -129,7 +132,7 @@ export function useDiagnose() {
       message: outcome.message,
       code: outcome.code,
     })
-    return false
+    return { ok: false as const }
   }
 
   const handleRequest = async (request: Promise<Awaited<ReturnType<typeof diagnoseResume>>>) => {
@@ -151,7 +154,7 @@ export function useDiagnose() {
         title: '요청을 완료하지 못했습니다',
         message,
       })
-      return false
+      return { ok: false as const }
     } finally {
       setIsSubmitting(false)
     }
@@ -167,7 +170,7 @@ export function useDiagnose() {
         title: '입력 확인이 필요합니다',
         message: validationError,
       })
-      return false
+      return { ok: false as const }
     }
 
     return handleRequest(diagnoseResume({ resumeText }))
@@ -183,7 +186,7 @@ export function useDiagnose() {
         title: '파일 확인이 필요합니다',
         message: validationError,
       })
-      return false
+      return { ok: false as const }
     }
 
     return handleRequest(diagnoseResumeFile(file as File))
