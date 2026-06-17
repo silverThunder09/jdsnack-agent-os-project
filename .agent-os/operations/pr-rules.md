@@ -161,9 +161,16 @@ docs(pr): tighten pr scope rules
 PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 
 ```md
+## 배경 · 문제 (Why)
+
+- 해결하려는 문제 / 현재 한계:
+- 변경 사유(택한 이유·대안):
+- 트리거(이슈 / 스펙 / 리뷰):
+
 ## 변경 요약
 
-- 
+- 한 줄 요약:
+- 핵심 변경점:
 
 ## 범위 판단
 
