@@ -76,6 +76,20 @@ class DiagnoseFixtureModeControllerTest {
     }
 
     @Test
+    void shortExtractedTextFromPdfUploadReturnsTextTooShort() throws Exception {
+        MockMultipartFile resumeFile = new MockMultipartFile(
+                "resumeFile",
+                "resume.pdf",
+                MediaType.APPLICATION_PDF_VALUE,
+                TestResumeSamples.createPdfBytes("short resume")
+        );
+
+        mockMvc.perform(multipart("/api/diagnose/file").file(resumeFile))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("TEXT_TOO_SHORT"));
+    }
+
+    @Test
     void unsupportedFileReturnsError() throws Exception {
         MockMultipartFile resumeFile = new MockMultipartFile(
                 "resumeFile",

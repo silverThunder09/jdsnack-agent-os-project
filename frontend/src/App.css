@@ -1197,6 +1197,30 @@ button:disabled {
   font-weight: 600;
 }
 
+.gate-reasons {
+  margin: 1rem 0 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 0.8rem;
+  background: rgba(220, 38, 38, 0.06);
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+
+.gate-reasons p {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+}
+
+.gate-reasons ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.gate-reasons li + li {
+  margin-top: 0.2rem;
+}
+
 .start-cta {
   margin-top: 1.2rem;
 }

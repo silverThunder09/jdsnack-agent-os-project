@@ -87,7 +87,7 @@ describe('새로운 분석 시작 페이지', () => {
     await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
     const jdArea = screen.getByLabelText('JD 내용 붙여넣기')
     await user.type(jdArea, '백엔드')
-    expect(screen.getByText('3 / 30,000')).toBeInTheDocument()
+    expect(screen.getByText('3 / 10,000')).toBeInTheDocument()
 
     await user.upload(screen.getByLabelText('파일 선택'), makeResumeFile())
     expect(screen.getByText('resume.pdf')).toBeInTheDocument()
@@ -125,6 +125,33 @@ describe('새로운 분석 시작 페이지', () => {
     await user.type(screen.getByLabelText('JD 내용 붙여넣기'), validJdText)
 
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeDisabled()
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+  })
+
+  it('짧은 JD는 파일이 있어도 분석 시작을 막고 업로드를 호출하지 않는다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
+    await user.type(screen.getByLabelText('JD 내용 붙여넣기'), '짧은 JD')
+    await user.upload(screen.getByLabelText('파일 선택'), makeResumeFile())
+
+    expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeDisabled()
+    expect(screen.getByText('JD 내용이 너무 짧습니다. 핵심 자격요건이 드러나도록 더 입력해주세요.')).toBeInTheDocument()
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+  })
+
+  it('분석 항목을 모두 해제하면 시작 버튼과 호출을 막는다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await fillJdAndResume(user)
+    for (const checkbox of screen.getAllByRole('checkbox')) {
+      await user.click(checkbox)
+    }
+
+    expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeDisabled()
+    expect(screen.getByText('분석 항목을 1개 이상 선택해 주세요.')).toBeInTheDocument()
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
 

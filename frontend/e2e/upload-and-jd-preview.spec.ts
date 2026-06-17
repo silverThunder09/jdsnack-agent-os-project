@@ -117,6 +117,32 @@ test('PDF 업로드 + JD 붙여넣기 후 JD 적합도 결과를 확인한다', 
   await expect(page.getByText('Spring Boot 관련 표현이 JD와 겹칩니다.')).toBeVisible()
 })
 
+test('짧은 JD에서는 분석 시작 전 업로드와 매칭 요청을 차단한다', async ({ page }) => {
+  let diagnoseFileRequests = 0
+  let matchPreviewRequests = 0
+
+  await page.route('**/api/diagnose/file', async (route) => {
+    diagnoseFileRequests += 1
+    await route.abort()
+  })
+  await page.route('**/api/match/preview', async (route) => {
+    matchPreviewRequests += 1
+    await route.abort()
+  })
+  await page.goto('/')
+
+  await page.getByRole('tab', { name: 'JD 내용 붙여넣기' }).click()
+  await page.getByLabel('JD 내용 붙여넣기').fill('짧은 JD')
+  await page.locator('#resume-file').setInputFiles(fixturePdf)
+
+  await expect(page.getByRole('button', { name: '분석 시작하기 →' })).toBeDisabled()
+  await expect(
+    page.getByText('JD 내용이 너무 짧습니다. 핵심 자격요건이 드러나도록 더 입력해주세요.'),
+  ).toBeVisible()
+  expect(diagnoseFileRequests).toBe(0)
+  expect(matchPreviewRequests).toBe(0)
+})
+
 test('분석 후 모의 면접 목적지에서 질문을 생성한다', async ({ page }) => {
   await mockFixtureFlow(page)
   await page.goto('/')
