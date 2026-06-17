@@ -14,7 +14,10 @@ type JdTab = 'link' | 'paste'
 type AnalysisPhase = 'input' | 'result'
 type AnalysisOptionKey = 'jdMatch' | 'ats' | 'sentence' | 'keyword'
 
-const JD_MAX_LENGTH = 30_000
+const JD_MAX_LENGTH = 10_000
+const RESUME_REQUIRED_MESSAGE = '이력서 파일을 업로드해 주세요.'
+const UNSUPPORTED_RESUME_FILE_MESSAGE = '지원하지 않는 파일 형식입니다. PDF 또는 DOCX 파일을 올려 주세요.'
+const ANALYSIS_OPTION_REQUIRED_MESSAGE = '분석 항목을 1개 이상 선택해 주세요.'
 
 const ANALYSIS_OPTIONS: {
   key: AnalysisOptionKey
@@ -139,6 +142,35 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / 1024).toFixed(0)} KB`
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function getPrevalidationReasons({
+  resumeFile,
+  jdText,
+  selectedOptionCount,
+}: {
+  resumeFile: File | null
+  jdText: string
+  selectedOptionCount: number
+}): string[] {
+  const reasons: string[] = []
+
+  if (!resumeFile) {
+    reasons.push(RESUME_REQUIRED_MESSAGE)
+  } else if (!inferResumeMode(resumeFile)) {
+    reasons.push(UNSUPPORTED_RESUME_FILE_MESSAGE)
+  }
+
+  const jdError = validateJdText(jdText)
+  if (jdError) {
+    reasons.push(jdError)
+  }
+
+  if (selectedOptionCount === 0) {
+    reasons.push(ANALYSIS_OPTION_REQUIRED_MESSAGE)
+  }
+
+  return reasons
 }
 
 function EmptyState({ title, message }: { title: string; message: string }) {
@@ -286,7 +318,12 @@ function App() {
   const selectedOptionKeys = ANALYSIS_OPTIONS.filter((option) => options[option.key]).map(
     (option) => option.key,
   )
-  const canStart = Boolean(resumeFile) && Boolean(trimmedJd) && selectedOptionKeys.length > 0
+  const prevalidationReasons = getPrevalidationReasons({
+    resumeFile,
+    jdText,
+    selectedOptionCount: selectedOptionKeys.length,
+  })
+  const canStart = prevalidationReasons.length === 0
 
   useEffect(() => {
     if (analysisPhase === 'result') {
@@ -340,14 +377,14 @@ function App() {
   }
 
   const handleJdTextChange = (value: string) => {
-    setJdText(value.slice(0, JD_MAX_LENGTH))
+    setJdText(value)
     setFormError('')
   }
 
   const handleJdFetch = async () => {
     await fetchJd(jdUrl, {
       onFetched: (fetched) => {
-        setJdText(fetched.jdText.slice(0, JD_MAX_LENGTH))
+        setJdText(fetched.jdText)
       },
     })
   }
@@ -377,12 +414,12 @@ function App() {
 
   const handleStartAnalysis = async () => {
     if (!resumeFile) {
-      setFormError('이력서 파일을 업로드해 주세요.')
+      setFormError(RESUME_REQUIRED_MESSAGE)
       return
     }
     const mode = inferResumeMode(resumeFile)
     if (!mode) {
-      setFormError('지원하지 않는 파일 형식입니다. PDF 또는 DOCX 파일을 올려 주세요.')
+      setFormError(UNSUPPORTED_RESUME_FILE_MESSAGE)
       return
     }
     const jdError = validateJdText(jdText)
@@ -391,7 +428,7 @@ function App() {
       return
     }
     if (selectedOptionKeys.length === 0) {
-      setFormError('분석 항목을 1개 이상 선택해 주세요.')
+      setFormError(ANALYSIS_OPTION_REQUIRED_MESSAGE)
       return
     }
 
@@ -598,12 +635,23 @@ function App() {
                 {formError}
               </p>
             ) : null}
+            {!canStart ? (
+              <div className="gate-reasons" role="status" aria-live="polite">
+                <p>분석 시작 전 확인이 필요합니다.</p>
+                <ul>
+                  {prevalidationReasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <div className="start-cta">
               <button
                 type="button"
                 className="cta-button"
                 disabled={!canStart || isPreviewSubmitting}
+                aria-disabled={!canStart || isPreviewSubmitting}
                 onClick={handleStartAnalysis}
               >
                 {isPreviewSubmitting ? '분석 중...' : '분석 시작하기 →'}

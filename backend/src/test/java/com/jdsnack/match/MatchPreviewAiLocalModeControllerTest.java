@@ -90,7 +90,7 @@ class MatchPreviewAiLocalModeControllerTest {
                 {
                   "resumeSource": {
                     "type": "TEXT",
-                    "value": "Spring Boot API 개발과 테스트 자동화 경험이 있으며 배포 운영도 다뤘습니다."
+                    "value": "Spring Boot API 개발과 테스트 자동화 경험이 있으며 배포 운영도 다뤘고 협업 문서화를 지속했습니다."
                   },
                   "jdText": "Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화, 배포 경험을 요구합니다.",
                   "jdUrl": "https://example.com/jobs/backend"

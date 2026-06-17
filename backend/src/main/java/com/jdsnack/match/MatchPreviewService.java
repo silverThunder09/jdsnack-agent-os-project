@@ -21,6 +21,8 @@ public class MatchPreviewService {
 
     private static final int MIN_JD_LENGTH = 50;
     private static final int MAX_JD_LENGTH = 10_000;
+    private static final int MIN_RESUME_SOURCE_LENGTH = 50;
+    private static final int MAX_RESUME_SOURCE_LENGTH = 10_000;
     private static final int MAX_KEYWORDS = 8;
     private static final Set<String> STOP_WORDS = Set.of(
             "and", "the", "with", "for", "from", "that", "this", "have", "will",
@@ -68,6 +70,15 @@ public class MatchPreviewService {
 
         if (!"TEXT".equals(type) && !"FILE".equals(type)) {
             throw new ApiException(ErrorCode.EMPTY_RESUME);
+        }
+
+        int length = value.length();
+        if (length < MIN_RESUME_SOURCE_LENGTH) {
+            throw new ApiException(ErrorCode.TEXT_TOO_SHORT);
+        }
+
+        if (length > MAX_RESUME_SOURCE_LENGTH) {
+            throw new ApiException(ErrorCode.TEXT_TOO_LONG);
         }
     }
 
