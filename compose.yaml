@@ -1,3 +1,5 @@
+name: jdsnack
+
 services:
   backend:
     build:

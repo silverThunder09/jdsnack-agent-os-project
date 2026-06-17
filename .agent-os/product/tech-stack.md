@@ -1,6 +1,6 @@
 # 기술 스택 (Tech Stack)
 
-신속한 1차 MVP 개발을 목표로 하는 모던 풀스택 기술 스택입니다. 1차 MVP는 외부 AI 연동 없이 입력 검증과 준비중 안내까지 구현합니다.
+신속한 MVP 개발을 목표로 한 모던 풀스택 기술 스택입니다. 1차 MVP에서 입력 검증과 준비중 안내를 구현했고, 2차에서 Gemini 연동(`ai-local` 모드)으로 이력서 진단과 JD 적합도 매칭을 추가했습니다.
 
 ## 백엔드 (Backend)
 
@@ -20,9 +20,9 @@
 
 - **AWS (Amazon Web Services)**:
   - **배포 아키텍처**: `frontend`, `backend` 분리 컨테이너를 기본 배포 단위로 두고, AWS **EC2**, **ECS**, 또는 유사한 컨테이너 실행 환경에서 reverse proxy / ingress 뒤에 배치합니다.
-  - **로컬/CI 기준**: `compose.yaml`로 프론트와 백엔드를 함께 올려 운영 전 통합 검증을 수행합니다.
+  - **로컬/CI 기준**: `compose.local.yaml`로 소스에서 이미지를 빌드해 프론트와 백엔드를 함께 올려 통합 검증을 수행합니다. 배포는 registry 이미지를 pull하는 `compose.prod.yaml`을 사용합니다.
 
-## 2차 MVP 확장 기술
+## AI 연동 (2차, 적용됨)
 
-- **Gemini API 연동**: 2차 MVP에서 서버 환경변수 기반으로 추가합니다.
+- **Gemini API 연동**: 서버 환경변수(`GEMINI_API_KEY`) 기반 `ai-local` 모드로 적용됨. 이력서 진단과 JD 적합도 매칭에 사용합니다. ATS·문장 첨삭·키워드 분석으로의 확장은 다음 단계입니다.
 - **비밀값 관리**: 운영 배포 시 환경변수 또는 AWS Secrets Manager를 사용합니다.
