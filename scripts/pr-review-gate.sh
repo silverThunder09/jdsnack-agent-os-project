@@ -142,6 +142,7 @@ if [ "$has_docker" -eq 1 ] && { [ "$has_backend" -eq 1 ] || [ "$has_frontend" -e
 fi
 
 required_sections=(
+  "## 배경 · 문제"
   "## 변경 요약"
   "## 범위 판단"
   "## 연결 문서"
