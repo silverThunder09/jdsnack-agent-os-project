@@ -45,6 +45,16 @@ function matchPayload() {
   })
 }
 
+function sentencePayload(edits = [
+  {
+    original: 'Spring Boot 기반 API를 개발했습니다.',
+    improved: 'Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.',
+    reason: 'JD 핵심 역량과 성과를 구체적으로 연결했습니다.',
+  },
+]) {
+  return mockJsonResponse({ success: true, data: { edits } })
+}
+
 async function fillJdAndResume(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
   await user.type(screen.getByLabelText('JD 내용 붙여넣기'), validJdText)
@@ -96,19 +106,22 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('resume.pdf')).toBeInTheDocument()
   })
 
-  it('키워드 분석은 선택 가능하고 준비중 태그가 표시되지 않는다', () => {
+  it('키워드 분석과 맞춤 첨삭은 선택 가능하고 준비중 태그가 표시되지 않는다', () => {
     render(<App />)
 
     expect(screen.getByText('JD 적합도')).toBeInTheDocument()
     expect(screen.getByText('ATS 분석')).toBeInTheDocument()
-    expect(screen.getByText('문장 첨삭')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /맞춤 첨삭/ })).toBeEnabled()
     expect(screen.getByText('키워드 분석')).toBeInTheDocument()
-    expect(screen.getAllByText('준비중')).toHaveLength(2)
+    expect(screen.getAllByText('준비중')).toHaveLength(1)
   })
 
   it('분석 시작하기는 JD 적합도(매칭) 결과와 준비중 패널을 보여준다', async () => {
     const user = userEvent.setup()
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(diagnosePayload()).mockResolvedValueOnce(matchPayload())
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(diagnosePayload())
+      .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(sentencePayload())
 
     render(<App />)
     await fillJdAndResume(user)
@@ -117,6 +130,7 @@ describe('새로운 분석 시작 페이지', () => {
     expect(await screen.findByText('79점')).toBeInTheDocument()
     expect(await screen.findByText('Spring Boot 운영 경험이 JD와 맞습니다.')).toBeInTheDocument()
     expect(await screen.findByText('Kubernetes')).toBeInTheDocument()
+    expect(await screen.findByText('Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.')).toBeInTheDocument()
     expect(screen.getByText('해당 키워드가 없습니다.')).toBeInTheDocument()
     expect(screen.getAllByText('준비 중인 분석입니다').length).toBeGreaterThanOrEqual(1)
   })
@@ -128,6 +142,7 @@ describe('새로운 분석 시작 페이지', () => {
     render(<App />)
     await fillJdAndResume(user)
     await user.click(screen.getByRole('checkbox', { name: /JD 적합도/ }))
+    await user.click(screen.getByRole('checkbox', { name: /맞춤 첨삭/ }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
 
     expect(await screen.findByRole('heading', { name: '키워드 분석' })).toBeInTheDocument()
@@ -136,6 +151,40 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.queryByRole('heading', { name: 'JD 적합도' })).not.toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
+  })
+
+  it('맞춤 첨삭만 선택하면 독립 API를 호출하고 Before→After 결과를 보여준다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(diagnosePayload())
+      .mockResolvedValueOnce(sentencePayload())
+
+    render(<App />)
+    await fillJdAndResume(user)
+    await user.click(screen.getByRole('checkbox', { name: /JD 적합도/ }))
+    await user.click(screen.getByRole('checkbox', { name: /키워드 분석/ }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
+
+    expect(await screen.findByRole('heading', { name: '문장 첨삭' })).toBeInTheDocument()
+    expect(screen.getByText('Spring Boot 기반 API를 개발했습니다.')).toBeInTheDocument()
+    expect(screen.getByText('Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'JD 적합도' })).not.toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
+  })
+
+  it('맞춤 첨삭 결과가 비어 있으면 빈 상태를 표시한다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(diagnosePayload())
+      .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(sentencePayload([]))
+
+    render(<App />)
+    await fillJdAndResume(user)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
+
+    expect(await screen.findByText('첨삭할 문장이 없습니다.')).toBeInTheDocument()
   })
 
   it('필수 입력이 없으면 분석 시작 버튼이 비활성화되어 실행되지 않는다', async () => {
@@ -182,6 +231,7 @@ describe('새로운 분석 시작 페이지', () => {
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(sentencePayload())
       .mockResolvedValueOnce(
         mockJsonResponse({
           success: true,
@@ -214,7 +264,10 @@ describe('새로운 분석 시작 페이지', () => {
 
   it('결과를 마크다운으로 내보내고 인쇄할 수 있다', async () => {
     const user = userEvent.setup()
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(diagnosePayload()).mockResolvedValueOnce(matchPayload())
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(diagnosePayload())
+      .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(sentencePayload())
     const createObjectURL = vi.fn(() => 'blob:mock')
     URL.createObjectURL = createObjectURL
     URL.revokeObjectURL = vi.fn()

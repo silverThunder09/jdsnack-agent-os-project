@@ -63,6 +63,16 @@ export interface MatchPreviewResult {
   missingKeywords: string[]
 }
 
+export interface SentenceEdit {
+  original: string
+  improved: string
+  reason: string
+}
+
+export interface SentencePreviewResult {
+  edits: SentenceEdit[]
+}
+
 export interface InterviewPreviewRequest {
   resumeSource: {
     type: 'TEXT' | 'FILE'
@@ -127,6 +137,17 @@ export type MatchPreviewOutcome =
       message: string
     }
 
+export type SentencePreviewOutcome =
+  | {
+      kind: 'success'
+      result: SentencePreviewResult
+    }
+  | {
+      kind: 'validation-error' | 'error'
+      code: ApiErrorCode
+      message: string
+    }
+
 export type InterviewPreviewOutcome =
   | {
       kind: 'success'
@@ -156,5 +177,6 @@ export interface ResultState {
   code?: ApiErrorCode
   diagnosis?: DiagnosisResult
   matchPreview?: MatchPreviewResult
+  sentencePreview?: SentencePreviewResult
   interviewPreview?: InterviewPreviewResult
 }

@@ -610,6 +610,41 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.sentence-edit-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.sentence-edit-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sentence-edit-card span {
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.sentence-edit-card p,
+.sentence-edit-empty {
+  margin: 0.35rem 0 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+@media (max-width: 720px) {
+  .sentence-edit-card {
+    grid-template-columns: 1fr;
+  }
+}
+
 .diagnose-button,
 .secondary-button {
   display: inline-flex;
