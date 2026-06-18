@@ -30,7 +30,10 @@ class MatchPreviewFixtureModeControllerTest {
                 .andExpect(jsonPath("$.data.summary").isString())
                 .andExpect(jsonPath("$.data.strengths[0]").isString())
                 .andExpect(jsonPath("$.data.gaps[0]").isString())
-                .andExpect(jsonPath("$.data.suggestions[0]").isString());
+                .andExpect(jsonPath("$.data.suggestions[0]").isString())
+                .andExpect(jsonPath("$.data.matchedKeywords").isArray())
+                .andExpect(jsonPath("$.data.partialKeywords").isArray())
+                .andExpect(jsonPath("$.data.missingKeywords").isArray());
     }
 
     private String validRequest() {

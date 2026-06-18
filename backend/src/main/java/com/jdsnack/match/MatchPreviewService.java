@@ -126,14 +126,18 @@ public class MatchPreviewService {
     private MatchPreviewResponse buildPreview(MatchPreviewRequest request) {
         List<String> resumeKeywords = extractKeywords(request.resumeSource().value());
         List<String> jdKeywords = extractKeywords(request.jdText());
-        List<String> matched = jdKeywords.stream()
+        List<String> matchedKeywords = jdKeywords.stream()
                 .filter(resumeKeywords::contains)
                 .distinct()
-                .limit(3)
                 .toList();
-        List<String> gaps = jdKeywords.stream()
+        List<String> missingKeywords = jdKeywords.stream()
                 .filter(keyword -> !resumeKeywords.contains(keyword))
                 .distinct()
+                .toList();
+        List<String> matched = matchedKeywords.stream()
+                .limit(3)
+                .toList();
+        List<String> gaps = missingKeywords.stream()
                 .limit(3)
                 .toList();
 
@@ -144,7 +148,10 @@ public class MatchPreviewService {
                 buildSummary(score, matched, gaps),
                 buildStrengths(matched, request.resumeSource().type()),
                 buildGaps(gaps),
-                buildSuggestions(gaps)
+                buildSuggestions(gaps),
+                matchedKeywords,
+                List.of(),
+                missingKeywords
         );
     }
 

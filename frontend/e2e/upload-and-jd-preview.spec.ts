@@ -42,6 +42,9 @@ async function mockFixtureFlow(page: import('@playwright/test').Page) {
           strengths: ['Spring Boot 관련 표현이 JD와 겹칩니다.'],
           gaps: ['배포 관련 경험 또는 성과 근거가 이력서에서 약하게 보입니다.'],
           suggestions: ['배포 경험이 있다면 프로젝트 맥락, 사용 기술, 결과를 함께 적어 보세요.'],
+          matchedKeywords: ['Spring Boot', 'REST API'],
+          partialKeywords: [],
+          missingKeywords: ['Kubernetes'],
         },
       }),
     })
@@ -115,6 +118,25 @@ test('PDF 업로드 + JD 붙여넣기 후 JD 적합도 결과를 확인한다', 
 
   await expect(page.getByText('76점')).toBeVisible()
   await expect(page.getByText('Spring Boot 관련 표현이 JD와 겹칩니다.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '키워드 분석' })).toBeVisible()
+  await expect(page.getByText('Kubernetes')).toBeVisible()
+})
+
+test('키워드 분석만 선택해도 매칭 요청과 키워드 결과를 제공한다', async ({ page }) => {
+  await mockFixtureFlow(page)
+  await page.goto('/')
+
+  await page.getByRole('tab', { name: 'JD 내용 붙여넣기' }).click()
+  await page.getByLabel('JD 내용 붙여넣기').fill(jdText)
+  await page.locator('#resume-file').setInputFiles(fixturePdf)
+  await page.getByRole('checkbox', { name: /JD 적합도/ }).uncheck()
+  await page.getByRole('button', { name: '분석 시작하기 →' }).click()
+
+  await expect(page.getByRole('heading', { name: '키워드 분석' })).toBeVisible()
+  await expect(page.getByText('REST API')).toBeVisible()
+  await expect(page.getByText('해당 키워드가 없습니다.')).toBeVisible()
+  await expect(page.getByText('76점')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '내보내기' })).toBeVisible()
 })
 
 test('짧은 JD에서는 분석 시작 전 업로드와 매칭 요청을 차단한다', async ({ page }) => {

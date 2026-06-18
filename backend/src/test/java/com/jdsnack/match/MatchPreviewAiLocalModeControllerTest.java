@@ -38,7 +38,10 @@ class MatchPreviewAiLocalModeControllerTest {
                         "Spring Boot와 테스트 자동화 경험은 잘 맞지만 배포 근거를 조금 더 보강하면 좋습니다.",
                         List.of("Spring Boot 경험이 JD 요구사항과 직접 맞닿습니다.", "테스트 자동화 경험이 확인됩니다."),
                         List.of("배포 경험을 더 구체적으로 드러내는 편이 좋습니다.", "운영 지표를 수치로 보강하면 좋습니다."),
-                        List.of("배포 경험이 있다면 프로젝트 맥락과 결과를 함께 적어 보세요.", "운영 성과를 숫자로 보강해 보세요.")
+                        List.of("배포 경험이 있다면 프로젝트 맥락과 결과를 함께 적어 보세요.", "운영 성과를 숫자로 보강해 보세요."),
+                        List.of("Spring Boot", "테스트 자동화"),
+                        List.of("CI/CD"),
+                        List.of("Kubernetes")
                 ));
 
         mockMvc.perform(post("/api/match/preview")
@@ -46,7 +49,10 @@ class MatchPreviewAiLocalModeControllerTest {
                         .content(validRequest()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.matchingScore").value(82))
-                .andExpect(jsonPath("$.data.gaps[0]").value("배포 경험을 더 구체적으로 드러내는 편이 좋습니다."));
+                .andExpect(jsonPath("$.data.gaps[0]").value("배포 경험을 더 구체적으로 드러내는 편이 좋습니다."))
+                .andExpect(jsonPath("$.data.matchedKeywords[0]").value("Spring Boot"))
+                .andExpect(jsonPath("$.data.partialKeywords[0]").value("CI/CD"))
+                .andExpect(jsonPath("$.data.missingKeywords[0]").value("Kubernetes"));
     }
 
     @Test

@@ -38,6 +38,9 @@ function matchPayload() {
       strengths: ['Spring Boot 운영 경험이 JD와 맞습니다.'],
       gaps: ['테스트 자동화 사례를 더 드러내면 좋습니다.'],
       suggestions: ['협업 개선 사례를 한 줄 더 보강해 보세요.'],
+      matchedKeywords: ['Spring Boot', 'REST API'],
+      partialKeywords: [],
+      missingKeywords: ['Kubernetes'],
     },
   })
 }
@@ -93,14 +96,14 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('resume.pdf')).toBeInTheDocument()
   })
 
-  it('분석 옵션 4개가 보이고 준비중 항목이 표시된다', () => {
+  it('키워드 분석은 선택 가능하고 준비중 태그가 표시되지 않는다', () => {
     render(<App />)
 
     expect(screen.getByText('JD 적합도')).toBeInTheDocument()
     expect(screen.getByText('ATS 분석')).toBeInTheDocument()
     expect(screen.getByText('문장 첨삭')).toBeInTheDocument()
     expect(screen.getByText('키워드 분석')).toBeInTheDocument()
-    expect(screen.getAllByText('준비중').length).toBeGreaterThanOrEqual(3)
+    expect(screen.getAllByText('준비중')).toHaveLength(2)
   })
 
   it('분석 시작하기는 JD 적합도(매칭) 결과와 준비중 패널을 보여준다', async () => {
@@ -113,7 +116,26 @@ describe('새로운 분석 시작 페이지', () => {
 
     expect(await screen.findByText('79점')).toBeInTheDocument()
     expect(await screen.findByText('Spring Boot 운영 경험이 JD와 맞습니다.')).toBeInTheDocument()
+    expect(await screen.findByText('Kubernetes')).toBeInTheDocument()
+    expect(screen.getByText('해당 키워드가 없습니다.')).toBeInTheDocument()
     expect(screen.getAllByText('준비 중인 분석입니다').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('키워드만 선택해도 매칭을 호출하고 JD 적합도 패널 없이 키워드 결과를 보여준다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(diagnosePayload()).mockResolvedValueOnce(matchPayload())
+
+    render(<App />)
+    await fillJdAndResume(user)
+    await user.click(screen.getByRole('checkbox', { name: /JD 적합도/ }))
+    await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
+
+    expect(await screen.findByRole('heading', { name: '키워드 분석' })).toBeInTheDocument()
+    expect(screen.getByText('Spring Boot', { selector: 'li' })).toBeInTheDocument()
+    expect(screen.queryByText('79점')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'JD 적합도' })).not.toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
   })
 
   it('필수 입력이 없으면 분석 시작 버튼이 비활성화되어 실행되지 않는다', async () => {
