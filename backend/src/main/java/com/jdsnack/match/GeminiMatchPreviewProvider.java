@@ -23,6 +23,7 @@ import java.util.List;
 public class GeminiMatchPreviewProvider {
 
     private static final String DEFAULT_MODEL = "gemini-2.5-flash";
+    private static final int MAX_KEYWORDS = 8;
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -111,7 +112,10 @@ public class GeminiMatchPreviewProvider {
                   "summary": "short Korean summary",
                   "strengths": ["Korean bullet"],
                   "gaps": ["Korean bullet"],
-                  "suggestions": ["Korean bullet"]
+                  "suggestions": ["Korean bullet"],
+                  "matchedKeywords": ["JD keyword found directly in resume"],
+                  "partialKeywords": ["JD keyword found by synonym or spelling variation"],
+                  "missingKeywords": ["JD keyword not found in resume"]
                 }
 
                 Rules:
@@ -119,6 +123,7 @@ public class GeminiMatchPreviewProvider {
                 - strengths, gaps, suggestions must contain 2 or 3 items each
                 - keep every bullet concise and practical
                 - focus on concrete resume evidence, missing keywords, and next resume improvements
+                - keyword arrays must be mutually exclusive and contain at most 8 concise items each
                 - if jdUrl exists, treat it as source metadata only
 
                 Resume Source Type:
@@ -140,7 +145,7 @@ public class GeminiMatchPreviewProvider {
         );
     }
 
-    private MatchPreviewResponse parseResponse(String responseBody) throws IOException {
+    MatchPreviewResponse parseResponse(String responseBody) throws IOException {
         JsonNode root = objectMapper.readTree(responseBody);
         String text = root.path("candidates")
                 .path(0)
@@ -160,6 +165,11 @@ public class GeminiMatchPreviewProvider {
         List<String> strengths = toStringList(payload.path("strengths"));
         List<String> gaps = toStringList(payload.path("gaps"));
         List<String> suggestions = toStringList(payload.path("suggestions"));
+        List<String> matchedKeywords = keywordList(payload.path("matchedKeywords"), List.of());
+        List<String> partialKeywords = keywordList(payload.path("partialKeywords"), matchedKeywords);
+        List<String> excludedKeywords = new ArrayList<>(matchedKeywords);
+        excludedKeywords.addAll(partialKeywords);
+        List<String> missingKeywords = keywordList(payload.path("missingKeywords"), excludedKeywords);
 
         if (matchingScore < 0 || matchingScore > 100
                 || summary.isBlank()
@@ -169,7 +179,16 @@ public class GeminiMatchPreviewProvider {
             throw new GeminiApiException(ErrorCode.GEMINI_API_RESPONSE_INVALID);
         }
 
-        return new MatchPreviewResponse(matchingScore, summary, strengths, gaps, suggestions);
+        return new MatchPreviewResponse(
+                matchingScore,
+                summary,
+                strengths,
+                gaps,
+                suggestions,
+                matchedKeywords,
+                partialKeywords,
+                missingKeywords
+        );
     }
 
     private String stripJsonFence(String text) {
@@ -196,6 +215,15 @@ public class GeminiMatchPreviewProvider {
             }
         });
         return values;
+    }
+
+    private List<String> keywordList(JsonNode node, List<String> excluded) {
+        return toStringList(node).stream()
+                .map(String::trim)
+                .filter(keyword -> !excluded.contains(keyword))
+                .distinct()
+                .limit(MAX_KEYWORDS)
+                .toList();
     }
 
     private record GeminiRequest(List<Content> contents) {

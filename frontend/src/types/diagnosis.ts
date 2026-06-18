@@ -58,6 +58,9 @@ export interface MatchPreviewResult {
   strengths: string[]
   gaps: string[]
   suggestions: string[]
+  matchedKeywords: string[]
+  partialKeywords: string[]
+  missingKeywords: string[]
 }
 
 export interface InterviewPreviewRequest {

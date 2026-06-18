@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.hasItem;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -28,7 +29,10 @@ class MatchPreviewControllerTest {
                 .andExpect(jsonPath("$.data.summary").isString())
                 .andExpect(jsonPath("$.data.strengths").isArray())
                 .andExpect(jsonPath("$.data.gaps").isArray())
-                .andExpect(jsonPath("$.data.suggestions").isArray());
+                .andExpect(jsonPath("$.data.suggestions").isArray())
+                .andExpect(jsonPath("$.data.matchedKeywords", hasItem("spring")))
+                .andExpect(jsonPath("$.data.partialKeywords").isEmpty())
+                .andExpect(jsonPath("$.data.missingKeywords", hasItem("rest")));
     }
 
     @Test

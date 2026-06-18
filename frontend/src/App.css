@@ -583,6 +583,33 @@ button:disabled {
   color: var(--accent);
 }
 
+.keyword-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.keyword-list li {
+  max-width: 100%;
+  padding: 0.35rem 0.65rem;
+  overflow-wrap: anywhere;
+  color: var(--primary-dark);
+  background: #eef3ff;
+  border: 1px solid #d9e3ff;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.keyword-empty {
+  margin: 0.85rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .diagnose-button,
 .secondary-button {
   display: inline-flex;

@@ -174,7 +174,18 @@ export async function previewMatch(
   if (payload?.success && payload.data) {
     return {
       kind: 'success',
-      result: payload.data,
+      result: {
+        ...payload.data,
+        matchedKeywords: Array.isArray(payload.data.matchedKeywords)
+          ? payload.data.matchedKeywords
+          : [],
+        partialKeywords: Array.isArray(payload.data.partialKeywords)
+          ? payload.data.partialKeywords
+          : [],
+        missingKeywords: Array.isArray(payload.data.missingKeywords)
+          ? payload.data.missingKeywords
+          : [],
+      },
     }
   }
 

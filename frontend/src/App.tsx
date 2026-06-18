@@ -52,7 +52,7 @@ const ANALYSIS_OPTIONS: {
     label: '키워드 분석',
     description: '주요 키워드 누락 여부와 활용도를 분석합니다.',
     recommended: false,
-    enabled: false,
+    enabled: true,
   },
 ]
 
@@ -96,26 +96,49 @@ function loadSavedInput(): { jdText: string; options: Record<AnalysisOptionKey, 
   }
 }
 
-function buildResultMarkdown(match: MatchPreviewResult): string {
+function buildResultMarkdown(
+  match: MatchPreviewResult,
+  submittedOptions: Record<AnalysisOptionKey, boolean>,
+): string {
   const list = (items: string[]) => (items.length ? items.map((item) => `- ${item}`).join('\n') : '- (없음)')
-  return [
-    '# JDSnack 분석 결과',
-    '',
-    `## JD 적합도 점수: ${match.matchingScore}점`,
-    '',
-    '### 요약',
-    match.summary,
-    '',
-    '### 강점',
-    list(match.strengths),
-    '',
-    '### Gap',
-    list(match.gaps),
-    '',
-    '### 제안',
-    list(match.suggestions),
-    '',
-  ].join('\n')
+  const sections = ['# JDSnack 분석 결과', '']
+
+  if (submittedOptions.jdMatch) {
+    sections.push(
+      `## JD 적합도 점수: ${match.matchingScore}점`,
+      '',
+      '### 요약',
+      match.summary,
+      '',
+      '### 강점',
+      list(match.strengths),
+      '',
+      '### Gap',
+      list(match.gaps),
+      '',
+      '### 제안',
+      list(match.suggestions),
+      '',
+    )
+  }
+
+  if (submittedOptions.keyword) {
+    sections.push(
+      '## 키워드 분석',
+      '',
+      '### 매칭 키워드',
+      list(match.matchedKeywords),
+      '',
+      '### 부분 매칭',
+      list(match.partialKeywords),
+      '',
+      '### 누락 키워드',
+      list(match.missingKeywords),
+      '',
+    )
+  }
+
+  return sections.join('\n')
 }
 
 function todayStamp(): string {
@@ -275,6 +298,20 @@ function ComingSoonPanel({ title, description }: { title: string; description: s
   )
 }
 
+function KeywordList({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <p className="keyword-empty">해당 키워드가 없습니다.</p>
+  }
+
+  return (
+    <ul className="keyword-list">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  )
+}
+
 function App() {
   const [currentView, setCurrentView] = useState<'home' | 'interview'>('home')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -356,7 +393,9 @@ function App() {
     if (!match) {
       return
     }
-    const blob = new Blob([buildResultMarkdown(match)], { type: 'text/markdown;charset=utf-8' })
+    const blob = new Blob([buildResultMarkdown(match, submittedOptions)], {
+      type: 'text/markdown;charset=utf-8',
+    })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -438,7 +477,7 @@ function App() {
     resetPreview()
     setAnalysisPhase('result')
 
-    if (options.jdMatch) {
+    if (options.jdMatch || options.keyword) {
       const outcome = await submitFile(mode, resumeFile)
       if (outcome.ok && outcome.diagnosis?.sourceText) {
         await submitPreview({
@@ -710,7 +749,7 @@ function App() {
           <h1>분석 결과</h1>
         </div>
         <div className="result-actions">
-          {submittedOptions.jdMatch && previewResult.status === 'success' ? (
+          {(submittedOptions.jdMatch || submittedOptions.keyword) && previewResult.status === 'success' ? (
             <>
               <button type="button" className="ghost-button" onClick={handleExportResult}>
                 내보내기
@@ -768,7 +807,28 @@ function App() {
           <ComingSoonPanel title="문장 첨삭" description="문장 표현·가독성·문법 개선 제안." />
         ) : null}
         {submittedOptions.keyword ? (
-          <ComingSoonPanel title="키워드 분석" description="주요 키워드 누락·활용도 분석." />
+          <AnalysisPanel
+            badge="Keyword Match"
+            title="키워드 분석"
+            description="JD 핵심 키워드가 이력서에 얼마나 반영됐는지 확인하세요."
+            result={previewResult}
+            successContent={
+              <div className="detail-list-grid detail-list-grid--triple" aria-label="키워드 분석 결과">
+                <section className="detail-card">
+                  <h3>매칭 키워드</h3>
+                  <KeywordList items={previewResult.matchPreview?.matchedKeywords ?? []} />
+                </section>
+                <section className="detail-card">
+                  <h3>부분 매칭</h3>
+                  <KeywordList items={previewResult.matchPreview?.partialKeywords ?? []} />
+                </section>
+                <section className="detail-card">
+                  <h3>누락 키워드</h3>
+                  <KeywordList items={previewResult.matchPreview?.missingKeywords ?? []} />
+                </section>
+              </div>
+            }
+          />
         ) : null}
       </div>
     </section>
