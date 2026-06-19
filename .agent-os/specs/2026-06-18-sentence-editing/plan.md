@@ -24,7 +24,7 @@
 - `stub`/`fixture`는 외부 호출 없이 결정적 `edits`를 반환한다(같은 입력 → 같은 결과).
 - Gemini `edits` 필드는 관대 처리(누락/비배열 시 빈 리스트, 성공 유지). 비-JSON·호출 실패는 기존 `GEMINI_API_RESPONSE_INVALID`/`GEMINI_API_REQUEST_FAILED` 정책을 따른다.
 - 문장 첨삭 패널은 키워드 패널의 `detail-card`/`successContent` 패턴을 차용하고, 서비스 계층(`previewSentence`)을 통해서만 데이터를 받는다.
-- 사이드바 `맞춤 첨삭` 잠금 메뉴는 유지(별개 메뉴, `ui-spec.md` 결정).
+- **[개정 2026-06-19] 사이드바 `맞춤 첨삭` 잠금 메뉴는 제거한다**(live 기능 중복·거짓 노출 결함, `ui-spec.md` 결정). 옵션 라벨은 `문장 첨삭`으로 한다.
 - 직전 spec들의 통합 검증 게이트를 깨지 않는다(`sentence` 선택 시에도 게이트 통과 후 실행).
 - 검증: 프론트 `npm run lint`/`npm test`/`npm run build`/`npm run test:e2e`, 백엔드 `./gradlew test`. 백엔드 미러 테스트(`GeminiSentencePreviewProviderTest`/`SentencePreviewControllerTest`/`SentencePreviewFixtureModeControllerTest`/`SentencePreviewAiLocalModeControllerTest`)와 프론트 sentence 옵션 해금·패널 표시 테스트(`App.test.tsx`)·e2e를 추가한다.
 
@@ -33,7 +33,7 @@
 - 매칭/키워드 응답에 문장 첨삭을 얹는 방식. 신규 전용 엔드포인트로만 제공(LLM 부하 분리 확정).
 - 새 ErrorCode, `ApiResponse<T>` 래퍼 변경, 검증 임계값(50/10,000) 변경.
 - 다국어 첨삭, 배치/대량 처리, 첨삭 결과 저장·이력 등 speculative 확장.
-- 사이드바 `맞춤 첨삭` 잠금 메뉴 해제, ATS 등 다른 "준비중" 옵션 해금, 문장 분리 알고리즘 고도화.
+- 사이드바 `맞춤 첨삭` 별도 전용 화면 재구현(잠금 메뉴는 제거만 함), ATS 등 다른 "준비중" 옵션 해금, 문장 분리 알고리즘 고도화.
 
 ## 컨테이너 운영 기준
 
@@ -48,5 +48,6 @@
 - **검증/에러 정책**: 매칭과 **동일 재사용 확정**(50~10,000자, URL 검증, 기존 `ErrorCode`). 새 에러 코드 없음.
 - **모드 동작**: `stub`/`fixture`는 결정적 산출(외부 호출 없음), `ai-local`만 Gemini 호출. 모든 모드 동일 스키마.
 - **프론트 호출**: `sentence` 선택 시 `previewSentence`를 매칭과 **독립 호출**.
-- **사이드바 잠금 메뉴**: `맞춤 첨삭` 잠금 **유지 확정**(별개 메뉴, 분석 옵션과 다름).
+- **사이드바 잠금 메뉴**: **[개정 2026-06-19] `맞춤 첨삭` 잠금 제거 확정**(머지 후 결함 수정 — live 기능을 🔒준비중으로 중복·거짓 노출하던 항목. 이전 "유지 확정"을 뒤집음). `ui-spec.md` 결정 참조.
+- **옵션 라벨**: **[개정 2026-06-19] `sentence` 옵션 라벨 `맞춤 첨삭`→`문장 첨삭` 확정**(결과 패널 제목·내보내기 섹션·정식명과 일치).
 - **내보내기 마크다운**: `buildResultMarkdown`에 문장 첨삭 섹션 **추가**(sentence 선택 시). 빈 `edits` 안전 처리.
