@@ -5,7 +5,8 @@ import { StatusMessage } from './components/StatusMessage'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
 import { useMatchPreview, validateJdText } from './hooks/useMatchPreview'
-import type { MatchPreviewResult, ResultState, ResumeInputMode } from './types/diagnosis'
+import { useSentencePreview } from './hooks/useSentencePreview'
+import type { MatchPreviewResult, ResultState, ResumeInputMode, SentencePreviewResult } from './types/diagnosis'
 import './App.css'
 
 const INPUT_STORAGE_KEY = 'jdsnack.analysis-input'
@@ -42,10 +43,10 @@ const ANALYSIS_OPTIONS: {
   },
   {
     key: 'sentence',
-    label: '문장 첨삭',
+    label: '맞춤 첨삭',
     description: '문장 표현, 가독성, 문법 및 전문성 향상을 제안합니다.',
     recommended: false,
-    enabled: false,
+    enabled: true,
   },
   {
     key: 'keyword',
@@ -97,13 +98,14 @@ function loadSavedInput(): { jdText: string; options: Record<AnalysisOptionKey, 
 }
 
 function buildResultMarkdown(
-  match: MatchPreviewResult,
+  match: MatchPreviewResult | undefined,
+  sentence: SentencePreviewResult | undefined,
   submittedOptions: Record<AnalysisOptionKey, boolean>,
 ): string {
   const list = (items: string[]) => (items.length ? items.map((item) => `- ${item}`).join('\n') : '- (없음)')
   const sections = ['# JDSnack 분석 결과', '']
 
-  if (submittedOptions.jdMatch) {
+  if (submittedOptions.jdMatch && match) {
     sections.push(
       `## JD 적합도 점수: ${match.matchingScore}점`,
       '',
@@ -122,7 +124,7 @@ function buildResultMarkdown(
     )
   }
 
-  if (submittedOptions.keyword) {
+  if (submittedOptions.keyword && match) {
     sections.push(
       '## 키워드 분석',
       '',
@@ -136,6 +138,23 @@ function buildResultMarkdown(
       list(match.missingKeywords),
       '',
     )
+  }
+
+  if (submittedOptions.sentence) {
+    sections.push('## 문장 첨삭', '')
+    if (!sentence?.edits.length) {
+      sections.push('- (없음)', '')
+    } else {
+      sentence.edits.forEach((edit, index) => {
+        sections.push(
+          `### 첨삭 ${index + 1}`,
+          `- 원문: ${edit.original}`,
+          `- 개선문: ${edit.improved}`,
+          `- 개선 사유: ${edit.reason}`,
+          '',
+        )
+      })
+    }
   }
 
   return sections.join('\n')
@@ -345,6 +364,12 @@ function App() {
     submit: submitPreview,
   } = useMatchPreview()
   const {
+    isSubmitting: isSentenceSubmitting,
+    resetResult: resetSentence,
+    result: sentenceResult,
+    submit: submitSentence,
+  } = useSentencePreview()
+  const {
     isSubmitting: isInterviewSubmitting,
     result: interviewResult,
     submit: submitInterview,
@@ -390,10 +415,11 @@ function App() {
 
   const handleExportResult = () => {
     const match = previewResult.matchPreview
-    if (!match) {
+    const sentence = sentenceResult.sentencePreview
+    if (!match && !sentence) {
       return
     }
-    const blob = new Blob([buildResultMarkdown(match, submittedOptions)], {
+    const blob = new Blob([buildResultMarkdown(match, sentence, submittedOptions)], {
       type: 'text/markdown;charset=utf-8',
     })
     const url = URL.createObjectURL(blob)
@@ -475,16 +501,25 @@ function App() {
     setSubmittedOptions({ ...options })
     resetDiagnose()
     resetPreview()
+    resetSentence()
     setAnalysisPhase('result')
 
-    if (options.jdMatch || options.keyword) {
+    if (options.jdMatch || options.keyword || options.sentence) {
       const outcome = await submitFile(mode, resumeFile)
       if (outcome.ok && outcome.diagnosis?.sourceText) {
-        await submitPreview({
+        const request = {
           resumeSource: { type: 'FILE', value: outcome.diagnosis.sourceText },
           jdText: trimmedJd,
           jdUrl: jdUrl.trim(),
-        })
+        } as const
+        const requests: Promise<void>[] = []
+        if (options.jdMatch || options.keyword) {
+          requests.push(submitPreview(request))
+        }
+        if (options.sentence) {
+          requests.push(submitSentence(request))
+        }
+        await Promise.all(requests)
       }
     }
   }
@@ -493,6 +528,7 @@ function App() {
     setAnalysisPhase('input')
     resetDiagnose()
     resetPreview()
+    resetSentence()
   }
 
   const handleInterviewSubmit = async () => {
@@ -689,11 +725,11 @@ function App() {
               <button
                 type="button"
                 className="cta-button"
-                disabled={!canStart || isPreviewSubmitting}
-                aria-disabled={!canStart || isPreviewSubmitting}
+                disabled={!canStart || isPreviewSubmitting || isSentenceSubmitting}
+                aria-disabled={!canStart || isPreviewSubmitting || isSentenceSubmitting}
                 onClick={handleStartAnalysis}
               >
-                {isPreviewSubmitting ? '분석 중...' : '분석 시작하기 →'}
+                {isPreviewSubmitting || isSentenceSubmitting ? '분석 중...' : '분석 시작하기 →'}
               </button>
               <button type="button" className="text-button" onClick={handleResetInput}>
                 입력 초기화
@@ -749,7 +785,8 @@ function App() {
           <h1>분석 결과</h1>
         </div>
         <div className="result-actions">
-          {(submittedOptions.jdMatch || submittedOptions.keyword) && previewResult.status === 'success' ? (
+          {((submittedOptions.jdMatch || submittedOptions.keyword) && previewResult.status === 'success')
+          || (submittedOptions.sentence && sentenceResult.status === 'success') ? (
             <>
               <button type="button" className="ghost-button" onClick={handleExportResult}>
                 내보내기
@@ -804,7 +841,36 @@ function App() {
 
         {submittedOptions.ats ? <ComingSoonPanel title="ATS 분석" description="ATS 통과 가능성과 포맷 최적화." /> : null}
         {submittedOptions.sentence ? (
-          <ComingSoonPanel title="문장 첨삭" description="문장 표현·가독성·문법 개선 제안." />
+          <AnalysisPanel
+            badge="Sentence Edit"
+            title="문장 첨삭"
+            description="JD에 맞춘 문장별 개선안과 이유를 확인하세요."
+            result={sentenceResult}
+            successContent={
+              sentenceResult.sentencePreview?.edits.length ? (
+                <div className="sentence-edit-list" aria-label="문장 첨삭 결과">
+                  {sentenceResult.sentencePreview.edits.map((edit, index) => (
+                    <article className="sentence-edit-card" key={`${edit.original}-${index}`}>
+                      <div>
+                        <span>원문</span>
+                        <p>{edit.original || '(내용 없음)'}</p>
+                      </div>
+                      <div>
+                        <span>개선문</span>
+                        <p>{edit.improved || '(내용 없음)'}</p>
+                      </div>
+                      <div>
+                        <span>개선 사유</span>
+                        <p>{edit.reason || '(내용 없음)'}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="sentence-edit-empty">첨삭할 문장이 없습니다.</p>
+              )
+            }
+          />
         ) : null}
         {submittedOptions.keyword ? (
           <AnalysisPanel

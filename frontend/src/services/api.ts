@@ -12,6 +12,8 @@ import type {
   MatchPreviewOutcome,
   MatchPreviewRequest,
   MatchPreviewResult,
+  SentencePreviewOutcome,
+  SentencePreviewResult,
 } from '../types/diagnosis'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -194,6 +196,62 @@ export async function previewMatch(
   }
 
   if (
+    payload.error.code === 'EMPTY_JD' ||
+    payload.error.code === 'JD_TEXT_TOO_SHORT' ||
+    payload.error.code === 'JD_TEXT_TOO_LONG' ||
+    payload.error.code === 'INVALID_JD_URL'
+  ) {
+    return {
+      kind: 'validation-error',
+      code: payload.error.code,
+      message: payload.error.message,
+    }
+  }
+
+  return {
+    kind: 'error',
+    code: payload.error.code,
+    message: payload.error.message,
+  }
+}
+
+export async function previewSentence(
+  request: MatchPreviewRequest,
+): Promise<SentencePreviewOutcome> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/sentence/preview`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<SentencePreviewResult>(response)
+  if (payload?.success && payload.data) {
+    return {
+      kind: 'success',
+      result: {
+        ...payload.data,
+        edits: Array.isArray(payload.data.edits) ? payload.data.edits : [],
+      },
+    }
+  }
+
+  if (!payload?.error || !KNOWN_ERROR_CODES.includes(payload.error.code)) {
+    throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+  }
+
+  if (
+    payload.error.code === 'EMPTY_RESUME' ||
+    payload.error.code === 'TEXT_TOO_SHORT' ||
+    payload.error.code === 'TEXT_TOO_LONG' ||
     payload.error.code === 'EMPTY_JD' ||
     payload.error.code === 'JD_TEXT_TOO_SHORT' ||
     payload.error.code === 'JD_TEXT_TOO_LONG' ||
