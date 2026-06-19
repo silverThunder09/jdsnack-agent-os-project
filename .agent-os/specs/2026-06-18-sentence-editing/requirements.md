@@ -7,7 +7,7 @@
 - JD 적합도 매칭은 `POST /api/match/preview`(`backend/src/main/java/com/jdsnack/match/MatchPreviewController.java`)로 제공되며, 요청은 `MatchPreviewRequest`(`resumeSource{type,value}`, `jdText`, `jdUrl`), 응답은 `ApiResponse<MatchPreviewResponse>` 형태다.
 - 모드 분기는 `MatchPreviewService`가 담당한다(`stub`/`fixture`는 `buildPreview`, `ai-local`만 `GeminiMatchPreviewProvider`로 분기). 요청 검증(`validateRequest`)·`ErrorCode` 체계·`stripJsonFence`/`toStringList` 헬퍼가 이미 존재한다.
 - 프론트 분석 옵션 `sentence`는 현재 `enabled: false`("준비중", `frontend/src/App.tsx` 약 44행)이고, 결과 화면 `submittedOptions.sentence` 자리에는 `ComingSoonPanel`만 있다.
-- 사이드바에는 `맞춤 첨삭` 잠금 메뉴가 따로 있다(`frontend/src/components/AppShell.tsx` 약 13행 `lockedItems`). 이는 분석 옵션과는 별개 메뉴다.
+- 사이드바에는 `맞춤 첨삭` 잠금 메뉴가 있다(`frontend/src/components/AppShell.tsx` 약 13행 `lockedItems`). **[개정 2026-06-19] 이 잠금 메뉴가 가리키던 기능이 본 spec의 문장 첨삭이며, live 기능이 🔒준비중으로 중복 노출되는 결함이라 제거 대상으로 재분류한다(REQ-04 참조).**
 
 ## 용어 정의 (문장 첨삭)
 
@@ -36,7 +36,8 @@
 
 ## `REQ-04` 프론트 sentence 옵션 해금 + 결과 패널
 
-- `ANALYSIS_OPTIONS`의 `sentence` 항목을 `enabled: true`로 바꿔 선택 가능하게 한다("준비중" 태그 제거, `frontend/src/App.tsx` 약 44행).
+- `ANALYSIS_OPTIONS`의 `sentence` 항목을 `enabled: true`로 바꿔 선택 가능하게 한다("준비중" 태그 제거, `frontend/src/App.tsx` 약 44행). **[개정 2026-06-19] 옵션 라벨은 `문장 첨삭`으로 한다(이전 `맞춤 첨삭`에서 변경; 결과 패널 제목·내보내기 섹션명과 일치, `ui-spec.md` 결정 참조).**
+- **[개정 2026-06-19] 사이드바 `맞춤 첨삭` 잠금 메뉴를 제거한다**(`frontend/src/components/AppShell.tsx` `lockedItems`에서 `'맞춤 첨삭'` 한 줄 제거). live인 문장 첨삭을 🔒준비중으로 중복·거짓 노출하던 항목이며, 별도 전용 화면 계획은 없다(`ui-spec.md` 결정 참조).
 - `sentence` 옵션이 제출에 포함되면, 결과 화면의 `submittedOptions.sentence` 자리에 `ComingSoonPanel` 대신 **문장 첨삭 패널**(문장별 Before→After 카드 + 사유)을 표시한다.
 - 문장 첨삭은 신규 엔드포인트에 의존하므로, `sentence`가 선택되면 신규 호출(`previewSentence`)이 수행되도록 한다. 매칭(`previewMatch`)과는 **독립된 호출**이다(LLM 부하 분리).
 - 프론트 타입(`frontend/src/types/diagnosis.ts`)에 `SentenceEdit`/`SentencePreviewResult{edits}`를 추가하고, 서비스(`frontend/src/services/api.ts`)에 `previewSentence()`를, 훅(`frontend/src/hooks/useSentencePreview.ts`)을 `useMatchPreview` 미러로 추가한다.
@@ -52,5 +53,7 @@
 - 매칭/키워드 응답에 문장 첨삭을 얹는 방식. 문장 첨삭은 신규 전용 엔드포인트로만 제공한다(LLM 부하 분리가 확정 결정).
 - 검증 임계값(JD/이력서 50/10,000) 변경, `ApiResponse<T>` 래퍼·`ErrorCode` 체계 변경, 새 에러 코드 추가.
 - 다국어 첨삭, 배치/대량 처리, 첨삭 결과 저장·이력 관리 등 speculative 확장.
-- 사이드바 `맞춤 첨삭` 잠금 메뉴(`AppShell.tsx` lockedItems) 해제(별개 메뉴이며, 본 spec은 분석 옵션 `sentence`만 다룬다 — `ui-spec.md` 결정 참조).
 - ATS 등 다른 "준비중" 옵션 해금, 문장 분리·문장 단위 추출 알고리즘 고도화.
+- 사이드바 `맞춤 첨삭` 잠금 메뉴를 **다른 화면으로 재구현**하는 것(잠금 메뉴는 제거만 하고, 별도 전용 화면은 만들지 않는다 — REQ-04·`ui-spec.md` 결정 참조).
+
+> 변경 이력: [2026-06-19] 사이드바 `맞춤 첨삭` 잠금 메뉴 "해제"는 본래 범위 밖이었으나, 머지 후 중복/거짓 노출 결함이 확인되어 REQ-04로 이동(제거 확정). 옵션 라벨도 `맞춤 첨삭`→`문장 첨삭`으로 개정.

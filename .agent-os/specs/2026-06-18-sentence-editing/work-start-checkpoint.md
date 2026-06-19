@@ -8,6 +8,8 @@
 - 판단 이유: 신규 전용 엔드포인트·신규 백엔드 패키지·신규 프론트 호출/훅/패널이 함께 추가되지만, 요청 계약·검증·`ErrorCode`·`ApiResponse<T>` 래퍼는 매칭에서 그대로 재사용하고 새 에러 코드·임계값 변경은 없다. 매칭 프롬프트/파싱 패턴을 복제하므로 모드별(`stub`/`fixture`/`ai-local`) 회귀 확인이 필요하다.
 
 ## Change Scope
+> [2026-06-19 개정] 아래는 최초 구현(#87 머지) 기준 기록이다. 머지 후 UI 결함 수정으로 **사이드바 `맞춤 첨삭` 잠금 메뉴 제거** + **옵션 라벨 `맞춤 첨삭`→`문장 첨삭`** 2건이 추가 범위로 들어왔다(아래 "바꾸지 않는 것"의 사이드바 항목은 더 이상 유효하지 않음). 상세는 `ui-spec.md`/`requirements.md` 개정 결정 참조.
+
 - 이번 작업에서 바꾸는 것(추가): 백엔드 신규 패키지 `com.jdsnack.sentence`(`SentencePreviewController`/`SentencePreviewService`/`SentencePreviewRequest`/`SentencePreviewResponse`/`SentenceEdit`/`Stub`·`Fixture`·`GeminiSentencePreviewProvider`), 프론트 `frontend/src/types/diagnosis.ts`(`SentenceEdit`/`SentencePreviewResult`)·`frontend/src/services/api.ts`(`previewSentence`)·`frontend/src/hooks/useSentencePreview.ts`·`frontend/src/App.tsx`(sentence 옵션 해금·결과 패널·호출 트리거·`buildResultMarkdown`), 관련 백엔드/프론트 테스트.
 - 이번 작업에서 바꾸지 않는 것: 매칭/키워드 엔드포인트·요청 스키마·`ApiResponse<T>` 래퍼·`ErrorCode`, 검증 임계값(50/10,000), 기존 JD 적합도·키워드 패널·셸, 사이드바 `맞춤 첨삭` 잠금 메뉴, 다른 `ComingSoonPanel`(ATS).
 
