@@ -48,6 +48,6 @@ documents:
     - scripts/smoke-test.sh
     - scripts/google-test.sh
 active_specs:
-  - .agent-os/specs/2026-06-18-sentence-editing
+  - .agent-os/specs/2026-06-20-saramin-jd-image-ocr
 archived_specs:
   - .agent-os/archive/specs
