@@ -242,6 +242,15 @@ public class JdHtmlExtractor {
         return value == null ? "" : value.replace('\u00A0', ' ').replaceAll("\\s+", " ").trim();
     }
 
+    String normalizeOcrText(String value) {
+        return normalize(value);
+    }
+
+    boolean isValidOcrText(String value) {
+        String normalized = normalize(value);
+        return normalized.length() >= MIN_CONTENT_LENGTH && hasMinimumJdQuality(normalized);
+    }
+
     private boolean hasMeaningfulText(Element element) {
         return !normalize(element.text()).isBlank();
     }

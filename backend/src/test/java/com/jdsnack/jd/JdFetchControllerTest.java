@@ -53,6 +53,30 @@ class JdFetchControllerTest {
     }
 
     @Test
+    void imageOcrResponseKeepsExistingContract() throws Exception {
+        given(jdFetchService.fetch(any()))
+                .willReturn(new JdFetchResponse(
+                        "이미지에서 추출한 백엔드 개발자 채용 공고 본문입니다. Java와 Spring Boot 운영 경험이 필요합니다.",
+                        "https://www.saramin.co.kr/zf_user/jobs/view?rec_idx=123",
+                        "백엔드 개발자 채용",
+                        "image-ocr",
+                        "saramin"
+                ));
+
+        mockMvc.perform(post("/api/jd/fetch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "jdUrl": "https://www.saramin.co.kr/zf_user/jobs/view?rec_idx=123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.jdText").isString())
+                .andExpect(jsonPath("$.data.fetchMode").value("image-ocr"))
+                .andExpect(jsonPath("$.data.sourceSite").value("saramin"));
+    }
+
+    @Test
     void invalidUrlReturnsBadRequest() throws Exception {
         given(jdFetchService.fetch(any()))
                 .willThrow(new ApiException(ErrorCode.INVALID_JD_URL));
