@@ -43,7 +43,7 @@ const ANALYSIS_OPTIONS: {
   },
   {
     key: 'sentence',
-    label: '맞춤 첨삭',
+    label: '문장 첨삭',
     description: '문장 표현, 가독성, 문법 및 전문성 향상을 제안합니다.',
     recommended: false,
     enabled: true,

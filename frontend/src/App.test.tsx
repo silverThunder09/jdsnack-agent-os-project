@@ -106,14 +106,18 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('resume.pdf')).toBeInTheDocument()
   })
 
-  it('키워드 분석과 맞춤 첨삭은 선택 가능하고 준비중 태그가 표시되지 않는다', () => {
+  it('키워드 분석과 문장 첨삭은 선택 가능하고 준비중 태그가 표시되지 않는다', () => {
     render(<App />)
 
     expect(screen.getByText('JD 적합도')).toBeInTheDocument()
     expect(screen.getByText('ATS 분석')).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: /맞춤 첨삭/ })).toBeEnabled()
+    expect(screen.getByRole('checkbox', { name: /문장 첨삭/ })).toBeEnabled()
     expect(screen.getByText('키워드 분석')).toBeInTheDocument()
     expect(screen.getAllByText('준비중')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /맞춤 첨삭/ })).not.toBeInTheDocument()
+    for (const item of ['분석 내역', '이력서 관리', '템플릿', '키워드 사전', '요금제']) {
+      expect(screen.getByRole('button', { name: item })).toBeDisabled()
+    }
   })
 
   it('분석 시작하기는 JD 적합도(매칭) 결과와 준비중 패널을 보여준다', async () => {
@@ -142,7 +146,7 @@ describe('새로운 분석 시작 페이지', () => {
     render(<App />)
     await fillJdAndResume(user)
     await user.click(screen.getByRole('checkbox', { name: /JD 적합도/ }))
-    await user.click(screen.getByRole('checkbox', { name: /맞춤 첨삭/ }))
+    await user.click(screen.getByRole('checkbox', { name: /문장 첨삭/ }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
 
     expect(await screen.findByRole('heading', { name: '키워드 분석' })).toBeInTheDocument()
@@ -153,7 +157,7 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
   })
 
-  it('맞춤 첨삭만 선택하면 독립 API를 호출하고 Before→After 결과를 보여준다', async () => {
+  it('문장 첨삭만 선택하면 독립 API를 호출하고 Before→After 결과를 보여준다', async () => {
     const user = userEvent.setup()
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(diagnosePayload())
@@ -173,7 +177,7 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
   })
 
-  it('맞춤 첨삭 결과가 비어 있으면 빈 상태를 표시한다', async () => {
+  it('문장 첨삭 결과가 비어 있으면 빈 상태를 표시한다', async () => {
     const user = userEvent.setup()
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(diagnosePayload())
