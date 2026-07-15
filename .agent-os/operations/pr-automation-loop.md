@@ -23,7 +23,9 @@ JDSnack 기능 구현 해줘.
 
 - Codex 담당: 구현, 테스트, 커밋, origin push.
 - Claude 담당: 문서 계획, 리뷰, PR, merge.
-- 새 spec 또는 변경요청이 있으면 `codex/<기능>` 브랜치에서 구현합니다.
+- **구현 대상 = `index.yml`의 `active_specs`(정확히 1개)**. 브랜치는 `codex/<active-spec-slug>`(spec 디렉터리명)로 만들어 루프가 어느 spec인지 식별할 수 있게 합니다.
+- **큐 전진(원자적)**: 구현 브랜치에 코드뿐 아니라 (a) 완료한 active spec을 `.agent-os/archive/specs/`로 `git mv`, (b) `index.yml`의 `active_specs`를 `pending_specs` 첫 항목으로 교체(그 항목을 `pending_specs`에서 제거)를 함께 커밋합니다. 머지되면 다음 대기 spec이 자동 활성화됩니다. (`pending_specs`가 비면 active만 archive로 이동.)
+- 변경요청(`리뷰 반려: <branch>` 이슈)이 있으면 같은 `codex/*` 브랜치에서 반영합니다.
 - 문서 없는 API/UI 계약 변경은 하지 않습니다.
 - 작업 범위 밖 파일은 스테이징하지 않습니다.
 - 할 일이 없으면 수정하지 않고 대기합니다.

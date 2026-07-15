@@ -28,7 +28,8 @@
 ## 문서 하네스
 
 - `Agent OS`: 제품 방향, 기능 spec, 운영 규칙, 에이전트 규칙을 담는 프로젝트 문서 체계입니다.
-- `Active Spec`: 현재 작업 기준이 되는 최신 spec입니다. 기본적으로 하나만 유지합니다.
+- `Active Spec`: 현재 구현 대상 spec입니다. **정확히 1개**(`index.yml`의 `active_specs`)만 유지합니다.
+- `Pending Spec` (대기/백로그): 아직 활성이 아니지만 순서대로 대기 중인 spec입니다(`index.yml`의 `pending_specs`, 순서 리스트). 사람이 미리 채워 두면 무인 배치가 순서대로 소진합니다. active가 완료·아카이브되면 첫 pending이 자동으로 active가 됩니다.
 - `Archived Spec`: 과거 기획 보관 문서입니다. 사용자가 요청하거나 활성 spec이 참조할 때만 확인합니다.
 - `REQ`: 요구사항 ID입니다.
 - `AC`: Acceptance Criteria의 약자입니다. 수용 기준을 뜻합니다.
