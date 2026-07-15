@@ -17,8 +17,10 @@
 - 현재 구현 중인 기능 문서
 - `requirements`, `acceptance-criteria`, `test-scenarios`, `traceability`를 갖춘 상태
 - `specs/YYYY-MM-DD-<slug>/`에 위치
-- 활성 spec은 항상 최신 기획 1개만 유지합니다.
-- 이전 spec은 구현 여부와 관계없이 `.agent-os/archive/specs/`로 이동합니다.
+- **활성 spec(`active_specs`)은 정확히 1개**만 유지합니다(현재 구현 대상).
+- **대기 spec(`pending_specs`)은 순서 리스트로 여러 개** 미리 쌓아둘 수 있습니다 — 무인 배치가 밤새 순서대로 소진하는 백로그입니다. 대기 spec도 `specs/`에 두어 구조 검증(REQ/AC/TC/traceability)을 받습니다.
+- **큐 전진(원자적)**: Codex가 active spec을 구현할 때 **같은 구현 PR**에 다음을 포함합니다 — (a) 완료한 active spec을 `.agent-os/archive/specs/`로 이동, (b) `active_specs`를 `pending_specs`의 첫 항목으로 교체(그 항목을 `pending_specs`에서 제거). 이 PR이 머지되면 다음 대기 spec이 자동으로 활성화되어 Codex가 이어서 집습니다.
+- 대기 spec이 없으면(`pending_specs: []`) 활성 완료 후 사람이 새 spec을 채웁니다. 이전 spec은 구현 여부와 관계없이 archive로 이동합니다.
 
 ### 3. 안정화
 
