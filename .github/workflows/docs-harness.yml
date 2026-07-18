@@ -103,6 +103,14 @@ jobs:
             }
           done < <(grep -E '^[[:space:]]+- ' .agent-os/standards/index.yml | sed 's/^[[:space:]]*- //')
 
+      - name: Test needs-human Discord notification contract
+        shell: bash
+        run: ./scripts/notify-needs-human-test.sh
+
+      - name: Test worker backend contract
+        shell: bash
+        run: ./scripts/backends-contract-test.sh
+
       - name: Block legacy MVP references
         shell: bash
         run: |
