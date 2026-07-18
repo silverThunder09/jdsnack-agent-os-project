@@ -237,6 +237,16 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 
 ## PR 실패 처리
 
+PR 또는 CI가 반려되면 코덱스는 아래 순서로 같은 작업 브랜치에서 자동 복구합니다.
+
+1. 최신 CI 로그, 리뷰 코멘트, 실패 Issue를 확인하고 반려 원인을 분류합니다.
+2. 실패를 로컬에서 재현하고 원래 요구사항·수용 기준·업무 검증을 유지하는 수정만 합니다.
+3. 관련 테스트와 필요한 전체 회귀 테스트를 실행합니다. 테스트 삭제, assertion 약화, 검증 범위 축소로 통과시키지 않습니다.
+4. 수정 내용을 Conventional Commit으로 커밋하고 같은 브랜치에 푸시합니다.
+5. PR의 CI와 리뷰 상태를 다시 확인하고, 남은 반려 사유가 있으면 1단계부터 반복합니다.
+
+동일 PR에서 최대 3회 리뷰 시도까지 반복합니다. 같은 실패가 반복되거나 외부 승인·비밀값·서비스 복구가 필요한 경우 `needs-human` Issue로 전환하고, 코덱스는 자동 머지하지 않은 채 담당자에게 필요한 조치를 보고합니다.
+
 - GitHub Actions 또는 리뷰가 실패하면 `.github/ISSUE_TEMPLATE/pr-failure.yml` 형식으로 Issue를 생성한다.
 - 실패 Issue에는 유형 라벨을 붙인다. 기본 분류는 `ci-failure`, `contract-drift`, `test-gap`, `deploy-risk`다.
 - Issue에는 실패 PR, 실패 체크, 핵심 로그, 관련 `REQ/AC/TC`, 수정 계획을 남긴다.
