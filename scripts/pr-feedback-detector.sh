@@ -10,6 +10,7 @@ JQ_BIN="${JQ_BIN:-jq}"
 REPO="${GH_REPO:-}"
 BRANCH="${PR_FEEDBACK_BRANCH:-}"
 DIFF_LIMIT="${PR_DIFF_LIMIT:-$DEFAULT_DIFF_LIMIT}"
+DIFF_LIMIT_SOURCE="environment"
 
 usage() {
     cat <<'USAGE'
@@ -115,6 +116,7 @@ while [ "$#" -gt 0 ]; do
         --diff-limit)
             [ "$#" -ge 2 ] || { usage >&2; exit 2; }
             DIFF_LIMIT="$2"
+            DIFF_LIMIT_SOURCE="cli"
             shift 2
             ;;
         --help|-h)
@@ -132,9 +134,21 @@ command -v "$GH_BIN" >/dev/null 2>&1 || emit_needs_human "gh_unavailable"
 command -v "$JQ_BIN" >/dev/null 2>&1 || emit_needs_human "jq_unavailable"
 
 case "$DIFF_LIMIT" in
-    ''|*[!0-9]*) emit_needs_human "invalid_diff_limit" "PR_DIFF_LIMIT must be a positive integer" ;;
+    ''|*[!0-9]*)
+        if [ "$DIFF_LIMIT_SOURCE" = "cli" ]; then
+            usage >&2
+            exit 2
+        fi
+        emit_needs_human "invalid_diff_limit" "PR_DIFF_LIMIT must be a positive integer"
+        ;;
 esac
-[ "$DIFF_LIMIT" -gt 0 ] || emit_needs_human "invalid_diff_limit" "PR_DIFF_LIMIT must be a positive integer"
+if [ "$DIFF_LIMIT" -le 0 ]; then
+    if [ "$DIFF_LIMIT_SOURCE" = "cli" ]; then
+        usage >&2
+        exit 2
+    fi
+    emit_needs_human "invalid_diff_limit" "PR_DIFF_LIMIT must be a positive integer"
+fi
 
 if [ -z "$REPO" ]; then
     if ! repo_payload="$(run_gh_json repo view --json nameWithOwner)"; then
@@ -160,7 +174,7 @@ esac
 if ! pr_list="$(run_gh_json pr list --repo "$REPO" --head "$BRANCH" --state open --json number --limit 1)"; then
     emit_needs_human "github_query_failed" "pr list failed"
 fi
-validate_json "$pr_list" "pr list" 'type == "array"'
+validate_json "$pr_list" "pr list" 'type == "array" and all(.[]; (.number | type) == "number")'
 pr_number="$($JQ_BIN -r '.[0].number // empty' <<EOF
 $pr_list
 EOF
@@ -170,13 +184,13 @@ if [ -n "$pr_number" ]; then
     if ! pr_payload="$(run_gh_json pr view "$pr_number" --repo "$REPO" --json number,title,url,state,headRefName,baseRefName,headRefOid,reviewDecision,additions,deletions,changedFiles,statusCheckRollup)"; then
         emit_needs_human "github_query_failed" "pr view failed"
     fi
-    validate_json "$pr_payload" "pr view" 'type == "object"'
+    validate_json "$pr_payload" "pr view" 'type == "object" and (.number | type) == "number" and (.baseRefName | type) == "string" and (.headRefOid | type) == "string" and (.statusCheckRollup | type) == "array"'
 fi
 
 if ! issue_list="$(run_gh_json issue list --repo "$REPO" --state open --search "\"리뷰 반려: $BRANCH\" in:title" --json number,title,url,updatedAt --limit 20)"; then
     emit_needs_human "github_query_failed" "issue list failed"
 fi
-validate_json "$issue_list" "issue list" 'type == "array"'
+validate_json "$issue_list" "issue list" 'type == "array" and all(.[]; (.number | type) == "number" and (.title | type) == "string")'
 issue_number="$($JQ_BIN -r --arg title "리뷰 반려: $BRANCH" 'map(select(.title == $title)) | sort_by(.updatedAt) | last | .number // empty' <<EOF
 $issue_list
 EOF
@@ -238,7 +252,7 @@ EOF
         if ! required_payload="$(run_gh_json api "repos/$REPO/branches/$base_branch/protection/required_status_checks" 2>/dev/null)"; then
             emit_needs_human "required_checks_unknown" "main branch protection could not be read; set PR_FEEDBACK_REQUIRED_CHECKS to override"
         fi
-        validate_json "$required_payload" "required status checks" 'type == "object" and ((.contexts // []) | type) == "array" and ((.checks // []) | type) == "array"'
+        validate_json "$required_payload" "required status checks" 'type == "object" and (.contexts | type) == "array" and (.checks | type) == "array"'
         required_checks="$($JQ_BIN -c '([.contexts[]?, .checks[]?.context] | map(select(. != null)) | unique)' <<EOF
 $required_payload
 EOF

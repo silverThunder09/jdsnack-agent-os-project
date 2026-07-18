@@ -76,6 +76,12 @@ set -e
 assert_eq 20 "$exit_code" "invalid diff limit exit code"
 assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "invalid diff limit status"
 
+set +e
+bash "$DETECTOR" --branch codex/example --diff-limit not-a-number >/dev/null 2>&1
+exit_code=$?
+set -e
+assert_eq 2 "$exit_code" "invalid CLI diff limit exit code"
+
 run_detector required_checks_unavailable
 assert_eq 20 "$exit_code" "required check lookup exit code"
 assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "required check lookup status"
@@ -104,6 +110,14 @@ assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "malformed GitH
 run_detector invalid_shape
 assert_eq 20 "$exit_code" "invalid GitHub response shape exit code"
 assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "invalid GitHub response shape status"
+
+run_detector invalid_pr_shape
+assert_eq 20 "$exit_code" "invalid PR response shape exit code"
+assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "invalid PR response shape status"
+
+run_detector invalid_required_shape
+assert_eq 20 "$exit_code" "invalid required checks response shape exit code"
+assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "invalid required checks response shape status"
 
 set +e
 output="$(
