@@ -3,7 +3,7 @@
 ## 상태
 
 - Feature Spec 상태: `active`
-- 구현 상태: `not-started`
+- 구현 상태: `in-progress`
 - 구현 전제: 이 문서와 내부 티켓의 범위·계약·테스트 시나리오를 기준으로 Codex가 구현합니다.
 
 ## 내부 수직 티켓
@@ -13,6 +13,8 @@
 - 범위: Google OAuth/OIDC callback, state 검증, 내부 사용자·세션, 인증 fake 테스트
 - 의존성: 없음
 - 완료 조건: AC-01, TC-01, TC-02 통과; secret/token 브라우저 비노출
+- 상태: `in-progress`
+- 검증: 백엔드 `GoogleAuthControllerTest`, 프론트 `AuthGate.test.tsx` 및 전체 lint/test/build 통과. 보호 API 인증 강제(TC-02)는 분석 이력 API 구현 시 연결합니다.
 
 ### T2. 이력서·JD 입력과 저장 계약
 
