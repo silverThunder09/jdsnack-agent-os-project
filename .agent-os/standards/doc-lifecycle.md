@@ -17,10 +17,12 @@
 - 현재 구현 중인 기능 문서
 - `requirements`, `acceptance-criteria`, `test-scenarios`, `traceability`를 갖춘 상태
 - `specs/YYYY-MM-DD-<slug>/`에 위치
-- **활성 spec(`active_specs`)은 정확히 1개**만 유지합니다(현재 구현 대상).
-- **대기 spec(`pending_specs`)은 순서 리스트로 여러 개** 미리 쌓아둘 수 있습니다 — 무인 배치가 밤새 순서대로 소진하는 백로그입니다. 대기 spec도 `specs/`에 두어 구조 검증(REQ/AC/TC/traceability)을 받습니다.
-- **큐 전진(원자적)**: Codex가 active spec을 구현할 때 **같은 구현 PR**에 다음을 포함합니다 — (a) 완료한 active spec을 `.agent-os/archive/specs/`로 이동, (b) `active_specs`를 `pending_specs`의 첫 항목으로 교체(그 항목을 `pending_specs`에서 제거). 이 PR이 머지되면 다음 대기 spec이 자동으로 활성화되어 Codex가 이어서 집습니다.
-- 대기 spec이 없으면(`pending_specs: []`) 활성 완료 후 사람이 새 spec을 채웁니다. 이전 spec은 구현 여부와 관계없이 archive로 이동합니다.
+- **구현 중 활성 spec(`active_specs`)은 정확히 1개**만 유지합니다(현재 구현 대상). Feature Spec 완료 PR에서 이전 spec을 archive한 뒤 다음 spec을 아직 시작하지 않은 전환 상태는 0개를 허용합니다.
+- `pending_specs`는 기본적으로 비워 둡니다. 미래 후보는 `.agent-os/product/spec-backlog.md`에 한 줄로만 관리합니다.
+- 다중 티켓 Feature Spec은 `plan.md`에 `T1…Tn`의 상태·의존성·완료 조건을 둡니다. 자동화는 준비된 티켓 하나만 claim합니다.
+- 티켓 PR이 머지되면 같은 Feature Spec의 티켓 상태와 traceability를 갱신하고, 다음 준비 티켓으로 진행합니다. 티켓 완료만으로 Spec을 archive하지 않습니다.
+- 마지막 티켓과 Feature Spec 전체 수용 기준이 통과하면, 같은 완료 PR에서 active Spec을 `.agent-os/archive/specs/`로 이동하고 `active_specs`를 비웁니다.
+- 후보 백로그에서 다음 Feature Spec을 만드는 일은 사람이 기획 범위를 확정한 뒤에만 시작합니다. 자동 승격하지 않습니다.
 
 ### 3. 안정화
 
@@ -63,6 +65,8 @@
 - `acceptance-criteria.md`
 - `test-scenarios.md`
 - `traceability.md`
+
+다중 티켓 Feature Spec에는 `plan.md`도 포함하며, 각 티켓은 독립 PR·검증 결과를 남깁니다.
 
 ## 레거시 문서 처리
 

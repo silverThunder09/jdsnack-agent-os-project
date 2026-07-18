@@ -6,6 +6,14 @@ documents:
     - .agent-os/product/roadmap.md
     - .agent-os/product/tech-stack.md
     - .agent-os/product/glossary.md
+    - .agent-os/product/decisions.md
+    - .agent-os/product/spec-backlog.md
+  technical_adr:
+    - .agent-os/adr/adr-001-postgresql.md
+    - .agent-os/adr/adr-002-oauth-provider.md
+    - .agent-os/adr/adr-003-jd-source-adapter.md
+    - .agent-os/adr/adr-004-analysis-record.md
+    - .agent-os/adr/adr-005-analysis-worker.md
   harness:
     - .agent-os/standards/codex-harness.md
     - .agent-os/standards/doc-lifecycle.md
@@ -48,9 +56,9 @@ documents:
     - scripts/smoke-test.sh
     - scripts/google-test.sh
 active_specs:
-  - .agent-os/specs/2026-06-20-saramin-jd-image-ocr
-# 대기 백로그(순서 리스트). 사람이 미리 채우고, 무인 루프가 순서대로 소진한다.
-# active가 완료·아카이브되면 첫 pending이 자동으로 active가 된다(doc-lifecycle.md 큐 전진).
+  - .agent-os/specs/2026-07-18-service-mvp
+# 상세 pending Spec을 미리 만들지 않는다. 후보는 제품 백로그에만 둔다.
 pending_specs: []
+candidate_backlog: .agent-os/product/spec-backlog.md
 archived_specs:
   - .agent-os/archive/specs
