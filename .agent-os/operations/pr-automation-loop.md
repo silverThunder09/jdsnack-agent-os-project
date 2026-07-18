@@ -23,6 +23,7 @@ JDSnack 기능 구현 해줘.
 
 - Codex 담당: 구현, 테스트, 커밋, origin push.
 - Claude 담당: 문서 계획, 리뷰, PR, merge.
+- 모델 정책: 기능 구현은 **5.6 Luna**, 테스트 코드 작성·테스트 결과 분석은 **5.6 Luna Medium**을 사용합니다. 빌드·lint·test·E2E 명령 실행 자체에는 모델을 지정하지 않습니다. 리뷰·판정은 Codex가 아니라 Claude `code-reviewer`가 담당합니다.
 - 구현 대상은 `index.yml`의 `active_specs`(정확히 1개) 안에서 준비된 티켓 하나입니다. `plan.md`가 없는 레거시 active Spec은 Spec 전체를 한 작업으로 취급합니다.
 - 티켓 브랜치는 `codex/<active-spec-slug>-<ticket-id>`로 만들고, 티켓별 구현·테스트·PR·리뷰·머지를 독립적으로 수행합니다.
 - **티켓 전진(원자적)**: 티켓 PR에는 코드뿐 아니라 `plan.md`의 티켓 상태와 관련 traceability·테스트 결과 갱신을 포함합니다. 머지 후 active Spec은 유지한 채 다음 준비 티켓을 claim합니다.
