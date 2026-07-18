@@ -49,7 +49,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
               <div className="auth-card__logo" aria-hidden="true">
                 JDSnack
               </div>
-              <span className="auth-card__eyebrow">JDSnack</span>
               <h1 aria-label="합격을 위한 분석을 시작해보세요">
                 <span>합격을 위한</span>
                 <span>분석을 시작해보세요</span>
