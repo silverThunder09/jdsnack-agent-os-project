@@ -34,6 +34,8 @@ fi
 
 반려 Issue를 가장 먼저 처리합니다. 같은 사건을 반복 감지하지 않도록 `event_key`에 Issue 갱신 시각 또는 PR head SHA를 포함합니다. 상태 저장·중복 제거는 호출하는 스케줄러가 담당합니다.
 
+CI 실패는 base 브랜치 보호 규칙의 required status check와 일치하는 항목만 감지합니다. 보호 규칙을 읽을 수 없으면 조용히 통과시키지 않고 `needs_human`을 반환합니다. 일시적으로 API를 읽을 수 없는 환경은 `PR_FEEDBACK_REQUIRED_CHECKS=check-a,check-b`로 명시할 수 있습니다. `ERROR` 상태도 실패로 처리합니다.
+
 ## 출력과 종료 코드
 
 | 종료 코드 | `status` | 의미 |
@@ -50,3 +52,4 @@ fi
 - 감지기는 GitHub 상태만 읽습니다. 코드 수정, 강제 push, PR 생성, 머지는 호출기가 별도 권한으로 수행합니다.
 - `needs_human`은 자동으로 실패를 숨기지 않고 인증·권한·외부 상태 문제를 사람에게 올립니다.
 - Codex 수정 작업은 기존 PR 규칙의 동일 브랜치·관련 테스트·업무 assertion 보존 규칙을 따릅니다.
+- 감지기 계약 테스트는 Docs Harness에서 매 PR마다 실행합니다.

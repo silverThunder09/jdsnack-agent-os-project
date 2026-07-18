@@ -48,6 +48,34 @@ assert_eq 10 "$exit_code" "CI failure exit code"
 assert_eq ci_failed "$(printf '%s' "$output" | jq -r .event_type)" "CI failure event"
 assert_eq backend "$(printf '%s' "$output" | jq -r .failed_checks[0].name)" "failed check name"
 
+run_detector ci_error
+assert_eq 10 "$exit_code" "CI ERROR exit code"
+assert_eq ci_failed "$(printf '%s' "$output" | jq -r .event_type)" "CI ERROR event"
+
+run_detector ci_optional
+assert_eq 0 "$exit_code" "optional check exit code"
+assert_eq no_action "$(printf '%s' "$output" | jq -r .status)" "optional check status"
+
+run_detector required_checks_unavailable
+assert_eq 20 "$exit_code" "required check lookup exit code"
+assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "required check lookup status"
+
+run_detector malformed
+assert_eq 20 "$exit_code" "malformed GitHub response exit code"
+assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "malformed GitHub response status"
+
+set +e
+output="$(
+    GH_BIN="$FIXTURE_GH" \
+    JQ_BIN=missing-jq \
+    GH_REPO=fixture/repo \
+    bash "$DETECTOR" --branch codex/example
+)"
+exit_code=$?
+set -e
+assert_eq 20 "$exit_code" "jq unavailable exit code"
+assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "jq unavailable status"
+
 run_detector no_action feature/not-codex
 assert_eq 0 "$exit_code" "non-Codex branch exit code"
 assert_eq no_action "$(printf '%s' "$output" | jq -r .status)" "non-Codex branch status"

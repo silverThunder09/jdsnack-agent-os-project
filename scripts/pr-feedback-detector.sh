@@ -34,12 +34,16 @@ emit_no_action() {
 emit_needs_human() {
     local reason="$1"
     local details="${2:-}"
-    "$JQ_BIN" -n \
-        --arg branch "$BRANCH" \
-        --arg repo "$REPO" \
-        --arg reason "$reason" \
-        --arg details "$details" \
-        '{status: "needs_human", branch: $branch, repository: $repo, reason: $reason, details: $details}'
+    if command -v "$JQ_BIN" >/dev/null 2>&1; then
+        "$JQ_BIN" -n \
+            --arg branch "$BRANCH" \
+            --arg repo "$REPO" \
+            --arg reason "$reason" \
+            --arg details "$details" \
+            '{status: "needs_human", branch: $branch, repository: $repo, reason: $reason, details: $details}'
+    else
+        printf '{"status":"needs_human","reason":"%s"}\n' "$reason"
+    fi
     exit "$NEEDS_HUMAN_EXIT"
 }
 
@@ -81,9 +85,18 @@ emit_actionable() {
 run_gh_json() {
     local output
     if ! output="$($GH_BIN "$@" 2>&1)"; then
-        emit_needs_human "github_query_failed" "$output"
+        printf '%s\n' "$output" >&2
+        return 1
     fi
     printf '%s' "$output"
+}
+
+validate_json() {
+    local payload="$1"
+    local source="$2"
+    if ! printf '%s' "$payload" | "$JQ_BIN" -e . >/dev/null 2>&1; then
+        emit_needs_human "github_response_invalid" "$source returned malformed JSON"
+    fi
 }
 
 while [ "$#" -gt 0 ]; do
@@ -118,7 +131,10 @@ command -v "$GH_BIN" >/dev/null 2>&1 || emit_needs_human "gh_unavailable"
 command -v "$JQ_BIN" >/dev/null 2>&1 || emit_needs_human "jq_unavailable"
 
 if [ -z "$REPO" ]; then
-    repo_payload="$(run_gh_json repo view --json nameWithOwner)"
+    if ! repo_payload="$(run_gh_json repo view --json nameWithOwner)"; then
+        emit_needs_human "github_query_failed" "repo view failed"
+    fi
+    validate_json "$repo_payload" "repo view"
     REPO="$($JQ_BIN -r '.nameWithOwner // empty' <<EOF
 $repo_payload
 EOF
@@ -135,24 +151,56 @@ case "$BRANCH" in
     *) emit_no_action ;;
 esac
 
-pr_list="$(run_gh_json pr list --repo "$REPO" --head "$BRANCH" --state open --json number --limit 1)"
+if ! pr_list="$(run_gh_json pr list --repo "$REPO" --head "$BRANCH" --state open --json number --limit 1)"; then
+    emit_needs_human "github_query_failed" "pr list failed"
+fi
+validate_json "$pr_list" "pr list"
 pr_number="$($JQ_BIN -r '.[0].number // empty' <<EOF
 $pr_list
 EOF
 )"
 pr_payload="null"
 if [ -n "$pr_number" ]; then
-    pr_payload="$(run_gh_json pr view "$pr_number" --repo "$REPO" --json number,title,url,state,headRefName,baseRefName,headRefOid,reviewDecision,additions,deletions,changedFiles,statusCheckRollup)"
+    if ! pr_payload="$(run_gh_json pr view "$pr_number" --repo "$REPO" --json number,title,url,state,headRefName,baseRefName,headRefOid,reviewDecision,additions,deletions,changedFiles,statusCheckRollup)"; then
+        emit_needs_human "github_query_failed" "pr view failed"
+    fi
+    validate_json "$pr_payload" "pr view"
 fi
 
-issue_list="$(run_gh_json issue list --repo "$REPO" --state open --json number,title,url,updatedAt --limit 100)"
+if ! issue_list="$(run_gh_json issue list --repo "$REPO" --state open --search "\"리뷰 반려: $BRANCH\" in:title" --json number,title,url,updatedAt --limit 20)"; then
+    emit_needs_human "github_query_failed" "issue list failed"
+fi
+validate_json "$issue_list" "issue list"
 issue_number="$($JQ_BIN -r --arg title "리뷰 반려: $BRANCH" 'map(select(.title == $title)) | sort_by(.updatedAt) | last | .number // empty' <<EOF
 $issue_list
 EOF
 )"
 issue_payload="null"
 if [ -n "$issue_number" ]; then
-    issue_payload="$(run_gh_json issue view "$issue_number" --repo "$REPO" --json number,title,url,body,comments,updatedAt)"
+    if ! issue_payload="$(run_gh_json issue view "$issue_number" --repo "$REPO" --json number,title,url,body,comments,updatedAt)"; then
+        emit_needs_human "github_query_failed" "issue view failed"
+    fi
+    validate_json "$issue_payload" "issue view"
+fi
+
+required_checks='[]'
+if [ -n "$pr_number" ]; then
+    base_branch="$($JQ_BIN -r '.baseRefName // empty' <<EOF
+$pr_payload
+EOF
+)"
+    if [ -n "${PR_FEEDBACK_REQUIRED_CHECKS:-}" ]; then
+        required_checks="$(printf '%s' "$PR_FEEDBACK_REQUIRED_CHECKS" | tr ',' '\n' | "$JQ_BIN" -Rsc 'split("\n") | map(select(length > 0))')"
+    else
+        if ! required_payload="$(run_gh_json api "repos/$REPO/branches/$base_branch/protection/required_status_checks" 2>/dev/null)"; then
+            emit_needs_human "required_checks_unknown" "main branch protection could not be read; set PR_FEEDBACK_REQUIRED_CHECKS to override"
+        fi
+        validate_json "$required_payload" "required status checks"
+        required_checks="$($JQ_BIN -c '([.contexts[]?, .checks[]?.context] | map(select(. != null)) | unique)' <<EOF
+$required_payload
+EOF
+)"
+    fi
 fi
 
 pr_ref="$($JQ_BIN -c 'if . == null then null else {
@@ -170,9 +218,10 @@ $issue_payload
 EOF
 )"
 
-failed_checks="$($JQ_BIN -c 'if . == null then [] else [.statusCheckRollup[]? | select(
-    ((.conclusion // .state // "") | ascii_upcase)
-    | IN("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE")
+failed_checks="$($JQ_BIN -c --argjson required "$required_checks" 'if . == null then [] else [.statusCheckRollup[]? | . as $check | select(
+    (($required | index($check.name)) != null or ($required | index($check.workflowName)) != null)
+    and (((.conclusion // .state // "") | ascii_upcase)
+      | IN("FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"))
   ) | {name, conclusion: (.conclusion // .state), detailsUrl}] end' <<EOF
 $pr_payload
 EOF

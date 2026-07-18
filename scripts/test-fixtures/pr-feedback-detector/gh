@@ -11,7 +11,11 @@ if [ "$command_name" = "repo" ] && [ "$subcommand" = "view" ]; then
 fi
 
 if [ "$command_name" = "pr" ] && [ "$subcommand" = "list" ]; then
-    if [ "$scenario" = "pr_review" ] || [ "$scenario" = "ci_failure" ]; then
+    if [ "$scenario" = "malformed" ]; then
+        printf '%s\n' '{not-json'
+        exit 0
+    fi
+    if [ "$scenario" = "pr_review" ] || [ "$scenario" = "ci_failure" ] || [ "$scenario" = "ci_error" ] || [ "$scenario" = "ci_optional" ] || [ "$scenario" = "required_checks_unavailable" ]; then
         printf '%s\n' '[{"number":7}]'
     else
         printf '%s\n' '[]'
@@ -22,9 +26,22 @@ fi
 if [ "$command_name" = "pr" ] && [ "$subcommand" = "view" ]; then
     if [ "$scenario" = "pr_review" ]; then
         printf '%s\n' '{"number":7,"title":"T2","url":"https://example.test/pr/7","state":"OPEN","headRefName":"codex/example","baseRefName":"main","headRefOid":"abc123","reviewDecision":"CHANGES_REQUESTED","additions":10,"deletions":2,"changedFiles":2,"statusCheckRollup":[]}'
+    elif [ "$scenario" = "ci_error" ]; then
+        printf '%s\n' '{"number":7,"title":"T2","url":"https://example.test/pr/7","state":"OPEN","headRefName":"codex/example","baseRefName":"main","headRefOid":"abc123","reviewDecision":"","additions":10,"deletions":2,"changedFiles":2,"statusCheckRollup":[{"name":"backend","state":"ERROR","detailsUrl":"https://example.test/check/7"}]}'
+    elif [ "$scenario" = "ci_optional" ]; then
+        printf '%s\n' '{"number":7,"title":"T2","url":"https://example.test/pr/7","state":"OPEN","headRefName":"codex/example","baseRefOid":"abc123","baseRefName":"main","reviewDecision":"","additions":10,"deletions":2,"changedFiles":2,"statusCheckRollup":[{"name":"optional","conclusion":"FAILURE","detailsUrl":"https://example.test/check/optional"}]}'
     else
         printf '%s\n' '{"number":7,"title":"T2","url":"https://example.test/pr/7","state":"OPEN","headRefName":"codex/example","baseRefName":"main","headRefOid":"abc123","reviewDecision":"","additions":10,"deletions":2,"changedFiles":2,"statusCheckRollup":[{"name":"backend","conclusion":"FAILURE","detailsUrl":"https://example.test/check/7"}]}'
     fi
+    exit 0
+fi
+
+if [ "$command_name" = "api" ]; then
+    if [ "$scenario" = "required_checks_unavailable" ]; then
+        printf 'branch protection unavailable\n' >&2
+        exit 1
+    fi
+    printf '%s\n' '{"contexts":["backend"],"checks":[{"context":"backend","app_id":15368}]}'
     exit 0
 fi
 
