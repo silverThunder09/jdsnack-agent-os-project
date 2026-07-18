@@ -8,13 +8,13 @@
 
 ## 내부 수직 티켓
 
-### T1. Google OAuth 로그인과 사용자 식별
+### T1. Google OAuth 로그인과 보호 API 인증 경계
 
-- 범위: Google OAuth/OIDC callback, state 검증, 내부 사용자·세션, 인증 fake 테스트
+- 범위: Google OAuth/OIDC callback, state 검증, 내부 사용자·세션, 공통 인증 경계, 보호 API 차단, 인증 fake 테스트
 - 의존성: 없음
-- 완료 조건: AC-01, TC-01, TC-02 통과; secret/token 브라우저 비노출
+- 완료 조건: AC-01, AC-01a, TC-01, TC-01a, TC-02 통과; secret/token 브라우저 비노출
 - 상태: `in-progress`
-- 검증: 백엔드 `GoogleAuthControllerTest`, 프론트 `AuthGate.test.tsx` 및 전체 lint/test/build 통과. 보호 API 인증 강제(TC-02)는 분석 이력 API 구현 시 연결합니다.
+- 검증: 백엔드 `GoogleAuthControllerTest`와 보호 API 인증 테스트, 프론트 `AuthGate.test.tsx` 및 전체 lint/test/build 통과. T2 이후 티켓은 T1에서 만든 공통 인증 경계를 재사용합니다.
 
 ### T2. 이력서·JD 입력과 저장 계약
 
