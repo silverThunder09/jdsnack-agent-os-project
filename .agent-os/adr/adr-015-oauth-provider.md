@@ -1,7 +1,7 @@
 # 1차 social login은 Google OAuth/OIDC로 시작
 
 ```yaml
-id: adr-002-oauth-provider
+id: adr-015-oauth-provider
 status: proposed
 risk: High
 author: Codex
