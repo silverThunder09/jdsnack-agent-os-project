@@ -47,3 +47,4 @@
 - 프론트: `cd frontend && npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`
 - 문서: active spec 필수 문서, traceability, index 포인터, 링크 검증
 - 외부 OAuth/Gemini/DB는 fake/stub 또는 격리된 테스트 경계로 검증하며 운영 secret을 테스트에 포함하지 않는다.
+- Compose smoke test는 로컬 전용 테스트 세션 발급 경로를 사용해 인증 후 기존 분석·업로드 검증을 수행할 수 있다. 이 경로는 `jdsnack.auth.smoke.enabled`가 명시적으로 켜진 로컬 compose에서만 등록되며 기본값은 `false`이고 운영 compose에는 노출하지 않는다.
