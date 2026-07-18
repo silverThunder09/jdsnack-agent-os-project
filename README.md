@@ -38,7 +38,6 @@ jdsnack-agent-os/
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── README.md
-├── CHANGELOG.md
 ├── .agent-os/
 │   ├── product/
 │   ├── specs/
@@ -66,7 +65,7 @@ jdsnack-agent-os/
 - 활성 기능 명세: `.agent-os/specs/`
 - 보관 기능 명세: `.agent-os/archive/specs/`
 - 아키텍처 문서: `docs/architecture/`
-- 변경 이력: `CHANGELOG.md`
+- 변경 이력: `git log --oneline`(커밋 단위) · `.agent-os/product/roadmap.md` 제품 검증 이력(단계 요약)
 
 ## 로컬 실행
 
