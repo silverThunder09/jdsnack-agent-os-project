@@ -1,7 +1,7 @@
 # 채용 사이트별 JD 수집을 Source Adapter로 격리
 
 ```yaml
-id: adr-003-jd-source-adapter
+id: adr-016-jd-source-adapter
 status: proposed
 risk: Standard
 author: Codex

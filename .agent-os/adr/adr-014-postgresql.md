@@ -1,7 +1,7 @@
 # PostgreSQL을 서비스 영속 저장소로 사용
 
 ```yaml
-id: adr-001-postgresql
+id: adr-014-postgresql
 status: proposed
 risk: High
 author: Codex

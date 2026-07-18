@@ -1,5 +1,10 @@
 # 주요 결정 기록
 
+> **번호 체계(2026-07-18 일원화)**: ADR·DECISION·`.agent-os/adr/` 파일은 **하나의 연속 번호**를 공유합니다.
+> 이 파일의 ADR-001~006·DECISION-007~013에 이어 기술 ADR 파일이 adr-014~018을 사용 중이며,
+> **새 결정은 ADR-019부터 `.agent-os/adr/`에 파일로 추가**합니다(frontmatter: id·status·risk·related_specs).
+> 이 파일은 기존 결정의 보관과 인덱스 역할을 유지합니다.
+
 ## ADR-001 단일 저장소 운영
 
 - 결정: 문서, 백엔드, 프론트엔드를 한 저장소에서 관리합니다.
@@ -86,6 +91,7 @@
 - 결정: MVP는 `openid`, `email`, `profile` 수준의 기본 식별 정보만 요청합니다.
 - 이유: 기본 식별 스코프 중심으로 구현해 검수 부담을 낮추고, provider 토큰과 내부 사용자 식별을 분리할 수 있습니다.
 - 영향: Kakao 등 추가 공급자는 MVP 범위에서 제외하며, 이후 별도 provider 경계로 추가합니다.
+- 상세(Context·검토 대안·risk): [adr-015-oauth-provider](../adr/adr-015-oauth-provider.md) — 같은 결정의 기술 ADR. 내용 충돌 시 adr 파일이 정본.
 
 ## DECISION-011 이력서는 분석 이력의 입력 사본으로만 보존
 

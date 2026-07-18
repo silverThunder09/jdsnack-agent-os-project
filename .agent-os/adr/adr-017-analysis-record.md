@@ -1,7 +1,7 @@
 # AI 분석을 사용자 소유 Analysis Record로 저장
 
 ```yaml
-id: adr-004-analysis-record
+id: adr-017-analysis-record
 status: proposed
 risk: High
 author: Codex
