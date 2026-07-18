@@ -4,7 +4,7 @@
 
 ## 현재 Feature Spec
 
-- **Service MVP**: `.agent-os/specs/2026-07-18-service-mvp/`에서 로그인부터 이력 조회·재시도·삭제까지 하나의 Feature Spec, 내부 티켓 5개로 구현합니다.
+- **Service MVP**: 활성 spec `.agent-os/specs/2026-07-18-service-mvp/` — 범위·티켓은 spec이 정본.
 
 ## Post MVP 후보
 
@@ -26,5 +26,5 @@
 
 ## 승격 규칙
 
-- 후보 하나를 선택해 `/grill-with-docs → /to-spec → /to-tickets → /implement` 순서로 진행합니다.
-- 상세 Feature Spec은 선택된 후보 하나에만 만들고, 나머지는 이 표에 남깁니다.
+- 승격 절차의 정본은 [doc-lifecycle.md](../standards/doc-lifecycle.md)입니다(사람이 시작, 자동 승격 없음, 상세 Spec은 선택된 후보 하나에만).
+- 실행 명령 순서: `/grill-with-docs → /to-spec → /to-tickets → /implement`.

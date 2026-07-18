@@ -88,11 +88,7 @@ resume_phase: test
 
 ## 시작 판단
 
-작업 시작 시 먼저 이 PR의 위험도를 결정합니다.
-
-- `Light`: 작고 위험이 낮은 변경
-- `Standard`: 일반적인 기능/로직/API/UI 변경
-- `High-risk`: 보안, 외부 API, 배포, DB, 인증, CI/CD 영향이 있는 변경
+작업 시작 시 먼저 이 PR의 위험도(`Light` / `Standard` / `High-risk`)를 결정합니다. 분류 기준·예시·필수 검증의 정본은 [pr-rules.md](pr-rules.md)의 "PR 위험도 기준"입니다.
 
 ## Technical ADR gate
 
@@ -137,49 +133,19 @@ resume_phase: test
 
 ## 변경 범위별 확인 기준
 
-| 변경 범위 | 기본 확인 |
-|---|---|
-| 요구사항, API/UI 계약 | active spec과 traceability 일치 |
-| `backend/**` | 백엔드 테스트와 API 계약 일치 |
-| `frontend/**` | 프론트 테스트와 UI 계약 일치 |
-| `.github/**`, CI/CD, Docker | CI/CD 체크리스트와 실행 결과 |
-| 외부 AI, 비밀값, 로그 정책 | 보안 정책과 secret 노출 여부 |
-| PR/머지/릴리즈 판단 | PR 규칙, 머지 규칙, 릴리즈 체크리스트 |
+변경 범위별 확인 기준의 정본은 [pr-review-gate.md](pr-review-gate.md)의 표입니다.
 
 ## PR 생성 조건
 
-- 커밋이 존재해야 합니다.
-- PR의 주 목적이 한 문장으로 설명되어야 합니다.
-- 변경 파일이 `pr-rules.md`의 `PR 범위 경계`를 통과해야 합니다.
-- CI, 운영, 템플릿, 광범위 문서 정리는 기능 PR과 분리해야 합니다.
-- 관련 문서와 테스트가 갱신되어야 합니다.
-- 로컬에서 가능한 검증을 통과해야 합니다.
-- PR 본문에 `REQ`, `AC`, `TC`, 변경 문서, 검증 결과가 연결되어야 합니다.
+PR 생성 전 검증 기준의 정본은 [pr-rules.md](pr-rules.md)의 "PR 전 필수 검증 기준"입니다.
 
 ## PR 실패 처리
 
-PR 실패는 숨기지 않고 Issue로 남깁니다.
-
-Issue에는 아래 내용을 기록합니다.
-
-- 실패 유형
-- 실패한 PR 링크
-- 실패한 체크 이름
-- 실패 로그 핵심
-- 관련 `REQ`, `AC`, `TC`
-- 수정 계획
-
-`High-risk` PR은 Issue 생성 후 같은 브랜치에서 수정하고 다시 테스트 후 커밋합니다.
+PR 실패는 숨기지 않고 Issue로 남깁니다. 실패 Issue의 형식·라벨·기록 항목·수정 절차의 정본은 [pr-rules.md](pr-rules.md)의 "PR 실패 처리"입니다. `High-risk` PR은 Issue 생성 후 같은 브랜치에서 수정하고 다시 테스트 후 커밋합니다.
 
 ## 머지 조건
 
-- GitHub Actions 통과
-- 위험도에 맞는 리뷰 통과
-- `High-risk`는 자체 리뷰 게이트 통과
-- PR 범위 경계 통과
-- PR 리뷰 승인
-- 머지 금지 조건 없음
-- `release-checklist.md` 또는 `cd-checklist.md`에 걸리는 배포 영향 확인
+머지 전 필수 조건·금지 조건의 정본은 [merge-rules.md](merge-rules.md)입니다. `High-risk`는 추가로 자체 리뷰 게이트([pr-review-gate.md](pr-review-gate.md))를 통과해야 합니다.
 
 ## main 반영 후
 

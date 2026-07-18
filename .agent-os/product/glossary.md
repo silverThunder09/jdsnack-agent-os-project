@@ -31,13 +31,13 @@
 - `Agent OS`: 제품 방향, 기능 spec, 운영 규칙, 에이전트 규칙을 담는 프로젝트 문서 체계입니다.
 - `Active Spec`: 현재 구현 대상 spec입니다. **정확히 1개**(`index.yml`의 `active_specs`)만 유지합니다.
 - `Feature Spec`: 하나의 사용자 가치 흐름을 요구사항·계약·수용 기준·테스트·내부 티켓으로 고정한 구현 계약입니다.
-- `Pending Spec`: 호환성을 위해 `index.yml`에 남긴 비어 있는 필드입니다. 미래 후보는 상세 Spec이 아니라 `spec-backlog.md`에 관리하고 자동 승격하지 않습니다.
+- `Pending Spec`: 호환성을 위해 `index.yml`에 남긴 비어 있는 필드입니다. 미래 후보는 `spec-backlog.md`에서 관리합니다(승격 규칙 정본은 `standards/doc-lifecycle.md`).
 - `Archived Spec`: 과거 기획 보관 문서입니다. 사용자가 요청하거나 활성 spec이 참조할 때만 확인합니다.
 - `REQ`: 요구사항 ID입니다.
 - `AC`: Acceptance Criteria의 약자입니다. 수용 기준을 뜻합니다.
 - `TC`: Test Case의 약자입니다. 테스트 시나리오를 뜻합니다.
 - `Traceability`: `REQ -> AC -> TC -> 계약/구현` 연결을 추적하는 문서입니다.
-- `Service MVP`: 로그인부터 분석 결과 재조회·재시도·삭제까지 사용자가 완료할 수 있는 최소한의 서비스 가치 흐름입니다. OCR 완료 뒤 Feature Spec 하나와 내부 수직 티켓 5개로 구현합니다.
+- `Service MVP`: 로그인부터 분석 결과 재조회·재시도·삭제까지 사용자가 완료할 수 있는 최소한의 서비스 가치 흐름입니다. 상세 범위·티켓 정의는 활성 spec `.agent-os/specs/2026-07-18-service-mvp/`가 정본입니다.
 - `Analysis History`: 사용자의 분석 입력 사본, JD, AI 분석 결과 또는 실패 상태를 저장해 나중에 목록·상세로 다시 확인하는 기능입니다. 재시도는 기존 입력 사본을 재사용하고 결과는 기존 이력을 덮어쓰지 않고 새 이력으로 저장하며, 사용자가 삭제하면 해당 이력의 입력·JD·결과를 함께 즉시 영구 삭제합니다.
 - `JD Source Adapter`: 사람인·JobKorea·RocketPunch처럼 출처별 JD 수집 차이를 공통 JD 계약으로 변환하는 경계입니다.
 
