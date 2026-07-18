@@ -40,7 +40,7 @@ describe('AuthGate', () => {
     )
 
     expect(await screen.findByRole('dialog', { name: 'Google 로그인' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Google로 로그인' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Google로 시작하기' })).toBeInTheDocument()
     expect(screen.getByText('보호 화면')).toBeInTheDocument()
   })
 
@@ -71,7 +71,7 @@ describe('AuthGate', () => {
     )
 
     expect(screen.getByText('보호 화면')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Google로 로그인' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Google로 시작하기' })).not.toBeInTheDocument()
   })
 
   it('OAuth 성공 callback은 보호 화면으로 진입시킨다', () => {

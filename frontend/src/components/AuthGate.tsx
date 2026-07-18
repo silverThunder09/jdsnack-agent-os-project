@@ -31,8 +31,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
               JDSnack
             </div>
             <span className="auth-card__eyebrow">JDSnack</span>
-            <h1>다시 오셨네요</h1>
-            <p>AI 이력서 코파일럿이 꿈의 직장을 찾는 데 도움을 드릴게요.</p>
+            <h1>합격을 위한 분석을 시작해보세요</h1>
+            <p>이력서와 채용 공고를 함께 살펴보고, 지원 전에 보완할 점을 찾아드릴게요.</p>
             {isLoading ? (
               <p className="auth-card__status" aria-live="polite">
                 로그인 상태를 확인하고 있습니다...
@@ -42,7 +42,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 <span className="auth-card__google-mark" aria-hidden="true">
                   G
                 </span>
-                Google로 로그인
+                Google로 시작하기
               </button>
             )}
             {message ? <p className="auth-card__error" role="alert">{message}</p> : null}
