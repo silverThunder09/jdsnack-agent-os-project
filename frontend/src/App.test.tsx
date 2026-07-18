@@ -65,11 +65,13 @@ describe('새로운 분석 시작 페이지', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
     window.localStorage.clear()
+    window.history.replaceState({}, '', '/?auth=success')
   })
 
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+    window.history.replaceState({}, '', '/')
   })
 
   it('셸·사이드바·새 분석 페이지가 렌더링된다', () => {

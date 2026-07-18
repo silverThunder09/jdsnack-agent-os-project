@@ -1,6 +1,7 @@
 import type { ChangeEvent, DragEvent, ReactNode, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
+import { AuthGate } from './components/AuthGate'
 import { StatusMessage } from './components/StatusMessage'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
@@ -331,7 +332,7 @@ function KeywordList({ items }: { items: string[] }) {
   )
 }
 
-function App() {
+function AuthenticatedApp() {
   const [currentView, setCurrentView] = useState<'home' | 'interview'>('home')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('input')
@@ -992,6 +993,14 @@ function App() {
         </section>
       )}
     </AppShell>
+  )
+}
+
+function App() {
+  return (
+    <AuthGate>
+      <AuthenticatedApp />
+    </AuthGate>
   )
 }
 

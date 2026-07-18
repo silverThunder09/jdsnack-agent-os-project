@@ -2,7 +2,7 @@
 
 | 요구사항 | 수용 기준 | 테스트 | 계약 | 티켓 |
 |---|---|---|---|---|
-| REQ-01 | AC-01 | TC-01, TC-02 | api-spec.md | T1 |
+| REQ-01 | AC-01 | TC-01, TC-01a, TC-02 | api-spec.md, ui-spec.md | T1 |
 | REQ-02 | AC-02 | TC-03, TC-04 | ui-spec.md | T2 |
 | REQ-03 | AC-03 | TC-05, TC-06 | api-spec.md | T2 |
 | REQ-04 | AC-04 | TC-03, TC-05 | api-spec.md | T3 |
