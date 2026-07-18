@@ -32,7 +32,7 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 ## 작업 시작 규칙
 
 - 브랜치를 만든 뒤 바로 큰 수정에 들어가지 않습니다.
-- 먼저 [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md) 기준으로 대상 spec, 변경 범위, 테스트 방법, PR 범위를 고정합니다.
+- 먼저 [work-start-checkpoint.md](../operations/work-start-checkpoint.md) 기준으로 대상 spec, 변경 범위, 테스트 방법, PR 범위를 고정합니다.
 - 체크포인트 없이 PR 범위가 커지면 작업을 쪼개고 새 체크포인트를 다시 잡습니다.
 
 ## 커밋 메시지 규칙

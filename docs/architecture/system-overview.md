@@ -11,15 +11,41 @@ JDSnack은 Spring Boot API와 React 프론트를 **분리 컨테이너로 배포
 - React가 `/api/diagnose`와 `/api/health` 호출
 - 프론트 컨테이너가 SPA를 제공
 - 백엔드 컨테이너가 REST API를 제공
-- Spring Boot가 입력값을 검증하고 `stub` 또는 `fixture` 모드로 응답
-- 1.5차 MVP 통합 런타임은 H2 fixture 데이터와 LocalStorage를 함께 사용
+- Spring Boot가 인증·입력 검증·분석 orchestration·JD 수집을 담당
+- Gemini·사람인 수집은 백엔드 provider/adapter 경계에서만 호출
+- 현재 preview 흐름은 fixture/stub/ai-local 모드로 검증하며 Service MVP는 사용자 소유 분석 이력을 추가한다
+
+## Dependency & data flow
+
+```mermaid
+flowchart LR
+  Browser["Browser"] --> Frontend["React frontend\ncomponents → hooks → services"]
+  Frontend -->|"/api + session cookie"| Backend["Spring Boot\nController → Service"]
+  Backend --> Auth["Google OAuth / session"]
+  Backend --> Analysis["Diagnose · Match · Sentence · Interview"]
+  Backend --> Jd["JD fetch adapter\nSaramin fallback / OCR"]
+  Analysis --> Gemini["Gemini provider\nserver-side only"]
+  Backend --> Store["H2 fixture now\nService MVP persistence next"]
+  Backend --> Tests["JUnit + fixture + compose smoke"]
+  Frontend --> UiTests["Vitest + Playwright"]
+```
+
+### Change impact guide
+
+| 변경 지점 | 함께 확인할 대상 |
+|---|---|
+| `frontend/src/services/*` | hook, `App.test.tsx`, UI spec, backend controller contract |
+| `backend/.../Controller` | Service, request/response DTO, API spec, controller test |
+| `backend/.../Service` | provider/adapter, fixture test, error contract |
+| 인증·세션 | `AuthGate`, authentication filter, 보호 API 401 test, smoke test |
+| compose·runtime | container workflow, health endpoint, `scripts/smoke-test.sh` |
 
 ## 문서 역할
 
-- 상세 백엔드 구조: [backend-architecture.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/docs/architecture/backend-architecture.md)
-- 상세 프론트 구조: [frontend-architecture.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/docs/architecture/frontend-architecture.md)
-- 통합/배포 구조: [integration-architecture.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/docs/architecture/integration-architecture.md)
-- 현재 구현 계약: `.agent-os/standards/index.yml`의 active Spec과 `docs/architecture/` 문서를 함께 확인
+- 상세 백엔드 구조: [backend-architecture.md](backend-architecture.md)
+- 상세 프론트 구조: [frontend-architecture.md](frontend-architecture.md)
+- 통합/배포 구조: [integration-architecture.md](integration-architecture.md)
+- 현재 구현 계약: [`../../.agent-os/standards/index.yml`](../../.agent-os/standards/index.yml)의 active spec과 이 문서를 함께 확인
 
 ## 핵심 불변 조건
 

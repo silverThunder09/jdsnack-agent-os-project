@@ -113,8 +113,8 @@ npm run build
 
 현재 실행 기준:
 
-- [browser-smoke-checks.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/browser-smoke-checks.md)
-- [scripts/smoke-test.sh](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/scripts/smoke-test.sh)
+- [browser-smoke-checks.md](browser-smoke-checks.md)
+- [scripts/smoke-test.sh](../../scripts/smoke-test.sh)
 
 ## PR 필수 기준
 

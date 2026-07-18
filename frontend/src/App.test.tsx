@@ -81,6 +81,11 @@ async function fillJdAndResume(user: ReturnType<typeof userEvent.setup>) {
   await user.upload(screen.getByLabelText('파일 선택'), makeResumeFile())
 }
 
+async function renderAuthenticatedApp() {
+  render(<App />)
+  await screen.findByRole('heading', { name: '새로운 분석 시작' })
+}
+
 describe('새로운 분석 시작 페이지', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
@@ -95,8 +100,8 @@ describe('새로운 분석 시작 페이지', () => {
     window.history.replaceState({}, '', '/')
   })
 
-  it('셸·사이드바·새 분석 페이지가 렌더링된다', () => {
-    render(<App />)
+  it('셸·사이드바·새 분석 페이지가 렌더링된다', async () => {
+    await renderAuthenticatedApp()
 
     expect(screen.getByLabelText('주요 내비게이션')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '홈' })).toBeInTheDocument()
@@ -123,7 +128,7 @@ describe('새로운 분석 시작 페이지', () => {
 
   it('사이드바 로고는 홈으로 이동하고 상단 로고는 표시하지 않는다', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderAuthenticatedApp()
 
     await user.click(screen.getByRole('button', { name: '모의 면접' }))
     expect(screen.getByRole('heading', { name: /현재 이력서와 JD 맥락/ })).toBeInTheDocument()
@@ -133,8 +138,8 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.queryByRole('link', { name: 'JDSnack 홈' })).not.toBeInTheDocument()
   })
 
-  it('잠금 메뉴는 비활성화되고 계정 목업 영역은 표시하지 않는다', () => {
-    render(<App />)
+  it('잠금 메뉴는 비활성화되고 계정 목업 영역은 표시하지 않는다', async () => {
+    await renderAuthenticatedApp()
 
     expect(screen.getByRole('button', { name: '분석 내역' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '요금제' })).toBeDisabled()
@@ -146,7 +151,7 @@ describe('새로운 분석 시작 페이지', () => {
 
   it('JD 탭 전환·글자수·이력서 업로드 칩이 동작한다', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderAuthenticatedApp()
 
     expect(screen.getByLabelText('채용 공고 URL')).toBeInTheDocument()
 
@@ -159,8 +164,8 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('resume.pdf')).toBeInTheDocument()
   })
 
-  it('키워드 분석과 문장 첨삭은 선택 가능하고 준비중 태그가 표시되지 않는다', () => {
-    render(<App />)
+  it('키워드 분석과 문장 첨삭은 선택 가능하고 준비중 태그가 표시되지 않는다', async () => {
+    await renderAuthenticatedApp()
 
     expect(screen.getByText('JD 적합도')).toBeInTheDocument()
     expect(screen.getByText('ATS 분석')).toBeInTheDocument()
@@ -180,7 +185,7 @@ describe('새로운 분석 시작 페이지', () => {
       .mockResolvedValueOnce(matchPayload())
       .mockResolvedValueOnce(sentencePayload())
 
-    render(<App />)
+    await renderAuthenticatedApp()
     await fillJdAndResume(user)
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
 
@@ -196,7 +201,7 @@ describe('새로운 분석 시작 페이지', () => {
     const user = userEvent.setup()
     vi.mocked(globalThis.fetch).mockResolvedValueOnce(diagnosePayload()).mockResolvedValueOnce(matchPayload())
 
-    render(<App />)
+    await renderAuthenticatedApp()
     await fillJdAndResume(user)
     await user.click(screen.getByRole('checkbox', { name: /JD 적합도/ }))
     await user.click(screen.getByRole('checkbox', { name: /문장 첨삭/ }))
@@ -216,7 +221,7 @@ describe('새로운 분석 시작 페이지', () => {
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(sentencePayload())
 
-    render(<App />)
+    await renderAuthenticatedApp()
     await fillJdAndResume(user)
     await user.click(screen.getByRole('checkbox', { name: /JD 적합도/ }))
     await user.click(screen.getByRole('checkbox', { name: /키워드 분석/ }))
@@ -237,7 +242,7 @@ describe('새로운 분석 시작 페이지', () => {
       .mockResolvedValueOnce(matchPayload())
       .mockResolvedValueOnce(sentencePayload([]))
 
-    render(<App />)
+    await renderAuthenticatedApp()
     await fillJdAndResume(user)
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
 
@@ -246,7 +251,7 @@ describe('새로운 분석 시작 페이지', () => {
 
   it('필수 입력이 없으면 분석 시작 버튼이 비활성화되어 실행되지 않는다', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderAuthenticatedApp()
 
     // JD만 입력하고 이력서 파일은 올리지 않음
     await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
@@ -258,7 +263,7 @@ describe('새로운 분석 시작 페이지', () => {
 
   it('짧은 JD는 파일이 있어도 분석 시작을 막고 업로드를 호출하지 않는다', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderAuthenticatedApp()
 
     await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
     await user.type(screen.getByLabelText('JD 내용 붙여넣기'), '짧은 JD')
@@ -271,7 +276,7 @@ describe('새로운 분석 시작 페이지', () => {
 
   it('분석 항목을 모두 해제하면 시작 버튼과 호출을 막는다', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderAuthenticatedApp()
 
     await fillJdAndResume(user)
     for (const checkbox of screen.getAllByRole('checkbox')) {
@@ -306,7 +311,7 @@ describe('새로운 분석 시작 페이지', () => {
         }),
       )
 
-    render(<App />)
+    await renderAuthenticatedApp()
     await fillJdAndResume(user)
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
     await screen.findByText('79점')
@@ -331,7 +336,7 @@ describe('새로운 분석 시작 페이지', () => {
     const printSpy = vi.fn()
     window.print = printSpy
 
-    render(<App />)
+    await renderAuthenticatedApp()
     await fillJdAndResume(user)
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
     await screen.findByText('79점')
@@ -345,20 +350,20 @@ describe('새로운 분석 시작 페이지', () => {
 
   it('JD 입력은 재마운트(새로고침) 후 복원된다', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderAuthenticatedApp()
     await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
     await user.type(screen.getByLabelText('JD 내용 붙여넣기'), validJdText)
 
     cleanup()
     vi.mocked(globalThis.fetch).mockResolvedValueOnce(authSessionPayload())
-    render(<App />)
+    await renderAuthenticatedApp()
     await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
     expect(screen.getByLabelText('JD 내용 붙여넣기')).toHaveValue(validJdText)
   })
 
   it('입력 초기화는 JD 본문을 비운다', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderAuthenticatedApp()
     await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
     await user.type(screen.getByLabelText('JD 내용 붙여넣기'), validJdText)
     await user.click(screen.getByRole('button', { name: '입력 초기화' }))

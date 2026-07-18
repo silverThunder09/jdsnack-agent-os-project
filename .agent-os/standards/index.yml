@@ -18,15 +18,18 @@ documents:
     - .agent-os/standards/codex-harness.md
     - .agent-os/standards/doc-lifecycle.md
     - .agent-os/standards/definition-of-done.md
+    - .agent-os/ai-readiness.yml
   engineering:
     - .agent-os/standards/coding-standards.md
     - .agent-os/standards/testing-standards.md
     - .agent-os/standards/git-workflow.md
     - .agent-os/standards/git-hooks.md
+    - .githooks/pre-commit
     - .agent-os/standards/backend.md
     - .agent-os/standards/frontend.md
     - .agent-os/standards/api.md
   architecture:
+    - docs/ARCHITECTURE.md
     - docs/architecture/system-overview.md
     - docs/architecture/backend-architecture.md
     - docs/architecture/frontend-architecture.md
@@ -60,6 +63,12 @@ documents:
     - backends.json
     - scripts/smoke-test.sh
     - scripts/google-test.sh
+    - scripts/check-ai-readiness.py
+    - scripts/README.md
+    - scripts/install-git-hooks.sh
+    - scripts/run-ai-readiness-evals.py
+    - evals/context-tasks.json
+    - evals/context-plan.schema.json
     - scripts/notify-needs-human.sh
     - scripts/notify-needs-human-test.sh
     - scripts/backends-contract-test.sh

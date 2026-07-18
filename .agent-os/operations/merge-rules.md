@@ -20,10 +20,10 @@
 
 ## 머지 전 필수 조건
 
-- PR 주 목적이 하나이고 변경 범위가 [pr-rules.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-rules.md)의 `PR 범위 경계`를 통과
+- PR 주 목적이 하나이고 변경 범위가 [pr-rules.md](pr-rules.md)의 `PR 범위 경계`를 통과
 - PR 본문 체크리스트 완료
 - 작업 시작 체크포인트와 PR 범위 판단이 일치
-- [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md) 기준 자체 리뷰 결과가 `PASS` 또는 허용 가능한 `COMMENT`
+- [pr-review-gate.md](pr-review-gate.md) 기준 자체 리뷰 결과가 `PASS` 또는 허용 가능한 `COMMENT`
 - 관련 문서 최신화
 - 테스트 통과
 - CI 체크리스트 통과
@@ -69,9 +69,9 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 
 - 필요 시 릴리즈 체크리스트 갱신
 - `main` 반영 후 GitHub Actions 결과 확인
-- CI/CD 기준이 바뀌었으면 [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md) 또는 [cd-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/cd-checklist.md) 갱신
-- 배포 대상이면 [release-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/release-checklist.md) 확인
-- 장애 가능성이 있으면 [incident-playbook.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/incident-playbook.md) 확인
+- CI/CD 기준이 바뀌었으면 [ci-checklist.md](ci-checklist.md) 또는 [cd-checklist.md](cd-checklist.md) 갱신
+- 배포 대상이면 [release-checklist.md](release-checklist.md) 확인
+- 장애 가능성이 있으면 [incident-playbook.md](incident-playbook.md) 확인
 - 머지 후 짧은 운영 기록으로 무엇을 머지했고 어떤 체크를 통과했는지 남김
 
 ## 핫픽스 예외

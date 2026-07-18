@@ -25,7 +25,7 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 - 배포 영향이 있으면 CD 체크리스트가 확인되었다.
 - 변경 이유가 `standards/` 문서와 충돌하지 않는다.
 - 커밋, PR, 머지 규칙이 Git 운영 표준과 충돌하지 않는다.
-- PR 작업이면 [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md) 기준 자체 리뷰 결과가 남아 있다.
+- PR 작업이면 [pr-review-gate.md](../operations/pr-review-gate.md) 기준 자체 리뷰 결과가 남아 있다.
 
 ## 문서별 완료 조건
 
@@ -54,8 +54,8 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 
 ### CI/CD 변경
 
-- [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md) 갱신
-- 배포 영향이 있으면 [cd-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/cd-checklist.md) 갱신
+- [ci-checklist.md](../operations/ci-checklist.md) 갱신
+- 배포 영향이 있으면 [cd-checklist.md](../operations/cd-checklist.md) 갱신
 - PR/머지 규칙과 충돌하지 않는지 확인
 
 ## 리뷰 기준

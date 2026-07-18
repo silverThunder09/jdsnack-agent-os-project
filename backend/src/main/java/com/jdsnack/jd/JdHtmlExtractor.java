@@ -20,7 +20,7 @@ public class JdHtmlExtractor {
 
     private static final int MIN_CONTENT_LENGTH = 50;
     private static final String FETCH_MODE = "static-html";
-    private static final List<String> CANDIDATE_SELECTORS = List.of(
+    static final List<String> CANDIDATE_SELECTORS = List.of(
             "article",
             "main",
             "section",
@@ -35,7 +35,7 @@ public class JdHtmlExtractor {
             "[id*=detail]",
             "div"
     );
-    private static final List<String> SARAMIN_CANDIDATE_SELECTORS = List.of(
+    static final List<String> SARAMIN_CANDIDATE_SELECTORS = List.of(
             ".recruit_detail",
             ".recruit_view",
             ".wrap_jv_cont",
@@ -45,12 +45,12 @@ public class JdHtmlExtractor {
             "#content .recruit_detail",
             "#content .job-description"
     );
-    private static final Set<String> PRIORITY_HINTS = Set.of(
+    static final Set<String> PRIORITY_HINTS = Set.of(
             "job", "description", "detail", "posting", "position", "role", "opening", "hiring",
             "jd", "requirement", "qualification", "responsibility", "about", "overview",
             "채용", "공고", "모집", "포지션", "직무", "업무", "상세", "자격", "요건", "우대"
     );
-    private static final Set<String> NOISE_HINTS = Set.of(
+    static final Set<String> NOISE_HINTS = Set.of(
             "related", "recommend", "similar", "share", "social", "comment", "footer", "header",
             "nav", "menu", "banner", "breadcrumb", "popup", "modal", "login", "signup",
             "추천", "관련", "공유", "메뉴", "배너", "댓글", "푸터", "헤더"
@@ -80,7 +80,7 @@ public class JdHtmlExtractor {
             "비정상적인 접근", "정상적인 경로로 접근", "서비스 이용에 불편을 드려 죄송합니다",
             "오류가 발생하였습니다", "error", "접속이 제한"
     );
-    private static final List<String> NOISE_SELECTORS = List.of(
+    static final List<String> NOISE_SELECTORS = List.of(
             "[hidden]",
             "[aria-hidden=true]",
             "[role=dialog]",
@@ -109,7 +109,7 @@ public class JdHtmlExtractor {
             "[id*=cta]",
             "[id*=apply]"
     );
-    private static final List<String> SARAMIN_NOISE_SELECTORS = List.of(
+    static final List<String> SARAMIN_NOISE_SELECTORS = List.of(
             "[class*=ai_match]",
             "[class*=aimatch]",
             "[class*=ai-recommend]",
@@ -122,18 +122,20 @@ public class JdHtmlExtractor {
             "[id*=recommend]",
             "[id*=similar]"
     );
-    private static final Set<String> SARAMIN_NOISE_HINTS = Set.of(
+    static final Set<String> SARAMIN_NOISE_HINTS = Set.of(
             "ai매치", "ai match", "매치율", "추천공고", "유사공고", "다른 공고", "다른채용", "공고를 추천",
             "similar jobs", "recommended jobs", "recommended role", "match score",
             "사람인 인공지능 기술 기반", "맞춤 공고를 추천해드리는", "채용정보제공 서비스입니다"
     );
 
+    private final JdCandidateSelector candidateSelector = new JdCandidateSelector();
+
     public JdFetchResponse extract(String html, String sourceUrl) {
         Document document = Jsoup.parse(html, sourceUrl);
         String sourceSite = detectSourceSite(sourceUrl);
-        sanitize(document, sourceSite);
+        candidateSelector.sanitize(document, sourceSite);
 
-        Element candidate = findCandidate(document, sourceSite);
+        Element candidate = candidateSelector.findCandidate(document, sourceSite);
         if (candidate == null) {
             throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
         }
@@ -166,61 +168,6 @@ public class JdHtmlExtractor {
         );
     }
 
-    private void sanitize(Document document, String sourceSite) {
-        document.select("script, style, noscript, nav, footer, header, form, button, svg, aside").remove();
-        for (String selector : NOISE_SELECTORS) {
-            document.select(selector).remove();
-        }
-        if ("saramin".equals(sourceSite)) {
-            for (String selector : SARAMIN_NOISE_SELECTORS) {
-                document.select(selector).remove();
-            }
-        }
-        document.select("[class], [id]").removeIf(this::isNoiseContainer);
-    }
-
-    private Element findCandidate(Document document, String sourceSite) {
-        if ("saramin".equals(sourceSite)) {
-            Element saraminCandidate = findSiteSpecificCandidate(document, SARAMIN_CANDIDATE_SELECTORS);
-            if (saraminCandidate != null) {
-                return saraminCandidate;
-            }
-        }
-
-        Elements candidates = new Elements();
-        Set<Element> seen = new LinkedHashSet<>();
-
-        for (String selector : CANDIDATE_SELECTORS) {
-            for (Element element : document.select(selector)) {
-                if (seen.add(element)) {
-                    candidates.add(element);
-                }
-            }
-        }
-
-        return candidates.stream()
-                .filter(this::hasMeaningfulText)
-                .max(Comparator.comparingInt(this::scoreCandidate))
-                .orElse(null);
-    }
-
-    private Element findSiteSpecificCandidate(Document document, List<String> selectors) {
-        Elements candidates = new Elements();
-        Set<Element> seen = new LinkedHashSet<>();
-        for (String selector : selectors) {
-            for (Element element : document.select(selector)) {
-                if (seen.add(element)) {
-                    candidates.add(element);
-                }
-            }
-        }
-
-        return candidates.stream()
-                .filter(this::hasMeaningfulText)
-                .max(Comparator.comparingInt(this::scoreCandidate))
-                .orElse(null);
-    }
-
     private String extractTitle(Document document) {
         String title = normalize(document.title());
         if (!title.isBlank()) {
@@ -238,7 +185,7 @@ public class JdHtmlExtractor {
         return "채용공고";
     }
 
-    private String normalize(String value) {
+    static String normalize(String value) {
         return value == null ? "" : value.replace('\u00A0', ' ').replaceAll("\\s+", " ").trim();
     }
 
@@ -249,63 +196,6 @@ public class JdHtmlExtractor {
     boolean isValidOcrText(String value) {
         String normalized = normalize(value);
         return normalized.length() >= MIN_CONTENT_LENGTH && hasMinimumJdQuality(normalized);
-    }
-
-    private boolean hasMeaningfulText(Element element) {
-        return !normalize(element.text()).isBlank();
-    }
-
-    private int scoreCandidate(Element element) {
-        String text = normalize(element.text());
-        String attributes = normalize((element.className() + " " + element.id()).toLowerCase(Locale.ROOT));
-
-        int score = text.length();
-        score += semanticTagBonus(element);
-        score += keywordBonus(attributes, PRIORITY_HINTS, 180);
-        score -= keywordBonus(attributes, NOISE_HINTS, 220);
-        score += Math.min(element.select("p").size() * 25, 125);
-        score += Math.min(element.select("li").size() * 12, 72);
-        score -= Math.min(element.select("a").size() * 10, 80);
-
-        return score;
-    }
-
-    private int semanticTagBonus(Element element) {
-        return switch (element.tagName()) {
-            case "article" -> 220;
-            case "main" -> 180;
-            case "section" -> 120;
-            default -> 0;
-        };
-    }
-
-    private int keywordBonus(String source, Set<String> hints, int weight) {
-        int matches = 0;
-        for (String hint : hints) {
-            if (containsHint(source, hint)) {
-                matches++;
-            }
-        }
-        return matches * weight;
-    }
-
-    private boolean isNoiseContainer(Element element) {
-        String attributes = normalize((element.className() + " " + element.id()).toLowerCase(Locale.ROOT));
-        if (attributes.isBlank()) {
-            return false;
-        }
-
-        for (String hint : NOISE_HINTS) {
-            if (attributes.contains(hint)) {
-                return true;
-            }
-        }
-        for (String hint : SARAMIN_NOISE_HINTS) {
-            if (attributes.contains(hint)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private String extractCandidateText(Element candidate, String title, String sourceSite) {
@@ -349,10 +239,7 @@ public class JdHtmlExtractor {
     }
 
     private void removeNestedNoise(Element candidate) {
-        for (String selector : NOISE_SELECTORS) {
-            candidate.select(selector).remove();
-        }
-        candidate.select("[class], [id]").removeIf(this::isNoiseContainer);
+        candidateSelector.removeNestedNoise(candidate);
     }
 
     private void removeDuplicatedHeadings(Element candidate, String title) {
@@ -464,7 +351,7 @@ public class JdHtmlExtractor {
         return false;
     }
 
-    private boolean containsHint(String source, String hint) {
+    static boolean containsHint(String source, String hint) {
         if (hint.chars().allMatch(ch -> ch < 128 && Character.isLetterOrDigit(ch))) {
             String[] tokens = source.split("[^a-z0-9]+");
             for (String token : tokens) {

@@ -18,11 +18,17 @@
 1. 사용자가 SPA에 접속합니다.
 2. 프론트 컨테이너가 API 요청을 백엔드 컨테이너로 전달합니다.
 3. Spring Boot가 입력값을 검증합니다.
-4. 유효한 입력이면 현재 compose 런타임 기준으로 fixture 결과를 반환합니다.
+4. 유효한 입력이면 fixture/stub 또는 명시적 `ai-local` provider가 결과를 반환합니다.
 5. 프론트가 결과 카드 또는 오류 상태를 렌더링합니다.
+
+## Common changes and gotchas
+
+- 로컬 검증은 `compose.local.yaml`, 배포 검증은 `compose.prod.yaml`을 사용합니다.
+- 코드 변경은 compose 재빌드 후 health endpoint와 관련 smoke test까지 확인해야 합니다.
+- 세션·Gemini key 같은 비밀값은 compose 로그·PR 본문·브라우저 저장소에 남기지 않습니다.
 
 ## 운영 문서 연결
 
-- 릴리즈 체크리스트: [.agent-os/operations/release-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/release-checklist.md)
-- 배포 런북: [.agent-os/operations/deploy-runbook.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/deploy-runbook.md)
-- 장애 대응: [.agent-os/operations/incident-playbook.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/incident-playbook.md)
+- 릴리즈 체크리스트: [release checklist](../../.agent-os/operations/release-checklist.md)
+- 배포 런북: [deploy runbook](../../.agent-os/operations/deploy-runbook.md)
+- 장애 대응: [incident playbook](../../.agent-os/operations/incident-playbook.md)

@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JDSnack · AI-Readiness Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #0f172a;
+        --text-2: #475569;
+        --text-3: #94a3b8;
+        --accent: #2563eb;
+        --accent-soft: #eff6ff;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --red: #dc2626;
+        --red-soft: #fee2e2;
+        --grid: #f1f5f9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          "Inter",
+          -apple-system,
+          system-ui,
+          "Segoe UI",
+          sans-serif;
+        font-feature-settings: "cv11", "ss01";
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 48px 40px 64px;
+      }
+
+      /* ============ HEADER ============ */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 32px;
+      }
+
+      .header .eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-3);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+
+      .header h1 {
+        font-size: 30px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+
+      .header .sub {
+        font-size: 14px;
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+
+      .header-meta {
+        text-align: right;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        line-height: 1.7;
+      }
+
+      .header-meta strong {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      /* ============ SCORE STRIP ============ */
+      .score-strip {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 24px;
+        margin-bottom: 32px;
+      }
+
+      .score-hero {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 28px 28px 24px;
+      }
+
+      .score-hero .label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .score-hero .value {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .score-hero .num {
+        font-size: 64px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        color: var(--text);
+      }
+
+      .score-hero .denom {
+        font-size: 20px;
+        color: var(--text-3);
+        font-weight: 500;
+      }
+
+      .score-hero .grade-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .grade-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--green-soft);
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 600;
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .grade-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--green);
+      }
+
+      .score-hero .desc {
+        font-size: 13px;
+        color: var(--text-2);
+        line-height: 1.5;
+        margin-top: 10px;
+      }
+
+      .score-hero hr {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 18px 0 14px;
+      }
+
+      .mini-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .mini-stat .k {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        margin-bottom: 2px;
+      }
+
+      .mini-stat .v {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      /* ============ 7 CATEGORY BAR CHART ============ */
+      .rules {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 20px 24px 24px;
+      }
+
+      .rules .rules-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .rules h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .legend-inline {
+        display: flex;
+        gap: 14px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-2);
+      }
+
+      .legend-inline span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .legend-inline i {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+      }
+
+      .rule-row {
+        display: grid;
+        grid-template-columns: 28px 1fr 220px 56px;
+        gap: 12px;
+        align-items: center;
+        padding: 7px 0;
+        font-size: 13px;
+      }
+
+      .rule-row + .rule-row {
+        border-top: 1px dashed var(--border);
+      }
+
+      .rule-row .idx {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        font-weight: 500;
+      }
+
+      .rule-row .title {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .rule-row .sub {
+        font-size: 11.5px;
+        color: var(--text-3);
+        margin-top: 1px;
+      }
+
+      .rule-row .bar {
+        height: 8px;
+        border-radius: 3px;
+        background: var(--grid);
+        overflow: hidden;
+      }
+
+      .rule-row .bar > span {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+      }
+
+      .bar-good > span {
+        background: var(--green);
+      }
+      .bar-warn > span {
+        background: var(--amber);
+      }
+      .bar-bad > span {
+        background: var(--red);
+      }
+
+      .rule-row .num {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: right;
+        color: var(--text);
+      }
+
+      /* ============ MAP ============ */
+      .map-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 32px;
+        overflow: hidden;
+      }
+
+      .map-head {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .map-head h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .map-head .sub {
+        font-size: 12px;
+        color: var(--text-2);
+        margin-top: 2px;
+      }
+
+      .map-legend {
+        display: flex;
+        gap: 18px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-2);
+        align-items: center;
+      }
+
+      .map-legend > span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .legend-square {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+      }
+
+      .legend-line {
+        width: 24px;
+        height: 0;
+        border-top: 1.5px solid;
+      }
+
+      .map-body {
+        padding: 28px 24px 32px;
+      }
+
+      .map-body svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      /* ============ FINDINGS ============ */
+      .findings {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .panel-head {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .panel-head h3 {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .panel-head .count {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        margin-left: auto;
+      }
+
+      .panel-strength .panel-head {
+        background: var(--green-soft);
+      }
+      .panel-strength .panel-head h3 {
+        color: var(--green);
+      }
+
+      .panel-risk .panel-head {
+        background: var(--red-soft);
+      }
+      .panel-risk .panel-head h3 {
+        color: var(--red);
+      }
+
+      .panel-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .panel-list li {
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .panel-list li:first-child {
+        border-top: 0;
+      }
+
+      .panel-list .head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        color: var(--text);
+      }
+
+      .panel-list .tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        padding: 2px 7px;
+        border-radius: 3px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+      }
+
+      .tag-rule {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .panel-list .note {
+        margin-top: 4px;
+        color: var(--text-2);
+        font-size: 12.5px;
+      }
+
+      .panel-list code {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11.5px;
+        background: var(--grid);
+        padding: 1px 5px;
+        border-radius: 3px;
+        color: var(--text);
+      }
+
+      footer {
+        margin-top: 48px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        text-align: center;
+      }
+
+      /* ============ SVG ============ */
+      .grid-bg {
+        stroke: var(--grid);
+        stroke-width: 1;
+      }
+
+      .node-card {
+        fill: var(--surface);
+        stroke: var(--border-strong);
+        stroke-width: 1.2;
+      }
+
+      .node-card.accent {
+        stroke: var(--accent);
+      }
+
+      .node-title {
+        font-family: "Inter", sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        fill: var(--text);
+      }
+
+      .node-meta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        fill: var(--text-3);
+      }
+
+      .node-kpi {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .edge {
+        fill: none;
+        stroke: var(--border-strong);
+        stroke-width: 1.3;
+      }
+
+      .edge-dash {
+        stroke-dasharray: 4 3;
+      }
+
+      .edge-warn {
+        stroke: var(--amber);
+      }
+
+      .edge-type {
+        stroke: var(--accent);
+        stroke-width: 1.5;
+      }
+
+      .codex-dot {
+        fill: var(--accent);
+      }
+      .codex-ring {
+        fill: var(--accent-soft);
+      }
+
+      .test-dot {
+        fill: var(--green);
+      }
+
+      .hot {
+        fill: var(--red-soft);
+        stroke: var(--red);
+        stroke-width: 1;
+      }
+
+      .warm {
+        fill: var(--amber-soft);
+        stroke: var(--amber);
+        stroke-width: 1;
+      }
+
+      @media (max-width: 960px) {
+        .score-strip,
+        .findings {
+          grid-template-columns: 1fr;
+        }
+        .rule-row {
+          grid-template-columns: 24px 1fr 140px 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+  <div class="page">
+    <header class="header">
+      <div>
+        <div class="eyebrow">레포지토리 감사 · AI 준비도 · v2 루브릭</div>
+        <h1>JDSnack — AI 준비도 지도</h1>
+        <div class="sub">7개 카테고리 채점 · 자동 기준선과 수동 검증 · ROI 우선순위</div>
+      </div>
+      <div class="header-meta">
+        <div>점수 측정 <strong>2026-07-19</strong></div>
+        <div>브랜치 <strong>codex/t2-auth-minor-fixes</strong></div>
+        <div>모듈 <strong>3</strong> · 컨텍스트 파일 <strong>6</strong></div>
+      </div>
+    </header>
+
+    <section class="score-strip">
+      <div class="score-hero">
+        <div class="label">AI 준비도 지수 · 자동 재측정</div>
+        <div class="value"><span class="num">76</span><span class="denom">/ 100</span></div>
+        <div class="grade-row">
+          <span class="grade-badge"><span class="grade-dot"></span> AI-Ready · gate 적용</span>
+        </div>
+        <div class="desc">모듈 진입 문서, Mermaid 의존성 지도, 링크·신선도 gate, 정적 eval, 책임 분리를 적용했습니다. 초기 자동 기준선은 <strong>28/100</strong>이었고, 현재 측정은 <strong>76/100</strong>입니다.</div>
+        <hr />
+        <div class="mini-stats">
+          <div class="mini-stat"><div class="k">컨텍스트 보유 모듈</div><div class="v">3 / 3</div></div>
+          <div class="mini-stat"><div class="k">실제 context broken link</div><div class="v" style="color: var(--green)">0</div></div>
+          <div class="mini-stat"><div class="k">300줄 초과 파일</div><div class="v">8</div></div>
+        </div>
+      </div>
+
+      <div class="rules">
+        <div class="rules-head">
+          <div><h2>7개 카테고리 — 자동 재측정</h2></div>
+          <div class="legend-inline"><span><i style="background: var(--green)"></i> 75% 이상</span><span><i style="background: var(--amber)"></i> 50–74%</span><span><i style="background: var(--red)"></i> 50% 미만</span></div>
+        </div>
+        <div class="rule-row"><div class="idx">A</div><div><div class="title">AI 탐색 &amp; 커버리지</div><div class="sub">backend · frontend · scripts 3개 모듈의 진입 문서를 제공합니다.</div></div><div class="bar bar-good"><span style="width:100%"></span></div><div class="num">15/15</div></div>
+        <div class="rule-row"><div class="idx">B</div><div><div class="title">컨텍스트 문서 품질</div><div class="sub">명령·핵심 경로·패턴·Gotcha·상호 참조를 모듈 문서에 통일했습니다.</div></div><div class="bar bar-good"><span style="width:75%"></span></div><div class="num">15/20</div></div>
+        <div class="rule-row"><div class="idx">C</div><div><div class="title">암묵지 외부화</div><div class="sub">모듈별 소유 범위·패턴·주의점·의존성을 문서화했습니다.</div></div><div class="bar bar-good"><span style="width:80%"></span></div><div class="num">16/20</div></div>
+        <div class="rule-row"><div class="idx">D</div><div><div class="title">모듈 간 의존성 매핑</div><div class="sub">architecture router와 Mermaid data-flow map으로 변경 영향을 연결합니다.</div></div><div class="bar bar-good"><span style="width:67%"></span></div><div class="num">10/15</div></div>
+        <div class="rule-row"><div class="idx">E</div><div><div class="title">검증 &amp; 품질 게이트</div><div class="sub">Docs Harness에서 readiness link/eval gate를 실행합니다.</div></div><div class="bar bar-warn"><span style="width:53%"></span></div><div class="num">8/15</div></div>
+        <div class="rule-row"><div class="idx">F</div><div><div class="title">신선도 &amp; 자가 유지보수</div><div class="sub">문서·모듈 freshness를 CI에서 검사하고, hook 연결만 남았습니다.</div></div><div class="bar bar-good"><span style="width:80%"></span></div><div class="num">8/10</div></div>
+        <div class="rule-row"><div class="idx">G</div><div><div class="title">에이전트 성과 측정</div><div class="sub">대표 작업 3개는 정적 검증하며 runner 기반 성과 측정은 후속입니다.</div></div><div class="bar bar-good"><span style="width:80%"></span></div><div class="num">4/5</div></div>
+      </div>
+    </section>
+
+    <section class="map-section">
+      <div class="map-head"><div><h2>구조 지도</h2><div class="sub">문서 하네스가 코드 모듈·아키텍처·검증 게이트를 연결하는 현재 경로</div></div><div class="map-legend"><span><span class="legend-dot" style="background:var(--accent)"></span>진입 문서</span><span><span class="legend-dot" style="background:var(--green)"></span>검증 게이트</span><span><span class="legend-square" style="background:var(--amber-soft);border:1px solid var(--amber)"></span>보강 대상</span><span><span class="legend-line" style="border-color:var(--accent)"></span>계약 연결</span></div></div>
+      <div class="map-body">
+        <svg viewBox="0 0 1180 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="JDSnack AI readiness structural map">
+          <g class="grid-bg"><path d="M0 80H1180M0 160H1180M0 240H1180M0 320H1180M0 400H1180M0 480H1180"/><path d="M120 0V560M360 0V560M600 0V560M840 0V560M1080 0V560"/></g>
+          <text x="190" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">문서 하네스</text>
+          <text x="590" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">코드 모듈</text>
+          <text x="990" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">검증·운영</text>
+          <path class="edge edge-type" d="M340 115H440M740 115H840M340 285H440M740 285H840M340 455H440M740 455H840"/>
+          <path class="edge edge-dash" d="M590 150V250M590 320V420M190 150V250M990 150V250"/>
+          <g transform="translate(40 55)"><rect class="node-card accent" width="300" height="95" rx="8"/><circle cx="24" cy="24" r="14" class="codex-ring"/><circle cx="24" cy="24" r="6" class="codex-dot"/><text x="48" y="28" class="node-title">AGENTS.md · module README</text><text x="18" y="53" class="node-meta">작업 경계 · 탐색 정책 · spec 진입 순서</text><text x="18" y="72" class="node-meta">핵심 모듈 3/3 안내</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--accent)">root</text></g>
+          <g transform="translate(440 55)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">.agent-os/specs/2026-07-18-service-mvp</text><text x="18" y="53" class="node-meta">REQ → AC → TC → traceability</text><text x="18" y="72" class="node-meta">활성 spec 1개 · API/UI 계약 포함</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">active</text></g>
+          <g transform="translate(840 55)"><rect class="node-card" width="300" height="95" rx="8"/><circle cx="24" cy="24" r="11" fill="var(--green-soft)"/><circle cx="24" cy="24" r="5" class="test-dot"/><text x="48" y="28" class="node-title">Docs Harness CI</text><text x="18" y="53" class="node-meta">index · link · freshness · static eval</text><text x="18" y="72" class="node-meta">문서 회귀를 PR/push에서 차단</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">gate</text></g>
+          <g transform="translate(40 225)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">docs/ARCHITECTURE.md</text><text x="18" y="53" class="node-meta">system · backend · frontend · integration</text><text x="18" y="72" class="node-meta">Mermaid data-flow · 변경 영향</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">10/15 D</text></g>
+          <g transform="translate(440 225)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">frontend/</text><text x="18" y="53" class="node-meta">React · hooks · services · types</text><text x="18" y="72" class="node-meta">App.tsx 책임 분리 · README 최신화</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">28 files</text></g>
+          <g transform="translate(840 225)"><rect class="node-card" width="300" height="95" rx="8"/><circle cx="24" cy="24" r="11" fill="var(--green-soft)"/><circle cx="24" cy="24" r="5" class="test-dot"/><text x="48" y="28" class="node-title">Frontend CI + E2E</text><text x="18" y="53" class="node-meta">lint · test · build · Playwright</text><text x="18" y="72" class="node-meta">compose smoke와 연결</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">gate</text></g>
+          <g transform="translate(40 395)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">.agent-os/product + adr/</text><text x="18" y="53" class="node-meta">decisions.md · ADR-014…020</text><text x="18" y="72" class="node-meta">제품·기술 결정의 외부 저장소</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">16/20 C</text></g>
+          <g transform="translate(440 395)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">backend/</text><text x="18" y="53" class="node-meta">Spring Boot · Controller → Service</text><text x="18" y="72" class="node-meta">fetch/extract/OCR 책임 분리</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">106 files</text></g>
+          <g transform="translate(840 395)"><rect class="node-card" width="300" height="95" rx="8"/><circle cx="24" cy="24" r="11" fill="var(--green-soft)"/><circle cx="24" cy="24" r="5" class="test-dot"/><text x="48" y="28" class="node-title">Backend CI + Container</text><text x="18" y="53" class="node-meta">test · build · health · smoke</text><text x="18" y="72" class="node-meta">Docker compose 재현 경로</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">gate</text></g>
+          <g transform="translate(40 505)"><rect class="warm" width="300" height="40" rx="6"/><text x="18" y="25" class="node-meta" style="fill:var(--amber);font-weight:600">NEXT · pre-commit readiness gate 연결</text></g>
+          <g transform="translate(440 505)"><rect class="warm" width="300" height="40" rx="6"/><text x="18" y="25" class="node-meta" style="fill:var(--amber);font-weight:600">NEXT · 모델 runner 기반 eval metrics</text></g>
+          <g transform="translate(840 505)"><rect class="warm" width="300" height="40" rx="6"/><text x="18" y="25" class="node-meta" style="fill:var(--amber);font-weight:600">NEXT · 300줄 초과 파일 점진 분리</text></g>
+        </svg>
+      </div>
+    </section>
+
+    <section class="findings">
+      <div class="panel panel-strength"><div class="panel-head"><h3>이번에 확인한 강점</h3><span class="count">4 items</span></div><ul class="panel-list"><li><div class="head"><span class="tag tag-rule">A 15/15</span>3개 모듈의 작업 진입 지도</div><div class="note">AGENTS.md와 backend/frontend/scripts README가 책임·명령·주의점을 제공합니다.</div></li><li><div class="head"><span class="tag tag-rule">D</span>의존성·변경 영향 지도</div><div class="note">ARCHITECTURE.md와 Mermaid map이 UI → API → 도메인/외부 연동을 연결합니다.</div></li><li><div class="head"><span class="tag tag-rule">E/F</span>실행되는 readiness gate</div><div class="note">Docs Harness가 링크, context freshness, 정적 eval 경로를 CI에서 검사합니다.</div></li><li><div class="head"><span class="tag tag-rule">B</span>큰 진입 파일 책임 분리</div><div class="note">App, JD fetch, HTML extract를 기능별 구성 요소로 분리했습니다.</div></li></ul></div>
+      <div class="panel panel-risk"><div class="panel-head"><h3>남은 후속 액션</h3><span class="count">3 items</span></div><ul class="panel-list"><li><div class="head"><span class="tag" style="background:var(--amber-soft);color:var(--amber)">S</span>pre-commit 또는 pre-push gate 연결</div><div class="note">CI 전에도 문서 drift를 차단합니다.</div></li><li><div class="head"><span class="tag" style="background:var(--amber-soft);color:var(--amber)">M</span>모델 runner 기반 eval metrics</div><div class="note">대표 3개 task의 pass-rate와 재작업률을 기록합니다.</div></li><li><div class="head"><span class="tag" style="background:var(--accent-soft);color:var(--accent)">M</span>남은 300줄 초과 파일 점진 분리</div><div class="note">다음 기능 변경과 함께 api.ts와 useMatchPreview를 책임 단위로 나눕니다.</div></li></ul></div>
+    </section>
+
+    <footer>JDSnack · Codex-Readiness · 자동 재측정 76/100 · 초기 기준선 28/100 · scored 2026-07-19</footer>
+  </div>
+</body>
+</html>

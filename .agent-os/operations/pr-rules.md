@@ -205,16 +205,16 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 
 ## 필수 체크
 
-- 작업 시작 전 [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md) 기준으로 범위를 먼저 고정
+- 작업 시작 전 [work-start-checkpoint.md](work-start-checkpoint.md) 기준으로 범위를 먼저 고정
 - PR 위험도(`Light` / `Standard` / `High-risk`)를 먼저 고정
 - 요구사항 변경 시 `requirements.md`, `acceptance-criteria.md`, `traceability.md` 갱신
 - API 변경 시 `api-spec.md` 갱신
 - UI 변경 시 `ui-spec.md` 갱신
 - 테스트 기준 변경 시 `test-scenarios.md` 갱신
-- 완료 기준은 [standards/definition-of-done.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/definition-of-done.md)를 따름
-- CI 기준은 [ci-checklist.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/ci-checklist.md)를 따름
-- PR 자동 운영 루프는 [pr-automation-loop.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-automation-loop.md)를 따름
-- PR 생성 후 자체 리뷰는 [pr-review-gate.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/pr-review-gate.md)를 따름
+- 완료 기준은 [standards/definition-of-done.md](../standards/definition-of-done.md)를 따름
+- CI 기준은 [ci-checklist.md](ci-checklist.md)를 따름
+- PR 자동 운영 루프는 [pr-automation-loop.md](pr-automation-loop.md)를 따름
+- PR 생성 후 자체 리뷰는 [pr-review-gate.md](pr-review-gate.md)를 따름
 
 ## PR 전 필수 검증 기준
 

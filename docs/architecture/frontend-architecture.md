@@ -26,7 +26,14 @@
 - 화면 렌더링 로직과 상태 전환 로직을 분리합니다.
 - UI 흐름이 바뀌면 `ui-spec.md`와 `test-scenarios.md`를 함께 갱신합니다.
 
+## Common changes and gotchas
+
+- 새 API는 `services/` → hook → component 순서로 연결합니다. 컴포넌트의 직접 `fetch`는 금지합니다.
+- 보호 API는 세션 쿠키를 위해 `credentials: 'include'`를 유지하고, `AuthGate`가 비로그인 호출을 막습니다.
+- 비동기 화면 상태는 loading/success/error/not-enabled를 테스트로 고정합니다.
+
 ## 관련 문서
 
-- UI 계약: [.agent-os/specs/2026-07-18-service-mvp/ui-spec.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-07-18-service-mvp/ui-spec.md)
-- 기능 요구사항: [.agent-os/specs/2026-07-18-service-mvp/requirements.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-07-18-service-mvp/requirements.md)
+- UI 계약: [Service MVP UI spec](../../.agent-os/specs/2026-07-18-service-mvp/ui-spec.md)
+- 기능 요구사항: [Service MVP requirements](../../.agent-os/specs/2026-07-18-service-mvp/requirements.md)
+- 모듈 진입점: [frontend README](../../frontend/README.md)

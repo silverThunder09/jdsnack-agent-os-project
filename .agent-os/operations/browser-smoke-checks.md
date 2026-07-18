@@ -38,7 +38,7 @@ Playwright smoke는 실제 외부 사이트와 Gemini를 호출하지 않고 rou
 
 실행 스크립트:
 
-- [scripts/smoke-test.sh](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/scripts/smoke-test.sh)
+- [scripts/smoke-test.sh](../../scripts/smoke-test.sh)
 - `cd frontend && npm run test:e2e`
 
 ## 로컬 실행 순서
