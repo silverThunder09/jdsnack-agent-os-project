@@ -29,6 +29,8 @@ JDSnack 기능 구현 해줘.
 - **티켓 전진(원자적)**: 티켓 PR에는 코드뿐 아니라 `plan.md`의 티켓 상태와 관련 traceability·테스트 결과 갱신을 포함합니다. 머지 후 active Spec은 유지한 채 다음 준비 티켓을 claim합니다.
 - **Feature 완료**: 마지막 티켓과 전체 수용 기준이 통과한 PR에서만 active Spec을 `.agent-os/archive/specs/`로 이동하고 `active_specs`를 비웁니다. 후보 백로그는 자동으로 active가 되지 않습니다.
 - 변경요청(`리뷰 반려: <branch>` 이슈)이 있으면 같은 `codex/*` 브랜치에서 반영합니다.
+- 반려 감지는 [pr-feedback-detector.sh](../../scripts/pr-feedback-detector.sh)가 한 번 실행될 때마다 수행합니다. 감지기는 GitHub 상태만 읽고 `no_action`, `actionable`, `needs_human` JSON과 종료 코드를 내보내며 polling loop를 내장하지 않습니다.
+- `actionable` 이벤트를 받은 외부 호출기만 Codex 세션을 깨워 같은 브랜치의 수정·테스트·커밋·푸시 작업을 시작합니다. 감지기 자체는 코드·브랜치·PR을 변경하지 않습니다.
 - 문서 없는 API/UI 계약 변경은 하지 않습니다.
 - 작업 범위 밖 파일은 스테이징하지 않습니다.
 - 할 일이 없으면 수정하지 않고 대기합니다.
