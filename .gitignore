@@ -41,3 +41,6 @@ frontend/playwright-report/
 # Temporary files
 *.tmp
 *.temp
+
+# AI-readiness eval artifacts (published by CI, not committed)
+evals/results/*.json

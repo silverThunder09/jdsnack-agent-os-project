@@ -103,6 +103,9 @@ jobs:
             }
           done < <(grep -E '^[[:space:]]+- ' .agent-os/standards/index.yml | sed 's/^[[:space:]]*- //')
 
+      - name: Check AI-readiness context
+        run: python3 scripts/check-ai-readiness.py
+
       - name: Block legacy MVP references
         shell: bash
         run: |

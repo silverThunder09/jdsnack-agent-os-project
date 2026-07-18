@@ -18,15 +18,18 @@ documents:
     - .agent-os/standards/codex-harness.md
     - .agent-os/standards/doc-lifecycle.md
     - .agent-os/standards/definition-of-done.md
+    - .agent-os/ai-readiness.yml
   engineering:
     - .agent-os/standards/coding-standards.md
     - .agent-os/standards/testing-standards.md
     - .agent-os/standards/git-workflow.md
     - .agent-os/standards/git-hooks.md
+    - .githooks/pre-commit
     - .agent-os/standards/backend.md
     - .agent-os/standards/frontend.md
     - .agent-os/standards/api.md
   architecture:
+    - docs/ARCHITECTURE.md
     - docs/architecture/system-overview.md
     - docs/architecture/backend-architecture.md
     - docs/architecture/frontend-architecture.md
@@ -57,6 +60,12 @@ documents:
     - .agent-os/operations/pr-feedback-detector.md
     - scripts/smoke-test.sh
     - scripts/google-test.sh
+    - scripts/check-ai-readiness.py
+    - scripts/README.md
+    - scripts/install-git-hooks.sh
+    - scripts/run-ai-readiness-evals.py
+    - evals/context-tasks.json
+    - evals/context-plan.schema.json
 active_specs:
   - .agent-os/specs/2026-07-18-service-mvp
 # 상세 pending Spec을 미리 만들지 않는다. 후보는 제품 백로그에만 둔다.

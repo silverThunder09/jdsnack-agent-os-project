@@ -29,9 +29,9 @@ const textValidationMessages = {
 
 const invalidUrlMessage = '올바른 JD 링크 형식을 입력해주세요.'
 
-type JdFetchStatus = 'idle' | 'fetching' | 'fetched' | 'fetch-error'
+export type JdFetchStatus = 'idle' | 'fetching' | 'fetched' | 'fetch-error'
 
-interface JdFetchState {
+export interface JdFetchState {
   status: JdFetchStatus
   title: string
   message: string

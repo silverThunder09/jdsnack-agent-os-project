@@ -102,7 +102,7 @@ resume_phase: test
 ## `Light` 흐름
 
 1. 작업 브랜치를 생성합니다.
-2. [work-start-checkpoint.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/work-start-checkpoint.md)에 `Light`로 기록합니다.
+2. [work-start-checkpoint.md](work-start-checkpoint.md)에 `Light`로 기록합니다.
 3. 변경을 구현합니다.
 4. 관련 테스트 또는 관련 CI만 확인합니다.
 5. 커밋합니다.

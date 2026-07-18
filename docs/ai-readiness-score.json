@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "repo": "agent-os",
+    "scored_at": "2026-07-19",
+    "git_branch": "codex/t2-auth-minor-fixes",
+    "rubric_version": "v2-100pt",
+    "method": "ai-readiness-cartography automatic score plus local gate verification"
+  },
+  "before": {
+    "automatic_total": 28,
+    "grade": "AI-Hostile",
+    "findings": [
+      "모듈별 실행 맥락과 의존성 지도가 부족했습니다.",
+      "문서 링크 검증, 정적 eval, 큰 진입 파일의 책임 분리가 없었습니다."
+    ]
+  },
+  "current": {
+    "automatic_total": 76,
+    "grade": "AI-Ready",
+    "modules_total": 3,
+    "context_files_total": 6,
+    "large_files_300plus": 8,
+    "categories": {
+      "A": { "score": 15, "max": 15 },
+      "B": { "score": 15, "max": 20 },
+      "C": { "score": 16, "max": 20 },
+      "D": { "score": 10, "max": 15 },
+      "E": { "score": 8, "max": 15 },
+      "F": { "score": 8, "max": 10 },
+      "G": { "score": 4, "max": 5 }
+    },
+    "verified": [
+      "python3 scripts/check-ai-readiness.py 통과",
+      "문서 링크와 정적 eval 케이스를 Docs Harness CI에서 검사",
+      "로컬 Codex 로그인 세션에서 context-on/off 지표를 필요할 때 측정할 수 있음",
+      "backend Gradle test, frontend lint/test/build, Docker compose health 확인"
+    ],
+    "scorer_caveats": [
+      "자동 scorer는 .agent-os 경로를 os/로 잘라 19개를 false positive로 보고합니다. 실제 gate는 0개 broken link를 확인했습니다.",
+      "Mermaid map은 docs/ARCHITECTURE.md와 docs/architecture/system-overview.md에 있지만 scorer는 README/AGENTS만 탐색해 D 항목에서 이를 인식하지 못합니다."
+    ]
+  },
+  "remaining_actions": [
+    {
+      "category": "E/F",
+      "action": "pre-commit 또는 pre-push에도 check-ai-readiness.py 연결",
+      "reason": "로컬 커밋 전 문서 drift 차단"
+    },
+    {
+      "category": "G",
+      "action": "기능 변경 전후에 로컬 Codex eval을 실행하고 결과 JSON을 비교",
+      "reason": "API 비용 없이 필요할 때 context-on/off pass-rate·경로·검증·제약·토큰 지표를 수집"
+    },
+    {
+      "category": "B",
+      "action": "api.ts, useMatchPreview 등 300줄 초과 파일은 기능 변경 시 다음 책임 단위로 분리",
+      "reason": "현재는 기존 500줄 초과 진입 파일 3개를 해소했고, 추가 분리는 별도 기능 변경과 함께 진행"
+    }
+  ]
+}

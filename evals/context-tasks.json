@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "mode": "static-context-validation",
+  "cases": [
+    {
+      "id": "backend-jd-fetch-change",
+      "prompt": "사람인 JD 수집 fallback을 변경하고 회귀를 검증한다.",
+      "expected_paths": [
+        "backend/src/main/java/com/jdsnack/jd/JdFetchService.java",
+        "backend/src/test/java/com/jdsnack/jd/JdFetchServiceTest.java",
+        "docs/architecture/backend-architecture.md"
+      ],
+      "required_checks": ["cd backend && ./gradlew test"],
+      "constraints": ["공개 API 응답 계약을 변경하지 않는다.", "외부 URL은 테스트 fixture로만 검증한다."],
+      "status": "not-run",
+      "not_run_reason": "모델 실행 runner가 아직 연결되지 않아 경로와 검증 명령만 정적으로 확인한다."
+    },
+    {
+      "id": "frontend-analysis-flow-change",
+      "prompt": "분석 시작 화면의 상태 흐름을 변경하고 UI 회귀를 검증한다.",
+      "expected_paths": [
+        "frontend/src/App.tsx",
+        "frontend/src/App.test.tsx",
+        "frontend/src/services/api.ts",
+        "docs/architecture/frontend-architecture.md"
+      ],
+      "required_checks": ["cd frontend && npm run lint && npm test && npm run build"],
+      "constraints": ["컴포넌트에서 직접 fetch를 호출하지 않는다.", "로그인 전 보호 API를 호출하지 않는다."],
+      "status": "not-run",
+      "not_run_reason": "모델 실행 runner가 아직 연결되지 않아 경로와 검증 명령만 정적으로 확인한다."
+    },
+    {
+      "id": "service-mvp-contract-change",
+      "prompt": "Service MVP의 보호 API 계약을 추가하고 요구사항부터 테스트까지 연결한다.",
+      "expected_paths": [
+        ".agent-os/specs/2026-07-18-service-mvp/requirements.md",
+        ".agent-os/specs/2026-07-18-service-mvp/acceptance-criteria.md",
+        ".agent-os/specs/2026-07-18-service-mvp/test-scenarios.md",
+        ".agent-os/specs/2026-07-18-service-mvp/traceability.md"
+      ],
+      "required_checks": ["python3 scripts/check-ai-readiness.py", "docker compose -f compose.local.yaml up -d --build"],
+      "constraints": ["문서 없는 API 변경을 하지 않는다.", "Entity를 API 응답으로 직접 반환하지 않는다."],
+      "status": "not-run",
+      "not_run_reason": "모델 실행 runner가 아직 연결되지 않아 경로와 검증 명령만 정적으로 확인한다."
+    }
+  ]
+}
