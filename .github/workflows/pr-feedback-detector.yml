@@ -1,0 +1,123 @@
+name: PR Feedback Detector
+
+on:
+  workflow_dispatch:
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created, edited]
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+  workflow_run:
+    types: [completed]
+
+permissions:
+  contents: write
+  checks: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  repair:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      contains(fromJSON('["Backend CI", "Frontend CI", "Container Flow", "Docs Harness"]'), github.event.workflow_run.name)
+    runs-on: [self-hosted, jdsnack]
+    concurrency:
+      group: jdsnack-review-repair-${{ github.event.issue.number || github.event.pull_request.number || github.event.workflow_run.id || github.run_id }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out automation
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Dispatch event to Codex
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            set +e
+            event="$(bash scripts/open-issue-work-dispatcher.sh --repo "$GITHUB_REPOSITORY" --apply)"
+            dispatch_code=$?
+            set -e
+            printf '```json\n%s\n```\n' "$event" >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$event"
+            case "$dispatch_code" in
+              0|10) exit 0 ;;
+              *) exit "$dispatch_code" ;;
+            esac
+          fi
+
+          branch="$(jq -r '
+            if .pull_request.head.ref then .pull_request.head.ref
+            elif .workflow_run.head_branch then .workflow_run.head_branch
+            elif ((.issue.title // "") | startswith("리뷰 반려: codex/")) then (.issue.title | sub("^리뷰 반려: "; ""))
+            else ""
+            end
+          ' "$GITHUB_EVENT_PATH")"
+
+          if [[ "$branch" != codex/* ]]; then
+            echo "No Codex branch is associated with this event."
+            exit 0
+          fi
+
+          if [ "$GITHUB_EVENT_NAME" = "issues" ] || [ "$GITHUB_EVENT_NAME" = "issue_comment" ]; then
+            if [ "$GITHUB_EVENT_NAME" = "issues" ] && ! jq -e '(.issue.title // "") | startswith("리뷰 반려: codex/")' "$GITHUB_EVENT_PATH" >/dev/null; then
+              echo "Issue is not a Codex review rejection."
+              exit 0
+            fi
+            set +e
+            event="$(bash scripts/open-issue-work-dispatcher.sh --repo "$GITHUB_REPOSITORY" --apply)"
+            dispatch_code=$?
+            set -e
+            printf '```json\n%s\n```\n' "$event" >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$event"
+            case "$dispatch_code" in
+              0|10) exit 0 ;;
+              *) exit "$dispatch_code" ;;
+            esac
+          fi
+
+          set +e
+          event="$(bash scripts/pr-feedback-detector.sh --repo "$GITHUB_REPOSITORY" --branch "$branch")"
+          detector_code=$?
+          set -e
+
+          printf '```json\n%s\n```\n' "$event" >> "$GITHUB_STEP_SUMMARY"
+
+          case "$detector_code" in
+            0)
+              echo "No actionable PR feedback."
+              ;;
+            10)
+              prompt="$(printf '%s' "$event" | jq -r '.prompt // empty')"
+              test -n "$prompt" || {
+                echo "Detector returned actionable feedback without a prompt." >&2
+                exit 20
+              }
+              worktree="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-review-${GITHUB_RUN_ID}.XXXXXX")"
+              cleanup_worktree() {
+                git worktree remove --force "$worktree" >/dev/null 2>&1 || true
+              }
+              trap cleanup_worktree EXIT
+              git fetch origin "$branch"
+              git worktree add --detach "$worktree" "origin/$branch"
+              codex exec \
+                --cd "$worktree" \
+                --sandbox workspace-write \
+                "$prompt Work only in this isolated worktree. Commit and push to the existing remote branch $branch. Do not create or merge a PR."
+              ;;
+            20)
+              echo "Detector needs human attention; see the JSON summary above."
+              ;;
+            *)
+              echo "Unexpected detector exit code: $detector_code" >&2
+              exit "$detector_code"
+              ;;
+          esac

@@ -118,6 +118,10 @@ jobs:
         shell: bash
         run: ./scripts/backends-contract-test.sh
 
+      - name: Test open issue work dispatcher
+        shell: bash
+        run: ./scripts/open-issue-work-dispatcher-test.sh
+
       - name: Block legacy MVP references
         shell: bash
         run: |

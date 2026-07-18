@@ -29,8 +29,9 @@ JDSnack 기능 구현 해줘.
 - **티켓 전진(원자적)**: 티켓 PR에는 코드뿐 아니라 `plan.md`의 티켓 상태와 관련 traceability·테스트 결과 갱신을 포함합니다. 머지 후 active Spec은 유지한 채 다음 준비 티켓을 claim합니다.
 - **Feature 완료**: 마지막 티켓과 전체 수용 기준이 통과한 PR에서만 active Spec을 `.agent-os/archive/specs/`로 이동하고 `active_specs`를 비웁니다. 후보 백로그는 자동으로 active가 되지 않습니다.
 - 변경요청(`리뷰 반려: <branch>` 이슈)이 있으면 같은 `codex/*` 브랜치에서 반영합니다.
-- 반려 감지는 [pr-feedback-detector.sh](../../scripts/pr-feedback-detector.sh)가 한 번 실행될 때마다 수행합니다. 감지기는 GitHub 상태만 읽고 `no_action`, `actionable`, `needs_human` JSON과 종료 코드를 내보내며 polling loop를 내장하지 않습니다.
-- `actionable` 이벤트를 받은 외부 호출기만 Codex 세션을 깨워 같은 브랜치의 수정·테스트·커밋·푸시 작업을 시작합니다. 감지기 자체는 코드·브랜치·PR을 변경하지 않습니다.
+- 반려 감지는 [pr-feedback-detector.sh](../../scripts/pr-feedback-detector.sh)가 GitHub 이벤트로 깨워진 workflow에서 한 번 실행될 때 수행합니다. 감지기는 polling loop를 내장하지 않으며 `no_action`, `actionable`, `needs_human` JSON과 종료 코드를 내보냅니다.
+- `.github/workflows/pr-feedback-detector.yml`은 반려 Issue 생성·수정, Issue/PR 댓글, PR 리뷰, required CI 완료 이벤트에만 실행됩니다. 로컬 `jdsnack` self-hosted runner가 안전한 후보를 격리 worktree에 전달해 Codex의 수정·테스트·커밋·푸시를 수행합니다.
+- Codex push 자체는 workflow 트리거가 아니므로 동일 이벤트의 무한 재실행을 만들지 않습니다. PR 생성·머지는 수행하지 않습니다.
 - 반려 자동 복구 루프는 PR 생성·갱신 뒤 CI 실패, 리뷰 `REQUEST_CHANGES`, 또는 반려 Issue가 확인되면 최신 로그·리뷰·Issue를 읽고 실패 원인을 재현합니다. 원래 수용 기준과 업무 검증 범위를 보존한 채 같은 브랜치에서 수정하고, 관련 테스트와 전체 회귀 테스트를 실행한 뒤 Conventional Commit으로 커밋·푸시하고 PR 상태를 다시 확인합니다. 테스트를 삭제하거나 assertion을 약화해 통과시키지 않습니다.
 - 자동 루프는 동일 PR에서 최대 3회 리뷰 시도까지 반복합니다. 같은 실패가 반복되거나 외부 승인·비밀값·서비스 복구가 필요하면 `needs-human`으로 기록하고 담당자에게 중단 지점과 필요한 조치를 보고합니다. 머지는 클로드/사용자 권한으로 수행하며 코덱스가 자동 머지하지 않습니다.
 - 문서 없는 API/UI 계약 변경은 하지 않습니다.
