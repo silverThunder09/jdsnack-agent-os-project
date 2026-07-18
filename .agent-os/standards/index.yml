@@ -53,6 +53,8 @@ documents:
     - .github/pull_request_template.md
     - .github/ISSUE_TEMPLATE/pr-failure.yml
     - scripts/pr-review-gate.sh
+    - scripts/pr-feedback-detector.sh
+    - .agent-os/operations/pr-feedback-detector.md
     - scripts/smoke-test.sh
     - scripts/google-test.sh
 active_specs:
