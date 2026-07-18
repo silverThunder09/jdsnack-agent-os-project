@@ -3,6 +3,26 @@ package com.jdsnack.common;
 import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
+    AUTHENTICATION_REQUIRED(
+            HttpStatus.UNAUTHORIZED,
+            "로그인이 필요합니다."
+    ),
+    OAUTH_NOT_CONFIGURED(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Google 로그인 설정이 준비되지 않았습니다."
+    ),
+    OAUTH_STATE_INVALID(
+            HttpStatus.BAD_REQUEST,
+            "로그인 요청이 만료되었거나 유효하지 않습니다."
+    ),
+    OAUTH_CALLBACK_FAILED(
+            HttpStatus.BAD_GATEWAY,
+            "Google 로그인에 실패했습니다. 잠시 후 다시 시도해주세요."
+    ),
+    OAUTH_PROVIDER_FAILED(
+            HttpStatus.BAD_GATEWAY,
+            "Google 계정 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요."
+    ),
     EMPTY_RESUME(
             HttpStatus.BAD_REQUEST,
             "이력서 내용을 입력해주세요."
