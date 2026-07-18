@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${PR_FEEDBACK_ALERT_ARGUMENTS_FILE:?PR_FEEDBACK_ALERT_ARGUMENTS_FILE is required}"
+printf '%s\n' "$@" > "$PR_FEEDBACK_ALERT_ARGUMENTS_FILE"

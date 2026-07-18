@@ -23,7 +23,7 @@ JDSnack 기능 구현 해줘.
 
 - Codex 담당: 구현, 테스트, 커밋, origin push.
 - Claude 담당: 문서 계획, 리뷰, PR, merge.
-- 모델 정책: 기능 구현은 **5.6 Luna**, 테스트 코드 작성·테스트 결과 분석은 **5.6 Luna Medium**을 사용합니다. 빌드·lint·test·E2E 명령 실행 자체에는 모델을 지정하지 않습니다. 리뷰·판정은 Codex가 아니라 Claude `code-reviewer`가 담당합니다.
+- 모델 정책은 [Worker 모델 배정](worker-backends.md)과 루트 [backends.json](../../backends.json)을 따릅니다. 빌드·lint·test·E2E 명령 실행 자체에는 모델을 지정하지 않습니다. 리뷰·판정은 Codex가 아니라 Claude `code-reviewer`가 담당합니다.
 - 구현 대상은 `index.yml`의 `active_specs`(정확히 1개) 안에서 준비된 티켓 하나입니다. `plan.md`가 없는 레거시 active Spec은 Spec 전체를 한 작업으로 취급합니다.
 - 티켓 브랜치는 `codex/<active-spec-slug>-<ticket-id>`로 만들고, 티켓별 구현·테스트·PR·리뷰·머지를 독립적으로 수행합니다.
 - **티켓 전진(원자적)**: 티켓 PR에는 코드뿐 아니라 `plan.md`의 티켓 상태와 관련 traceability·테스트 결과 갱신을 포함합니다. 머지 후 active Spec은 유지한 채 다음 준비 티켓을 claim합니다.
@@ -31,6 +31,8 @@ JDSnack 기능 구현 해줘.
 - 변경요청(`리뷰 반려: <branch>` 이슈)이 있으면 같은 `codex/*` 브랜치에서 반영합니다.
 - 반려 감지는 [pr-feedback-detector.sh](../../scripts/pr-feedback-detector.sh)가 한 번 실행될 때마다 수행합니다. 감지기는 GitHub 상태만 읽고 `no_action`, `actionable`, `needs_human` JSON과 종료 코드를 내보내며 polling loop를 내장하지 않습니다.
 - `actionable` 이벤트를 받은 외부 호출기만 Codex 세션을 깨워 같은 브랜치의 수정·테스트·커밋·푸시 작업을 시작합니다. 감지기 자체는 코드·브랜치·PR을 변경하지 않습니다.
+- 반려 자동 복구 루프는 PR 생성·갱신 뒤 CI 실패, 리뷰 `REQUEST_CHANGES`, 또는 반려 Issue가 확인되면 최신 로그·리뷰·Issue를 읽고 실패 원인을 재현합니다. 원래 수용 기준과 업무 검증 범위를 보존한 채 같은 브랜치에서 수정하고, 관련 테스트와 전체 회귀 테스트를 실행한 뒤 Conventional Commit으로 커밋·푸시하고 PR 상태를 다시 확인합니다. 테스트를 삭제하거나 assertion을 약화해 통과시키지 않습니다.
+- 자동 루프는 동일 PR에서 최대 3회 리뷰 시도까지 반복합니다. 같은 실패가 반복되거나 외부 승인·비밀값·서비스 복구가 필요하면 `needs-human`으로 기록하고 담당자에게 중단 지점과 필요한 조치를 보고합니다. 머지는 클로드/사용자 권한으로 수행하며 코덱스가 자동 머지하지 않습니다.
 - 문서 없는 API/UI 계약 변경은 하지 않습니다.
 - 작업 범위 밖 파일은 스테이징하지 않습니다.
 - 할 일이 없으면 수정하지 않고 대기합니다.

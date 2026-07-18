@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DETECTOR="$ROOT_DIR/scripts/pr-feedback-detector.sh"
 FIXTURE_GH="$ROOT_DIR/scripts/test-fixtures/pr-feedback-detector/gh"
+ALERT_FIXTURE="$ROOT_DIR/scripts/test-fixtures/needs-human-alert/notify"
 
 assert_eq() {
     local expected="$1"
@@ -85,6 +86,27 @@ assert_eq 2 "$exit_code" "invalid CLI diff limit exit code"
 run_detector required_checks_unavailable
 assert_eq 20 "$exit_code" "required check lookup exit code"
 assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "required check lookup status"
+
+alert_arguments_file="$(mktemp "${TMPDIR:-/tmp}/jdsnack-detector-alert.XXXXXX")"
+set +e
+output="$(
+    GH_BIN="$FIXTURE_GH" \
+    GH_REPO=fixture/repo \
+    PR_FEEDBACK_FIXTURE_SCENARIO=required_checks_unavailable \
+    NEEDS_HUMAN_ALERT_SCRIPT="$ALERT_FIXTURE" \
+    PR_FEEDBACK_ALERT_ARGUMENTS_FILE="$alert_arguments_file" \
+    bash "$DETECTOR" --branch codex/example
+)"
+exit_code=$?
+set -e
+assert_eq 20 "$exit_code" "alerted required check lookup exit code"
+assert_eq --source "$(sed -n '1p' "$alert_arguments_file")" "alert source option"
+assert_eq pr-feedback-detector "$(sed -n '2p' "$alert_arguments_file")" "alert source"
+assert_eq --reason "$(sed -n '7p' "$alert_arguments_file")" "alert reason option"
+assert_eq required_checks_unknown "$(sed -n '8p' "$alert_arguments_file")" "alert reason"
+assert_eq --url "$(sed -n '11p' "$alert_arguments_file")" "alert URL option"
+assert_eq https://example.test/pr/7 "$(sed -n '12p' "$alert_arguments_file")" "alert URL"
+rm -f "$alert_arguments_file"
 
 set +e
 output="$(

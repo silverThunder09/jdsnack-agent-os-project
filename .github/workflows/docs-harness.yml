@@ -106,6 +106,14 @@ jobs:
       - name: Check AI-readiness context
         run: python3 scripts/check-ai-readiness.py
 
+      - name: Test needs-human Discord notification contract
+        shell: bash
+        run: ./scripts/notify-needs-human-test.sh
+
+      - name: Test worker backend contract
+        shell: bash
+        run: ./scripts/backends-contract-test.sh
+
       - name: Block legacy MVP references
         shell: bash
         run: |

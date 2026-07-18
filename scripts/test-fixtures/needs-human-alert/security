@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${NOTIFY_SECURITY_SCENARIO:-configured}" = "missing" ]; then
+    exit 44
+fi
+
+printf '%s\n' 'https://discord.invalid/webhook'
