@@ -9,10 +9,10 @@ documents:
     - .agent-os/product/decisions.md
     - .agent-os/product/spec-backlog.md
   technical_adr:
-    - .agent-os/adr/adr-014-postgresql.md
+    - .agent-os/adr/adr-019-postgresql-service-storage.md
     - .agent-os/adr/adr-015-oauth-provider.md
     - .agent-os/adr/adr-016-jd-source-adapter.md
-    - .agent-os/adr/adr-017-analysis-record.md
+    - .agent-os/adr/adr-020-analysis-input-record.md
     - .agent-os/adr/adr-018-analysis-worker.md
   harness:
     - .agent-os/standards/codex-harness.md
