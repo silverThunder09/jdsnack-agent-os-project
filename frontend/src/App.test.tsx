@@ -22,6 +22,16 @@ function authSessionPayload() {
   })
 }
 
+function unauthenticatedSessionPayload() {
+  return mockJsonResponse({
+    success: true,
+    data: {
+      authenticated: false,
+      user: null,
+    },
+  })
+}
+
 function makeResumeFile() {
   return new File([resumeSourceText], 'resume.pdf', { type: 'application/pdf' })
 }
@@ -93,6 +103,22 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByRole('button', { name: '모의 면접' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '새로운 분석 시작' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeInTheDocument()
+  })
+
+  it('비로그인 사용자는 공개 홈과 로그인 CTA만 보고 보호 기능은 사용할 수 없다', async () => {
+    vi.mocked(globalThis.fetch).mockReset().mockResolvedValueOnce(unauthenticatedSessionPayload())
+    window.history.replaceState({}, '', '/')
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: /합격을 위한/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '로그인' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '로그인하고 분석 시작하기' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '모의 면접' })).toBeDisabled()
+    expect(screen.queryByRole('heading', { name: '새로운 분석 시작' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('채용 공고 URL')).not.toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/auth/session', expect.objectContaining({ credentials: 'include' }))
   })
 
   it('사이드바 로고는 홈으로 이동하고 상단 로고는 표시하지 않는다', async () => {
@@ -324,6 +350,7 @@ describe('새로운 분석 시작 페이지', () => {
     await user.type(screen.getByLabelText('JD 내용 붙여넣기'), validJdText)
 
     cleanup()
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(authSessionPayload())
     render(<App />)
     await user.click(screen.getByRole('tab', { name: 'JD 내용 붙여넣기' }))
     expect(screen.getByLabelText('JD 내용 붙여넣기')).toHaveValue(validJdText)

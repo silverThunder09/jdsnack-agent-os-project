@@ -28,6 +28,7 @@ export class NetworkError extends Error {
 }
 
 const KNOWN_ERROR_CODES: ApiErrorCode[] = [
+  'AUTHENTICATION_REQUIRED',
   'EMPTY_RESUME',
   'TEXT_TOO_SHORT',
   'TEXT_TOO_LONG',
@@ -108,6 +109,7 @@ export async function diagnoseResume(
   try {
     response = await fetch(`${API_BASE_URL}/api/diagnose`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -137,6 +139,7 @@ export async function diagnoseResumeFile(file: File): Promise<DiagnoseOutcome> {
   try {
     response = await fetch(`${API_BASE_URL}/api/diagnose/file`, {
       method: 'POST',
+      credentials: 'include',
       body: formData,
     })
   } catch {
@@ -161,6 +164,7 @@ export async function previewMatch(
   try {
     response = await fetch(`${API_BASE_URL}/api/match/preview`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -223,6 +227,7 @@ export async function previewSentence(
   try {
     response = await fetch(`${API_BASE_URL}/api/sentence/preview`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -277,6 +282,7 @@ export async function fetchJdFromUrl(jdUrl: string): Promise<JdFetchOutcome> {
   try {
     response = await fetch(`${API_BASE_URL}/api/jd/fetch`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -323,6 +329,7 @@ export async function previewInterview(
   try {
     response = await fetch(`${API_BASE_URL}/api/interview/preview`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',

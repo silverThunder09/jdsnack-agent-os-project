@@ -209,6 +209,58 @@ button:disabled {
   padding: 2rem 0 3rem;
 }
 
+.public-home {
+  display: grid;
+  min-height: calc(100vh - 140px);
+  place-items: center;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.public-home__content {
+  max-width: 720px;
+  padding: clamp(2rem, 6vw, 5rem);
+  border: 1px solid rgba(217, 224, 242, 0.9);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow);
+}
+
+.public-home__eyebrow {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.public-home h1 {
+  margin: 0;
+  color: #101828;
+  font-size: clamp(2.3rem, 5vw, 4.5rem);
+  letter-spacing: -0.07em;
+  line-height: 1.15;
+}
+
+.public-home p {
+  margin: 1.5rem 0 2rem;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.public-home__cta {
+  min-height: 3.4rem;
+  padding: 0.85rem 1.6rem;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 14px 28px rgba(79, 70, 229, 0.22);
+}
+
 .home-shell,
 .interview-shell {
   display: grid;

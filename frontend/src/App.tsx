@@ -2,6 +2,7 @@ import type { ChangeEvent, DragEvent, ReactNode, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
 import { AuthGate, AuthLoginAction } from './components/AuthGate'
+import { useAuthGate } from './components/AuthGateContext'
 import { StatusMessage } from './components/StatusMessage'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
@@ -315,6 +316,41 @@ function ComingSoonPanel({ title, description }: { title: string; description: s
         tone="neutral"
       />
     </section>
+  )
+}
+
+function PublicHomeApp() {
+  const { openLogin } = useAuthGate()
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+
+  return (
+    <AppShell
+      topbarAction={<AuthLoginAction />}
+      currentView="home"
+      isSidebarOpen={isSidebarOpen}
+      isAuthenticated={false}
+      onNavigate={() => setIsSidebarOpen(false)}
+      onToggleSidebar={() => setIsSidebarOpen((current) => !current)}
+    >
+      <section className="public-home" aria-label="JDSnack 공개 홈">
+        <div className="public-home__content">
+          <span className="public-home__eyebrow">JDSnack</span>
+          <h1>
+            합격을 위한
+            <br />
+            분석을 시작해보세요
+          </h1>
+          <p>
+            이력서와 채용 공고를 함께 살펴보고,
+            <br />
+            지원 전에 보완할 점을 찾아드릴게요.
+          </p>
+          <button type="button" className="public-home__cta" onClick={openLogin}>
+            로그인하고 분석 시작하기
+          </button>
+        </div>
+      </section>
+    </AppShell>
   )
 }
 
@@ -1000,9 +1036,14 @@ function AuthenticatedApp() {
 function App() {
   return (
     <AuthGate>
-      <AuthenticatedApp />
+      <AppContent />
     </AuthGate>
   )
+}
+
+function AppContent() {
+  const { status } = useAuthGate()
+  return status === 'authenticated' ? <AuthenticatedApp /> : <PublicHomeApp />
 }
 
 export default App
