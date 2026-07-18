@@ -95,6 +95,18 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeInTheDocument()
   })
 
+  it('사이드바 로고는 홈으로 이동하고 상단 로고는 표시하지 않는다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '모의 면접' }))
+    expect(screen.getByRole('heading', { name: /현재 이력서와 JD 맥락/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'JDSnack 홈' }))
+    expect(screen.getByRole('heading', { name: '새로운 분석 시작' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'JDSnack 홈' })).not.toBeInTheDocument()
+  })
+
   it('잠금 메뉴는 비활성화되고 계정 목업 영역은 표시하지 않는다', () => {
     render(<App />)
 

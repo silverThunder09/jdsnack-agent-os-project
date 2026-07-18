@@ -30,13 +30,18 @@ export function AppShell({
   return (
     <div className={`saas-shell${isSidebarOpen ? ' saas-shell--sidebar-open' : ''}`}>
       <aside className="saas-sidebar" aria-label="주요 내비게이션">
-        <div className="saas-sidebar__brand">
+        <button
+          type="button"
+          className="saas-sidebar__brand"
+          aria-label="JDSnack 홈"
+          onClick={() => onNavigate('home')}
+        >
           <span className="brand-icon">J</span>
           <div>
             <strong>JDSnack</strong>
             <p>AI Resume Copilot</p>
           </div>
-        </div>
+        </button>
 
         <nav className="saas-sidebar__nav" aria-label="서비스 메뉴">
           <button
@@ -92,9 +97,6 @@ export function AppShell({
             >
               ☰
             </button>
-            <a className="brand-mark" href="/" aria-label="JDSnack 홈">
-              <strong>JDSnack</strong>
-            </a>
           </div>
           <div className="saas-topbar__right">
             <span className="saas-help-pill">도움말</span>
