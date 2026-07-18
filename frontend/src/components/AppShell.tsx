@@ -7,6 +7,7 @@ interface AppShellProps {
   topbarAction?: ReactNode
   currentView: AppView
   isSidebarOpen: boolean
+  isAuthenticated?: boolean
   onNavigate: (view: AppView) => void
   onToggleSidebar: () => void
 }
@@ -24,6 +25,7 @@ export function AppShell({
   topbarAction,
   currentView,
   isSidebarOpen,
+  isAuthenticated = true,
   onNavigate,
   onToggleSidebar,
 }: AppShellProps) {
@@ -57,7 +59,9 @@ export function AppShell({
 
           <button
             type="button"
-            className={`saas-nav-item${currentView === 'interview' ? ' saas-nav-item--active' : ''}`}
+            className={`saas-nav-item${currentView === 'interview' ? ' saas-nav-item--active' : ''}${!isAuthenticated ? ' saas-nav-item--locked' : ''}`}
+            aria-disabled={!isAuthenticated}
+            disabled={!isAuthenticated}
             onClick={() => onNavigate('interview')}
           >
             <span className="saas-nav-item__icon" aria-hidden="true">

@@ -13,8 +13,8 @@ function callbackState(): AuthState | null {
   const auth = params.get('auth')
   if (auth === 'success') {
     return {
-      status: 'loading',
-      session: null,
+      status: 'authenticated',
+      session: { authenticated: true, user: null },
       message: '',
     }
   }
@@ -34,7 +34,9 @@ export function useAuth() {
   )
 
   useEffect(() => {
-    if (state.status !== 'loading') {
+    const isOAuthCallback = new URLSearchParams(window.location.search).get('auth') === 'success'
+    const shouldRefreshCallbackSession = state.status === 'authenticated' && isOAuthCallback && !state.session?.user
+    if (state.status !== 'loading' && !shouldRefreshCallbackSession) {
       return
     }
 
@@ -62,7 +64,7 @@ export function useAuth() {
     return () => {
       cancelled = true
     }
-  }, [state.status])
+  }, [state.status, state.session?.user])
 
   return {
     ...state,

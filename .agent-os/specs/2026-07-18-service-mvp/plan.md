@@ -13,8 +13,9 @@
 - 범위: Google OAuth/OIDC callback, state 검증, 내부 사용자·세션, 공통 인증 경계, 보호 API 차단, 인증 fake 테스트
 - 의존성: 없음
 - 완료 조건: AC-01, AC-01a, TC-01, TC-01a, TC-02 통과; secret/token 브라우저 비노출
-- 상태: `in-progress`
+- 상태: `completed`
 - 검증: 백엔드 `GoogleAuthControllerTest`와 보호 API 인증 테스트, 프론트 `AuthGate.test.tsx` 및 보호 API `credentials: 'include'` 검증, 전체 lint/test/build 통과. T2 이후 티켓은 T1에서 만든 공통 인증 경계를 재사용합니다.
+- 검증 결과: 백엔드 전체 테스트, 프론트 lint·22개 테스트·build, Docker 재빌드 후 health 및 비로그인 보호 API 401 검증을 완료했습니다.
 
 ### T2. 이력서·JD 입력과 저장 계약
 
@@ -46,3 +47,4 @@
 - 프론트: `cd frontend && npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`
 - 문서: active spec 필수 문서, traceability, index 포인터, 링크 검증
 - 외부 OAuth/Gemini/DB는 fake/stub 또는 격리된 테스트 경계로 검증하며 운영 secret을 테스트에 포함하지 않는다.
+- Compose smoke test는 로컬 전용 테스트 세션 발급 경로를 사용해 인증 후 기존 분석·업로드 검증을 수행할 수 있다. 이 경로는 `jdsnack.auth.smoke.enabled`가 명시적으로 켜진 로컬 compose에서만 등록되며 기본값은 `false`이고 운영 compose에는 노출하지 않는다.

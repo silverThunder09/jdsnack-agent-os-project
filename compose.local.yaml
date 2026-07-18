@@ -10,6 +10,7 @@ services:
         required: false
     environment:
       JDSNACK_DIAGNOSIS_MODE: ${JDSNACK_DIAGNOSIS_MODE:-ai-local}
+      JDSNACK_AUTH_SMOKE_ENABLED: ${JDSNACK_AUTH_SMOKE_ENABLED:-true}
     ports:
       - "8080:8080"
 

@@ -8,6 +8,7 @@ VALID_RESUME_TEXT="${VALID_RESUME_TEXT:-Experienced backend engineer with Spring
 SHORT_RESUME_TEXT="${SHORT_RESUME_TEXT:-짧은 이력서입니다.}"
 UNKNOWN_RESUME_TEXT="${UNKNOWN_RESUME_TEXT:-Platform engineer with distributed tracing rollout, incident command ownership, and multi-region disaster recovery practice across services.}"
 SMOKE_TMP_DIR="${SMOKE_TMP_DIR:-/tmp/jdsnack-smoke}"
+SMOKE_COOKIE_JAR="${SMOKE_COOKIE_JAR:-/tmp/jdsnack-smoke.cookies}"
 
 wait_for_url() {
   local url="$1"
@@ -56,11 +57,41 @@ run_health_check() {
   assert_contains /tmp/jdsnack-health.json '"version":"1.0.0"' "health response must include version"
 }
 
+run_public_session_check() {
+  curl -fsS "${FRONTEND_URL}/api/auth/session" >/tmp/jdsnack-session.json
+  assert_contains /tmp/jdsnack-session.json '"success":true' "session endpoint must be public"
+  assert_contains /tmp/jdsnack-session.json '"authenticated":false' "smoke test must start unauthenticated"
+}
+
+run_smoke_login() {
+  local http_code
+
+  http_code="$(
+    curl -sS -o /tmp/jdsnack-smoke-login.json -w '%{http_code}' \
+      -c "${SMOKE_COOKIE_JAR}" \
+      -X POST "${BACKEND_URL}/internal/test-auth/session"
+  )"
+
+  if [[ "${http_code}" != "204" ]]; then
+    echo "Expected 204 for smoke session creation, got ${http_code}"
+    cat /tmp/jdsnack-smoke-login.json
+    return 1
+  fi
+}
+
+run_authenticated_session_check() {
+  curl -fsS "${FRONTEND_URL}/api/auth/session" \
+    -b "${SMOKE_COOKIE_JAR}" \
+    >/tmp/jdsnack-authenticated-session.json
+  assert_contains /tmp/jdsnack-authenticated-session.json '"authenticated":true' "smoke session must authenticate"
+}
+
 run_short_resume_check() {
   local http_code
 
   http_code="$(
     curl -sS -o /tmp/jdsnack-short.json -w '%{http_code}' \
+      -b "${SMOKE_COOKIE_JAR}" \
       -X POST "${FRONTEND_URL}/api/diagnose" \
       -H 'Content-Type: application/json' \
       -H 'Accept: application/json' \
@@ -81,6 +112,7 @@ run_valid_resume_check() {
 
   http_code="$(
     curl -sS -o /tmp/jdsnack-valid.json -w '%{http_code}' \
+      -b "${SMOKE_COOKIE_JAR}" \
       -X POST "${FRONTEND_URL}/api/diagnose" \
       -H 'Content-Type: application/json' \
       -H 'Accept: application/json' \
@@ -172,6 +204,7 @@ run_upload_check() {
   local http_code
   http_code="$(
     curl -sS -o "${response_file}" -w '%{http_code}' \
+      -b "${SMOKE_COOKIE_JAR}" \
       -F "resumeFile=@${file_path};type=${content_type}" \
       "${FRONTEND_URL}/api/diagnose/file"
   )"
@@ -233,12 +266,49 @@ run_unknown_fixture_check() {
   assert_contains /tmp/jdsnack-unknown-docx.json '"code":"FIXTURE_NOT_FOUND"' "unknown docx must return FIXTURE_NOT_FOUND"
 }
 
+run_protected_api_auth_check() {
+  local path
+  local http_code
+
+  for path in \
+    /api/diagnose \
+    /api/diagnose/file \
+    /api/match/preview \
+    /api/sentence/preview \
+    /api/jd/fetch \
+    /api/interview/preview \
+    /api/analysis-histories; do
+    http_code="$(
+      curl -sS -o /tmp/jdsnack-protected.json -w '%{http_code}' \
+        -X POST "${FRONTEND_URL}${path}" \
+        -H 'Content-Type: application/json' \
+        -H 'Accept: application/json' \
+        -d '{}'
+    )"
+
+    if [[ "${http_code}" != "401" ]]; then
+      echo "Expected 401 for unauthenticated ${path}, got ${http_code}"
+      cat /tmp/jdsnack-protected.json
+      return 1
+    fi
+
+    assert_contains \
+      /tmp/jdsnack-protected.json \
+      '"code":"AUTHENTICATION_REQUIRED"' \
+      "${path} must require authentication"
+  done
+}
+
 main() {
   wait_for_url "${BACKEND_URL}/api/health" "backend health"
   wait_for_url "${FRONTEND_URL}" "frontend root"
 
   run_frontend_root_check
   run_health_check
+  run_public_session_check
+  run_protected_api_auth_check
+  run_smoke_login
+  run_authenticated_session_check
   run_short_resume_check
   run_valid_resume_check
   prepare_upload_fixtures

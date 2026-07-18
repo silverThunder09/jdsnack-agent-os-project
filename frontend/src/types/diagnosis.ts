@@ -2,6 +2,7 @@ export type AnalysisStatus = 'idle' | 'loading' | 'success' | 'not-enabled' | 'e
 export type ResumeInputMode = 'text' | 'pdf' | 'docx'
 
 export type ApiErrorCode =
+  | 'AUTHENTICATION_REQUIRED'
   | 'EMPTY_RESUME'
   | 'TEXT_TOO_SHORT'
   | 'TEXT_TOO_LONG'
