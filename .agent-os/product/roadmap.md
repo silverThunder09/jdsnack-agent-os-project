@@ -24,13 +24,7 @@
 
 ### 내부 수직 티켓
 
-Service MVP Feature Spec은 다음 다섯 티켓으로 끝까지 관통합니다.
-
-1. OAuth 로그인과 사용자 식별
-2. 이력서·JD 입력과 저장 계약
-3. 기존 AI 진단·JD 매칭 연결
-4. 분석 결과 저장과 이력 조회
-5. 재시도·삭제와 사용자 데이터 제어
+Service MVP는 수직 티켓 다섯 개(T1~T5)로 끝까지 관통합니다. 티켓의 정의·의존성·진행 상태는 [plan.md](../specs/2026-07-18-service-mvp/plan.md)가 정본입니다.
 
 ## Post MVP
 
@@ -38,7 +32,4 @@ Service MVP Feature Spec은 다음 다섯 티켓으로 끝까지 관통합니다
 
 ## 실행 규칙
 
-- 한 시점에는 Feature Spec 하나만 상세 문서로 유지합니다.
-- Feature Spec은 requirements, acceptance criteria, test scenarios, API/UI 계약, traceability와 내부 티켓 계획을 가집니다.
-- 티켓은 하나씩 PR·리뷰·머지하며, 마지막 티켓의 종단 간 검증이 끝나기 전에는 Feature Spec을 archive하지 않습니다.
-- 후보 백로그에서 다음 Feature Spec으로의 승격은 `/grill-with-docs`로 범위를 확정한 뒤 사람이 시작합니다. 자동 승격하지 않습니다.
+Feature Spec 운영 규칙(한 시점 1개 유지, 필수 문서 구성, 티켓 PR 절차, 백로그 승격)은 [doc-lifecycle.md](../standards/doc-lifecycle.md)가 정본입니다.
