@@ -1609,10 +1609,6 @@ button:disabled {
 }
 
 .auth-login-button {
-  position: fixed;
-  top: 1rem;
-  right: 1.5rem;
-  z-index: 30;
   min-height: 2.8rem;
   padding: 0.65rem 1.2rem;
   border: 0;
@@ -1633,9 +1629,6 @@ button:disabled {
     border-radius: 1.5rem;
   }
 
-  .auth-login-button {
-    right: 1rem;
-  }
 }
 
 .start-cta {

@@ -4,6 +4,7 @@ type AppView = 'home' | 'interview'
 
 interface AppShellProps {
   children: ReactNode
+  topbarAction?: ReactNode
   currentView: AppView
   isSidebarOpen: boolean
   onNavigate: (view: AppView) => void
@@ -20,6 +21,7 @@ const lockedItems = [
 
 export function AppShell({
   children,
+  topbarAction,
   currentView,
   isSidebarOpen,
   onNavigate,
@@ -118,6 +120,7 @@ export function AppShell({
               🔔
               <span className="saas-bell__badge">3</span>
             </span>
+            {topbarAction}
           </div>
         </header>
 

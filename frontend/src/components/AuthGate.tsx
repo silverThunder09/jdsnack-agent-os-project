@@ -1,19 +1,49 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
+
+type AuthGateContextValue = {
+  status: ReturnType<typeof useAuth>['status']
+  isLoginOpen: boolean
+  openLogin: () => void
+  closeLogin: () => void
+}
+
+const AuthGateContext = createContext<AuthGateContextValue | null>(null)
+
+export function AuthLoginAction() {
+  const auth = useContext(AuthGateContext)
+
+  if (!auth || auth.status === 'authenticated' || auth.isLoginOpen) {
+    return null
+  }
+
+  return (
+    <button type="button" className="auth-login-button" onClick={auth.openLogin}>
+      로그인
+    </button>
+  )
+}
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { status, message, startGoogleLogin } = useAuth()
   const [isLoginOpen, setIsLoginOpen] = useState(false)
+  const authContext: AuthGateContextValue = {
+    status,
+    isLoginOpen,
+    openLogin: () => setIsLoginOpen(true),
+    closeLogin: () => setIsLoginOpen(false),
+  }
 
   if (status === 'authenticated') {
-    return <>{children}</>
+    return <AuthGateContext.Provider value={authContext}>{children}</AuthGateContext.Provider>
   }
 
   const isLoading = status === 'loading'
 
   return (
-    <div className="auth-shell">
+    <AuthGateContext.Provider value={authContext}>
+      <div className="auth-shell">
       {children}
       {isLoginOpen ? (
         <div className="auth-modal-layer">
@@ -23,7 +53,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
               type="button"
               className="auth-card__close"
               aria-label="로그인 창 닫기"
-              onClick={() => setIsLoginOpen(false)}
+              onClick={authContext.closeLogin}
             >
               ×
             </button>
@@ -62,11 +92,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
             <p className="auth-card__legal">계속하면 JDSnack의 서비스 이용약관 및 개인정보 처리방침에 동의하게 됩니다.</p>
           </section>
         </div>
-      ) : (
-        <button type="button" className="auth-login-button" onClick={() => setIsLoginOpen(true)}>
-          로그인
-        </button>
-      )}
-    </div>
+      ) : null}
+      </div>
+    </AuthGateContext.Provider>
   )
 }

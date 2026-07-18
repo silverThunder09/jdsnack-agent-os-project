@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AuthGate } from './AuthGate'
+import { AuthGate, AuthLoginAction } from './AuthGate'
 
 function sessionPayload(authenticated: boolean) {
   return {
@@ -35,6 +35,7 @@ describe('AuthGate', () => {
 
     render(
       <AuthGate>
+        <AuthLoginAction />
         <p>보호 화면</p>
       </AuthGate>,
     )
@@ -50,6 +51,7 @@ describe('AuthGate', () => {
 
     render(
       <AuthGate>
+        <AuthLoginAction />
         <p>보호 화면</p>
       </AuthGate>,
     )
@@ -68,6 +70,7 @@ describe('AuthGate', () => {
 
     render(
       <AuthGate>
+        <AuthLoginAction />
         <p>보호 화면</p>
       </AuthGate>,
     )
@@ -81,6 +84,7 @@ describe('AuthGate', () => {
 
     render(
       <AuthGate>
+        <AuthLoginAction />
         <p>보호 화면</p>
       </AuthGate>,
     )
