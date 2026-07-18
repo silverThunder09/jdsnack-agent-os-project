@@ -2,7 +2,6 @@ import type { ChangeEvent, DragEvent, ReactNode, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
 import { AuthGate, AuthLoginAction } from './components/AuthGate'
-import { useAuthGate } from './components/AuthGateContext'
 import { StatusMessage } from './components/StatusMessage'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
@@ -334,7 +333,6 @@ function KeywordList({ items }: { items: string[] }) {
 }
 
 function AuthenticatedApp() {
-  const { session } = useAuthGate()
   const [currentView, setCurrentView] = useState<'home' | 'interview'>('home')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('input')
@@ -906,7 +904,6 @@ function AuthenticatedApp() {
   return (
     <AppShell
       topbarAction={<AuthLoginAction />}
-      account={session?.user}
       currentView={currentView}
       isSidebarOpen={isSidebarOpen}
       onNavigate={(view) => {

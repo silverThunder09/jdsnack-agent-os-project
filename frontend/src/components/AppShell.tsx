@@ -1,12 +1,10 @@
 import type { ReactNode } from 'react'
-import type { AuthUser } from '../types/auth'
 
 type AppView = 'home' | 'interview'
 
 interface AppShellProps {
   children: ReactNode
   topbarAction?: ReactNode
-  account?: AuthUser | null
   currentView: AppView
   isSidebarOpen: boolean
   onNavigate: (view: AppView) => void
@@ -24,7 +22,6 @@ const lockedItems = [
 export function AppShell({
   children,
   topbarAction,
-  account,
   currentView,
   isSidebarOpen,
   onNavigate,
@@ -82,26 +79,6 @@ export function AppShell({
           ))}
         </nav>
 
-        <div className="saas-sidebar__profile" aria-label="계정 정보">
-          <div className="plan-card">
-            <strong>프로 플랜</strong>
-            <span>만료일 2025.06.30</span>
-            <button type="button" className="plan-card__manage" disabled aria-disabled="true">
-              플랜 관리
-            </button>
-          </div>
-          {account ? (
-            <div className="profile-row">
-              <span className="profile-avatar" aria-hidden="true">
-                {getProfileInitials(account.displayName ?? account.email)}
-              </span>
-              <div className="profile-row__info">
-                <strong>{account.displayName || account.email}</strong>
-                <span>{account.email}</span>
-              </div>
-            </div>
-          ) : null}
-        </div>
       </aside>
 
       <div className="saas-main">
@@ -133,8 +110,4 @@ export function AppShell({
       </div>
     </div>
   )
-}
-
-function getProfileInitials(value: string): string {
-  return value.trim().slice(0, 2).toUpperCase() || 'G'
 }

@@ -95,29 +95,15 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeInTheDocument()
   })
 
-  it('잠금 메뉴는 비활성화되고 로그인한 계정 프로필이 보인다', async () => {
+  it('잠금 메뉴는 비활성화되고 계정 목업 영역은 표시하지 않는다', () => {
     render(<App />)
 
     expect(screen.getByRole('button', { name: '분석 내역' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '요금제' })).toBeDisabled()
-    expect(await screen.findByText('테스트 사용자')).toBeInTheDocument()
-    expect(screen.getByText('user@example.com')).toBeInTheDocument()
-    expect(screen.queryByText('김현준')).not.toBeInTheDocument()
-    expect(screen.getByText('프로 플랜')).toBeInTheDocument()
-  })
-
-  it('비로그인 화면에는 이전 사용자의 프로필이 보이지 않는다', async () => {
-    vi.mocked(globalThis.fetch).mockReset()
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(mockJsonResponse({
-      success: true,
-      data: { authenticated: false, user: null },
-    }))
-
-    render(<App />)
-
-    expect(await screen.findByRole('heading', { name: '새로운 분석 시작' })).toBeInTheDocument()
     expect(screen.queryByText('김현준')).not.toBeInTheDocument()
     expect(screen.queryByText('hyunjun.kim@example.com')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('계정 정보')).not.toBeInTheDocument()
+    expect(screen.queryByText('프로 플랜')).not.toBeInTheDocument()
   })
 
   it('JD 탭 전환·글자수·이력서 업로드 칩이 동작한다', async () => {

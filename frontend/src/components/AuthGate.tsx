@@ -18,11 +18,10 @@ export function AuthLoginAction() {
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { status, session, message, startGoogleLogin } = useAuth()
+  const { status, message, startGoogleLogin } = useAuth()
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const authContext: AuthGateContextValue = {
     status,
-    session,
     isLoginOpen,
     openLogin: () => setIsLoginOpen(true),
     closeLogin: () => setIsLoginOpen(false),
