@@ -20,6 +20,7 @@ Exit codes:
   0  no actionable feedback
   10 actionable PR/CI/review feedback found
   20 detector cannot determine state and needs a human
+  2  invalid command-line arguments
 USAGE
 }
 
@@ -84,8 +85,7 @@ emit_actionable() {
 
 run_gh_json() {
     local output
-    if ! output="$($GH_BIN "$@" 2>&1)"; then
-        printf '%s\n' "$output" >&2
+    if ! output="$($GH_BIN "$@")"; then
         return 1
     fi
     printf '%s' "$output"
@@ -94,7 +94,8 @@ run_gh_json() {
 validate_json() {
     local payload="$1"
     local source="$2"
-    if ! printf '%s' "$payload" | "$JQ_BIN" -e . >/dev/null 2>&1; then
+    local predicate="${3:-.}"
+    if ! printf '%s' "$payload" | "$JQ_BIN" -e "$predicate" >/dev/null 2>&1; then
         emit_needs_human "github_response_invalid" "$source returned malformed JSON"
     fi
 }
@@ -130,11 +131,16 @@ done
 command -v "$GH_BIN" >/dev/null 2>&1 || emit_needs_human "gh_unavailable"
 command -v "$JQ_BIN" >/dev/null 2>&1 || emit_needs_human "jq_unavailable"
 
+case "$DIFF_LIMIT" in
+    ''|*[!0-9]*) emit_needs_human "invalid_diff_limit" "PR_DIFF_LIMIT must be a positive integer" ;;
+esac
+[ "$DIFF_LIMIT" -gt 0 ] || emit_needs_human "invalid_diff_limit" "PR_DIFF_LIMIT must be a positive integer"
+
 if [ -z "$REPO" ]; then
     if ! repo_payload="$(run_gh_json repo view --json nameWithOwner)"; then
         emit_needs_human "github_query_failed" "repo view failed"
     fi
-    validate_json "$repo_payload" "repo view"
+    validate_json "$repo_payload" "repo view" '(.nameWithOwner | type) == "string" and (.nameWithOwner | length) > 0'
     REPO="$($JQ_BIN -r '.nameWithOwner // empty' <<EOF
 $repo_payload
 EOF
@@ -154,7 +160,7 @@ esac
 if ! pr_list="$(run_gh_json pr list --repo "$REPO" --head "$BRANCH" --state open --json number --limit 1)"; then
     emit_needs_human "github_query_failed" "pr list failed"
 fi
-validate_json "$pr_list" "pr list"
+validate_json "$pr_list" "pr list" 'type == "array"'
 pr_number="$($JQ_BIN -r '.[0].number // empty' <<EOF
 $pr_list
 EOF
@@ -164,13 +170,13 @@ if [ -n "$pr_number" ]; then
     if ! pr_payload="$(run_gh_json pr view "$pr_number" --repo "$REPO" --json number,title,url,state,headRefName,baseRefName,headRefOid,reviewDecision,additions,deletions,changedFiles,statusCheckRollup)"; then
         emit_needs_human "github_query_failed" "pr view failed"
     fi
-    validate_json "$pr_payload" "pr view"
+    validate_json "$pr_payload" "pr view" 'type == "object"'
 fi
 
 if ! issue_list="$(run_gh_json issue list --repo "$REPO" --state open --search "\"리뷰 반려: $BRANCH\" in:title" --json number,title,url,updatedAt --limit 20)"; then
     emit_needs_human "github_query_failed" "issue list failed"
 fi
-validate_json "$issue_list" "issue list"
+validate_json "$issue_list" "issue list" 'type == "array"'
 issue_number="$($JQ_BIN -r --arg title "리뷰 반려: $BRANCH" 'map(select(.title == $title)) | sort_by(.updatedAt) | last | .number // empty' <<EOF
 $issue_list
 EOF
@@ -180,27 +186,7 @@ if [ -n "$issue_number" ]; then
     if ! issue_payload="$(run_gh_json issue view "$issue_number" --repo "$REPO" --json number,title,url,body,comments,updatedAt)"; then
         emit_needs_human "github_query_failed" "issue view failed"
     fi
-    validate_json "$issue_payload" "issue view"
-fi
-
-required_checks='[]'
-if [ -n "$pr_number" ]; then
-    base_branch="$($JQ_BIN -r '.baseRefName // empty' <<EOF
-$pr_payload
-EOF
-)"
-    if [ -n "${PR_FEEDBACK_REQUIRED_CHECKS:-}" ]; then
-        required_checks="$(printf '%s' "$PR_FEEDBACK_REQUIRED_CHECKS" | tr ',' '\n' | "$JQ_BIN" -Rsc 'split("\n") | map(select(length > 0))')"
-    else
-        if ! required_payload="$(run_gh_json api "repos/$REPO/branches/$base_branch/protection/required_status_checks" 2>/dev/null)"; then
-            emit_needs_human "required_checks_unknown" "main branch protection could not be read; set PR_FEEDBACK_REQUIRED_CHECKS to override"
-        fi
-        validate_json "$required_payload" "required status checks"
-        required_checks="$($JQ_BIN -c '([.contexts[]?, .checks[]?.context] | map(select(. != null)) | unique)' <<EOF
-$required_payload
-EOF
-)"
-    fi
+    validate_json "$issue_payload" "issue view" 'type == "object"'
 fi
 
 pr_ref="$($JQ_BIN -c 'if . == null then null else {
@@ -218,11 +204,53 @@ $issue_payload
 EOF
 )"
 
+issue_body="$($JQ_BIN -r '.body // empty' <<EOF
+$issue_payload
+EOF
+)"
+issue_updated_at="$($JQ_BIN -r '.updatedAt // empty' <<EOF
+$issue_payload
+EOF
+)"
+feedback_summary="$(printf '%s' "$issue_body" | tr '\n' ' ' | cut -c 1-500)"
+
+if [ -n "$issue_number" ]; then
+    event_key="issue:${issue_number}:${issue_updated_at}"
+    emit_actionable \
+        "review_rejection_issue" \
+        "$event_key" \
+        "${feedback_summary:-리뷰 반려 Issue가 열려 있습니다.}" \
+        "Read Issue #${issue_number} for branch ${BRANCH}, fix the requested changes on the same branch, run the relevant tests, commit, and push. Preserve business coverage and do not weaken assertions." \
+        "[]" \
+        "$pr_ref" \
+        "$issue_ref"
+fi
+
+required_checks='[]'
+if [ -n "$pr_number" ]; then
+    base_branch="$($JQ_BIN -r '.baseRefName // empty' <<EOF
+$pr_payload
+EOF
+)"
+    if [ -n "${PR_FEEDBACK_REQUIRED_CHECKS:-}" ]; then
+        required_checks="$(printf '%s' "$PR_FEEDBACK_REQUIRED_CHECKS" | tr ',' '\n' | "$JQ_BIN" -Rsc 'split("\n") | map(select(length > 0))')"
+    else
+        if ! required_payload="$(run_gh_json api "repos/$REPO/branches/$base_branch/protection/required_status_checks" 2>/dev/null)"; then
+            emit_needs_human "required_checks_unknown" "main branch protection could not be read; set PR_FEEDBACK_REQUIRED_CHECKS to override"
+        fi
+        validate_json "$required_payload" "required status checks" 'type == "object" and ((.contexts // []) | type) == "array" and ((.checks // []) | type) == "array"'
+        required_checks="$($JQ_BIN -c '([.contexts[]?, .checks[]?.context] | map(select(. != null)) | unique)' <<EOF
+$required_payload
+EOF
+)"
+    fi
+fi
+
 failed_checks="$($JQ_BIN -c --argjson required "$required_checks" 'if . == null then [] else [.statusCheckRollup[]? | . as $check | select(
-    (($required | index($check.name)) != null or ($required | index($check.workflowName)) != null)
+    (($required | index($check.name)) != null or ($required | index($check.workflowName)) != null or ($required | index($check.context)) != null)
     and (((.conclusion // .state // "") | ascii_upcase)
       | IN("FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"))
-  ) | {name, conclusion: (.conclusion // .state), detailsUrl}] end' <<EOF
+  ) | {name: (.name // .context), context, conclusion: (.conclusion // .state), detailsUrl}] end' <<EOF
 $pr_payload
 EOF
 )"
@@ -235,31 +263,10 @@ pr_review_decision="$($JQ_BIN -r '.reviewDecision // empty' <<EOF
 $pr_payload
 EOF
 )"
-issue_body="$($JQ_BIN -r '.body // empty' <<EOF
-$issue_payload
-EOF
-)"
-issue_updated_at="$($JQ_BIN -r '.updatedAt // empty' <<EOF
-$issue_payload
-EOF
-)"
-feedback_summary="$(printf '%s' "$issue_body" | tr '\n' ' ' | cut -c 1-500)"
 head_oid="$($JQ_BIN -r '.headRefOid // "no-pr"' <<EOF
 $pr_payload
 EOF
 )"
-
-if [ -n "$issue_number" ]; then
-    event_key="issue:${issue_number}:${issue_updated_at}"
-    emit_actionable \
-        "review_rejection_issue" \
-        "$event_key" \
-        "${feedback_summary:-리뷰 반려 Issue가 열려 있습니다.}" \
-        "Read Issue #${issue_number} for branch ${BRANCH}, fix the requested changes on the same branch, run the relevant tests, commit, and push. Preserve business coverage and do not weaken assertions." \
-        "$failed_checks" \
-        "$pr_ref" \
-        "$issue_ref"
-fi
 
 if [ "$pr_review_decision" = "CHANGES_REQUESTED" ]; then
     event_key="pr:${pr_number}:${head_oid}:changes-requested"
