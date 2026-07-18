@@ -61,6 +61,13 @@ class AuthenticationFilterTest {
                 .andExpect(jsonPath("$.data.authenticated").value(false));
     }
 
+    @Test
+    void smokeSessionEndpointIsDisabledByDefault() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.post("/internal/test-auth/session"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
     private MockHttpSession authenticatedSession() {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(GoogleAuthService.SESSION_USER_ID, "test-user");
