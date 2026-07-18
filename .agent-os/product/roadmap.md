@@ -1,44 +1,44 @@
 # 제품 로드맵 (Product Roadmap)
 
-## Phase 1: 1차 MVP (서비스 뼈대)
+## 로드맵 읽기 규칙
 
-- **이력서 입력 UI**: 텍스트 입력, 글자 수 표시, 입력값 보존.
-- **입력 검증 API**: 빈 입력, 짧은 입력, 긴 입력 검증.
-- **준비중 안내**: 유효한 입력에 대해 AI 분석 기능 준비중 메시지 표시.
-- **서비스 구조 준비**: Spring Boot 백엔드와 React 프론트엔드 기본 구조 구축.
+기존 Phase 1~2.5는 제품 검증 이력입니다. 관련 구현 스펙은 archive에 보관하며, 현재 구현 루프는 `active_specs`와 `pending_specs`를 기준으로만 움직입니다.
 
-## Phase 1.5: 업로드 + fixture 분석 MVP
+## 제품 검증 이력
 
-- **이력서 업로드**: PDF, DOCX 파일 업로드 지원.
-- **텍스트 추출**: 업로드 파일에서 이력서 텍스트 추출.
-- **fixture 결과 화면**: 외부 AI 없이 정적 분석 결과를 반환해 결과 화면 검증.
-- **운영 모드 분리**: no-key 준비중 모드와 fixture 분석 모드 분리.
+- Phase 1: 이력서 입력·검증·준비중 안내·Spring Boot/React 뼈대
+- Phase 1.5: PDF/DOCX 업로드·텍스트 추출·fixture 분석
+- Phase 1.6: JD 텍스트·링크 입력·비교 API 계약
+- Phase 1.7: 사람인 HTML 수집·오탐 방지·안전한 외부 fetch
+- Phase 2: Gemini 이력서 진단·구조화 응답
+- Phase 2.5: Gemini JD 매칭·stub/fixture 롤백
+- 기존 프론트 결과·문장·키워드·모의면접 preview
 
-## Phase 1.6: JD 입력 설계 MVP
+## 서비스 MVP
 
-- **JD 텍스트 입력**: 사용자가 비교 기준이 되는 JD 본문을 직접 붙여넣기.
-- **JD 링크 선택 입력**: 출처 메모용 링크를 선택적으로 입력.
-- **비교 API 초안**: 실제 분석 전, 이력서-JD 비교 요청 계약을 문서로 먼저 고정.
+서비스 MVP는 기능 목록이 아니라 다음의 완전한 사용자 가치 흐름입니다.
 
-## Phase 1.7: JD 링크 수집 안정화 MVP
+`OAuth 1개 공급자 로그인 → 이력서·JD 입력 → 기존 AI 진단·JD 매칭 → 결과 저장 → 이력 조회·재시도·삭제`
 
-- **사람인 우선 수집**: 사람인 정적 HTML 공고에서 JD 본문 초안을 추출.
-- **오탐 방지**: 개인정보, 푸터, 추천공고 문구만 추출되면 실패 처리.
-- **안전한 외부 fetch**: 내부망 차단, timeout, redirect, 응답 크기 제한 기준 고정.
+사람인 이미지 OCR은 구현·검증을 마치고 archive로 이동했습니다. 현재 위 흐름 전체를 정의한 `2026-07-18-service-mvp` Feature Spec이 유일한 active Spec입니다.
 
-## Phase 2: 로컬 전용 AI 이력서 분석 MVP
+### 내부 수직 티켓
 
-- **로컬 ai-local 모드**: 서버 환경변수 기반 Gemini 연동으로 실제 이력서 분석 수행.
-- **이력서 진단 리포트**: 종합 점수, 요약, 강점, 개선 포인트를 실제 AI 응답으로 반환.
-- **구조화된 Gemini 응답**: JSON 파싱 기반 결과 계약 유지.
+Service MVP Feature Spec은 다음 다섯 티켓으로 끝까지 관통합니다.
 
-## Phase 3: 포스트 론칭 (Post-Launch)
+1. OAuth 로그인과 사용자 식별
+2. 이력서·JD 입력과 저장 계약
+3. 기존 AI 진단·JD 매칭 연결
+4. 분석 결과 저장과 이력 조회
+5. 재시도·삭제와 사용자 데이터 제어
 
-- **JD(직무 기술서) AI 매칭 기능**: 원하는 채용 공고(JD)를 입력하면 내 이력서와의 적합도 점수(Matching Score) 및 보완점 추천.
-- **모의 면접 질문 생성**: 이력서 기반 예상 기술/인성 면접 질문 리스트 자동 제안.
+## Post MVP
 
-## Phase 2.5: 로컬 전용 AI JD 매칭 MVP
+후보의 설명·선택 기준은 [spec-backlog.md](spec-backlog.md)에만 둡니다. 후보는 기획 확정 전에는 Feature Spec도 자동화 입력도 아닙니다.
 
-- **로컬 ai-local 모드 JD 매칭**: Gemini 기반으로 JD 본문과 이력서를 비교해 실제 매칭 결과를 반환.
-- **응답 계약 유지**: `matchingScore`, `summary`, `strengths`, `gaps`, `suggestions` 구조 고정.
-- **안전한 롤백 경로**: `stub`/`fixture`에서는 기존 규칙 기반 미리보기 유지.
+## 실행 규칙
+
+- 한 시점에는 Feature Spec 하나만 상세 문서로 유지합니다.
+- Feature Spec은 requirements, acceptance criteria, test scenarios, API/UI 계약, traceability와 내부 티켓 계획을 가집니다.
+- 티켓은 하나씩 PR·리뷰·머지하며, 마지막 티켓의 종단 간 검증이 끝나기 전에는 Feature Spec을 archive하지 않습니다.
+- 후보 백로그에서 다음 Feature Spec으로의 승격은 `/grill-with-docs`로 범위를 확정한 뒤 사람이 시작합니다. 자동 승격하지 않습니다.

@@ -33,5 +33,5 @@
 
 ## 관련 문서
 
-- API 계약: [.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md)
+- API 계약: [.agent-os/specs/2026-07-18-service-mvp/api-spec.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-07-18-service-mvp/api-spec.md)
 - 테스트 기준: [.agent-os/standards/testing-standards.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/standards/testing-standards.md)

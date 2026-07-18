@@ -28,5 +28,5 @@
 
 ## 관련 문서
 
-- UI 계약: [.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/ui-spec.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/ui-spec.md)
-- 기능 요구사항: [.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/requirements.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-05-21-0943-ai-resume-diagnoser/requirements.md)
+- UI 계약: [.agent-os/specs/2026-07-18-service-mvp/ui-spec.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-07-18-service-mvp/ui-spec.md)
+- 기능 요구사항: [.agent-os/specs/2026-07-18-service-mvp/requirements.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/specs/2026-07-18-service-mvp/requirements.md)
