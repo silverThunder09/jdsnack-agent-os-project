@@ -13,7 +13,7 @@
 
 ## 저장소 계약
 
-- Service MVP의 서비스 영속 저장소 방향은 [ADR-014 PostgreSQL](../../adr/adr-014-postgresql.md)을 따른다.
+- Service MVP의 서비스 영속 저장소 방향은 [ADR-019 PostgreSQL](../../adr/adr-019-postgresql-service-storage.md)을 따른다. 입력 스냅샷 저장 계약은 [ADR-020 Analysis Input Record](../../adr/adr-020-analysis-input-record.md)를 따른다.
 - PostgreSQL의 구체적인 스키마·migration·운영 연결·복구 방식은 관련 technical ADR과 구현 티켓에서 확정한다.
 - 테스트는 H2 또는 fixture를 사용할 수 있지만, 서비스 재시작 후에도 사용자·분석 이력이 보존되는 운영 저장소 계약을 대체하지 않는다.
 

@@ -22,6 +22,8 @@
 - 범위: 기존 텍스트 추출/JD fetch 경계 연결, 입력 정규화, 분석 입력 스냅샷 모델·저장, 원본 파일 미보관
 - 의존성: T1의 사용자 식별 경계
 - 완료 조건: AC-02, AC-03; TC-03~TC-06 통과
+- 상태: `completed`
+- 검증: 텍스트 입력 정규화, PDF/DOCX 추출 결과 저장, 사람인 JD fetch 성공·실패 및 URL 스냅샷, PostgreSQL 호환 JDBC 스키마와 사용자 소유 필터 테스트를 통과했습니다. 백엔드 전체 테스트, 프론트 lint·22개 테스트·build, Docker 재빌드 후 Compose smoke test를 완료했습니다.
 
 ### T3. 기존 AI 진단·JD 매칭 연결과 상태 저장
 

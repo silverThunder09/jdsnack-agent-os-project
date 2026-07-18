@@ -9,6 +9,23 @@ CREATE TABLE IF NOT EXISTS app_user (
     CONSTRAINT uq_app_user_provider_subject UNIQUE (provider, provider_subject)
 );
 
+CREATE TABLE IF NOT EXISTS analysis_input_snapshot (
+    snapshot_id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    resume_text TEXT NOT NULL,
+    jd_input_type VARCHAR(32) NOT NULL,
+    jd_text TEXT NOT NULL,
+    jd_source_url VARCHAR(2048),
+    jd_source_site VARCHAR(64),
+    jd_fetch_mode VARCHAR(64),
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT fk_analysis_input_snapshot_user
+        FOREIGN KEY (user_id) REFERENCES app_user(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_input_snapshot_user_created
+    ON analysis_input_snapshot (user_id, created_at);
+
 CREATE TABLE IF NOT EXISTS resume_fixture_mapping (
     mapping_id VARCHAR(64) PRIMARY KEY,
     input_type VARCHAR(16) NOT NULL,

@@ -113,3 +113,17 @@
 - 결정: 실패 이력의 재시도는 기존 이력을 덮어쓰지 않고 새 분석 이력을 생성합니다.
 - 이유: 사용자가 입력을 다시 제출하지 않고 재시도할 수 있으며, 분석 요청의 성공·실패 상태를 명확히 확인할 수 있습니다.
 - 영향: 실패 이력에도 사용자 입력 사본이 보존되므로 일반 분석 이력과 동일한 삭제 정책을 적용합니다.
+
+## ADR-019 PostgreSQL Service MVP 영속 저장소
+
+- 결정: Service MVP 운영 영속 저장소는 PostgreSQL을 사용하고, 애플리케이션은 `JdbcTemplate` 기반 저장 경계를 사용합니다.
+- 상태: `accepted` (2026-07-19 사용자 승인)
+- 상세: [adr-019-postgresql-service-storage](../adr/adr-019-postgresql-service-storage.md)
+- 대체: [ADR-014 PostgreSQL](../adr/adr-014-postgresql.md)
+
+## ADR-020 분석 입력 스냅샷 사용자 소유 저장
+
+- 결정: 제출 당시 정규화된 이력서 텍스트·JD 본문·출처 URL을 사용자 소유 Analysis Record 입력 스냅샷으로 저장하고 PDF/DOCX 원본은 저장하지 않습니다.
+- 상태: `accepted` (2026-07-19 사용자 승인)
+- 상세: [adr-020-analysis-input-record](../adr/adr-020-analysis-input-record.md)
+- 대체: [ADR-017 Analysis Record](../adr/adr-017-analysis-record.md)
