@@ -79,8 +79,9 @@ describe('AuthGate', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: '로그인' })).not.toBeInTheDocument())
   })
 
-  it('OAuth 성공 callback은 보호 화면으로 진입시킨다', () => {
+  it('OAuth 성공 callback은 세션을 다시 조회하고 보호 화면으로 진입시킨다', async () => {
     window.history.replaceState({}, '', '/?auth=success')
+    vi.mocked(globalThis.fetch).mockResolvedValue(sessionPayload(true))
 
     render(
       <AuthGate>
@@ -90,6 +91,9 @@ describe('AuthGate', () => {
     )
 
     expect(screen.getByText('보호 화면')).toBeInTheDocument()
-    expect(globalThis.fetch).not.toHaveBeenCalled()
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/auth/session',
+      expect.objectContaining({ credentials: 'include' }),
+    ))
   })
 })
