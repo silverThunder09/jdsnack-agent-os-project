@@ -45,6 +45,14 @@
 
 `requirements -> acceptance-criteria -> test-scenarios -> implementation -> verification`
 
+## 코드 변경 후 로컬 실행 반영
+
+- `frontend/` 또는 `backend/` 코드가 변경되면 테스트·lint·build만으로 완료 처리하지 않습니다.
+- 검증이 끝난 뒤 반드시 `docker compose -f compose.local.yaml up -d --build`로 최신 코드를 이미지에 반영하고 컨테이너를 재실행합니다.
+- 재실행 후 `docker compose -f compose.local.yaml ps`와 관련 health endpoint를 확인합니다. Docker 접근 또는 실행이 막히면 완료로 보고하지 않고 blocker를 남깁니다.
+- 프론트 정적 번들이 포함된 경우에는 제공 중인 번들이 최신 변경을 포함하는지 확인하고, 사용자 브라우저 캐시가 남을 수 있으면 강력 새로고침 방법을 함께 안내합니다.
+- 문서만 변경한 경우에는 제품 컨테이너 재빌드가 필요하지 않습니다.
+
 ## 변경 시 필수 동기화 규칙
 
 - API 변경: `api-spec.md` 갱신 필수
