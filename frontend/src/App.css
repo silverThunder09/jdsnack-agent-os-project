@@ -1519,6 +1519,10 @@ button:disabled {
   letter-spacing: -0.06em;
 }
 
+.auth-card h1 span {
+  display: block;
+}
+
 .auth-card > p:not(.auth-card__status):not(.auth-card__error):not(.auth-card__legal) {
   max-width: 25rem;
   color: var(--muted);

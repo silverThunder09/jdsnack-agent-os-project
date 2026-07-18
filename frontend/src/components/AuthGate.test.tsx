@@ -40,6 +40,7 @@ describe('AuthGate', () => {
     )
 
     expect(await screen.findByRole('dialog', { name: 'Google 로그인' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '합격을 위한 분석을 시작해보세요' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Google로 시작하기' })).toBeInTheDocument()
     expect(screen.getByText('보호 화면')).toBeInTheDocument()
   })
