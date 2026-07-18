@@ -90,11 +90,8 @@ gh pr review <PR_NUMBER> --comment --body-file <review-report.md>
 
 ## 머지 조건
 
-머지 전 아래 조건을 모두 만족해야 합니다.
+머지 전 게이트 고유 조건은 아래 셋입니다. 그 외 공통 머지 조건(CI·실패 Issue 등)의 정본은 [merge-rules.md](merge-rules.md)입니다.
 
 - `scripts/pr-review-gate.sh <PR_NUMBER>` 실행 완료
 - 자체 리뷰 결과 `PASS` 또는 허용 가능한 `COMMENT`
 - `REQUEST_CHANGES` 없음
-- PR 실패 Issue가 있다면 해결 또는 후속 Issue 연결 완료
-- GitHub Actions 통과
-- [merge-rules.md](/Users/t2025-m0141/AI-Project/JDSnack/agent-os/.agent-os/operations/merge-rules.md)의 머지 조건 통과

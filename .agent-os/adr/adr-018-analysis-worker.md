@@ -1,7 +1,7 @@
 # 장시간 분석은 선택적 비동기 Worker로 분리
 
 ```yaml
-id: adr-005-analysis-worker
+id: adr-018-analysis-worker
 status: proposed
 risk: High
 author: Codex

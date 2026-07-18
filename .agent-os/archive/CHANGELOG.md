@@ -1,4 +1,8 @@
-# 변경 이력
+# 변경 이력 (보관본 — 2026-06-14까지)
+
+> 이 파일은 2026-07-18에 보관 처리됐습니다. 수동 사본 유지가 중단돼 실제 이력과 어긋났기 때문입니다.
+> 이후 변경 이력의 정본: 커밋 단위 = `git log --oneline`(squash 머지 + Conventional Commits 제목),
+> 단계 요약 = `.agent-os/product/roadmap.md`의 "제품 검증 이력", 결정 근거 = `.agent-os/product/decisions.md`.
 
 ## 2026-06-14
 
@@ -72,7 +76,7 @@
 - 중복 상세 문서 복사본 정리
 - 오래된 `initial-setup` 스펙 제거
 - API/ERD 원본 문서를 활성 기능 명세 경로로 통일
-- `jdsnack-agent-os-main.zip` 참고본을 기준으로 상세 문서 복원
+- 초기 참고본 압축 아카이브를 기준으로 상세 문서 복원
 - 제품 문서, 기능 명세, 표준, 운영 문서를 `.agent-os/` 아래로 재배치
 - API, ERD, 아키텍처 상세 문서를 `docs/` 아래로 복사
 - 루트 `README.md`, `AGENTS.md`, `config.yml`을 현재 저장소 구조에 맞게 갱신

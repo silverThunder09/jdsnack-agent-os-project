@@ -256,11 +256,7 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 7. 배포/운영 영향이 별도 PR 또는 명확한 예외로 기록되었는가
 8. PR 본문에 남은 위험과 후속 작업이 충분히 적혀 있는가
 
-리뷰 결정은 아래 셋 중 하나만 사용합니다.
-
-- `PASS`: 머지 가능
-- `COMMENT`: 머지는 가능하지만 후속 개선 필요
-- `REQUEST_CHANGES`: 머지 금지, 실패 Issue 생성 후 수정 필요
+리뷰 결정(`PASS` / `COMMENT` / `REQUEST_CHANGES`)의 정의와 사용 규칙 정본은 [pr-review-gate.md](pr-review-gate.md)의 "리뷰 결정"입니다.
 
 ## 반려 기준
 
