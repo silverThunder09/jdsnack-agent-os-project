@@ -6,6 +6,7 @@
 - 공개 API는 Google OAuth 시작·callback·session과 health 확인으로 한정한다.
 - 보호 API 요청은 controller 진입 전 공통 인증 경계(필터·인터셉터 또는 동등한 경계)에서 내부 세션을 검증한다. 세션이 없으면 controller/service를 실행하지 않고 `401 AUTHENTICATION_REQUIRED`를 반환한다.
 - 현재 기존 분석 API를 새 분석 이력 API로 통합하기 전까지 다음 경로도 보호 API로 취급한다: `/api/diagnose/**`, `/api/match/**`, `/api/sentence/**`, `/api/jd/**`, `/api/interview/**`.
+- 브라우저의 프론트 서비스 계층은 보호 API 요청에 `credentials: 'include'`를 사용해 내부 세션 쿠키를 전송한다. provider token이나 별도 인증 토큰을 브라우저 저장소·요청 본문에 넣지 않는다.
 - 성공 응답은 기존 `ApiResponse<T>` 래퍼를 사용한다.
 - Entity는 응답으로 직접 노출하지 않고 전용 response DTO로 변환한다.
 - 타인 소유 또는 삭제된 이력은 동일한 `ANALYSIS_HISTORY_NOT_FOUND` 계열 오류로 처리해 존재 여부를 숨긴다.
