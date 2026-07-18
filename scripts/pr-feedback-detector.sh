@@ -11,6 +11,8 @@ REPO="${GH_REPO:-}"
 BRANCH="${PR_FEEDBACK_BRANCH:-}"
 DIFF_LIMIT="${PR_DIFF_LIMIT:-$DEFAULT_DIFF_LIMIT}"
 DIFF_LIMIT_SOURCE="environment"
+ALERT_SCRIPT="${NEEDS_HUMAN_ALERT_SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/notify-needs-human.sh}"
+ALERT_URL=""
 
 usage() {
     cat <<'USAGE'
@@ -36,6 +38,19 @@ emit_no_action() {
 emit_needs_human() {
     local reason="$1"
     local details="${2:-}"
+    if [ -x "$ALERT_SCRIPT" ]; then
+        local alert_args=(
+            --source pr-feedback-detector
+            --repository "$REPO"
+            --branch "$BRANCH"
+            --reason "$reason"
+            --event-key "needs-human:${REPO:-unknown}:${BRANCH:-unknown}:$reason"
+        )
+        if [ -n "$ALERT_URL" ]; then
+            alert_args+=(--url "$ALERT_URL")
+        fi
+        "$ALERT_SCRIPT" "${alert_args[@]}" >/dev/null 2>&1 || true
+    fi
     if command -v "$JQ_BIN" >/dev/null 2>&1; then
         "$JQ_BIN" -n \
             --arg branch "$BRANCH" \
@@ -217,6 +232,16 @@ issue_ref="$($JQ_BIN -c 'if . == null then null else {
 $issue_payload
 EOF
 )"
+
+issue_url="$($JQ_BIN -r '.url // empty' <<EOF
+$issue_payload
+EOF
+)"
+pr_url="$($JQ_BIN -r '.url // empty' <<EOF
+$pr_payload
+EOF
+)"
+ALERT_URL="${issue_url:-$pr_url}"
 
 issue_body="$($JQ_BIN -r '.body // empty' <<EOF
 $issue_payload

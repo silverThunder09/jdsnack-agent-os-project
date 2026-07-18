@@ -55,8 +55,14 @@ documents:
     - scripts/pr-review-gate.sh
     - scripts/pr-feedback-detector.sh
     - .agent-os/operations/pr-feedback-detector.md
+    - .agent-os/operations/needs-human-alerts.md
+    - .agent-os/operations/worker-backends.md
+    - backends.json
     - scripts/smoke-test.sh
     - scripts/google-test.sh
+    - scripts/notify-needs-human.sh
+    - scripts/notify-needs-human-test.sh
+    - scripts/backends-contract-test.sh
 active_specs:
   - .agent-os/specs/2026-07-18-service-mvp
 # 상세 pending Spec을 미리 만들지 않는다. 후보는 제품 백로그에만 둔다.
