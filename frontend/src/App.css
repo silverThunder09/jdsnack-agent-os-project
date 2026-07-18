@@ -1432,6 +1432,39 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.auth-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.auth-card {
+  width: min(100%, 30rem);
+  display: grid;
+  gap: 1rem;
+  padding: 2.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: var(--surface);
+  box-shadow: 0 1.5rem 3rem rgba(104, 63, 27, 0.12);
+}
+
+.auth-card h1,
+.auth-card p,
+.auth-card small {
+  margin: 0;
+}
+
+.auth-card__eyebrow {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.auth-card small {
+  color: var(--muted);
+}
+
 .start-cta {
   display: flex;
   flex-direction: column;
