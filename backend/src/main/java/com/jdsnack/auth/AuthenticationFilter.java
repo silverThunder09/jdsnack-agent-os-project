@@ -34,7 +34,10 @@ public class AuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String contextPath = request.getContextPath();
-        String path = request.getRequestURI().substring(contextPath.length());
+        String path = request.getRequestURI();
+        if (!contextPath.isEmpty() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
 
         return !path.startsWith(API_PREFIX)
                 || GOOGLE_START_PATH.equals(path)
