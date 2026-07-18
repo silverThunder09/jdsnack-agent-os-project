@@ -106,6 +106,10 @@ jobs:
       - name: Check AI-readiness context
         run: python3 scripts/check-ai-readiness.py
 
+      - name: Test PR feedback detector
+        shell: bash
+        run: ./scripts/pr-feedback-detector-test.sh
+
       - name: Test needs-human Discord notification contract
         shell: bash
         run: ./scripts/notify-needs-human-test.sh
