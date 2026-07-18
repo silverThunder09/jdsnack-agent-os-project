@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { status, message, startGoogleLogin } = useAuth()
-  const [isLoginOpen, setIsLoginOpen] = useState(true)
+  const [isLoginOpen, setIsLoginOpen] = useState(false)
 
   if (status === 'authenticated') {
     return <>{children}</>
@@ -63,7 +63,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           </section>
         </div>
       ) : (
-        <button type="button" className="auth-reopen-button" onClick={() => setIsLoginOpen(true)}>
+        <button type="button" className="auth-login-button" onClick={() => setIsLoginOpen(true)}>
           로그인
         </button>
       )}

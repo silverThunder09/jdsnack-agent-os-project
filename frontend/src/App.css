@@ -1608,7 +1608,7 @@ button:disabled {
   line-height: 1.5;
 }
 
-.auth-reopen-button {
+.auth-login-button {
   position: fixed;
   top: 1rem;
   right: 1.5rem;
@@ -1633,7 +1633,7 @@ button:disabled {
     border-radius: 1.5rem;
   }
 
-  .auth-reopen-button {
+  .auth-login-button {
     right: 1rem;
   }
 }
