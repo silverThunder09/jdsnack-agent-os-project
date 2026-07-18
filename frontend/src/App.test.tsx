@@ -9,7 +9,17 @@ const resumeSourceText =
   'Spring Boot 기반 서비스 설계와 운영, 테스트 자동화, 협업 개선 경험이 있습니다.'
 
 function mockJsonResponse(payload: unknown) {
-  return { json: async () => payload } as Response
+  return { ok: true, json: async () => payload } as Response
+}
+
+function authSessionPayload() {
+  return mockJsonResponse({
+    success: true,
+    data: {
+      authenticated: true,
+      user: { id: 'user-1', email: 'user@example.com', displayName: '테스트 사용자' },
+    },
+  })
 }
 
 function makeResumeFile() {
@@ -64,6 +74,7 @@ async function fillJdAndResume(user: ReturnType<typeof userEvent.setup>) {
 describe('새로운 분석 시작 페이지', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(authSessionPayload())
     window.localStorage.clear()
     window.history.replaceState({}, '', '/?auth=success')
   })
@@ -84,13 +95,27 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeInTheDocument()
   })
 
-  it('잠금 메뉴는 비활성화되고 프로필 영역은 정적으로 보인다', () => {
+  it('사이드바 로고는 홈으로 이동하고 상단 로고는 표시하지 않는다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '모의 면접' }))
+    expect(screen.getByRole('heading', { name: /현재 이력서와 JD 맥락/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'JDSnack 홈' }))
+    expect(screen.getByRole('heading', { name: '새로운 분석 시작' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'JDSnack 홈' })).not.toBeInTheDocument()
+  })
+
+  it('잠금 메뉴는 비활성화되고 계정 목업 영역은 표시하지 않는다', () => {
     render(<App />)
 
     expect(screen.getByRole('button', { name: '분석 내역' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '요금제' })).toBeDisabled()
-    expect(screen.getByText('김현준')).toBeInTheDocument()
-    expect(screen.getByText('프로 플랜')).toBeInTheDocument()
+    expect(screen.queryByText('김현준')).not.toBeInTheDocument()
+    expect(screen.queryByText('hyunjun.kim@example.com')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('계정 정보')).not.toBeInTheDocument()
+    expect(screen.queryByText('프로 플랜')).not.toBeInTheDocument()
   })
 
   it('JD 탭 전환·글자수·이력서 업로드 칩이 동작한다', async () => {
@@ -155,7 +180,7 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('Spring Boot', { selector: 'li' })).toBeInTheDocument()
     expect(screen.queryByText('79점')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'JD 적합도' })).not.toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3)
     expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
   })
 
@@ -175,7 +200,7 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('Spring Boot 기반 API를 개발했습니다.')).toBeInTheDocument()
     expect(screen.getByText('Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'JD 적합도' })).not.toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3)
     expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
   })
 
@@ -202,7 +227,7 @@ describe('새로운 분석 시작 페이지', () => {
     await user.type(screen.getByLabelText('JD 내용 붙여넣기'), validJdText)
 
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeDisabled()
-    expect(globalThis.fetch).not.toHaveBeenCalled()
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('짧은 JD는 파일이 있어도 분석 시작을 막고 업로드를 호출하지 않는다', async () => {
@@ -215,7 +240,7 @@ describe('새로운 분석 시작 페이지', () => {
 
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeDisabled()
     expect(screen.getByText('JD 내용이 너무 짧습니다. 핵심 자격요건이 드러나도록 더 입력해주세요.')).toBeInTheDocument()
-    expect(globalThis.fetch).not.toHaveBeenCalled()
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('분석 항목을 모두 해제하면 시작 버튼과 호출을 막는다', async () => {
@@ -229,7 +254,7 @@ describe('새로운 분석 시작 페이지', () => {
 
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeDisabled()
     expect(screen.getByText('분석 항목을 1개 이상 선택해 주세요.')).toBeInTheDocument()
-    expect(globalThis.fetch).not.toHaveBeenCalled()
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('분석 후 모의 면접 뷰에서 질문을 생성한다', async () => {

@@ -1,7 +1,7 @@
 import type { ChangeEvent, DragEvent, ReactNode, RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
-import { AuthGate } from './components/AuthGate'
+import { AuthGate, AuthLoginAction } from './components/AuthGate'
 import { StatusMessage } from './components/StatusMessage'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
@@ -903,6 +903,7 @@ function AuthenticatedApp() {
 
   return (
     <AppShell
+      topbarAction={<AuthLoginAction />}
       currentView={currentView}
       isSidebarOpen={isSidebarOpen}
       onNavigate={(view) => {

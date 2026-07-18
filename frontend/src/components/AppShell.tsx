@@ -4,6 +4,7 @@ type AppView = 'home' | 'interview'
 
 interface AppShellProps {
   children: ReactNode
+  topbarAction?: ReactNode
   currentView: AppView
   isSidebarOpen: boolean
   onNavigate: (view: AppView) => void
@@ -20,6 +21,7 @@ const lockedItems = [
 
 export function AppShell({
   children,
+  topbarAction,
   currentView,
   isSidebarOpen,
   onNavigate,
@@ -28,13 +30,18 @@ export function AppShell({
   return (
     <div className={`saas-shell${isSidebarOpen ? ' saas-shell--sidebar-open' : ''}`}>
       <aside className="saas-sidebar" aria-label="주요 내비게이션">
-        <div className="saas-sidebar__brand">
+        <button
+          type="button"
+          className="saas-sidebar__brand"
+          aria-label="JDSnack 홈"
+          onClick={() => onNavigate('home')}
+        >
           <span className="brand-icon">J</span>
           <div>
             <strong>JDSnack</strong>
             <p>AI Resume Copilot</p>
           </div>
-        </div>
+        </button>
 
         <nav className="saas-sidebar__nav" aria-label="서비스 메뉴">
           <button
@@ -77,24 +84,6 @@ export function AppShell({
           ))}
         </nav>
 
-        <div className="saas-sidebar__profile" aria-label="계정 정보">
-          <div className="plan-card">
-            <strong>프로 플랜</strong>
-            <span>만료일 2025.06.30</span>
-            <button type="button" className="plan-card__manage" disabled aria-disabled="true">
-              플랜 관리
-            </button>
-          </div>
-          <div className="profile-row">
-            <span className="profile-avatar" aria-hidden="true">
-              HJ
-            </span>
-            <div className="profile-row__info">
-              <strong>김현준</strong>
-              <span>hyunjun.kim@example.com</span>
-            </div>
-          </div>
-        </div>
       </aside>
 
       <div className="saas-main">
@@ -108,9 +97,6 @@ export function AppShell({
             >
               ☰
             </button>
-            <a className="brand-mark" href="/" aria-label="JDSnack 홈">
-              <strong>JDSnack</strong>
-            </a>
           </div>
           <div className="saas-topbar__right">
             <span className="saas-help-pill">도움말</span>
@@ -118,6 +104,7 @@ export function AppShell({
               🔔
               <span className="saas-bell__badge">3</span>
             </span>
+            {topbarAction}
           </div>
         </header>
 

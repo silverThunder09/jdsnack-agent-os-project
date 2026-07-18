@@ -13,8 +13,8 @@ function callbackState(): AuthState | null {
   const auth = params.get('auth')
   if (auth === 'success') {
     return {
-      status: 'authenticated',
-      session: { authenticated: true, user: null },
+      status: 'loading',
+      session: null,
       message: '',
     }
   }
