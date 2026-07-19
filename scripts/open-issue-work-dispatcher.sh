@@ -102,7 +102,7 @@ result="$($JQ_BIN -c --arg repo "$REPO" '
       .skipped += [{number: $issue.number, title: $issue.title, reason: "unsupported_issue_type"}]
     elif ($labels | index("needs-human")) != null then
       .skipped += [{number: $issue.number, title: $issue.title, branch: $branch, reason: "needs_human_label"}]
-    elif (($issue.body // "") | test("이미 main에|중복 작업|중복 브랜치|폐기")) then
+    elif (($issue.body // "") | test("이미 main에|중복 작업|중복 브랜치|폐기|merge된 PR|머지된 PR|다른 PR에서 반영")) then
       .skipped += [{number: $issue.number, title: $issue.title, branch: $branch, reason: "stale_or_duplicate"}]
     else
       .candidates += [{
