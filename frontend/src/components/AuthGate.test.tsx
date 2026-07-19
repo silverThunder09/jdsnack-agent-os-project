@@ -95,5 +95,21 @@ describe('AuthGate', () => {
       '/api/auth/session',
       expect.objectContaining({ credentials: 'include' }),
     ))
+    expect(window.location.search).toBe('')
+  })
+
+  it('OAuth 실패 callback도 인증 쿼리를 주소창에서 제거한다', async () => {
+    window.history.replaceState({}, '', '/?auth=error&code=OAUTH_STATE_INVALID')
+    vi.mocked(globalThis.fetch).mockResolvedValue(sessionPayload(false))
+
+    render(
+      <AuthGate>
+        <AuthLoginAction />
+        <p>보호 화면</p>
+      </AuthGate>,
+    )
+
+    expect(await screen.findByRole('button', { name: '로그인' })).toBeInTheDocument()
+    expect(window.location.search).toBe('')
   })
 })
