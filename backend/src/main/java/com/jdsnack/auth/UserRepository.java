@@ -1,6 +1,7 @@
 package com.jdsnack.auth;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -16,27 +17,38 @@ public class UserRepository {
     }
 
     public UserRecord saveGoogleUser(GoogleUserProfile profile) {
-        Optional<UserRecord> existing = findByProviderSubject(profile.providerSubject());
-        if (existing.isPresent()) {
-            jdbcTemplate.update(
-                    "UPDATE app_user SET email = ?, display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
-                    profile.email(),
-                    profile.displayName(),
-                    existing.get().id()
-            );
-            return findById(existing.get().id()).orElseThrow();
+        int updated = updateGoogleUser(profile);
+        if (updated == 0) {
+            insertGoogleUserOrRecoverRace(profile);
         }
 
-        String id = UUID.randomUUID().toString();
-        jdbcTemplate.update(
-                "INSERT INTO app_user (user_id, provider, provider_subject, email, display_name, created_at, updated_at) "
-                        + "VALUES (?, 'google', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                id,
-                profile.providerSubject(),
+        return findByProviderSubject(profile.providerSubject()).orElseThrow();
+    }
+
+    private int updateGoogleUser(GoogleUserProfile profile) {
+        return jdbcTemplate.update(
+                "UPDATE app_user SET email = ?, display_name = ?, updated_at = CURRENT_TIMESTAMP "
+                        + "WHERE provider = 'google' AND provider_subject = ?",
                 profile.email(),
-                profile.displayName()
+                profile.displayName(),
+                profile.providerSubject()
         );
-        return findById(id).orElseThrow();
+    }
+
+    private void insertGoogleUserOrRecoverRace(GoogleUserProfile profile) {
+        String id = UUID.randomUUID().toString();
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO app_user (user_id, provider, provider_subject, email, display_name, created_at, updated_at) "
+                            + "VALUES (?, 'google', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                    id,
+                    profile.providerSubject(),
+                    profile.email(),
+                    profile.displayName()
+            );
+        } catch (DuplicateKeyException exception) {
+            updateGoogleUser(profile);
+        }
     }
 
     public Optional<UserRecord> findById(String id) {

@@ -28,10 +28,30 @@ function callbackState(): AuthState | null {
   return null
 }
 
+function clearAuthCallbackQuery(): void {
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('auth')) {
+    return
+  }
+
+  url.searchParams.delete('auth')
+  url.searchParams.delete('code')
+  const query = url.searchParams.toString()
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${url.pathname}${query ? `?${query}` : ''}${url.hash}`,
+  )
+}
+
 export function useAuth() {
   const [state, setState] = useState<AuthState>(() =>
     callbackState() ?? { status: 'loading', session: null, message: '' },
   )
+
+  useEffect(() => {
+    clearAuthCallbackQuery()
+  }, [])
 
   useEffect(() => {
     if (state.status !== 'loading') {
