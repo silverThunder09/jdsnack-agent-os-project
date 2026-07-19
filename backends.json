@@ -14,6 +14,11 @@
       }
     },
     "claude": {
+      "implementation-fallback": {
+        "provider": "anthropic",
+        "model": "sonnet",
+        "reason": "Codex outage 시 사용자 승인 후 구현·테스트를 대행합니다. spec 계약 준수 신뢰성이 높고 즉시 가용한 유일한 폴백 백엔드입니다."
+      },
       "documentation-planning": {
         "provider": "anthropic",
         "model": "opus",
