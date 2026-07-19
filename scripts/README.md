@@ -34,7 +34,7 @@ flowchart LR
 
 - `check-ai-readiness.py`의 제외 경로는 의존성·빌드 산출물·archive이며, 실제 문서 링크는 모두 검사합니다.
 - [대표 eval](../evals/context-tasks.json)은 읽기 전용 계획 평가입니다. 구현 정확도·재작업률은 별도 PR/이슈 telemetry 없이는 측정하지 않습니다.
-- 성공한 eval 전체 실행 결과는 `evals/results/`에 게시되며, 정책의 `eval_pass_rate_threshold` 미달 시 readiness gate가 실패합니다.
+- 성공한 eval 전체 실행은 `evals/results/latest.json`으로 게시되며, 정책의 `eval_pass_rate_threshold` 미달 시 readiness gate가 실패합니다.
 - API key는 사용하지 않습니다. 형님 로컬 Codex 로그인 세션에서 실행하며, 결과 JSON은 `evals/results/`에만 저장됩니다.
 
 ## Dependencies
@@ -42,7 +42,7 @@ flowchart LR
 - CI는 [Docs Harness workflow](../.github/workflows/docs-harness.yml)에서 readiness gate를 실행합니다.
 - 모델 eval은 의도적으로 CI에서 실행하지 않습니다. API 비용 대신 필요할 때만 로컬 Codex 사용 한도를 소모합니다.
 - 서비스 변경은 [아키텍처 지도](../docs/ARCHITECTURE.md)와 활성 spec의 수용 기준을 함께 확인합니다.
-- 5분 폴링을 기본 트리거로 사용하지 않습니다. `./.github/workflows/autonomous-loop.yml`이 main 반영과 승인된 제품 Issue를 감지합니다.
+- 5분 폴링을 기본 트리거로 사용하지 않습니다. `.github/workflows/autonomous-loop.yml`이 main 반영과 승인된 제품 Issue를 감지합니다.
 
 ## Commands
 
