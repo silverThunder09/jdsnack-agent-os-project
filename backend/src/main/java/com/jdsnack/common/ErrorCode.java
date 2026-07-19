@@ -95,6 +95,14 @@ public enum ErrorCode {
             HttpStatus.NOT_IMPLEMENTED,
             "모의 면접 질문 생성 기능은 준비 중입니다."
     ),
+    INVALID_ANALYSIS_INPUT(
+            HttpStatus.BAD_REQUEST,
+            "분석 입력을 확인해주세요."
+    ),
+    ANALYSIS_HISTORY_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "요청한 분석 이력을 찾을 수 없습니다."
+    ),
     INTERVIEW_QUESTION_GENERATION_FAILED(
             HttpStatus.BAD_GATEWAY,
             "모의 면접 질문 생성에 실패했습니다. 잠시 후 다시 시도해주세요."
