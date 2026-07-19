@@ -70,6 +70,18 @@ public class AnalysisInputSnapshotService {
         );
     }
 
+    public AnalysisInputSnapshot saveResolvedInput(
+            String userId,
+            String resumeText,
+            JdInputType jdInputType,
+            String jdText,
+            String sourceUrl,
+            String sourceSite,
+            String fetchMode
+    ) {
+        return save(userId, resumeText, jdInputType, jdText, sourceUrl, sourceSite, fetchMode);
+    }
+
     private AnalysisInputSnapshot save(
             String userId,
             String resumeText,
