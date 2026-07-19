@@ -16,7 +16,7 @@ if [ "$command_name" = "issue" ] && [ "$subcommand" = "list" ]; then
     elif [ "$scenario" = "actionable" ]; then
         printf '%s\n' '[{"number":120,"title":"리뷰 반려: codex/example","url":"https://example.test/issues/120","body":"requested change","labels":[],"updatedAt":"2026-07-19T00:00:00Z"}]'
     elif [ "$scenario" = "stale-merged" ]; then
-        printf '%s\n' '[{"number":130,"title":"리뷰 반려: codex/event-repair","url":"https://example.test/issues/130","body":"다른 PR에서 반영됨","labels":[],"updatedAt":"2026-07-19T00:00:00Z"}]'
+        printf '%s\n' '[{"number":130,"title":"리뷰 반려: codex/event-repair","url":"https://example.test/issues/130","body":"다른 PR에서 이미 병합됨","labels":[],"updatedAt":"2026-07-19T00:00:00Z"}]'
     else
         printf '%s\n' '[{"number":112,"title":"리뷰 반려: codex/pr-feedback-detector","url":"https://example.test/issues/112","body":"이미 main에 병합된 중복 작업","labels":[],"updatedAt":"2026-07-19T00:00:00Z"},{"number":110,"title":"리뷰 반려: codex/service-mvp-t2","url":"https://example.test/issues/110","body":"분리 요청","labels":[{"name":"needs-human"}],"updatedAt":"2026-07-19T00:00:00Z"},{"number":99,"title":"리뷰 후속: T1","url":"https://example.test/issues/99","body":"T2에서 처리","labels":[],"updatedAt":"2026-07-19T00:00:00Z"}]'
     fi
