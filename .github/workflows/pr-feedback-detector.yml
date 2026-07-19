@@ -11,6 +11,11 @@ on:
   issue_comment:
     types: [created, edited]
   workflow_run:
+    workflows:
+      - Backend CI
+      - Frontend CI
+      - Container Flow
+      - Docs Harness
     types: [completed]
 
 permissions:
