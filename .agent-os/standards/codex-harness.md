@@ -27,7 +27,7 @@
 
 ## 자동화 경계
 
-- Spec 선택·승격·완료 전이는 [`spec-queue.json`](../product/spec-queue.json)과 저장소의 event-driven autonomous loop 실행기가 담당합니다. 실행기와 workflow는 별도 구현 PR에서 연결합니다.
+- Spec 선택·승격·완료 전이는 [`spec-queue.json`](../product/spec-queue.json)과 [`autonomous-loop.yml`](../../.github/workflows/autonomous-loop.yml)이 담당합니다.
 - 티켓 구현은 Codex, 문서 Spec 생성과 독립 리뷰·PR 게이트는 Claude가 담당합니다.
 - 자동화가 판단할 수 없는 상태를 추측해 진행하지 않고, 상태·사유·재개 지점을 기록한 뒤 알립니다.
 
