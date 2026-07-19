@@ -75,4 +75,12 @@ public class AnalysisInputSnapshotRepository {
                 .stream()
                 .findFirst();
     }
+
+    public boolean deleteByIdAndUserId(String snapshotId, String userId) {
+        return jdbcTemplate.update(
+                "DELETE FROM analysis_input_snapshot WHERE snapshot_id = ? AND user_id = ?",
+                snapshotId,
+                userId
+        ) > 0;
+    }
 }
