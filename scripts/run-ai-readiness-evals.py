@@ -217,6 +217,11 @@ def main() -> int:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     output = RESULTS_DIR / f"context-plan-{datetime.now().strftime('%Y%m%dT%H%M%SZ')}.json"
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if payload["summary"]["completed_runs"] == len(results):
+        (RESULTS_DIR / "latest.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
     print(f"AI-readiness eval results: {output.relative_to(ROOT)}")
     print(json.dumps(payload["summary"], ensure_ascii=False))
     return 0 if payload["summary"]["completed_runs"] == len(results) else 1

@@ -15,3 +15,5 @@
 - 문서·경로 검증: [`../../scripts/check-ai-readiness.py`](../../scripts/check-ai-readiness.py)
 
 구조·데이터 흐름이 바뀌면 `system-overview.md`의 Mermaid map을 갱신합니다.
+
+> Note: API/UI 계약 변경은 활성 spec과 관련 테스트를 함께 확인합니다.

@@ -1,0 +1,8 @@
+# Default reviewer ownership for independent review routing.
+* @silverThunder09
+
+/backend/ @silverThunder09
+/frontend/ @silverThunder09
+/.agent-os/ @silverThunder09
+/docs/ @silverThunder09
+/scripts/ @silverThunder09

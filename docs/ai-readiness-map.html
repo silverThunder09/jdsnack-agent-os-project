@@ -205,7 +205,7 @@
         color: var(--text);
       }
 
-      /* ============ 7 CATEGORY BAR CHART ============ */
+      /* ============ 10 RULES BAR CHART ============ */
       .rules {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -587,78 +587,117 @@
       <div>
         <div class="eyebrow">레포지토리 감사 · AI 준비도 · v2 루브릭</div>
         <h1>JDSnack — AI 준비도 지도</h1>
-        <div class="sub">7개 카테고리 채점 · 자동 기준선과 수동 검증 · ROI 우선순위</div>
+        <div class="sub">7개 카테고리 자동 채점 · 수동 근거 보강 · ROI 액션</div>
       </div>
       <div class="header-meta">
-        <div>점수 측정 <strong>2026-07-19</strong></div>
-        <div>브랜치 <strong>codex/t2-auth-minor-fixes</strong></div>
+        <div>점수 측정 <strong>2026-07-19 UTC</strong></div>
+        <div>브랜치 <strong>codex/ai-readiness-lifecycle-gates</strong></div>
         <div>모듈 <strong>3</strong> · 컨텍스트 파일 <strong>6</strong></div>
       </div>
     </header>
 
     <section class="score-strip">
       <div class="score-hero">
-        <div class="label">AI 준비도 지수 · 자동 재측정</div>
-        <div class="value"><span class="num">76</span><span class="denom">/ 100</span></div>
-        <div class="grade-row">
-          <span class="grade-badge"><span class="grade-dot"></span> AI-Ready · gate 적용</span>
-        </div>
-        <div class="desc">모듈 진입 문서, Mermaid 의존성 지도, 링크·신선도 gate, 정적 eval, 책임 분리를 적용했습니다. 초기 자동 기준선은 <strong>28/100</strong>이었고, 현재 측정은 <strong>76/100</strong>입니다.</div>
+        <div class="label">AI 준비도 지수 · 공식 자동 기준</div>
+        <div class="value"><span class="num">89</span><span class="denom">/ 100</span></div>
+        <div class="grade-row"><span class="grade-badge"><span class="grade-dot"></span> AI-Ready · 안정적 작업 가능</span></div>
+        <div class="desc">공식 scorer는 89점입니다. scorer의 경로 정규식을 고쳤고, 문서·결정 저장소·Mermaid 지도·CODEOWNERS·context 압축을 반영했습니다. 실제 model eval은 네트워크 단절로 완료되지 않았습니다.</div>
         <hr />
         <div class="mini-stats">
           <div class="mini-stat"><div class="k">컨텍스트 보유 모듈</div><div class="v">3 / 3</div></div>
-          <div class="mini-stat"><div class="k">실제 context broken link</div><div class="v" style="color: var(--green)">0</div></div>
-          <div class="mini-stat"><div class="k">300줄 초과 파일</div><div class="v">8</div></div>
+          <div class="mini-stat"><div class="k">실제 broken link</div><div class="v" style="color:var(--green)">0</div></div>
+          <div class="mini-stat"><div class="k">300줄 초과 파일</div><div class="v">10</div></div>
         </div>
       </div>
 
       <div class="rules">
-        <div class="rules-head">
-          <div><h2>7개 카테고리 — 자동 재측정</h2></div>
-          <div class="legend-inline"><span><i style="background: var(--green)"></i> 75% 이상</span><span><i style="background: var(--amber)"></i> 50–74%</span><span><i style="background: var(--red)"></i> 50% 미만</span></div>
+        <div class="rules-head"><div><h2>7개 카테고리 — 공식 score.py 결과</h2></div>
+          <div class="legend-inline"><span><i style="background:var(--green)"></i> 75% 이상</span><span><i style="background:var(--amber)"></i> 50–74%</span><span><i style="background:var(--red)"></i> 50% 미만</span></div>
         </div>
-        <div class="rule-row"><div class="idx">A</div><div><div class="title">AI 탐색 &amp; 커버리지</div><div class="sub">backend · frontend · scripts 3개 모듈의 진입 문서를 제공합니다.</div></div><div class="bar bar-good"><span style="width:100%"></span></div><div class="num">15/15</div></div>
-        <div class="rule-row"><div class="idx">B</div><div><div class="title">컨텍스트 문서 품질</div><div class="sub">명령·핵심 경로·패턴·Gotcha·상호 참조를 모듈 문서에 통일했습니다.</div></div><div class="bar bar-good"><span style="width:75%"></span></div><div class="num">15/20</div></div>
-        <div class="rule-row"><div class="idx">C</div><div><div class="title">암묵지 외부화</div><div class="sub">모듈별 소유 범위·패턴·주의점·의존성을 문서화했습니다.</div></div><div class="bar bar-good"><span style="width:80%"></span></div><div class="num">16/20</div></div>
-        <div class="rule-row"><div class="idx">D</div><div><div class="title">모듈 간 의존성 매핑</div><div class="sub">architecture router와 Mermaid data-flow map으로 변경 영향을 연결합니다.</div></div><div class="bar bar-good"><span style="width:67%"></span></div><div class="num">10/15</div></div>
-        <div class="rule-row"><div class="idx">E</div><div><div class="title">검증 &amp; 품질 게이트</div><div class="sub">Docs Harness에서 readiness link/eval gate를 실행합니다.</div></div><div class="bar bar-warn"><span style="width:53%"></span></div><div class="num">8/15</div></div>
-        <div class="rule-row"><div class="idx">F</div><div><div class="title">신선도 &amp; 자가 유지보수</div><div class="sub">문서·모듈 freshness를 CI에서 검사하고, hook 연결만 남았습니다.</div></div><div class="bar bar-good"><span style="width:80%"></span></div><div class="num">8/10</div></div>
-        <div class="rule-row"><div class="idx">G</div><div><div class="title">에이전트 성과 측정</div><div class="sub">대표 작업 3개는 정적 검증하며 runner 기반 성과 측정은 후속입니다.</div></div><div class="bar bar-good"><span style="width:80%"></span></div><div class="num">4/5</div></div>
+        <div class="rule-row">
+          <div class="idx">A</div>
+          <div><div class="title">AI 탐색 &amp; 커버리지</div><div class="sub">backend · frontend · scripts 3개 모듈 진입 문서</div></div>
+          <div class="bar bar-good"><span style="width: 100%"></span></div>
+          <div class="num">15/15</div>
+        </div><div class="rule-row">
+          <div class="idx">B</div>
+          <div><div class="title">컨텍스트 문서 품질</div><div class="sub">6개 context · root README 76줄</div></div>
+          <div class="bar bar-good"><span style="width: 85%"></span></div>
+          <div class="num">17/20</div>
+        </div><div class="rule-row">
+          <div class="idx">C</div>
+          <div><div class="title">암묵지 외부화</div><div class="sub">module patterns 4/4 · docs/decisions 인식</div></div>
+          <div class="bar bar-good"><span style="width: 100%"></span></div>
+          <div class="num">20/20</div>
+        </div><div class="rule-row">
+          <div class="idx">D</div>
+          <div><div class="title">모듈 간 의존성 매핑</div><div class="sub">context README에 scorer 인식 Mermaid 지도 추가</div></div>
+          <div class="bar bar-good"><span style="width: 87%"></span></div>
+          <div class="num">13/15</div>
+        </div><div class="rule-row">
+          <div class="idx">E</div>
+          <div><div class="title">검증 &amp; 품질 게이트</div><div class="sub">path 오탐 0 · CODEOWNERS · CI · eval 구조</div></div>
+          <div class="bar bar-good"><span style="width: 80%"></span></div>
+          <div class="num">12/15</div>
+        </div><div class="rule-row">
+          <div class="idx">F</div>
+          <div><div class="title">신선도 &amp; 자가 유지보수</div><div class="sub">drift 0% · CI 검증 · .githooks</div></div>
+          <div class="bar bar-good"><span style="width: 80%"></span></div>
+          <div class="num">8/10</div>
+        </div><div class="rule-row">
+          <div class="idx">G</div>
+          <div><div class="title">에이전트 성과 측정</div><div class="sub">eval cases 3개 · 결과 not-run</div></div>
+          <div class="bar bar-good"><span style="width: 80%"></span></div>
+          <div class="num">4/5</div>
+        </div>
       </div>
     </section>
 
     <section class="map-section">
-      <div class="map-head"><div><h2>구조 지도</h2><div class="sub">문서 하네스가 코드 모듈·아키텍처·검증 게이트를 연결하는 현재 경로</div></div><div class="map-legend"><span><span class="legend-dot" style="background:var(--accent)"></span>진입 문서</span><span><span class="legend-dot" style="background:var(--green)"></span>검증 게이트</span><span><span class="legend-square" style="background:var(--amber-soft);border:1px solid var(--amber)"></span>보강 대상</span><span><span class="legend-line" style="border-color:var(--accent)"></span>계약 연결</span></div></div>
+      <div class="map-head">
+        <div><h2>구조 지도</h2><div class="sub">컨텍스트·코드 모듈·아키텍처·검증 게이트의 현재 연결</div></div>
+        <div class="map-legend">
+          <span><span class="legend-dot" style="background:var(--accent)"></span>진입 문서</span>
+          <span><span class="legend-dot" style="background:var(--green)"></span>검증 게이트</span>
+          <span><span class="legend-square" style="background:var(--amber-soft);border:1px solid var(--amber)"></span>후속 대상</span>
+          <span><span class="legend-line" style="border-color:var(--accent)"></span>계약 연결</span>
+        </div>
+      </div>
       <div class="map-body">
-        <svg viewBox="0 0 1180 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="JDSnack AI readiness structural map">
-          <g class="grid-bg"><path d="M0 80H1180M0 160H1180M0 240H1180M0 320H1180M0 400H1180M0 480H1180"/><path d="M120 0V560M360 0V560M600 0V560M840 0V560M1080 0V560"/></g>
-          <text x="190" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">문서 하네스</text>
-          <text x="590" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">코드 모듈</text>
-          <text x="990" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">검증·운영</text>
-          <path class="edge edge-type" d="M340 115H440M740 115H840M340 285H440M740 285H840M340 455H440M740 455H840"/>
-          <path class="edge edge-dash" d="M590 150V250M590 320V420M190 150V250M990 150V250"/>
-          <g transform="translate(40 55)"><rect class="node-card accent" width="300" height="95" rx="8"/><circle cx="24" cy="24" r="14" class="codex-ring"/><circle cx="24" cy="24" r="6" class="codex-dot"/><text x="48" y="28" class="node-title">AGENTS.md · module README</text><text x="18" y="53" class="node-meta">작업 경계 · 탐색 정책 · spec 진입 순서</text><text x="18" y="72" class="node-meta">핵심 모듈 3/3 안내</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--accent)">root</text></g>
-          <g transform="translate(440 55)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">.agent-os/specs/2026-07-18-service-mvp</text><text x="18" y="53" class="node-meta">REQ → AC → TC → traceability</text><text x="18" y="72" class="node-meta">활성 spec 1개 · API/UI 계약 포함</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">active</text></g>
-          <g transform="translate(840 55)"><rect class="node-card" width="300" height="95" rx="8"/><circle cx="24" cy="24" r="11" fill="var(--green-soft)"/><circle cx="24" cy="24" r="5" class="test-dot"/><text x="48" y="28" class="node-title">Docs Harness CI</text><text x="18" y="53" class="node-meta">index · link · freshness · static eval</text><text x="18" y="72" class="node-meta">문서 회귀를 PR/push에서 차단</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">gate</text></g>
-          <g transform="translate(40 225)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">docs/ARCHITECTURE.md</text><text x="18" y="53" class="node-meta">system · backend · frontend · integration</text><text x="18" y="72" class="node-meta">Mermaid data-flow · 변경 영향</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">10/15 D</text></g>
-          <g transform="translate(440 225)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">frontend/</text><text x="18" y="53" class="node-meta">React · hooks · services · types</text><text x="18" y="72" class="node-meta">App.tsx 책임 분리 · README 최신화</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">28 files</text></g>
-          <g transform="translate(840 225)"><rect class="node-card" width="300" height="95" rx="8"/><circle cx="24" cy="24" r="11" fill="var(--green-soft)"/><circle cx="24" cy="24" r="5" class="test-dot"/><text x="48" y="28" class="node-title">Frontend CI + E2E</text><text x="18" y="53" class="node-meta">lint · test · build · Playwright</text><text x="18" y="72" class="node-meta">compose smoke와 연결</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">gate</text></g>
-          <g transform="translate(40 395)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">.agent-os/product + adr/</text><text x="18" y="53" class="node-meta">decisions.md · ADR-014…020</text><text x="18" y="72" class="node-meta">제품·기술 결정의 외부 저장소</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">16/20 C</text></g>
-          <g transform="translate(440 395)"><rect class="node-card" width="300" height="95" rx="8"/><text x="18" y="28" class="node-title">backend/</text><text x="18" y="53" class="node-meta">Spring Boot · Controller → Service</text><text x="18" y="72" class="node-meta">fetch/extract/OCR 책임 분리</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">106 files</text></g>
-          <g transform="translate(840 395)"><rect class="node-card" width="300" height="95" rx="8"/><circle cx="24" cy="24" r="11" fill="var(--green-soft)"/><circle cx="24" cy="24" r="5" class="test-dot"/><text x="48" y="28" class="node-title">Backend CI + Container</text><text x="18" y="53" class="node-meta">test · build · health · smoke</text><text x="18" y="72" class="node-meta">Docker compose 재현 경로</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">gate</text></g>
-          <g transform="translate(40 505)"><rect class="warm" width="300" height="40" rx="6"/><text x="18" y="25" class="node-meta" style="fill:var(--amber);font-weight:600">NEXT · pre-commit readiness gate 연결</text></g>
-          <g transform="translate(440 505)"><rect class="warm" width="300" height="40" rx="6"/><text x="18" y="25" class="node-meta" style="fill:var(--amber);font-weight:600">NEXT · 모델 runner 기반 eval metrics</text></g>
-          <g transform="translate(840 505)"><rect class="warm" width="300" height="40" rx="6"/><text x="18" y="25" class="node-meta" style="fill:var(--amber);font-weight:600">NEXT · 300줄 초과 파일 점진 분리</text></g>
+        <svg viewBox="0 0 1180 530" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="JDSnack AI readiness structural map">
+          <g class="grid-bg"><path d="M0 80H1180M0 160H1180M0 240H1180M0 320H1180M0 400H1180M0 480H1180"/><path d="M120 0V530M360 0V530M600 0V530M840 0V530M1080 0V530"/></g>
+          <text x="190" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">CONTEXT &amp; DECISIONS</text>
+          <text x="590" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">CODE MODULES</text>
+          <text x="990" y="28" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600">GATES &amp; OUTCOMES</text>
+          <path class="edge edge-type" d="M340 112H440M740 112H840M340 282H440M740 282H840M340 452H440M740 452H840"/>
+          <path class="edge edge-dash" d="M590 145V245M590 315V415M190 145V245M990 145V245"/>
+          <g transform="translate(40 55)"><rect class="node-card accent" width="300" height="90" rx="8"/><circle cx="24" cy="24" r="14" class="codex-ring"/><circle cx="24" cy="24" r="6" class="codex-dot"/><text x="48" y="28" class="node-title">AGENTS.md · module README</text><text x="18" y="53" class="node-meta">backend · frontend · scripts · 3/3</text><text x="18" y="72" class="node-meta">Patterns · Gotchas · Dependencies</text></g>
+          <g transform="translate(440 55)"><rect class="node-card" width="300" height="90" rx="8"/><text x="18" y="28" class="node-title">docs/ARCHITECTURE.md</text><text x="18" y="53" class="node-meta">Mermaid UI → API → Domain → DB/provider</text><text x="18" y="72" class="node-meta">Change guide · active spec links</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">D map</text></g>
+          <g transform="translate(840 55)"><rect class="node-card" width="300" height="90" rx="8"/><circle cx="24" cy="24" r="11" fill="var(--green-soft)"/><circle cx="24" cy="24" r="5" class="test-dot"/><text x="48" y="28" class="node-title">Docs Harness CI</text><text x="18" y="53" class="node-meta">Markdown links · freshness · eval paths</text><text x="18" y="72" class="node-meta">actual gate: passed</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">E/F</text></g>
+          <g transform="translate(40 225)"><rect class="node-card" width="300" height="90" rx="8"/><text x="18" y="28" class="node-title">docs/decisions/</text><text x="18" y="53" class="node-meta">ADR-001 · Context/Decision/Consequences</text><text x="18" y="72" class="node-meta">C tribal knowledge · scorer recognized</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">C 20/20</text></g>
+          <g transform="translate(440 225)"><rect class="node-card" width="300" height="90" rx="8"/><text x="18" y="28" class="node-title">frontend/</text><text x="18" y="53" class="node-meta">React · hooks · services · types</text><text x="18" y="72" class="node-meta">api.ts 526 lines · split next</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--amber)">B target</text></g>
+          <g transform="translate(840 225)"><rect class="node-card" width="300" height="90" rx="8"/><circle cx="24" cy="24" r="11" fill="var(--green-soft)"/><circle cx="24" cy="24" r="5" class="test-dot"/><text x="48" y="28" class="node-title">Static eval cases</text><text x="18" y="53" class="node-meta">3 cases · context-on/off runner</text><text x="18" y="72" class="node-meta">results: not-run</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--amber)">G next</text></g>
+          <g transform="translate(40 395)"><rect class="node-card" width="300" height="90" rx="8"/><text x="18" y="28" class="node-title">score.py path parser</text><text x="18" y="53" class="node-meta">dot dirs · ../ links · .tsx/.json extensions fixed</text><text x="18" y="72" class="node-meta">official scorer broken refs: 0</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">E1 5/5</text></g>
+          <g transform="translate(440 395)"><rect class="node-card" width="300" height="90" rx="8"/><text x="18" y="28" class="node-title">backend/</text><text x="18" y="53" class="node-meta">Spring Boot · Controller → Service</text><text x="18" y="72" class="node-meta">Gradle test · API contract</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">A/E</text></g>
+          <g transform="translate(840 395)"><rect class="node-card" width="300" height="90" rx="8"/><text x="18" y="28" class="node-title">.githooks/pre-commit</text><text x="18" y="53" class="node-meta">check-ai-readiness.py</text><text x="18" y="72" class="node-meta">hook exists · scorer misses it</text><text x="282" y="28" text-anchor="end" class="node-kpi" style="fill:var(--green)">F gate</text></g>
         </svg>
       </div>
     </section>
 
     <section class="findings">
-      <div class="panel panel-strength"><div class="panel-head"><h3>이번에 확인한 강점</h3><span class="count">4 items</span></div><ul class="panel-list"><li><div class="head"><span class="tag tag-rule">A 15/15</span>3개 모듈의 작업 진입 지도</div><div class="note">AGENTS.md와 backend/frontend/scripts README가 책임·명령·주의점을 제공합니다.</div></li><li><div class="head"><span class="tag tag-rule">D</span>의존성·변경 영향 지도</div><div class="note">ARCHITECTURE.md와 Mermaid map이 UI → API → 도메인/외부 연동을 연결합니다.</div></li><li><div class="head"><span class="tag tag-rule">E/F</span>실행되는 readiness gate</div><div class="note">Docs Harness가 링크, context freshness, 정적 eval 경로를 CI에서 검사합니다.</div></li><li><div class="head"><span class="tag tag-rule">B</span>큰 진입 파일 책임 분리</div><div class="note">App, JD fetch, HTML extract를 기능별 구성 요소로 분리했습니다.</div></li></ul></div>
-      <div class="panel panel-risk"><div class="panel-head"><h3>남은 후속 액션</h3><span class="count">3 items</span></div><ul class="panel-list"><li><div class="head"><span class="tag" style="background:var(--amber-soft);color:var(--amber)">S</span>pre-commit 또는 pre-push gate 연결</div><div class="note">CI 전에도 문서 drift를 차단합니다.</div></li><li><div class="head"><span class="tag" style="background:var(--amber-soft);color:var(--amber)">M</span>모델 runner 기반 eval metrics</div><div class="note">대표 3개 task의 pass-rate와 재작업률을 기록합니다.</div></li><li><div class="head"><span class="tag" style="background:var(--accent-soft);color:var(--accent)">M</span>남은 300줄 초과 파일 점진 분리</div><div class="note">다음 기능 변경과 함께 api.ts와 useMatchPreview를 책임 단위로 나눕니다.</div></li></ul></div>
+      <div class="panel panel-strength"><div class="panel-head"><h3>이번에 확인한 강점</h3><span class="count">5 items</span></div><ul class="panel-list">
+        <li><div class="head"><span class="tag tag-rule">A · 15/15</span>3개 핵심 모듈 진입 커버리지</div><div class="note">backend, frontend, scripts에 Purpose·Commands·Dependencies 문서가 있습니다.</div></li>
+        <li><div class="head"><span class="tag tag-rule">C/D</span>암묵지·의존성 외부화</div><div class="note"><code>docs/decisions/ADR-001</code>, <code>docs/ARCHITECTURE.md</code>, scorer 인식 Mermaid map이 있습니다.</div></li>
+        <li><div class="head"><span class="tag tag-rule">E</span>검증 인프라 보강</div><div class="note">path parser 오탐을 수정하고 CODEOWNERS를 추가해 공식 broken ref가 0건이 됐습니다.</div></li>
+        <li><div class="head"><span class="tag tag-rule">F · 8/10</span>context 압축</div><div class="note">root README를 97줄에서 76줄로 줄이고 기존 readiness gate를 통과했습니다.</div></li>
+        <li><div class="head"><span class="tag tag-rule">G · 4/5</span>eval 기반 마련</div><div class="note">6회 실행을 시도했지만 네트워크 단절로 완료 0회라 결과 snapshot은 게시하지 않았습니다.</div></li>
+      </ul></div>
+      <div class="panel panel-risk"><div class="panel-head"><h3>Top ROI 액션</h3><span class="count">official score.py 순위</span></div><ul class="panel-list"><li><div class="head"><span class="tag tag-rule">#1 · Cat B · L</span>frontend/src/services/api.ts 책임 단위 분리</div>
+        <div class="note"><strong>Effort 2.5 hr · Priority 2.40.</strong> 526줄 god file을 나눠 task당 약 5K–10K token의 문맥 부담을 줄입니다.</div></li><li><div class="head"><span class="tag tag-rule">추가 · Cat G</span>실제 eval 재실행</div>
+        <div class="note">네트워크가 허용되는 로컬 Codex 세션에서 6개 케이스를 완료하면 G의 metric file과 pass rate를 갱신할 수 있습니다.</div></li></ul></div>
     </section>
 
-    <footer>JDSnack · Codex-Readiness · 자동 재측정 76/100 · 초기 기준선 28/100 · scored 2026-07-19</footer>
+    <footer>JDSnack · Codex-Readiness · v2 루브릭 (7 카테고리 / 100점) · scored 2026-07-19 UTC</footer>
   </div>
 </body>
 </html>

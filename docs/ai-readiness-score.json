@@ -1,60 +1,230 @@
 {
   "meta": {
     "repo": "agent-os",
+    "path": "/Users/t2025-m0141/AI-Project/JDSnack/agent-os",
     "scored_at": "2026-07-19",
-    "git_branch": "codex/t2-auth-minor-fixes",
+    "git_branch": "codex/ai-readiness-lifecycle-gates",
     "rubric_version": "v2-100pt",
-    "method": "ai-readiness-cartography automatic score plus local gate verification"
-  },
-  "before": {
-    "automatic_total": 28,
-    "grade": "AI-Hostile",
-    "findings": [
-      "모듈별 실행 맥락과 의존성 지도가 부족했습니다.",
-      "문서 링크 검증, 정적 eval, 큰 진입 파일의 책임 분리가 없었습니다."
-    ]
-  },
-  "current": {
-    "automatic_total": 76,
-    "grade": "AI-Ready",
     "modules_total": 3,
     "context_files_total": 6,
-    "large_files_300plus": 8,
-    "categories": {
-      "A": { "score": 15, "max": 15 },
-      "B": { "score": 15, "max": 20 },
-      "C": { "score": 16, "max": 20 },
-      "D": { "score": 10, "max": 15 },
-      "E": { "score": 8, "max": 15 },
-      "F": { "score": 8, "max": 10 },
-      "G": { "score": 4, "max": 5 }
+    "large_files_300plus": 10
+  },
+  "total": 89,
+  "grade": "AI-Ready",
+  "grade_color": "green",
+  "categories": {
+    "A": {
+      "name": "AI Navigation & Coverage",
+      "score": 15,
+      "max": 15,
+      "evidence": {
+        "core_modules": 3,
+        "covered_modules": 3,
+        "coverage_ratio": 1.0,
+        "root_context": "AGENTS.md"
+      },
+      "sub_scores": {},
+      "findings": []
     },
-    "verified": [
-      "python3 scripts/check-ai-readiness.py 통과",
-      "문서 링크와 정적 eval 케이스를 Docs Harness CI에서 검사",
-      "로컬 Codex 로그인 세션에서 context-on/off 지표를 필요할 때 측정할 수 있음",
-      "backend Gradle test, frontend lint/test/build, Docker compose health 확인"
+    "B": {
+      "name": "Context Document Quality",
+      "score": 17,
+      "max": 20,
+      "evidence": {
+        "context_files": 6,
+        "max_lines": 79,
+        "min_lines": 19
+      },
+      "sub_scores": {
+        "B1_Conciseness": 4,
+        "B2_QuickCommands": 3,
+        "B3_KeyFiles": 4,
+        "B4_NonObvious": 3,
+        "B5_CrossRefs": 3
+      },
+      "findings": []
+    },
+    "C": {
+      "name": "Tribal Knowledge Externalization",
+      "score": 20,
+      "max": 20,
+      "evidence": {
+        "memory_md": false,
+        "adr": true,
+        "modules_total": 3,
+        "q1_owns": 3,
+        "q2_patterns": 3,
+        "q3_nonobvious": 3,
+        "q4_deps": 3
+      },
+      "sub_scores": {
+        "C_Q1_Owns": 4,
+        "C_Q2_Patterns": 4,
+        "C_Q3_NonObvious": 4,
+        "C_Q4_Dependencies": 4,
+        "C_Q5_TribalStore": 4
+      },
+      "findings": []
+    },
+    "D": {
+      "name": "Cross-Module Dependency Mapping",
+      "score": 13,
+      "max": 15,
+      "evidence": {
+        "architecture_doc": true,
+        "mermaid_diagrams": true,
+        "context_with_deps_section": 4,
+        "monorepo_workspace": false
+      },
+      "sub_scores": {},
+      "findings": []
+    },
+    "E": {
+      "name": "Verification & Quality Gates",
+      "score": 12,
+      "max": 15,
+      "evidence": {
+        "ref_total": 48,
+        "ref_broken": 0,
+        "codeowners": true,
+        "pr_template": true,
+        "ci_workflows": true,
+        "husky": false,
+        "evals_dir": true
+      },
+      "sub_scores": {
+        "E1_RefAccuracy": 5,
+        "E2_CriticReview": 4,
+        "E3_TaskValidation": 1,
+        "E4_PromptTests": 2
+      },
+      "findings": []
+    },
+    "F": {
+      "name": "Freshness & Self-Maintenance",
+      "score": 8,
+      "max": 10,
+      "evidence": {
+        "drifted_modules": 0,
+        "measurable_modules": 3,
+        "drift_ratio": 0.0,
+        "ctx_validation_workflow": true,
+        "hook_validates_paths": false
+      },
+      "sub_scores": {},
+      "findings": [
+        "pre-commit / pre-push hook에 path 검증 없음"
+      ]
+    },
+    "G": {
+      "name": "Agent Performance Outcomes",
+      "score": 4,
+      "max": 5,
+      "evidence": {
+        "eval_dirs": [
+          "evals"
+        ],
+        "metric_files": [],
+        "telemetry_hint": true
+      },
+      "sub_scores": {},
+      "findings": []
+    }
+  },
+  "insights": [
+    "총점 89/100 · 등급 AI-Ready",
+    "가장 낮은 카테고리: E Verification & Quality Gates 12/15",
+    "가장 낮은 카테고리: F Freshness & Self-Maintenance 8/10"
+  ],
+  "actions": [
+    {
+      "title": "god file 1개 분할 (>500 lines): frontend/src/services/api.ts (526)",
+      "category": "B",
+      "effort": "L",
+      "effort_hours": 2.5,
+      "impact": "파일당 ~5K-10K token 절감 + 편집 정확도 ↑",
+      "impact_score": 6,
+      "priority": 2.4
+    }
+  ],
+  "extras": {
+    "modules": [
+      {
+        "path": "/Users/t2025-m0141/AI-Project/JDSnack/agent-os/backend",
+        "rel": "backend",
+        "code_files": 118,
+        "has_context": true,
+        "context_file": "/Users/t2025-m0141/AI-Project/JDSnack/agent-os/backend/README.md",
+        "context_kind": "README.md"
+      },
+      {
+        "path": "/Users/t2025-m0141/AI-Project/JDSnack/agent-os/frontend",
+        "rel": "frontend",
+        "code_files": 30,
+        "has_context": true,
+        "context_file": "/Users/t2025-m0141/AI-Project/JDSnack/agent-os/frontend/README.md",
+        "context_kind": "README.md"
+      },
+      {
+        "path": "/Users/t2025-m0141/AI-Project/JDSnack/agent-os/scripts",
+        "rel": "scripts",
+        "code_files": 4,
+        "has_context": true,
+        "context_file": "/Users/t2025-m0141/AI-Project/JDSnack/agent-os/scripts/README.md",
+        "context_kind": "README.md"
+      }
     ],
-    "scorer_caveats": [
-      "자동 scorer는 .agent-os 경로를 os/로 잘라 19개를 false positive로 보고합니다. 실제 gate는 0개 broken link를 확인했습니다.",
-      "Mermaid map은 docs/ARCHITECTURE.md와 docs/architecture/system-overview.md에 있지만 scorer는 README/AGENTS만 탐색해 D 항목에서 이를 인식하지 못합니다."
+    "large_files": [
+      {
+        "path": "frontend/src/services/api.ts",
+        "lines": 526
+      },
+      {
+        "path": "backend/src/main/java/com/jdsnack/jd/JdHtmlExtractor.java",
+        "lines": 471
+      },
+      {
+        "path": "frontend/src/App.test.tsx",
+        "lines": 433
+      },
+      {
+        "path": "backend/src/main/java/com/jdsnack/jd/JdFetchService.java",
+        "lines": 393
+      },
+      {
+        "path": "scripts/autonomous_spec_loop.py",
+        "lines": 347
+      },
+      {
+        "path": "backend/src/test/java/com/jdsnack/jd/JdFetchServiceTest.java",
+        "lines": 334
+      },
+      {
+        "path": "backend/src/test/java/com/jdsnack/jd/JdFetchImageOcrTest.java",
+        "lines": 333
+      },
+      {
+        "path": "frontend/e2e/upload-and-jd-preview.spec.ts",
+        "lines": 307
+      },
+      {
+        "path": "backend/src/main/java/com/jdsnack/jd/JdImageOcrFallback.java",
+        "lines": 305
+      },
+      {
+        "path": "frontend/src/hooks/useMatchPreview.ts",
+        "lines": 303
+      }
     ]
   },
-  "remaining_actions": [
-    {
-      "category": "E/F",
-      "action": "pre-commit 또는 pre-push에도 check-ai-readiness.py 연결",
-      "reason": "로컬 커밋 전 문서 drift 차단"
-    },
-    {
-      "category": "G",
-      "action": "기능 변경 전후에 로컬 Codex eval을 실행하고 결과 JSON을 비교",
-      "reason": "API 비용 없이 필요할 때 context-on/off pass-rate·경로·검증·제약·토큰 지표를 수집"
-    },
-    {
-      "category": "B",
-      "action": "api.ts, useMatchPreview 등 300줄 초과 파일은 기능 변경 시 다음 책임 단위로 분리",
-      "reason": "현재는 기존 500줄 초과 진입 파일 3개를 해소했고, 추가 분리는 별도 기능 변경과 함께 진행"
-    }
-  ]
+  "manual_review": {
+    "verified_at": "2026-07-20",
+    "actual_markdown_broken_refs": 0,
+    "static_readiness_gate": "passed",
+    "score_parser_fixed": true,
+    "agent_eval_status": "runner-error",
+    "agent_eval_runs": 6,
+    "agent_eval_completed": 0,
+    "agent_eval_blocker": "Codex CLI model requests disconnected in the sandboxed local run; no latest result was published."
+  }
 }
