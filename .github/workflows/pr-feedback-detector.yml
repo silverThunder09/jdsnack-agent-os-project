@@ -22,8 +22,30 @@ permissions:
 jobs:
   repair:
     if: >-
-      github.event_name != 'workflow_run' ||
-      contains(fromJSON('["Backend CI", "Frontend CI", "Container Flow", "Docs Harness"]'), github.event.workflow_run.name)
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'workflow_run' ||
+        (
+          github.event_name == 'issues' &&
+          contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.issue.author_association)
+        ) ||
+        (
+          github.event_name == 'issue_comment' &&
+          contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+        ) ||
+        (
+          github.event_name == 'pull_request_review' &&
+          contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association)
+        ) ||
+        (
+          github.event_name == 'pull_request_review_comment' &&
+          contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+        )
+      ) &&
+      (
+        github.event_name != 'workflow_run' ||
+        contains(fromJSON('["Backend CI", "Frontend CI", "Container Flow", "Docs Harness"]'), github.event.workflow_run.name)
+      )
     runs-on: [self-hosted, jdsnack]
     concurrency:
       group: jdsnack-review-repair-${{ github.event.issue.number || github.event.pull_request.number || github.event.workflow_run.id || github.run_id }}
