@@ -8,6 +8,7 @@ documents:
     - .agent-os/product/glossary.md
     - .agent-os/product/decisions.md
     - .agent-os/product/spec-backlog.md
+    - .agent-os/product/spec-queue.json
   technical_adr:
     - .agent-os/adr/adr-019-postgresql-service-storage.md
     - .agent-os/adr/adr-015-oauth-provider.md

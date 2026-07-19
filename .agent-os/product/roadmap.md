@@ -2,7 +2,7 @@
 
 ## 로드맵 읽기 규칙
 
-기존 Phase 1~2.5는 제품 검증 이력입니다. 관련 구현 스펙은 archive에 보관하며, 현재 구현 루프는 `active_specs`와 `pending_specs`를 기준으로만 움직입니다.
+기존 Phase 1~2.5는 제품 검증 이력입니다. 관련 구현 스펙은 archive에 보관하며, 현재 구현 루프는 `active_specs`와 실행 큐(`spec-queue.json`)를 기준으로 움직입니다.
 
 ## 제품 검증 이력
 
@@ -28,8 +28,8 @@ Service MVP는 수직 티켓 다섯 개(T1~T5)로 끝까지 관통합니다. 티
 
 ## Post MVP
 
-후보의 설명·선택 기준은 [spec-backlog.md](spec-backlog.md)에만 둡니다. 후보는 기획 확정 전에는 Feature Spec도 자동화 입력도 아닙니다.
+후보 설명은 [spec-backlog.md](spec-backlog.md)에, 실행 상태·우선순위·승격 조건은 [spec-queue.json](spec-queue.json)에 둡니다. 자동 판정 가능한 후보는 Feature Spec으로 자동 승격되고, 사람 판단이 필요한 후보만 중단 지점으로 알립니다.
 
 ## 실행 규칙
 
-Feature Spec 운영 규칙(한 시점 1개 유지, 필수 문서 구성, 티켓 PR 절차, 백로그 승격)은 [doc-lifecycle.md](../standards/doc-lifecycle.md)가 정본입니다.
+Feature Spec 운영 규칙(한 시점 1개 유지, 필수 문서 구성, 티켓 PR 절차, 큐 승격)은 [doc-lifecycle.md](../standards/doc-lifecycle.md)가 정본입니다.

@@ -9,7 +9,7 @@
 - 머지 판단, 머지 실행, 머지 후 운영 기록은 클로드가 담당합니다.
 - 코덱스는 머지를 직접 수행하지 않습니다.
 - 코덱스는 머지 전 리뷰 결과에 따른 코드 수정, 테스트, 사용자가 지시한 자동 배포 작업만 수행합니다.
-- **무인 배치**: `codex/*` 구현 PR은 무인 리뷰-머지 루프(`jdsnack-review-merge-loop`)가 `code-reviewer` 5점 채점에서 **4점 이상이면 자동 머지**한다(4점 미만이면 구조화된 변경요청을 코덱스로). spec·거버넌스 PR은 사용자가 머지한다. **단, `High-risk` 변경(보안/외부 API/배포/DB/인증/CI)은 점수와 무관하게 자동 머지하지 않고 `needs-human`으로 사람에게 에스컬레이션한다.** 구현 워커가 폴백으로 Claude인 PR(본문에 `backend: claude-fallback` 표기)도 구현·리뷰 벤더가 같으므로 점수와 무관하게 자동 머지하지 않고 사용자 머지로 강등한다([worker-backends.md](worker-backends.md)의 폴백 규칙).
+- **무인 배치**: `codex/*` 구현 PR은 무인 리뷰-머지 루프(`jdsnack-review-merge-loop`)가 `code-reviewer` 5점 채점에서 **4점 이상이면 자동 머지**한다(4점 미만이면 구조화된 변경요청을 코덱스로). 자율 루프가 `spec-queue.json`에서 선택한 `automation/spec-*` promotion PR은 Docs Harness·traceability·diff 범위 검증을 통과하면 자동 머지한다. **단, `High-risk` 변경(보안/외부 API/배포/DB/인증/CI)은 점수와 무관하게 자동 머지하지 않고 `needs-human`으로 사람에게 에스컬레이션한다.** 구현 워커가 폴백으로 Claude인 PR(본문에 `backend: claude-fallback` 표기)도 구현·리뷰 벤더가 같으므로 점수와 무관하게 자동 머지하지 않고 사용자 머지로 강등한다([worker-backends.md](worker-backends.md)의 폴백 규칙).
 
 ## 기본 전략
 
