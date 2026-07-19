@@ -137,9 +137,17 @@ run_detector invalid_pr_shape
 assert_eq 20 "$exit_code" "invalid PR response shape exit code"
 assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "invalid PR response shape status"
 
+run_detector invalid_pr_metrics
+assert_eq 20 "$exit_code" "invalid PR metrics response shape exit code"
+assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "invalid PR metrics response shape status"
+
 run_detector invalid_required_shape
 assert_eq 20 "$exit_code" "invalid required checks response shape exit code"
 assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "invalid required checks response shape status"
+
+run_detector invalid_issue_shape
+assert_eq 20 "$exit_code" "invalid issue response shape exit code"
+assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "invalid issue response shape status"
 
 set +e
 output="$(

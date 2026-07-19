@@ -41,7 +41,7 @@
 
 - `.github/workflows/docs-harness.yml`
 - `.github/workflows/backend-ci.yml`
-- PR 운영 스크립트 변경 시 `scripts/pr-feedback-detector-test.sh`로 반려·CI 오류·선택적 체크 필터·환경 실패 경계를 검증합니다.
+- PR 운영 스크립트 변경 시 `scripts/pr-feedback-detector-test.sh`로 반려·CI 오류·선택적 체크 필터·환경 실패 경계를 검증하고, 별도 CI workflow 변경 PR에서 이를 Docs Harness에 연결합니다.
 
 ### 2. 백엔드 CI
 

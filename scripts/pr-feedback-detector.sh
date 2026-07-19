@@ -199,13 +199,13 @@ if [ -n "$pr_number" ]; then
     if ! pr_payload="$(run_gh_json pr view "$pr_number" --repo "$REPO" --json number,title,url,state,headRefName,baseRefName,headRefOid,reviewDecision,additions,deletions,changedFiles,statusCheckRollup)"; then
         emit_needs_human "github_query_failed" "pr view failed"
     fi
-    validate_json "$pr_payload" "pr view" 'type == "object" and (.number | type) == "number" and (.baseRefName | type) == "string" and (.headRefOid | type) == "string" and (.statusCheckRollup | type) == "array"'
+    validate_json "$pr_payload" "pr view" 'type == "object" and (.number | type) == "number" and (.baseRefName | type) == "string" and (.headRefOid | type) == "string" and (.additions | type) == "number" and (.deletions | type) == "number" and ((.reviewDecision == null) or ((.reviewDecision | type) == "string")) and (.statusCheckRollup | type) == "array" and all(.statusCheckRollup[]; type == "object" and ((.name == null) or ((.name | type) == "string")) and ((.workflowName == null) or ((.workflowName | type) == "string")) and ((.context == null) or ((.context | type) == "string")) and ((.conclusion == null) or ((.conclusion | type) == "string")) and ((.state == null) or ((.state | type) == "string")))'
 fi
 
 if ! issue_list="$(run_gh_json issue list --repo "$REPO" --state open --search "\"리뷰 반려: $BRANCH\" in:title" --json number,title,url,updatedAt --limit 20)"; then
     emit_needs_human "github_query_failed" "issue list failed"
 fi
-validate_json "$issue_list" "issue list" 'type == "array" and all(.[]; (.number | type) == "number" and (.title | type) == "string")'
+validate_json "$issue_list" "issue list" 'type == "array" and all(.[]; (.number | type) == "number" and (.title | type) == "string" and (.updatedAt | type) == "string")'
 issue_number="$($JQ_BIN -r --arg title "리뷰 반려: $BRANCH" 'map(select(.title == $title)) | sort_by(.updatedAt) | last | .number // empty' <<EOF
 $issue_list
 EOF
@@ -215,7 +215,7 @@ if [ -n "$issue_number" ]; then
     if ! issue_payload="$(run_gh_json issue view "$issue_number" --repo "$REPO" --json number,title,url,body,comments,updatedAt)"; then
         emit_needs_human "github_query_failed" "issue view failed"
     fi
-    validate_json "$issue_payload" "issue view" 'type == "object"'
+    validate_json "$issue_payload" "issue view" 'type == "object" and (.number | type) == "number" and (.title | type) == "string" and (.updatedAt | type) == "string" and ((.body == null) or ((.body | type) == "string")) and (.comments | type) == "array" and all(.comments[]; type == "object" and (.createdAt | type) == "string" and (.author.login | type) == "string" and (.body | type) == "string")'
 fi
 
 pr_ref="$($JQ_BIN -c 'if . == null then null else {
@@ -277,7 +277,7 @@ EOF
         if ! required_payload="$(run_gh_json api "repos/$REPO/branches/$base_branch/protection/required_status_checks" 2>/dev/null)"; then
             emit_needs_human "required_checks_unknown" "main branch protection could not be read; set PR_FEEDBACK_REQUIRED_CHECKS to override"
         fi
-        validate_json "$required_payload" "required status checks" 'type == "object" and (.contexts | type) == "array" and (.checks | type) == "array"'
+        validate_json "$required_payload" "required status checks" 'type == "object" and (.contexts | type) == "array" and all(.contexts[]; type == "string") and (.checks | type) == "array" and all(.checks[]; type == "object" and (.context | type) == "string")'
         required_checks="$($JQ_BIN -c '([.contexts[]?, .checks[]?.context] | map(select(. != null)) | unique)' <<EOF
 $required_payload
 EOF
