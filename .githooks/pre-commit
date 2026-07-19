@@ -4,4 +4,12 @@ set -eu
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+current_branch="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
+case "$current_branch" in
+  main|master)
+    echo "ERROR: 기능 커밋은 main/master에서 금지됩니다. codex/* 작업 브랜치를 먼저 생성하세요." >&2
+    exit 1
+    ;;
+esac
+
 python3 scripts/check-ai-readiness.py
