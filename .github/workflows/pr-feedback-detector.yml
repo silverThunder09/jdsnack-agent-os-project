@@ -52,6 +52,7 @@ jobs:
         contains(fromJSON('["Backend CI", "Frontend CI", "Container Flow", "Docs Harness"]'), github.event.workflow_run.name)
       )
     runs-on: [self-hosted, jdsnack]
+    timeout-minutes: 30
     concurrency:
       group: jdsnack-review-repair-${{ github.event.issue.number || github.event.pull_request.number || github.event.workflow_run.id || github.run_id }}
       cancel-in-progress: false
@@ -135,10 +136,15 @@ jobs:
               trap cleanup_worktree EXIT
               git fetch origin "$branch"
               git worktree add --detach "$worktree" "origin/$branch"
-              codex exec \
+              base_sha="$(git -C "$worktree" rev-parse HEAD)"
+              if ! codex exec \
                 --cd "$worktree" \
                 --sandbox workspace-write \
-                "$prompt Work only in this isolated worktree. Commit and push to the existing remote branch $branch. Do not create or merge a PR."
+                "$prompt Work only in this isolated worktree. Commit the changes on the current worktree. Do not push, create, or merge a PR; the runner will publish the commit after verifying it."; then
+                echo "Codex execution failed." >&2
+                exit 20
+              fi
+              scripts/publish-codex-branch.sh --worktree "$worktree" --branch "$branch" --base-sha "$base_sha"
               ;;
             20)
               echo "Detector needs human attention; see the JSON summary above."
