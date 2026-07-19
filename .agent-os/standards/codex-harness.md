@@ -1,87 +1,34 @@
 # Codex 하네스 표준
 
-## 목적
+이 문서는 상세 운영 규칙을 다시 복사하지 않고, Codex가 작업을 시작할 때 지켜야 할 진입점과 검증 경계만 정의합니다.
 
-이 문서는 JDSnack 저장소를 **Codex가 읽기 쉽고, 지키기 쉽고, 검증하기 쉬운 상태**로 유지하기 위한 운영 규정입니다.
+## 작업 진입 순서
 
-## 왜 필요한가
+1. [`AGENTS.md`](../../AGENTS.md)를 읽습니다.
+2. [`index.yml`](index.yml)의 `active_specs`와 [`spec-queue.json`](../product/spec-queue.json)을 읽습니다.
+3. 현재 티켓의 `requirements.md` → `acceptance-criteria.md` → `test-scenarios.md` → API/UI 계약을 읽습니다.
+4. 관련 코드·테스트만 탐색하고 구현합니다.
+5. traceability, 테스트, CI, PR 게이트를 확인합니다.
 
-문서만 많다고 좋은 저장소가 되지는 않습니다.  
-좋은 하네스는 “어디를 읽어야 하는지”, “무엇을 바꾸면 어떤 문서를 같이 바꿔야 하는지”, “완료를 어떻게 검증하는지”를 분명하게 만듭니다.
+## 불변 조건
 
-## 핵심 원칙
+- 한 시점에 active Feature Spec은 하나입니다.
+- 한 번에 준비된 티켓 하나만 구현합니다.
+- API/UI 계약 변경은 해당 spec 문서와 함께 변경합니다.
+- 테스트 assertion을 약화하거나 검증 범위를 줄여 통과시키지 않습니다.
+- `backend/` 또는 `frontend/` 코드 변경은 테스트·lint·build 후 Compose 재빌드, 컨테이너 상태, health endpoint까지 확인합니다.
+- High-risk, 충돌, 필수 의존성 장애, 사람 판단이 필요한 큐 조건은 `needs-human`으로 멈춥니다.
 
-### 1. `AGENTS.md`는 지도다
+## 탐색 경계
 
-- `AGENTS.md`는 짧은 진입점만 제공합니다.
-- 긴 설명과 상세 규칙은 `agent-os/` 아래 구조화된 문서로 보냅니다.
+- 기본 탐색은 `rg --files`와 `rg`를 사용합니다.
+- archive, 빌드 산출물, 의존성 폴더, `.env` 내용은 기본 컨텍스트에서 제외합니다.
+- 상세 탐색 규칙은 [`agent-scan-policy.md`](../operations/agent-scan-policy.md)를 따릅니다.
 
-### 2. 문서가 구현보다 먼저 온다
+## 자동화 경계
 
-- 기능 구현 전 `requirements.md`를 먼저 정리합니다.
-- 구현 전 `acceptance-criteria.md`와 `test-scenarios.md`를 준비합니다.
-- 구현 후 `traceability.md`로 요구사항과 검증을 연결합니다.
+- Spec 선택·승격·완료 전이는 [`spec-queue.json`](../product/spec-queue.json)과 저장소의 event-driven autonomous loop 실행기가 담당합니다. 실행기와 workflow는 별도 구현 PR에서 연결합니다.
+- 티켓 구현은 Codex, 문서 Spec 생성과 독립 리뷰·PR 게이트는 Claude가 담당합니다.
+- 자동화가 판단할 수 없는 상태를 추측해 진행하지 않고, 상태·사유·재개 지점을 기록한 뒤 알립니다.
 
-### 3. 경계는 글이 아니라 규칙으로 다룬다
-
-- API 계약, UI 흐름, 아키텍처 경계는 문서에만 남기지 않습니다.
-- 반복되는 리뷰 피드백은 `standards/` 문서나 자동 체크 규칙으로 승격합니다.
-
-### 4. 에이전트 가독성을 우선한다
-
-- 한 문서에 하나의 책임만 둡니다.
-- 디렉토리와 파일명은 역할 중심으로 단순하게 유지합니다.
-- 오래된 계획은 `archive/`로 이동하고 현재 활성 문서만 전면에 둡니다.
-
-### 5. 탐색 표면을 줄인다
-
-- 작업 시작 시 active spec, 관련 코드 폴더, 관련 테스트만 읽습니다.
-- 기본 탐색은 `rg --files`와 `rg`로 수행합니다.
-- `frontend/node_modules`, `frontend/dist`, `backend/build`, `backend/.gradle`, `.agent-os/archive`, `.git`는 기본 탐색에서 제외합니다.
-- archive는 사용자가 직접 요청하거나 active spec이 명시적으로 참조할 때만 읽습니다.
-- 컨텍스트가 커지면 추가 탐색보다 현재 읽은 파일과 결정사항 요약을 우선합니다.
-
-## 필수 작업 순서
-
-`requirements -> acceptance-criteria -> test-scenarios -> implementation -> verification`
-
-## 코드 변경 후 로컬 실행 반영
-
-- `frontend/` 또는 `backend/` 코드가 변경되면 테스트·lint·build만으로 완료 처리하지 않습니다.
-- 검증이 끝난 뒤 반드시 `docker compose -f compose.local.yaml up -d --build`로 최신 코드를 이미지에 반영하고 컨테이너를 재실행합니다.
-- 재실행 후 `docker compose -f compose.local.yaml ps`와 관련 health endpoint를 확인합니다. Docker 접근 또는 실행이 막히면 완료로 보고하지 않고 blocker를 남깁니다.
-- 프론트 정적 번들이 포함된 경우에는 제공 중인 번들이 최신 변경을 포함하는지 확인하고, 사용자 브라우저 캐시가 남을 수 있으면 강력 새로고침 방법을 함께 안내합니다.
-- 문서만 변경한 경우에는 제품 컨테이너 재빌드가 필요하지 않습니다.
-
-## 변경 시 필수 동기화 규칙
-
-- API 변경: `api-spec.md` 갱신 필수
-- UI 흐름 변경: `ui-spec.md` 갱신 필수
-- 요구사항 변경: `requirements.md`, `acceptance-criteria.md`, `traceability.md` 갱신 필수
-- 새 테스트 추가/변경: `test-scenarios.md`와 연결 필수
-
-## 금지 규칙
-
-- 거대한 단일 지침 파일 작성
-- 문서 없는 API 변경
-- 테스트 시나리오 없는 acceptance criteria 추가
-- 암묵적 구조 변경
-- 반복 피드백을 구두로만 남기고 표준으로 승격하지 않는 것
-- 전체 `find .`, 전체 `ls -R`, archive 전체 탐색으로 컨텍스트를 낭비하는 것
-
-## 승격 규칙
-
-다음 항목이 2회 이상 반복되면 문서 또는 자동 체크로 승격합니다.
-
-- 같은 리뷰 코멘트
-- 같은 구조 위반
-- 같은 테스트 누락
-- 같은 naming drift
-
-## 적용 범위
-
-- 제품 코드
-- 테스트 코드
-- 설계 문서
-- 릴리즈 및 운영 문서
-- 이후 추가될 CI/검증 스크립트
+상세 완료 조건은 [`definition-of-done.md`](definition-of-done.md), Spec 생명주기는 [`doc-lifecycle.md`](doc-lifecycle.md), PR 운영은 [`pr-automation-loop.md`](../operations/pr-automation-loop.md)가 정본입니다.

@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "selection_policy": {
+    "order": "priority_ascending_then_id",
+    "when_no_eligible_candidate": "needs-human",
+    "one_active_spec": true
+  },
+  "candidates": [
+    {
+      "id": "service-mvp",
+      "slug": "2026-07-18-service-mvp",
+      "title": "Service MVP",
+      "priority": 0,
+      "status": "active",
+      "spec_path": ".agent-os/specs/2026-07-18-service-mvp",
+      "auto_promote": false,
+      "start_condition": {"type": "bootstrap"}
+    },
+    {
+      "id": "ats-score-format",
+      "slug": "ats-score-format",
+      "title": "ATS 점수·포맷 진단",
+      "priority": 1,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "feature_completed", "feature": "service-mvp"}
+    },
+    {
+      "id": "analysis-report-export",
+      "slug": "analysis-report-export",
+      "title": "분석 결과 리포트 내보내기",
+      "priority": 2,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:analysis-history"}
+    },
+    {
+      "id": "ai-quality-versioning",
+      "slug": "ai-quality-versioning",
+      "title": "AI 품질 평가와 prompt/model version",
+      "priority": 3,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:analysis-data"}
+    },
+    {
+      "id": "ai-usage-cost-limit",
+      "slug": "ai-usage-cost-limit",
+      "title": "AI 호출량·비용 제한",
+      "priority": 4,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:cost"}
+    },
+    {
+      "id": "jobkorea-jd-adapter",
+      "slug": "jobkorea-jd-adapter",
+      "title": "JobKorea JD adapter",
+      "priority": 5,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:jobkorea"}
+    },
+    {
+      "id": "rocketpunch-jd-adapter",
+      "slug": "rocketpunch-jd-adapter",
+      "title": "RocketPunch JD adapter",
+      "priority": 6,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:rocketpunch"}
+    },
+    {
+      "id": "async-analysis-worker",
+      "slug": "async-analysis-worker",
+      "title": "비동기 analysis worker와 Redis",
+      "priority": 7,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:analysis-latency"}
+    },
+    {
+      "id": "observability-incident-response",
+      "slug": "observability-incident-response",
+      "title": "분석·수집 관측성과 장애 대응",
+      "priority": 8,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:operations"}
+    },
+    {
+      "id": "billing",
+      "slug": "billing",
+      "title": "결제 연동",
+      "priority": 9,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:pricing"}
+    },
+    {
+      "id": "usage-metering",
+      "slug": "usage-metering",
+      "title": "요금제·사용량 제한",
+      "priority": 10,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:usage"}
+    },
+    {
+      "id": "ec2-production",
+      "slug": "ec2-production",
+      "title": "EC2 실배포",
+      "priority": 11,
+      "status": "candidate",
+      "auto_promote": true,
+      "start_condition": {"type": "issue_label", "label": "product-signal:production"}
+    }
+  ]
+}

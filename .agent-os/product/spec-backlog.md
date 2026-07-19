@@ -1,6 +1,6 @@
 # JDSnack 후보 백로그
 
-이 문서는 다음 기획 후보만 관리합니다. 후보는 상세 Feature Spec이 아니며 자동 구현 대상으로 승격되지 않습니다.
+이 문서는 다음 기획 후보의 사람이 읽는 설명을 관리합니다. 실행 상태·우선순위·자동 승격 조건의 정본은 [`spec-queue.json`](spec-queue.json)입니다.
 
 ## 현재 Feature Spec
 
@@ -26,5 +26,7 @@
 
 ## 승격 규칙
 
-- 승격 절차의 정본은 [doc-lifecycle.md](../standards/doc-lifecycle.md)입니다(사람이 시작, 자동 승격 없음, 상세 Spec은 선택된 후보 하나에만).
-- 실행 명령 순서: `/grill-with-docs → /to-spec → /to-tickets → /implement`.
+- 승격 절차의 정본은 [doc-lifecycle.md](../standards/doc-lifecycle.md)와 [`spec-queue.json`](spec-queue.json)입니다.
+- 자동 판정 가능한 시작조건을 충족한 첫 후보는 이벤트 기반 루프가 자동 승격합니다.
+- 제품 신호가 필요한 후보는 해당 `product-signal:*` 라벨이 붙은 Issue가 생길 때까지 자동으로 추측하지 않습니다.
+- 실행 명령 순서: `queue select → spec generate → spec validate → T1 dispatch → ticket advance → feature complete → queue select`.
