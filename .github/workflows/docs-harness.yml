@@ -122,6 +122,10 @@ jobs:
         shell: bash
         run: ./scripts/open-issue-work-dispatcher-test.sh
 
+      - name: Test Codex branch publishing
+        shell: bash
+        run: ./scripts/publish-codex-branch-test.sh
+
       - name: Block legacy MVP references
         shell: bash
         run: |
