@@ -1,0 +1,19 @@
+name: Codex Branch Review
+
+on:
+  push:
+    branches:
+      - 'codex/**'
+
+jobs:
+  review:
+    runs-on: [self-hosted, jdsnack]
+    timeout-minutes: 30
+    concurrency:
+      group: jdsnack-review-loop
+      cancel-in-progress: false
+    steps:
+      - name: Run Claude review-merge loop
+        run: |
+          claude -p "다음 절차 문서를 읽고 그 절차를 정확히 1회 실행하라: $HOME/.claude/scheduled-tasks/jdsnack-review-merge-loop/SKILL.md" \
+            --dangerously-skip-permissions
