@@ -97,7 +97,7 @@ result="$($JQ_BIN -c --arg repo "$REPO" '
   reduce .[] as $issue (
     {candidates: [], skipped: []};
     ($issue.labels | map(.name)) as $labels |
-    (if ($issue.title | test("^리뷰 반려: codex/")) then ($issue.title | capture("^리뷰 반려: (?<branch>codex/[^ ]+)$").branch) else "" end) as $branch |
+    (if ($issue.title | test("^리뷰 (반려|후속): codex/")) then ($issue.title | capture("^리뷰 (반려|후속): (?<branch>codex/[^ ]+)$").branch) else "" end) as $branch |
     if ($branch == "") then
       .skipped += [{number: $issue.number, title: $issue.title, reason: "unsupported_issue_type"}]
     elif ($labels | index("needs-human")) != null then

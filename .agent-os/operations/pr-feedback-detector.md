@@ -27,7 +27,7 @@ fi
 
 ## 감지 대상
 
-- 열린 `리뷰 반려: codex/<branch>` Issue
+- 열린 `리뷰 반려: codex/<branch>` 또는 `리뷰 후속: codex/<branch>` Issue
 - PR 리뷰 결정 `CHANGES_REQUESTED`
 - PR required check의 `FAILURE`, `CANCELLED`, `TIMED_OUT`, `ACTION_REQUIRED`, `STARTUP_FAILURE`
 - PR 추가·삭제 변경량 합계가 기본 1,000줄을 초과한 경우
