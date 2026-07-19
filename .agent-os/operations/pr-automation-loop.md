@@ -62,6 +62,10 @@ phase: claim | implement | test | review | fix | pr | merge | advance
 attempt: 0
 last_completed_step: ...
 status: running | interrupted | blocked | completed
+active_backend: codex | claude-fallback
+fallback_reason: codex-auth | codex-quota | null
+fallback_since: <ISO8601> | null
+fallback_approved: true | false
 updated_at: ...
 lock: ...
 ```

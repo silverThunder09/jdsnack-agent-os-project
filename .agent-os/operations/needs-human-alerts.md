@@ -8,6 +8,7 @@
 
 - `pr-feedback-detector`가 `needs_human`을 반환할 때
 - `jdsnack-review-merge-loop`가 `needs-human`으로 중단할 때
+- 워커 폴백 승인을 요청할 때(`--source worker-fallback`, [worker-backends.md](worker-backends.md)의 폴백 전환 조건)
 
 알림에는 발생원, 브랜치, 사유, PR 또는 Issue 링크만 포함합니다. PR 또는 Issue를 아직 특정하지 못한 경우에는 GitHub 알림 링크를 보냅니다. CI 로그, 리뷰 원문, webhook URL, 비밀값은 보내지 않습니다.
 
