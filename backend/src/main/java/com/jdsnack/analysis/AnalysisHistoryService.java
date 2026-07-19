@@ -98,7 +98,11 @@ public class AnalysisHistoryService {
 
     @Transactional
     public void delete(String userId, String historyId) {
-        if (!historyRepository.deleteByIdAndUserId(historyId, userId)) {
+        AnalysisHistory history = findHistory(userId, historyId);
+        if (!historyRepository.deleteByIdAndUserId(history.id(), userId)) {
+            throw new ApiException(ErrorCode.ANALYSIS_HISTORY_NOT_FOUND);
+        }
+        if (!snapshotRepository.deleteByIdAndUserId(history.snapshotId(), userId)) {
             throw new ApiException(ErrorCode.ANALYSIS_HISTORY_NOT_FOUND);
         }
     }

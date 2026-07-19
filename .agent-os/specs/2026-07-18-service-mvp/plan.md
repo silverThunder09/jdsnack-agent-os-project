@@ -15,7 +15,7 @@
 - 완료 조건: AC-01, AC-01a, TC-01, TC-01a, TC-02 통과; secret/token 브라우저 비노출
 - 상태: `completed`
 - 검증: 백엔드 `GoogleAuthControllerTest`와 보호 API 인증 테스트, 프론트 `AuthGate.test.tsx` 및 보호 API `credentials: 'include'` 검증, 전체 lint/test/build 통과. T2 이후 티켓은 T1에서 만든 공통 인증 경계를 재사용합니다.
-- 검증 결과: 백엔드 전체 테스트, 프론트 lint·22개 테스트·build, Docker 재빌드 후 health 및 비로그인 보호 API 401 검증을 완료했습니다.
+- 검증 결과: 백엔드 전체 테스트, 프론트 lint·25개 테스트·build 및 E2E를 통과했습니다. Docker 재빌드 후 컨테이너 상태와 백엔드 health endpoint 200 응답을 확인했습니다.
 
 ### T2. 이력서·JD 입력과 저장 계약
 
@@ -23,7 +23,7 @@
 - 의존성: T1의 사용자 식별 경계
 - 완료 조건: AC-02, AC-03; TC-03~TC-06 통과
 - 상태: `completed`
-- 검증: 텍스트 입력 정규화, PDF/DOCX 추출 결과 저장, 사람인 JD fetch 성공·실패 및 URL 스냅샷, PostgreSQL 호환 JDBC 스키마와 사용자 소유 필터 테스트를 통과했습니다. 백엔드 전체 테스트, 프론트 lint·22개 테스트·build, Docker 재빌드 후 Compose smoke test를 완료했습니다.
+- 검증: 텍스트 입력 정규화, PDF/DOCX 추출 결과 저장, 사람인 JD fetch 성공·실패 및 URL 스냅샷, PostgreSQL 호환 JDBC 스키마와 사용자 소유 필터 테스트를 통과했습니다. 백엔드 전체 테스트, 프론트 lint·25개 테스트·build 및 E2E를 통과했으며 Docker 재빌드 후 컨테이너 상태와 백엔드 health endpoint 200 응답을 확인했습니다.
 
 ### T3. 기존 AI 진단·JD 매칭 연결과 상태 저장
 
@@ -47,7 +47,7 @@
 - 의존성: T4
 - 완료 조건: AC-07~AC-10; TC-11~TC-17 통과
 - 상태: `completed`
-- 검증: 새 이력 ID 재시도, 저장 JD 재사용, 연쇄 삭제, 삭제 확인 UI, 백엔드·프론트·E2E 테스트 통과.
+- 검증: 새 이력 ID 재시도, 저장 JD 재사용, 이력과 연결 스냅샷의 연쇄 삭제, 삭제 확인 UI, 백엔드·프론트·E2E 테스트를 통과했습니다.
 
 ## 공통 검증
 

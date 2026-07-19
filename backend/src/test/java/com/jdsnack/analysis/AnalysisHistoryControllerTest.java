@@ -92,6 +92,12 @@ class AnalysisHistoryControllerTest {
                 .getResponse()
                 .getContentAsString();
         String originalId = createResponse.replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+        String originalSnapshotId = jdbcTemplate.queryForObject(
+                "SELECT snapshot_id FROM analysis_history WHERE history_id = ? AND user_id = ?",
+                String.class,
+                originalId,
+                userId
+        );
 
         String retryResponse = mockMvc.perform(post("/api/analysis-histories/{historyId}/retry", originalId)
                         .session(authenticatedSession(userId)))
@@ -101,8 +107,15 @@ class AnalysisHistoryControllerTest {
                 .getResponse()
                 .getContentAsString();
         String retryId = retryResponse.replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+        String retrySnapshotId = jdbcTemplate.queryForObject(
+                "SELECT snapshot_id FROM analysis_history WHERE history_id = ? AND user_id = ?",
+                String.class,
+                retryId,
+                userId
+        );
 
         org.assertj.core.api.Assertions.assertThat(retryId).isNotEqualTo(originalId);
+        org.assertj.core.api.Assertions.assertThat(retrySnapshotId).isNotEqualTo(originalSnapshotId);
 
         mockMvc.perform(delete("/api/analysis-histories/{historyId}", originalId)
                         .session(authenticatedSession(userId)))
@@ -116,6 +129,14 @@ class AnalysisHistoryControllerTest {
         mockMvc.perform(get("/api/analysis-histories/{historyId}", retryId)
                         .session(authenticatedSession(userId)))
                 .andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(snapshotCount(originalSnapshotId)).isZero();
+        org.assertj.core.api.Assertions.assertThat(snapshotCount(retrySnapshotId)).isEqualTo(1);
+
+        mockMvc.perform(delete("/api/analysis-histories/{historyId}", originalId)
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("ANALYSIS_HISTORY_NOT_FOUND"));
     }
 
     @Test
@@ -196,5 +217,13 @@ class AnalysisHistoryControllerTest {
                   }
                 }
                 """.formatted(JD_TEXT);
+    }
+
+    private int snapshotCount(String snapshotId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM analysis_input_snapshot WHERE snapshot_id = ?",
+                Integer.class,
+                snapshotId
+        );
     }
 }
