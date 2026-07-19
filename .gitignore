@@ -25,6 +25,7 @@ pids
 *.pid
 *.seed
 *.pid.lock
+.agent-os/runtime/
 .env
 .env.*
 !.env.example

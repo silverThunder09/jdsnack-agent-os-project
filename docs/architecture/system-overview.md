@@ -28,6 +28,17 @@ flowchart LR
   Backend --> Store["H2 fixture now\nService MVP persistence next"]
   Backend --> Tests["JUnit + fixture + compose smoke"]
   Frontend --> UiTests["Vitest + Playwright"]
+
+  MainPush["main push / product Issue"] --> AutoLoop["autonomous-loop.yml\nqueue selector + idempotency"]
+  AutoLoop --> Queue["spec-queue.json\npriority + start condition"]
+  Queue --> SpecPlanner["Claude Spec planner"]
+  SpecPlanner --> SpecPR["automation/spec-* promotion PR"]
+  SpecPR --> AutoLoop
+  Queue --> Codex["Codex T1..Tn worker"]
+  Codex --> Branch["codex/* push"]
+  Branch --> Review["CI + review/merge loop"]
+  Review --> MainPush
+  AutoLoop --> Human["needs-human alert"]
 ```
 
 ### Change impact guide
@@ -54,3 +65,4 @@ flowchart LR
 - Gemini 기반 진단·매칭과 사람인 OCR 폴백은 백엔드 경계에서만 수행합니다. 프론트는 API 계약과 비밀값 비노출 규칙을 지킵니다.
 - 프론트는 API 계약에만 의존하고 외부 AI 세부 구현은 모릅니다.
 - Service MVP에서 사용자·이력서·분석 결과 영속 저장을 도입하기 전까지의 fixture·로컬 저장 흐름은 제품 검증 이력으로 취급합니다.
+- Spec 자동화는 `spec-queue.json`을 유일한 실행 큐로 사용합니다. `main push`와 승인된 제품 Issue가 큐 선택·Spec 승격·Codex 디스패치를 깨우며, 5분 폴링은 정상 트리거가 아닙니다.

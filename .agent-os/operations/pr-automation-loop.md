@@ -27,14 +27,16 @@ JDSnack 기능 구현 해줘.
 - 구현 대상은 `index.yml`의 `active_specs`(정확히 1개) 안에서 준비된 티켓 하나입니다. `plan.md`가 없는 레거시 active Spec은 Spec 전체를 한 작업으로 취급합니다.
 - 티켓 브랜치는 `codex/<active-spec-slug>-<ticket-id>`로 만들고, 티켓별 구현·테스트·PR·리뷰·머지를 독립적으로 수행합니다.
 - **티켓 전진(원자적)**: 티켓 PR에는 코드뿐 아니라 `plan.md`의 티켓 상태와 관련 traceability·테스트 결과 갱신을 포함합니다. 머지 후 active Spec은 유지한 채 다음 준비 티켓을 claim합니다.
-- **Feature 완료**: 마지막 티켓과 전체 수용 기준이 통과한 PR에서만 active Spec을 `.agent-os/archive/specs/`로 이동하고 `active_specs`를 비웁니다. 후보 백로그는 자동으로 active가 되지 않습니다.
+- **Feature 완료**: 마지막 티켓과 전체 수용 기준이 통과한 PR을 main에 반영하면 `autonomous-loop.yml`이 완료 Spec을 archive하고 `active_specs`를 비운 뒤 `spec-queue.json`의 첫 eligible 후보를 자동 승격합니다. 자동 판정 가능한 후보가 없을 때만 `needs-human`으로 중단합니다.
+- **Spec 순환**: 자동 승격된 후보는 문서 필수 세트와 traceability를 생성·검증한 뒤 Spec promotion PR을 만들고, 통과하면 T1을 Codex에 디스패치합니다. 한 시점에 active Spec은 하나만 유지합니다.
 - 변경요청(`리뷰 반려: <branch>` 또는 `리뷰 후속: <branch>` 이슈)이 있으면 같은 `codex/*` 브랜치에서 반영합니다.
 - **클로드 리뷰-머지 루프도 GitHub 이벤트로 기동합니다.** [`.github/workflows/codex-branch-review.yml`](../../.github/workflows/codex-branch-review.yml)이 `codex/**` 브랜치 push마다 로컬 `jdsnack` self-hosted runner에서 클로드 리뷰-머지 절차(`jdsnack-review-merge-loop` SKILL.md)를 즉시 1회 기동합니다. 기존 5분 폴링 감지기(`~/.claude/scripts/jdsnack-codex-watch.sh`)는 push 이벤트가 유실될 때를 대비한 백업 용도로만 유지하며, 정상 상황에서는 이 workflow가 먼저 처리합니다.
 - 반려 감지는 [pr-feedback-detector.sh](../../scripts/pr-feedback-detector.sh)가 GitHub 이벤트로 깨워진 workflow에서 한 번 실행될 때 수행합니다. 감지기는 polling loop를 내장하지 않으며 `no_action`, `actionable`, `needs_human` JSON과 종료 코드를 내보냅니다.
 - `.github/workflows/pr-feedback-detector.yml`은 반려 Issue 생성·수정, Issue/PR 댓글, PR 리뷰, required CI 완료 이벤트에만 실행됩니다. 로컬 `jdsnack` self-hosted runner가 안전한 후보를 격리 worktree에 전달해 Codex의 수정·테스트·커밋·푸시를 수행합니다.
+- `.github/workflows/autonomous-loop.yml`은 5분 폴링 대신 main 반영, 승인된 제품 Issue, workflow dispatch 이벤트에서 큐 선택·Spec 승격·Codex T1 디스패치를 수행합니다. 리뷰 반려 Issue는 기존 `pr-feedback-detector`가 담당하고 자율 루프가 중복 처리하지 않습니다.
 - Codex push 자체는 workflow 트리거가 아니므로 동일 이벤트의 무한 재실행을 만들지 않습니다. PR 생성·머지는 수행하지 않습니다.
 - 반려 자동 복구 루프는 PR 생성·갱신 뒤 CI 실패, 리뷰 `REQUEST_CHANGES`, 또는 반려 Issue가 확인되면 최신 로그·리뷰·Issue를 읽고 실패 원인을 재현합니다. 원래 수용 기준과 업무 검증 범위를 보존한 채 같은 브랜치에서 수정하고, 관련 테스트와 전체 회귀 테스트를 실행한 뒤 Conventional Commit으로 커밋·푸시하고 PR 상태를 다시 확인합니다. 테스트를 삭제하거나 assertion을 약화해 통과시키지 않습니다.
-- 자동 루프는 동일 PR에서 최대 3회 리뷰 시도까지 반복합니다. 같은 실패가 반복되거나 외부 승인·비밀값·서비스 복구가 필요하면 `needs-human`으로 기록하고 담당자에게 중단 지점과 필요한 조치를 보고합니다. 머지는 클로드/사용자 권한으로 수행하며 코덱스가 자동 머지하지 않습니다.
+- 자동 루프는 동일 PR에서 최대 3회 리뷰 시도까지 반복합니다. 같은 실패가 반복되거나 외부 승인·비밀값·서비스 복구가 필요하면 `needs-human`으로 기록하고 담당자에게 중단 지점과 필요한 조치를 보고합니다. 일반 구현 PR은 리뷰-머지 실행기가, `automation/spec-*` promotion PR은 자율 루프가 각각 게이트 통과 후 머지합니다. 코덱스는 직접 머지하지 않습니다.
 - 문서 없는 API/UI 계약 변경은 하지 않습니다.
 - 작업 범위 밖 파일은 스테이징하지 않습니다.
 - 할 일이 없으면 수정하지 않고 대기합니다.

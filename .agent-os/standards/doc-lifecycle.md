@@ -18,11 +18,12 @@
 - `requirements`, `acceptance-criteria`, `test-scenarios`, `traceability`를 갖춘 상태
 - `specs/YYYY-MM-DD-<slug>/`에 위치
 - **구현 중 활성 spec(`active_specs`)은 정확히 1개**만 유지합니다(현재 구현 대상). Feature Spec 완료 PR에서 이전 spec을 archive한 뒤 다음 spec을 아직 시작하지 않은 전환 상태는 0개를 허용합니다.
-- `pending_specs`는 기본적으로 비워 둡니다. 미래 후보는 `.agent-os/product/spec-backlog.md`에 한 줄로만 관리합니다.
+- 실행 큐의 정본은 `.agent-os/product/spec-queue.json`입니다. `spec-backlog.md`는 사람이 읽는 후보 설명과 시작조건을 제공하고, 큐는 우선순위·상태·기계적으로 판정할 수 있는 승격조건을 보관합니다.
 - 다중 티켓 Feature Spec은 `plan.md`에 `T1…Tn`의 상태·의존성·완료 조건을 둡니다. 자동화는 준비된 티켓 하나만 claim합니다.
 - 티켓 PR이 머지되면 같은 Feature Spec의 티켓 상태와 traceability를 갱신하고, 다음 준비 티켓으로 진행합니다. 티켓 완료만으로 Spec을 archive하지 않습니다.
 - 마지막 티켓과 Feature Spec 전체 수용 기준이 통과하면, 같은 완료 PR에서 active Spec을 `.agent-os/archive/specs/`로 이동하고 `active_specs`를 비웁니다.
-- 후보 백로그에서 다음 Feature Spec을 만드는 일은 사람이 기획 범위를 확정한 뒤에만 시작합니다. 자동 승격하지 않습니다.
+- 마지막 티켓과 전체 수용 기준이 통과하면 이벤트 기반 자율 루프가 큐의 첫 번째 eligible 후보를 선택합니다. 후보가 자동 판정 가능한 조건을 충족하면 새 Feature Spec을 생성·활성화하고 T1을 Codex에 디스패치합니다.
+- 시작조건이 사람의 제품 판단이나 외부 신호를 요구하면 해당 후보를 추측해 승격하지 않고 `needs-human`으로 알립니다. `product-signal:*` Issue 라벨은 검증된 외부 신호로 큐의 조건을 해제합니다.
 
 ### 3. 안정화
 

@@ -126,6 +126,14 @@ jobs:
         shell: bash
         run: ./scripts/publish-codex-branch-test.sh
 
+      - name: Validate executable Spec queue
+        shell: bash
+        run: python3 scripts/autonomous_spec_loop.py validate
+
+      - name: Test autonomous Spec promotion and issue dispatch
+        shell: bash
+        run: ./scripts/autonomous-spec-loop-test.sh
+
       - name: Block legacy MVP references
         shell: bash
         run: |
