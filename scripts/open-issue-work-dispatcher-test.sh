@@ -39,6 +39,11 @@ assert_eq 10 "$exit_code" "actionable exit code"
 assert_eq actionable "$(printf '%s' "$output" | jq -r .status)" "actionable status"
 assert_eq codex/example "$(printf '%s' "$output" | jq -r .candidates[0].branch)" "actionable branch"
 
+run_dispatcher follow-up
+assert_eq 10 "$exit_code" "follow-up exit code"
+assert_eq actionable "$(printf '%s' "$output" | jq -r .status)" "follow-up status"
+assert_eq codex/example "$(printf '%s' "$output" | jq -r .candidates[0].branch)" "follow-up branch"
+
 run_dispatcher stale-merged
 assert_eq 0 "$exit_code" "stale merged exit code"
 assert_eq no_action "$(printf '%s' "$output" | jq -r .status)" "stale merged status"

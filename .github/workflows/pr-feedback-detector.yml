@@ -84,7 +84,7 @@ jobs:
           branch="$(jq -r '
             if .pull_request.head.ref then .pull_request.head.ref
             elif .workflow_run.head_branch then .workflow_run.head_branch
-            elif ((.issue.title // "") | startswith("리뷰 반려: codex/")) then (.issue.title | sub("^리뷰 반려: "; ""))
+            elif ((.issue.title // "") | test("^리뷰 (반려|후속): codex/")) then (.issue.title | sub("^리뷰 (반려|후속): "; ""))
             else ""
             end
           ' "$GITHUB_EVENT_PATH")"
@@ -95,8 +95,8 @@ jobs:
           fi
 
           if [ "$GITHUB_EVENT_NAME" = "issues" ] || [ "$GITHUB_EVENT_NAME" = "issue_comment" ]; then
-            if [ "$GITHUB_EVENT_NAME" = "issues" ] && ! jq -e '(.issue.title // "") | startswith("리뷰 반려: codex/")' "$GITHUB_EVENT_PATH" >/dev/null; then
-              echo "Issue is not a Codex review rejection."
+            if [ "$GITHUB_EVENT_NAME" = "issues" ] && ! jq -e '(.issue.title // "") | test("^리뷰 (반려|후속): codex/")' "$GITHUB_EVENT_PATH" >/dev/null; then
+              echo "Issue is not an actionable Codex review issue."
               exit 0
             fi
             set +e
