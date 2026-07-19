@@ -16,7 +16,7 @@ import java.util.Base64;
 public class GoogleAuthService {
 
     static final String SESSION_STATE = GoogleAuthService.class.getName() + ".oauth-state";
-    static final String SESSION_USER_ID = GoogleAuthService.class.getName() + ".user-id";
+    public static final String SESSION_USER_ID = GoogleAuthService.class.getName() + ".user-id";
 
     private final GoogleAuthProperties properties;
     private final GoogleOAuthClient googleOAuthClient;
