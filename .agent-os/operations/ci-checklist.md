@@ -42,6 +42,7 @@
 - `.github/workflows/docs-harness.yml`
 - `.github/workflows/backend-ci.yml`
 - PR 운영 스크립트 변경 시 `scripts/pr-feedback-detector-test.sh`와 `scripts/open-issue-work-dispatcher-test.sh`로 반려·CI 오류·이슈 분류·환경 실패 경계를 검증하고 Docs Harness에서 실행합니다.
+- PR 운영 스크립트 변경 시 `scripts/pr-feedback-detector-test.sh`와 `scripts/open-issue-work-dispatcher-test.sh`로 반려·CI 오류·이슈 분류·환경 실패 경계를 검증하고 Docs Harness에서 실행합니다.
 
 ### 2. 백엔드 CI
 

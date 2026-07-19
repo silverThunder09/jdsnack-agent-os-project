@@ -19,7 +19,7 @@ if [ "$command_name" = "pr" ] && [ "$subcommand" = "list" ]; then
         printf '%s\n' '{}'
         exit 0
     fi
-    if [ "$scenario" = "pr_review" ] || [ "$scenario" = "ci_failure" ] || [ "$scenario" = "ci_error" ] || [ "$scenario" = "ci_optional" ] || [ "$scenario" = "ci_status_matrix" ] || [ "$scenario" = "diff_over_limit" ] || [ "$scenario" = "required_checks_unavailable" ] || [ "$scenario" = "invalid_pr_shape" ] || [ "$scenario" = "invalid_required_shape" ] || [ "$scenario" = "issue_priority" ]; then
+    if [ "$scenario" = "pr_review" ] || [ "$scenario" = "ci_failure" ] || [ "$scenario" = "ci_error" ] || [ "$scenario" = "ci_optional" ] || [ "$scenario" = "ci_status_matrix" ] || [ "$scenario" = "diff_over_limit" ] || [ "$scenario" = "required_checks_unavailable" ] || [ "$scenario" = "invalid_pr_shape" ] || [ "$scenario" = "invalid_pr_metrics" ] || [ "$scenario" = "invalid_required_shape" ] || [ "$scenario" = "invalid_issue_shape" ] || [ "$scenario" = "issue_priority" ]; then
         printf '%s\n' '[{"number":7}]'
     else
         printf '%s\n' '[]'
@@ -40,6 +40,8 @@ if [ "$command_name" = "pr" ] && [ "$subcommand" = "view" ]; then
         printf '%s\n' '{"number":7,"title":"T2","url":"https://example.test/pr/7","state":"OPEN","headRefName":"codex/example","baseRefName":"main","headRefOid":"abc123","reviewDecision":"","additions":10,"deletions":2,"changedFiles":2,"statusCheckRollup":[{"name":"failure","conclusion":"FAILURE","detailsUrl":"https://example.test/check/failure"},{"name":"error","conclusion":"ERROR","detailsUrl":"https://example.test/check/error"},{"name":"cancelled","conclusion":"CANCELLED","detailsUrl":"https://example.test/check/cancelled"},{"name":"timed-out","conclusion":"TIMED_OUT","detailsUrl":"https://example.test/check/timed-out"},{"name":"action-required","conclusion":"ACTION_REQUIRED","detailsUrl":"https://example.test/check/action-required"},{"name":"startup-failure","conclusion":"STARTUP_FAILURE","detailsUrl":"https://example.test/check/startup-failure"}]}'
     elif [ "$scenario" = "invalid_pr_shape" ]; then
         printf '%s\n' '{"number":7,"title":"T2","url":"https://example.test/pr/7","state":"OPEN","headRefName":"codex/example","baseRefName":"main","headRefOid":"abc123","reviewDecision":"","additions":10,"deletions":2,"changedFiles":2}'
+    elif [ "$scenario" = "invalid_pr_metrics" ]; then
+        printf '%s\n' '{"number":7,"title":"T2","url":"https://example.test/pr/7","state":"OPEN","headRefName":"codex/example","baseRefName":"main","headRefOid":"abc123","reviewDecision":"","additions":"1001","deletions":0,"changedFiles":2,"statusCheckRollup":[]}'
     else
         printf '%s\n' '{"number":7,"title":"T2","url":"https://example.test/pr/7","state":"OPEN","headRefName":"codex/example","baseRefName":"main","headRefOid":"abc123","reviewDecision":"","additions":10,"deletions":2,"changedFiles":2,"statusCheckRollup":[{"name":"backend","conclusion":"FAILURE","detailsUrl":"https://example.test/check/7"}]}'
     fi
@@ -64,7 +66,7 @@ if [ "$command_name" = "api" ]; then
 fi
 
 if [ "$command_name" = "issue" ] && [ "$subcommand" = "list" ]; then
-    if [ "$scenario" = "issue_rejection" ] || [ "$scenario" = "issue_priority" ]; then
+    if [ "$scenario" = "issue_rejection" ] || [ "$scenario" = "issue_priority" ] || [ "$scenario" = "invalid_issue_shape" ]; then
         printf '%s\n' '[{"number":110,"title":"리뷰 반려: codex/example","url":"https://example.test/issues/110","updatedAt":"2026-07-19T00:00:00Z"}]'
     else
         printf '%s\n' '[]'
@@ -73,6 +75,10 @@ if [ "$command_name" = "issue" ] && [ "$subcommand" = "list" ]; then
 fi
 
 if [ "$command_name" = "issue" ] && [ "$subcommand" = "view" ]; then
+    if [ "$scenario" = "invalid_issue_shape" ]; then
+        printf '%s\n' '{"number":110,"title":"리뷰 반려: codex/example","url":"https://example.test/issues/110","body":"diff over limit: split request","comments":[]}'
+        exit 0
+    fi
     printf '%s\n' '{"number":110,"title":"리뷰 반려: codex/example","url":"https://example.test/issues/110","updatedAt":"2026-07-19T00:00:00Z","body":"diff over limit: split request","comments":[]}'
     exit 0
 fi
