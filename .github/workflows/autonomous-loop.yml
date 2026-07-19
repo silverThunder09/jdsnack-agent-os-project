@@ -1,0 +1,51 @@
+name: Autonomous JDSnack Loop
+
+on:
+  push:
+    branches:
+      - main
+  issues:
+    types: [opened, edited, labeled]
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  autonomous-loop:
+    name: Select and dispatch the next JDSnack work item
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (
+        (github.event_name == 'issues' || github.event_name == 'issue_comment') &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
+          (github.event_name == 'issues' && github.event.issue.author_association) ||
+          (github.event_name == 'issue_comment' && github.event.comment.author_association))
+      )
+    runs-on: [self-hosted, jdsnack]
+    timeout-minutes: 45
+    concurrency:
+      group: jdsnack-autonomous-loop
+      cancel-in-progress: false
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run event-driven autonomous loop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          bash scripts/autonomous-spec-loop.sh \
+            --event "$GITHUB_EVENT_NAME" \
+            --event-key "$GITHUB_EVENT_NAME:${GITHUB_RUN_ID}:${GITHUB_SHA:-none}" \
+            --event-path "$GITHUB_EVENT_PATH" \
+            --apply
