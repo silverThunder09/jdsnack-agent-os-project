@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  createAnalysisHistoryFile,
+  createAnalysisHistory,
+  deleteAnalysisHistory,
   diagnoseResume,
   diagnoseResumeFile,
   fetchJdFromUrl,
+  getAnalysisHistory,
+  listAnalysisHistories,
   previewInterview,
   previewMatch,
   previewSentence,
+  retryAnalysisHistory,
 } from './api'
 
 function successResponse() {
@@ -55,6 +61,29 @@ describe('보호 API 서비스 계층', () => {
         path: '/api/interview/preview',
         invoke: () => previewInterview({ resumeSource: { type: 'TEXT', value: 'resume' }, jdText: 'jd' }),
       },
+      {
+        path: '/api/analysis-histories',
+        invoke: () => createAnalysisHistory({ resumeText: 'resume', jd: { inputType: 'TEXT', text: 'jd' } }),
+      },
+      {
+        path: '/api/analysis-histories/file',
+        invoke: () => createAnalysisHistoryFile(
+          new File(['resume'], 'resume.pdf', { type: 'application/pdf' }),
+          { jd: { inputType: 'TEXT', text: 'jd' } },
+        ),
+      },
+      {
+        path: '/api/analysis-histories',
+        invoke: () => listAnalysisHistories(),
+      },
+      {
+        path: '/api/analysis-histories/history-1',
+        invoke: () => getAnalysisHistory('history-1'),
+      },
+      {
+        path: '/api/analysis-histories/history-1/retry',
+        invoke: () => retryAnalysisHistory('history-1'),
+      },
     ]
 
     for (const request of requestCases) {
@@ -64,5 +93,11 @@ describe('보호 API 서비스 계층', () => {
         expect.objectContaining({ credentials: 'include' }),
       )
     }
+
+    await deleteAnalysisHistory('history-1')
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      '/api/analysis-histories/history-1',
+      expect.objectContaining({ credentials: 'include', method: 'DELETE' }),
+    )
   })
 })

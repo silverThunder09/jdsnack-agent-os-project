@@ -23,6 +23,8 @@ export type ApiErrorCode =
   | 'JD_MATCH_PREVIEW_NOT_ENABLED'
   | 'MOCK_INTERVIEW_NOT_ENABLED'
   | 'INTERVIEW_QUESTION_GENERATION_FAILED'
+  | 'INVALID_ANALYSIS_INPUT'
+  | 'ANALYSIS_HISTORY_NOT_FOUND'
   | 'INTERNAL_ERROR'
 
 export interface DiagnoseRequest {
@@ -102,6 +104,43 @@ export interface JdFetchResult {
   fetchMode: string
   sourceSite: string
   sections?: Partial<JdSections>
+}
+
+export interface AnalysisHistoryCreateRequest {
+  resumeText: string
+  jd: {
+    inputType: 'TEXT' | 'SARAMIN_URL'
+    text?: string
+    sourceUrl?: string | null
+    sourceSite?: string | null
+  }
+}
+
+export interface AnalysisHistorySummary {
+  id: string
+  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+  createdAt: string
+  jdLabel: string
+  jdSourceUrl: string | null
+  summary: string | null
+}
+
+export interface AnalysisHistoryDetail {
+  id: string
+  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+  createdAt: string
+  input: {
+    resumeText: string
+    jdInputType: 'TEXT' | 'SARAMIN_URL'
+    jdText: string
+    sourceUrl: string | null
+    sourceSite: string | null
+  }
+  result: {
+    diagnosis: DiagnosisResult | null
+    match: MatchPreviewResult | null
+  } | null
+  failure: ApiError | null
 }
 
 export interface ApiError {

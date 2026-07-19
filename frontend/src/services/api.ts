@@ -1,5 +1,8 @@
 import type {
   ApiErrorCode,
+  AnalysisHistoryCreateRequest,
+  AnalysisHistoryDetail,
+  AnalysisHistorySummary,
   ApiResponse,
   DiagnoseOutcome,
   DiagnoseRequest,
@@ -49,6 +52,8 @@ const KNOWN_ERROR_CODES: ApiErrorCode[] = [
   'JD_MATCH_PREVIEW_NOT_ENABLED',
   'MOCK_INTERVIEW_NOT_ENABLED',
   'INTERVIEW_QUESTION_GENERATION_FAILED',
+  'INVALID_ANALYSIS_INPUT',
+  'ANALYSIS_HISTORY_NOT_FOUND',
   'INTERNAL_ERROR',
 ]
 
@@ -378,4 +383,144 @@ export async function previewInterview(
     code: payload.error.code,
     message: payload.error.message,
   }
+}
+
+export async function createAnalysisHistory(
+  request: AnalysisHistoryCreateRequest,
+): Promise<AnalysisHistoryDetail> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/analysis-histories`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<AnalysisHistoryDetail>(response)
+  if (payload?.success && payload.data) {
+    return payload.data
+  }
+
+  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+}
+
+export async function createAnalysisHistoryFile(
+  resumeFile: File,
+  request: Omit<AnalysisHistoryCreateRequest, 'resumeText'>,
+): Promise<AnalysisHistoryDetail> {
+  const formData = new FormData()
+  formData.append('resumeFile', resumeFile)
+  formData.append('inputType', request.jd.inputType)
+  if (request.jd.text) formData.append('text', request.jd.text)
+  if (request.jd.sourceUrl) formData.append('sourceUrl', request.jd.sourceUrl)
+  if (request.jd.sourceSite) formData.append('sourceSite', request.jd.sourceSite)
+
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}/api/analysis-histories/file`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+      body: formData,
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<AnalysisHistoryDetail>(response)
+  if (payload?.success && payload.data) {
+    return payload.data
+  }
+
+  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+}
+
+export async function listAnalysisHistories(): Promise<AnalysisHistorySummary[]> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/analysis-histories`, {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<AnalysisHistorySummary[]>(response)
+  if (payload?.success && payload.data) {
+    return payload.data
+  }
+
+  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+}
+
+export async function getAnalysisHistory(historyId: string): Promise<AnalysisHistoryDetail> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/analysis-histories/${historyId}`, {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<AnalysisHistoryDetail>(response)
+  if (payload?.success && payload.data) {
+    return payload.data
+  }
+
+  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+}
+
+export async function retryAnalysisHistory(historyId: string): Promise<AnalysisHistoryDetail> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/analysis-histories/${historyId}/retry`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<AnalysisHistoryDetail>(response)
+  if (payload?.success && payload.data) {
+    return payload.data
+  }
+
+  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+}
+
+export async function deleteAnalysisHistory(historyId: string): Promise<void> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/analysis-histories/${historyId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  if (response.ok) {
+    return
+  }
+
+  const payload = await parseJson<unknown>(response)
+  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
 }

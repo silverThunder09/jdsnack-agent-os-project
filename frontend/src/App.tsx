@@ -7,9 +7,12 @@ import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
 import { useMatchPreview } from './hooks/useMatchPreview'
 import { useSentencePreview } from './hooks/useSentencePreview'
+import { useAnalysisHistory } from './hooks/useAnalysisHistory'
 import { AnalysisInputView } from './features/analysis/AnalysisInputView'
 import { AnalysisResultView } from './features/analysis/AnalysisResultView'
 import { InterviewWorkspace } from './features/analysis/InterviewWorkspace'
+import { AnalysisHistoryView } from './features/analysis/AnalysisHistoryView'
+import { createAnalysisHistory, createAnalysisHistoryFile } from './services/api'
 import {
   ANALYSIS_OPTIONS,
   ANALYSIS_OPTION_REQUIRED_MESSAGE,
@@ -26,6 +29,7 @@ import {
   type AnalysisOptionKey,
   type AnalysisPhase,
   type JdTab,
+  type ResumeInputTab,
 } from './features/analysis/analysisUtils'
 import './App.css'
 
@@ -55,12 +59,14 @@ function PublicHomeApp() {
 }
 
 function AuthenticatedApp() {
-  const [currentView, setCurrentView] = useState<'home' | 'interview'>('home')
+  const [currentView, setCurrentView] = useState<'home' | 'interview' | 'history'>('home')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('input')
   const [jdTab, setJdTab] = useState<JdTab>('link')
   const [jdUrl, setJdUrl] = useState('')
   const [jdText, setJdText] = useState(() => loadSavedInput()?.jdText ?? '')
+  const [resumeInputTab, setResumeInputTab] = useState<ResumeInputTab>('file')
+  const [resumeText, setResumeText] = useState('')
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [options, setOptions] = useState<Record<AnalysisOptionKey, boolean>>(
@@ -73,15 +79,16 @@ function AuthenticatedApp() {
   const [jobTitle, setJobTitle] = useState('')
   const resultRef = useRef<HTMLElement>(null)
 
-  const { result: diagnoseResult, submitFile, resetResult: resetDiagnose } = useDiagnose()
+  const { result: diagnoseResult, submit, submitFile, resetResult: resetDiagnose } = useDiagnose()
   const { fetchJd, isFetchingJd, isSubmitting: isPreviewSubmitting, jdFetchState, resetResult: resetPreview, result: previewResult, submit: submitPreview } = useMatchPreview()
   const { isSubmitting: isSentenceSubmitting, resetResult: resetSentence, result: sentenceResult, submit: submitSentence } = useSentencePreview()
   const { isSubmitting: isInterviewSubmitting, result: interviewResult, submit: submitInterview } = useInterviewPreview()
+  const { histories, selectedHistory, isLoading: isHistoryLoading, error: historyError, load: loadHistories, select: selectHistory, retry: retryHistory, remove: removeHistory } = useAnalysisHistory()
 
   const trimmedJd = jdText.trim()
   const hasResumeSource = Boolean(diagnoseResult.status === 'success' && diagnoseResult.diagnosis?.sourceText)
   const selectedOptionKeys = ANALYSIS_OPTIONS.filter((option) => options[option.key]).map((option) => option.key)
-  const prevalidationReasons = getPrevalidationReasons({ resumeFile, jdText, selectedOptionCount: selectedOptionKeys.length })
+  const prevalidationReasons = getPrevalidationReasons({ resumeFile: resumeInputTab === 'file' ? resumeFile : null, resumeText: resumeInputTab === 'text' ? resumeText : '', jdText, selectedOptionCount: selectedOptionKeys.length })
   const canStart = prevalidationReasons.length === 0
 
   useEffect(() => {
@@ -99,6 +106,8 @@ function AuthenticatedApp() {
   const handleResetInput = () => {
     setJdText('')
     setJdUrl('')
+    setResumeText('')
+    setResumeInputTab('file')
     setOptions({ ...DEFAULT_OPTIONS })
     setFormError('')
     try {
@@ -137,9 +146,9 @@ function AuthenticatedApp() {
   const toggleOption = (key: AnalysisOptionKey) => { setOptions((current) => ({ ...current, [key]: !current[key] })); setFormError('') }
 
   const handleStartAnalysis = async () => {
-    if (!resumeFile) { setFormError(RESUME_REQUIRED_MESSAGE); return }
-    const mode = inferResumeMode(resumeFile)
-    if (!mode) { setFormError(UNSUPPORTED_RESUME_FILE_MESSAGE); return }
+    if (resumeInputTab === 'file' && !resumeFile) { setFormError(RESUME_REQUIRED_MESSAGE); return }
+    const mode = resumeFile ? inferResumeMode(resumeFile) : null
+    if (resumeInputTab === 'file' && !mode) { setFormError(UNSUPPORTED_RESUME_FILE_MESSAGE); return }
     if (prevalidationReasons.length > 0) { setFormError(prevalidationReasons[0] ?? ANALYSIS_OPTION_REQUIRED_MESSAGE); return }
 
     setFormError('')
@@ -148,14 +157,32 @@ function AuthenticatedApp() {
     resetPreview()
     resetSentence()
     setAnalysisPhase('result')
-    if (!options.jdMatch && !options.keyword && !options.sentence) return
-
-    const outcome = await submitFile(mode, resumeFile)
-    if (!outcome.ok || !outcome.diagnosis?.sourceText) return
+    const outcome = resumeInputTab === 'text'
+      ? await submit(resumeText)
+      : await submitFile(mode!, resumeFile)
+    const historyInput = {
+      jd: {
+        inputType: jdUrl.trim() ? 'SARAMIN_URL' as const : 'TEXT' as const,
+        text: trimmedJd,
+        sourceUrl: jdUrl.trim() || null,
+        sourceSite: jdUrl.trim() ? 'saramin' : null,
+      },
+    }
+    const hasExtractedResume = outcome.ok && Boolean(outcome.diagnosis?.sourceText)
+    const runHistoryRequest = () => hasExtractedResume
+      ? createAnalysisHistory({ resumeText: outcome.diagnosis!.sourceText, ...historyInput })
+      : resumeInputTab === 'text'
+        ? createAnalysisHistory({ resumeText, ...historyInput })
+        : createAnalysisHistoryFile(resumeFile!, historyInput)
+    if (!outcome.ok || !outcome.diagnosis?.sourceText) {
+      await runHistoryRequest().catch(() => undefined)
+      return
+    }
     const request = { resumeSource: { type: 'FILE', value: outcome.diagnosis.sourceText }, jdText: trimmedJd, jdUrl: jdUrl.trim() } as const
     const requests: Promise<void>[] = []
     if (options.jdMatch || options.keyword) requests.push(submitPreview(request))
     if (options.sentence) requests.push(submitSentence(request))
+    requests.push(runHistoryRequest().then(() => undefined).catch(() => undefined))
     await Promise.all(requests)
   }
 
@@ -176,17 +203,28 @@ function AuthenticatedApp() {
       topbarAction={<AuthLoginAction />}
       currentView={currentView}
       isSidebarOpen={isSidebarOpen}
-      onNavigate={(view) => { setCurrentView(view); setIsSidebarOpen(false) }}
+      onNavigate={(view) => { setCurrentView(view); setIsSidebarOpen(false); if (view === 'history') void loadHistories() }}
       onToggleSidebar={() => setIsSidebarOpen((current) => !current)}
     >
       {currentView === 'home' ? (
         analysisPhase === 'input' ? (
-          <AnalysisInputView {...{ jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput }} />
+        <AnalysisInputView {...{ jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput }} />
         ) : (
           <AnalysisResultView {...{ submittedOptions, previewResult, sentenceResult, resultRef, handleExportResult, handlePrintResult: () => window.print(), handleNewAnalysis }} />
         )
-      ) : (
+      ) : currentView === 'interview' ? (
         <InterviewWorkspace {...{ jobTitle, setJobTitle, hasResumeSource, trimmedJd, isInterviewSubmitting, handleInterviewSubmit, interviewResult }} />
+      ) : (
+        <AnalysisHistoryView
+          histories={histories}
+          selectedHistory={selectedHistory}
+          isLoading={isHistoryLoading}
+          error={historyError}
+          onLoad={loadHistories}
+          onSelect={selectHistory}
+          onRetry={retryHistory}
+          onDelete={removeHistory}
+        />
       )}
     </AppShell>
   )

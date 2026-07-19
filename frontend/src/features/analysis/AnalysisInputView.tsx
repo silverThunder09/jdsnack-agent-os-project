@@ -1,6 +1,6 @@
 import type { ChangeEvent, Dispatch, DragEvent, SetStateAction } from 'react'
 import type { JdFetchState } from '../../hooks/useMatchPreview'
-import { ACCURACY_TIPS, ANALYSIS_OPTIONS, type AnalysisOptionKey, type JdTab, formatFileSize, JD_MAX_LENGTH, PROGRESS_STEPS } from './analysisUtils'
+import { ACCURACY_TIPS, ANALYSIS_OPTIONS, type AnalysisOptionKey, type JdTab, type ResumeInputTab, formatFileSize, JD_MAX_LENGTH, PROGRESS_STEPS } from './analysisUtils'
 
 interface AnalysisInputViewProps {
   jdTab: JdTab
@@ -8,6 +8,10 @@ interface AnalysisInputViewProps {
   jdUrl: string
   jdText: string
   trimmedJd: string
+  resumeInputTab: ResumeInputTab
+  setResumeInputTab: (tab: ResumeInputTab) => void
+  resumeText: string
+  setResumeText: (value: string) => void
   resumeFile: File | null
   isDragging: boolean
   setIsDragging: Dispatch<SetStateAction<boolean>>
@@ -31,7 +35,7 @@ interface AnalysisInputViewProps {
 }
 
 export function AnalysisInputView(props: AnalysisInputViewProps) {
-  const { jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput } = props
+  const { jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput } = props
   return (
     <section className="start-page" aria-label="새로운 분석 시작">
       <header className="start-page__head">
@@ -128,31 +132,37 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
             <h2 className="step-card__title">
               <span className="step-badge">2</span> 이력서 업로드
             </h2>
-            <div
-              className={`dropzone${isDragging ? ' dropzone--active' : ''}`}
-              onDragOver={(event) => {
-                event.preventDefault()
-                setIsDragging(true)
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-            >
-              <span className="dropzone__icon" aria-hidden="true">
-                ⬆
-              </span>
-              <p className="dropzone__title">이력서 파일을 드래그하거나 클릭하여 업로드하세요</p>
-              <p className="dropzone__hint">PDF, DOCX 파일을 지원합니다. (최대 10MB)</p>
-              <label className="file-select-button" htmlFor="resume-file">
-                파일 선택
-              </label>
-              <input
-                id="resume-file"
-                className="sr-only"
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={handleFileInput}
-              />
+            <div className="input-tabs" role="tablist" aria-label="이력서 입력 방식">
+              <button type="button" role="tab" aria-selected={resumeInputTab === 'text'} className={resumeInputTab === 'text' ? 'input-tab input-tab--active' : 'input-tab'} onClick={() => setResumeInputTab('text')}>
+                텍스트 입력
+              </button>
+              <button type="button" role="tab" aria-selected={resumeInputTab === 'file'} className={resumeInputTab === 'file' ? 'input-tab input-tab--active' : 'input-tab'} onClick={() => setResumeInputTab('file')}>
+                파일 업로드
+              </button>
             </div>
+            {resumeInputTab === 'text' ? (
+              <>
+                <label className="field-label" htmlFor="resume-text">이력서 내용</label>
+                <textarea id="resume-text" className="text-area" placeholder="기존 이력서 내용을 붙여넣어 주세요." value={resumeText} onChange={(event) => setResumeText(event.target.value)} rows={8} />
+                <p className="char-count">{resumeText.length.toLocaleString()} / 10,000</p>
+              </>
+            ) : (
+              <div
+                className={`dropzone${isDragging ? ' dropzone--active' : ''}`}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  setIsDragging(true)
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+              >
+                <span className="dropzone__icon" aria-hidden="true">⬆</span>
+                <p className="dropzone__title">이력서 파일을 드래그하거나 클릭하여 업로드하세요</p>
+                <p className="dropzone__hint">PDF, DOCX 파일을 지원합니다. (최대 10MB)</p>
+                <label className="file-select-button" htmlFor="resume-file">파일 선택</label>
+                <input id="resume-file" className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileInput} />
+              </div>
+            )}
             {resumeFile ? (
               <div className="file-chip">
                 <div className="file-chip__info">

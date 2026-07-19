@@ -71,8 +71,36 @@ function sentencePayload(edits = [
     improved: 'Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.',
     reason: 'JD 핵심 역량과 성과를 구체적으로 연결했습니다.',
   },
-]) {
+  ]) {
   return mockJsonResponse({ success: true, data: { edits } })
+}
+
+function historyPayload(id = 'history-1') {
+  return mockJsonResponse({
+    success: true,
+    data: {
+      id,
+      status: 'SUCCEEDED',
+      createdAt: '2026-07-19T12:00:00Z',
+      input: { resumeText: resumeSourceText, jdInputType: 'TEXT', jdText: validJdText, sourceUrl: null, sourceSite: null },
+      result: { diagnosis: null, match: null },
+      failure: null,
+    },
+  })
+}
+
+function historyListPayload() {
+  return mockJsonResponse({
+    success: true,
+    data: [{
+      id: 'history-1',
+      status: 'SUCCEEDED',
+      createdAt: '2026-07-19T12:00:00Z',
+      jdLabel: '직접 입력 JD',
+      jdSourceUrl: null,
+      summary: '저장된 분석 요약입니다.',
+    }],
+  })
 }
 
 async function fillJdAndResume(user: ReturnType<typeof userEvent.setup>) {
@@ -138,10 +166,24 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.queryByRole('link', { name: 'JDSnack 홈' })).not.toBeInTheDocument()
   })
 
-  it('잠금 메뉴는 비활성화되고 계정 목업 영역은 표시하지 않는다', async () => {
+  it('분석 내역 메뉴에서 최신 이력 목록을 불러온다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(historyListPayload())
+
+    await renderAuthenticatedApp()
+    await user.click(screen.getByRole('button', { name: '분석 내역' }))
+
+    expect(await screen.findByRole('heading', { name: '지난 분석을 다시 확인하세요' })).toBeInTheDocument()
+    expect(screen.getByText('저장된 분석 요약입니다.')).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenLastCalledWith('/api/analysis-histories', expect.objectContaining({ credentials: 'include' }))
+  })
+
+  it('분석 내역은 활성화하고 목업 메뉴는 제거하며 계정 목업 영역은 표시하지 않는다', async () => {
     await renderAuthenticatedApp()
 
-    expect(screen.getByRole('button', { name: '분석 내역' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '분석 내역' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '템플릿' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '키워드 사전' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '요금제' })).toBeDisabled()
     expect(screen.queryByText('김현준')).not.toBeInTheDocument()
     expect(screen.queryByText('hyunjun.kim@example.com')).not.toBeInTheDocument()
@@ -164,6 +206,17 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('resume.pdf')).toBeInTheDocument()
   })
 
+  it('기존 이력서 텍스트를 직접 입력할 수 있다', async () => {
+    const user = userEvent.setup()
+    await renderAuthenticatedApp()
+
+    await user.click(screen.getByRole('tab', { name: '텍스트 입력' }))
+    await user.type(screen.getByLabelText('이력서 내용'), resumeSourceText)
+
+    expect(screen.getByLabelText('이력서 내용')).toHaveValue(resumeSourceText)
+    expect(screen.getByText(`${resumeSourceText.length} / 10,000`)).toBeInTheDocument()
+  })
+
   it('키워드 분석과 문장 첨삭은 선택 가능하고 준비중 태그가 표시되지 않는다', async () => {
     await renderAuthenticatedApp()
 
@@ -173,7 +226,7 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('키워드 분석')).toBeInTheDocument()
     expect(screen.getAllByText('준비중')).toHaveLength(1)
     expect(screen.queryByRole('button', { name: /맞춤 첨삭/ })).not.toBeInTheDocument()
-    for (const item of ['분석 내역', '이력서 관리', '템플릿', '키워드 사전', '요금제']) {
+    for (const item of ['이력서 관리', '요금제']) {
       expect(screen.getByRole('button', { name: item })).toBeDisabled()
     }
   })
@@ -184,6 +237,7 @@ describe('새로운 분석 시작 페이지', () => {
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
       .mockResolvedValueOnce(sentencePayload())
+      .mockResolvedValueOnce(historyPayload())
 
     await renderAuthenticatedApp()
     await fillJdAndResume(user)
@@ -199,7 +253,10 @@ describe('새로운 분석 시작 페이지', () => {
 
   it('키워드만 선택해도 매칭을 호출하고 JD 적합도 패널 없이 키워드 결과를 보여준다', async () => {
     const user = userEvent.setup()
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(diagnosePayload()).mockResolvedValueOnce(matchPayload())
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(diagnosePayload())
+      .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(historyPayload())
 
     await renderAuthenticatedApp()
     await fillJdAndResume(user)
@@ -211,7 +268,7 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('Spring Boot', { selector: 'li' })).toBeInTheDocument()
     expect(screen.queryByText('79점')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'JD 적합도' })).not.toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledTimes(3)
+    expect(globalThis.fetch).toHaveBeenCalledTimes(4)
     expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
   })
 
@@ -220,6 +277,7 @@ describe('새로운 분석 시작 페이지', () => {
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(sentencePayload())
+      .mockResolvedValueOnce(historyPayload())
 
     await renderAuthenticatedApp()
     await fillJdAndResume(user)
@@ -231,7 +289,7 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText('Spring Boot 기반 API를 개발했습니다.')).toBeInTheDocument()
     expect(screen.getByText('Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'JD 적합도' })).not.toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledTimes(3)
+    expect(globalThis.fetch).toHaveBeenCalledTimes(4)
     expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument()
   })
 
@@ -241,6 +299,7 @@ describe('새로운 분석 시작 페이지', () => {
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
       .mockResolvedValueOnce(sentencePayload([]))
+      .mockResolvedValueOnce(historyPayload())
 
     await renderAuthenticatedApp()
     await fillJdAndResume(user)
@@ -294,6 +353,7 @@ describe('새로운 분석 시작 페이지', () => {
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
       .mockResolvedValueOnce(sentencePayload())
+      .mockResolvedValueOnce(historyPayload())
       .mockResolvedValueOnce(
         mockJsonResponse({
           success: true,
@@ -330,6 +390,7 @@ describe('새로운 분석 시작 페이지', () => {
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
       .mockResolvedValueOnce(sentencePayload())
+      .mockResolvedValueOnce(historyPayload())
     const createObjectURL = vi.fn(() => 'blob:mock')
     URL.createObjectURL = createObjectURL
     URL.revokeObjectURL = vi.fn()
