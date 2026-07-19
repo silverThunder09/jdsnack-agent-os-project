@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-type AppView = 'home' | 'interview'
+type AppView = 'home' | 'interview' | 'history'
 
 interface AppShellProps {
   children: ReactNode
@@ -13,10 +13,7 @@ interface AppShellProps {
 }
 
 const lockedItems = [
-  '분석 내역',
   '이력서 관리',
-  '템플릿',
-  '키워드 사전',
   '요금제',
 ]
 
@@ -68,6 +65,19 @@ export function AppShell({
               ▸
             </span>
             <span>모의 면접</span>
+          </button>
+
+          <button
+            type="button"
+            className={`saas-nav-item${currentView === 'history' ? ' saas-nav-item--active' : ''}${!isAuthenticated ? ' saas-nav-item--locked' : ''}`}
+            aria-disabled={!isAuthenticated}
+            disabled={!isAuthenticated}
+            onClick={() => onNavigate('history')}
+          >
+            <span className="saas-nav-item__icon" aria-hidden="true">
+              ◷
+            </span>
+            <span>분석 내역</span>
           </button>
 
           <div className="saas-sidebar__divider" />

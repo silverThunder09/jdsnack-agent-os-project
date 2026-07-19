@@ -2,6 +2,7 @@ import type { MatchPreviewResult, ResumeInputMode, SentencePreviewResult } from 
 import { validateJdText } from '../../hooks/useMatchPreview'
 
 export type JdTab = 'link' | 'paste'
+export type ResumeInputTab = 'text' | 'file'
 export type AnalysisPhase = 'input' | 'result'
 export type AnalysisOptionKey = 'jdMatch' | 'ats' | 'sentence' | 'keyword'
 
@@ -99,10 +100,12 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function getPrevalidationReasons({ resumeFile, jdText, selectedOptionCount }: { resumeFile: File | null; jdText: string; selectedOptionCount: number }): string[] {
+export function getPrevalidationReasons({ resumeFile, resumeText = '', jdText, selectedOptionCount }: { resumeFile: File | null; resumeText?: string; jdText: string; selectedOptionCount: number }): string[] {
   const reasons: string[] = []
-  if (!resumeFile) reasons.push(RESUME_REQUIRED_MESSAGE)
-  else if (!inferResumeMode(resumeFile)) reasons.push(UNSUPPORTED_RESUME_FILE_MESSAGE)
+  if (!resumeFile && !resumeText.trim()) reasons.push(RESUME_REQUIRED_MESSAGE)
+  else if (resumeFile && !inferResumeMode(resumeFile)) reasons.push(UNSUPPORTED_RESUME_FILE_MESSAGE)
+  else if (!resumeFile && resumeText.trim().length < 50) reasons.push('이력서 내용이 너무 짧습니다. 최소 50자 이상 입력해주세요.')
+  else if (!resumeFile && resumeText.trim().length > 10_000) reasons.push('이력서 내용이 너무 깁니다. 10,000자 이내로 입력해주세요.')
   const jdError = validateJdText(jdText)
   if (jdError) reasons.push(jdError)
   if (selectedOptionCount === 0) reasons.push(ANALYSIS_OPTION_REQUIRED_MESSAGE)
