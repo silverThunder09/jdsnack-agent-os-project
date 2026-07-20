@@ -1,11 +1,12 @@
 import type { RefObject } from 'react'
-import { AnalysisPanel, ComingSoonPanel, KeywordList, SummaryCard } from './AnalysisPanels'
+import { AnalysisPanel, FormatCheckList, KeywordList, SummaryCard } from './AnalysisPanels'
 import type { ResultState } from '../../types/diagnosis'
 import type { AnalysisOptionKey } from './analysisUtils'
 
 interface AnalysisResultViewProps {
   submittedOptions: Record<AnalysisOptionKey, boolean>
   previewResult: ResultState
+  atsResult: ResultState
   sentenceResult: ResultState
   resultRef: RefObject<HTMLElement | null>
   handleExportResult: () => void
@@ -14,7 +15,7 @@ interface AnalysisResultViewProps {
 }
 
 export function AnalysisResultView(props: AnalysisResultViewProps) {
-  const { submittedOptions, previewResult, sentenceResult, resultRef, handleExportResult, handlePrintResult, handleNewAnalysis } = props
+  const { submittedOptions, previewResult, atsResult, sentenceResult, resultRef, handleExportResult, handlePrintResult, handleNewAnalysis } = props
   return (
     <section className="result-page" aria-label="분석 결과" ref={resultRef} tabIndex={-1}>
       <header className="result-page__head">
@@ -24,6 +25,7 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
         </div>
         <div className="result-actions">
           {((submittedOptions.jdMatch || submittedOptions.keyword) && previewResult.status === 'success')
+          || (submittedOptions.ats && atsResult.status === 'success')
           || (submittedOptions.sentence && sentenceResult.status === 'success') ? (
             <>
               <button type="button" className="ghost-button" onClick={handleExportResult}>
@@ -47,6 +49,17 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
             score={previewResult.matchPreview?.matchingScore}
             summary={previewResult.matchPreview?.summary}
             description="JD와 이력서 적합도를 계산하고 있습니다."
+          />
+        </div>
+      ) : null}
+
+      {submittedOptions.ats ? (
+        <div className="summary-grid">
+          <SummaryCard
+            label="ATS 점수"
+            score={atsResult.atsPreview?.atsScore}
+            summary={atsResult.atsPreview?.summary}
+            description="이력서가 ATS에서 읽힐 수 있는 신호를 점검하고 있습니다."
           />
         </div>
       ) : null}
@@ -77,7 +90,30 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
           />
         ) : null}
 
-        {submittedOptions.ats ? <ComingSoonPanel title="ATS 분석" description="ATS 통과 가능성과 포맷 최적화." /> : null}
+        {submittedOptions.ats ? (
+          <AnalysisPanel
+            badge="ATS Check"
+            title="ATS 점수·포맷 진단"
+            description="추출된 텍스트 기준으로 ATS가 읽을 수 있는 신호와 보완점을 확인하세요."
+            result={atsResult}
+            successContent={
+              <div className="detail-list-grid detail-list-grid--triple" aria-label="ATS 진단 결과">
+                <section className="detail-card">
+                  <h3>포맷 점검</h3>
+                  <FormatCheckList checks={atsResult.atsPreview?.formatChecks ?? []} />
+                </section>
+                <section className="detail-card">
+                  <h3>강점·위험</h3>
+                  <KeywordList items={[...(atsResult.atsPreview?.strengths ?? []), ...(atsResult.atsPreview?.risks ?? [])]} />
+                </section>
+                <section className="detail-card">
+                  <h3>개선 제안</h3>
+                  <KeywordList items={atsResult.atsPreview?.suggestions ?? []} />
+                </section>
+              </div>
+            }
+          />
+        ) : null}
         {submittedOptions.sentence ? (
           <AnalysisPanel
             badge="Sentence Edit"

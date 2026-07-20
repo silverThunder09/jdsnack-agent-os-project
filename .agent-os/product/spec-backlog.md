@@ -4,7 +4,7 @@
 
 ## 현재 Feature Spec
 
-- **Service MVP**: 활성 spec `.agent-os/specs/2026-07-18-service-mvp/` — 범위·티켓은 spec이 정본.
+- **ATS 점수·포맷 진단**: 활성 spec `.agent-os/specs/2026-07-20-ats-score-format/` — 범위·티켓은 spec이 정본.
 
 ## Post MVP 후보
 
@@ -13,7 +13,6 @@
 | 분석 결과 리포트 내보내기 | 이력 조회 사용성이 확인된 뒤 |
 | AI 품질 평가와 prompt/model version | 실제 분석 결과를 누적한 뒤 |
 | AI 호출량·비용 제한 | 호출량 또는 비용 경계가 필요해진 뒤 |
-| ATS 점수·포맷 진단 (마지막 "준비중" 분석 옵션 해금) | Service MVP 완료 즉시 — 최우선 후보 |
 | JobKorea JD adapter | 사람인 외 수집 수요가 확인된 뒤 |
 | RocketPunch JD adapter | JobKorea 범위와 효과를 검증한 뒤 |
 | 비동기 analysis worker와 Redis | 동기 분석이 사용자 경험을 막는다고 확인된 뒤 |

@@ -25,6 +25,7 @@ class AuthenticationFilterTest {
     @ValueSource(strings = {
             "/api/diagnose",
             "/api/match/preview",
+            "/api/ats/preview",
             "/api/sentence/preview",
             "/api/jd/fetch",
             "/api/interview/preview",

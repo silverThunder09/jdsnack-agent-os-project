@@ -1,4 +1,4 @@
-import type { MatchPreviewResult, ResumeInputMode, SentencePreviewResult } from '../../types/diagnosis'
+import type { AtsPreviewResult, MatchPreviewResult, ResumeInputMode, SentencePreviewResult } from '../../types/diagnosis'
 import { validateJdText } from '../../hooks/useMatchPreview'
 
 export type JdTab = 'link' | 'paste'
@@ -19,7 +19,7 @@ export const ANALYSIS_OPTIONS: {
   enabled: boolean
 }[] = [
   { key: 'jdMatch', label: 'JD 적합도', description: '이력서와 JD의 핵심 키워드 및 역량 적합도를 분석합니다.', recommended: true, enabled: true },
-  { key: 'ats', label: 'ATS 분석', description: 'ATS 통과 가능성과 포맷, 키워드 최적화 여부를 분석합니다.', recommended: true, enabled: false },
+  { key: 'ats', label: 'ATS 분석', description: 'ATS 통과 가능성과 포맷, 키워드 최적화 여부를 분석합니다.', recommended: true, enabled: true },
   { key: 'sentence', label: '문장 첨삭', description: '문장 표현, 가독성, 문법 및 전문성 향상을 제안합니다.', recommended: false, enabled: true },
   { key: 'keyword', label: '키워드 분석', description: '주요 키워드 누락 여부와 활용도를 분석합니다.', recommended: false, enabled: true },
 ]
@@ -68,6 +68,7 @@ export function clearSavedInput() {
 export function buildResultMarkdown(
   match: MatchPreviewResult | undefined,
   sentence: SentencePreviewResult | undefined,
+  ats: AtsPreviewResult | undefined,
   submittedOptions: Record<AnalysisOptionKey, boolean>,
 ): string {
   const list = (items: string[]) => (items.length ? items.map((item) => `- ${item}`).join('\n') : '- (없음)')
@@ -78,6 +79,24 @@ export function buildResultMarkdown(
     sections.push('## 문장 첨삭', '')
     if (!sentence?.edits.length) sections.push('- (없음)', '')
     else sentence.edits.forEach((edit, index) => sections.push(`### 첨삭 ${index + 1}`, `- 원문: ${edit.original}`, `- 개선문: ${edit.improved}`, `- 개선 사유: ${edit.reason}`, ''))
+  }
+  if (submittedOptions.ats && ats) {
+    sections.push(
+      `## ATS 점수·포맷 진단: ${ats.atsScore}점`,
+      '',
+      '### 요약',
+      ats.summary,
+      '',
+      '### 포맷 점검',
+      ...ats.formatChecks.map((check) => `- ${check.passed ? '통과' : '보완'}: ${check.label} — ${check.message}`),
+      '',
+      '### 누락 키워드',
+      list(ats.missingKeywords),
+      '',
+      '### 제안',
+      list(ats.suggestions),
+      '',
+    )
   }
   return sections.join('\n')
 }

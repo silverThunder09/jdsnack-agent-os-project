@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
 import { AuthGate, AuthLoginAction } from './components/AuthGate'
 import { useAuthGate } from './components/AuthGateContext'
+import { useAtsPreview } from './hooks/useAtsPreview'
 import { useDiagnose } from './hooks/useDiagnose'
 import { useInterviewPreview } from './hooks/useInterviewPreview'
 import { useMatchPreview } from './hooks/useMatchPreview'
@@ -81,6 +82,7 @@ function AuthenticatedApp() {
 
   const { result: diagnoseResult, submit, submitFile, resetResult: resetDiagnose } = useDiagnose()
   const { fetchJd, isFetchingJd, isSubmitting: isPreviewSubmitting, jdFetchState, resetResult: resetPreview, result: previewResult, submit: submitPreview } = useMatchPreview()
+  const { isSubmitting: isAtsSubmitting, result: atsResult, resetResult: resetAts, submit: submitAts } = useAtsPreview()
   const { isSubmitting: isSentenceSubmitting, resetResult: resetSentence, result: sentenceResult, submit: submitSentence } = useSentencePreview()
   const { isSubmitting: isInterviewSubmitting, result: interviewResult, submit: submitInterview } = useInterviewPreview()
   const { histories, selectedHistory, isLoading: isHistoryLoading, error: historyError, load: loadHistories, select: selectHistory, retry: retryHistory, remove: removeHistory } = useAnalysisHistory()
@@ -119,9 +121,10 @@ function AuthenticatedApp() {
 
   const handleExportResult = () => {
     const match = previewResult.matchPreview
+    const ats = atsResult.atsPreview
     const sentence = sentenceResult.sentencePreview
-    if (!match && !sentence) return
-    const blob = new Blob([buildResultMarkdown(match, sentence, submittedOptions)], { type: 'text/markdown;charset=utf-8' })
+    if (!match && !ats && !sentence) return
+    const blob = new Blob([buildResultMarkdown(match, sentence, ats, submittedOptions)], { type: 'text/markdown;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -155,6 +158,7 @@ function AuthenticatedApp() {
     setSubmittedOptions({ ...options })
     resetDiagnose()
     resetPreview()
+    resetAts()
     resetSentence()
     setAnalysisPhase('result')
     const outcome = resumeInputTab === 'text'
@@ -181,6 +185,7 @@ function AuthenticatedApp() {
     const request = { resumeSource: { type: 'FILE', value: outcome.diagnosis.sourceText }, jdText: trimmedJd, jdUrl: jdUrl.trim() } as const
     const requests: Promise<void>[] = []
     if (options.jdMatch || options.keyword) requests.push(submitPreview(request))
+    if (options.ats) requests.push(submitAts(request))
     if (options.sentence) requests.push(submitSentence(request))
     requests.push(runHistoryRequest().then(() => undefined).catch(() => undefined))
     await Promise.all(requests)
@@ -190,6 +195,7 @@ function AuthenticatedApp() {
     setAnalysisPhase('input')
     resetDiagnose()
     resetPreview()
+    resetAts()
     resetSentence()
   }
 
@@ -208,9 +214,9 @@ function AuthenticatedApp() {
     >
       {currentView === 'home' ? (
         analysisPhase === 'input' ? (
-        <AnalysisInputView {...{ jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput }} />
+        <AnalysisInputView {...{ jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isAtsSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput }} />
         ) : (
-          <AnalysisResultView {...{ submittedOptions, previewResult, sentenceResult, resultRef, handleExportResult, handlePrintResult: () => window.print(), handleNewAnalysis }} />
+          <AnalysisResultView {...{ submittedOptions, previewResult, atsResult, sentenceResult, resultRef, handleExportResult, handlePrintResult: () => window.print(), handleNewAnalysis }} />
         )
       ) : currentView === 'interview' ? (
         <InterviewWorkspace {...{ jobTitle, setJobTitle, hasResumeSource, trimmedJd, isInterviewSubmitting, handleInterviewSubmit, interviewResult }} />

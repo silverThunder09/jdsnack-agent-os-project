@@ -4,6 +4,8 @@ import type {
   AnalysisHistoryDetail,
   AnalysisHistorySummary,
   ApiResponse,
+  AtsPreviewOutcome,
+  AtsPreviewResult,
   DiagnoseOutcome,
   DiagnoseRequest,
   DiagnosisResult,
@@ -205,6 +207,68 @@ export async function previewMatch(
   }
 
   if (
+    payload.error.code === 'EMPTY_JD' ||
+    payload.error.code === 'JD_TEXT_TOO_SHORT' ||
+    payload.error.code === 'JD_TEXT_TOO_LONG' ||
+    payload.error.code === 'INVALID_JD_URL'
+  ) {
+    return {
+      kind: 'validation-error',
+      code: payload.error.code,
+      message: payload.error.message,
+    }
+  }
+
+  return {
+    kind: 'error',
+    code: payload.error.code,
+    message: payload.error.message,
+  }
+}
+
+export async function previewAts(
+  request: MatchPreviewRequest,
+): Promise<AtsPreviewOutcome> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/ats/preview`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<AtsPreviewResult>(response)
+  if (payload?.success && payload.data) {
+    return {
+      kind: 'success',
+      result: {
+        ...payload.data,
+        strengths: Array.isArray(payload.data.strengths) ? payload.data.strengths : [],
+        risks: Array.isArray(payload.data.risks) ? payload.data.risks : [],
+        suggestions: Array.isArray(payload.data.suggestions) ? payload.data.suggestions : [],
+        matchedKeywords: Array.isArray(payload.data.matchedKeywords) ? payload.data.matchedKeywords : [],
+        missingKeywords: Array.isArray(payload.data.missingKeywords) ? payload.data.missingKeywords : [],
+        formatChecks: Array.isArray(payload.data.formatChecks) ? payload.data.formatChecks : [],
+      },
+    }
+  }
+
+  if (!payload?.error || !KNOWN_ERROR_CODES.includes(payload.error.code)) {
+    throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+  }
+
+  if (
+    payload.error.code === 'EMPTY_RESUME' ||
+    payload.error.code === 'TEXT_TOO_SHORT' ||
+    payload.error.code === 'TEXT_TOO_LONG' ||
     payload.error.code === 'EMPTY_JD' ||
     payload.error.code === 'JD_TEXT_TOO_SHORT' ||
     payload.error.code === 'JD_TEXT_TOO_LONG' ||

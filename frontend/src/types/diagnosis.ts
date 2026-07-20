@@ -66,6 +66,23 @@ export interface MatchPreviewResult {
   missingKeywords: string[]
 }
 
+export interface AtsFormatCheck {
+  label: string
+  passed: boolean
+  message: string
+}
+
+export interface AtsPreviewResult {
+  atsScore: number
+  summary: string
+  strengths: string[]
+  risks: string[]
+  suggestions: string[]
+  matchedKeywords: string[]
+  missingKeywords: string[]
+  formatChecks: AtsFormatCheck[]
+}
+
 export interface SentenceEdit {
   original: string
   improved: string
@@ -177,6 +194,17 @@ export type MatchPreviewOutcome =
       message: string
     }
 
+export type AtsPreviewOutcome =
+  | {
+      kind: 'success'
+      result: AtsPreviewResult
+    }
+  | {
+      kind: 'validation-error' | 'error'
+      code: ApiErrorCode
+      message: string
+    }
+
 export type SentencePreviewOutcome =
   | {
       kind: 'success'
@@ -217,6 +245,7 @@ export interface ResultState {
   code?: ApiErrorCode
   diagnosis?: DiagnosisResult
   matchPreview?: MatchPreviewResult
+  atsPreview?: AtsPreviewResult
   sentencePreview?: SentencePreviewResult
   interviewPreview?: InterviewPreviewResult
 }

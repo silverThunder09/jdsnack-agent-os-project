@@ -24,3 +24,7 @@ export function ComingSoonPanel({ title, description }: { title: string; descrip
 export function KeywordList({ items }: { items: string[] }) {
   return items.length === 0 ? <p className="keyword-empty">해당 키워드가 없습니다.</p> : <ul className="keyword-list">{items.map((item) => <li key={item}>{item}</li>)}</ul>
 }
+
+export function FormatCheckList({ checks }: { checks: { label: string; passed: boolean; message: string }[] }) {
+  return <ul className="keyword-list">{checks.map((check) => <li key={check.label}>{check.passed ? '통과' : '보완'} · {check.label}: {check.message}</li>)}</ul>
+}

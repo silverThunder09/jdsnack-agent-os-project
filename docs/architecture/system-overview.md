@@ -13,6 +13,7 @@ JDSnack은 Spring Boot API와 React 프론트를 **분리 컨테이너로 배포
 - 백엔드 컨테이너가 REST API를 제공
 - Spring Boot가 인증·입력 검증·분석 orchestration·JD 수집을 담당
 - Gemini·사람인 수집은 백엔드 provider/adapter 경계에서만 호출
+- ATS 점수·포맷 진단은 이력서 추출 텍스트와 JD를 서버의 결정론적 서비스에서 계산하며 외부 호출을 하지 않음
 - 현재 preview 흐름은 fixture/stub/ai-local 모드로 검증하며 Service MVP는 사용자 소유 분석 이력을 추가한다
 
 ## Dependency & data flow
@@ -22,7 +23,7 @@ flowchart LR
   Browser["Browser"] --> Frontend["React frontend\ncomponents → hooks → services"]
   Frontend -->|"/api + session cookie"| Backend["Spring Boot\nController → Service"]
   Backend --> Auth["Google OAuth / session"]
-  Backend --> Analysis["Diagnose · Match · Sentence · Interview"]
+  Backend --> Analysis["Diagnose · Match · ATS · Sentence · Interview"]
   Backend --> Jd["JD fetch adapter\nSaramin fallback / OCR"]
   Analysis --> Gemini["Gemini provider\nserver-side only"]
   Backend --> Store["H2 fixture now\nService MVP persistence next"]
