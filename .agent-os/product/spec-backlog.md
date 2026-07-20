@@ -4,7 +4,8 @@
 
 ## 현재 Feature Spec
 
-- **Service MVP**: 활성 spec `.agent-os/specs/2026-07-18-service-mvp/` — 범위·티켓은 spec이 정본.
+- **ATS 점수·포맷 진단**: 활성 spec `.agent-os/specs/2026-07-20-ats-score-format/` — 범위·티켓은 spec이 정본. 마지막 "준비중" 분석 옵션을 실동작으로 해금.
+- **Service MVP**: 구현 완료, archive spec `.agent-os/archive/specs/2026-07-18-service-mvp/` — 범위·티켓 정본.
 
 ## Post MVP 후보
 

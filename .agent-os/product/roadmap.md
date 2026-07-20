@@ -20,11 +20,11 @@
 
 `OAuth 1개 공급자 로그인 → 이력서·JD 입력 → 기존 AI 진단·JD 매칭 → 결과 저장 → 이력 조회·재시도·삭제`
 
-사람인 이미지 OCR은 구현·검증을 마치고 archive로 이동했습니다. 현재 위 흐름 전체를 정의한 `2026-07-18-service-mvp` Feature Spec이 유일한 active Spec입니다.
+사람인 이미지 OCR과 Service MVP는 구현·검증을 마치고 archive로 이동했습니다. 위 흐름 전체를 정의한 `2026-07-18-service-mvp` Feature Spec은 완료되었으며, 현재 active Spec은 마지막 "준비중" 분석 옵션을 해금하는 `2026-07-20-ats-score-format`입니다.
 
 ### 내부 수직 티켓
 
-Service MVP는 수직 티켓 다섯 개(T1~T5)로 끝까지 관통합니다. 티켓의 정의·의존성·진행 상태는 [plan.md](../specs/2026-07-18-service-mvp/plan.md)가 정본입니다.
+Service MVP는 수직 티켓 다섯 개(T1~T5)로 끝까지 관통했습니다. 완료된 티켓의 정의·의존성·검증 기록은 [plan.md](../archive/specs/2026-07-18-service-mvp/plan.md)가 정본입니다. 현재 active Spec의 티켓 정본은 [ats-score-format plan.md](../specs/2026-07-20-ats-score-format/plan.md)입니다.
 
 ## Post MVP
 

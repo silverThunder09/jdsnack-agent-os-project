@@ -11,17 +11,18 @@
       "slug": "2026-07-18-service-mvp",
       "title": "Service MVP",
       "priority": 0,
-      "status": "active",
-      "spec_path": ".agent-os/specs/2026-07-18-service-mvp",
+      "status": "completed",
+      "spec_path": ".agent-os/archive/specs/2026-07-18-service-mvp",
       "auto_promote": false,
       "start_condition": {"type": "bootstrap"}
     },
     {
       "id": "ats-score-format",
-      "slug": "ats-score-format",
+      "slug": "2026-07-20-ats-score-format",
       "title": "ATS 점수·포맷 진단",
       "priority": 1,
-      "status": "candidate",
+      "status": "active",
+      "spec_path": ".agent-os/specs/2026-07-20-ats-score-format",
       "auto_promote": true,
       "start_condition": {"type": "feature_completed", "feature": "service-mvp"}
     },
