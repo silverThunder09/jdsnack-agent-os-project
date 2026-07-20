@@ -11,6 +11,7 @@
 - `install-git-hooks.sh`: 버전관리되는 `.githooks/`를 현재 clone의 Git hook 경로로 연결합니다.
 - `smoke-test.sh`: 실행 중인 서비스의 기본 API smoke test를 수행합니다.
 - `pr-review-gate.sh`: PR 리뷰 게이트 결과를 확인합니다.
+- `../.github/workflows/pr-ci-router.yml`: PR 변경 경로에 맞는 CI만 선택적으로 실행합니다.
 - `autonomous_spec_loop.py`: Spec 완료·승격·티켓 디스패치 결정을 결정론적으로 계산합니다.
 - `autonomous-spec-loop.sh`: GitHub 이벤트를 Spec 큐와 Claude/Codex 실행기로 연결합니다.
 - `create-codex-worktree.sh`: 최신 `origin/main`에서 Codex worktree를 생성합니다.

@@ -1,10 +1,22 @@
 name: Docs Harness
 
 on:
-  pull_request:
+  workflow_call:
   push:
     branches:
       - main
+    paths:
+      - '.agent-os/**'
+      - '.github/**'
+      - 'docs/**'
+      - 'evals/**'
+      - 'scripts/**'
+      - 'AGENTS.md'
+      - 'README.md'
+      - 'config.yml'
+      - 'backends.json'
+      - 'backend/README.md'
+      - 'frontend/README.md'
   workflow_dispatch:
 
 permissions:
@@ -129,6 +141,10 @@ jobs:
       - name: Test Codex worktree base guard
         shell: bash
         run: ./scripts/create-codex-worktree-test.sh
+
+      - name: Test PR CI router contract
+        shell: bash
+        run: ./scripts/pr-ci-router-test.sh
 
       - name: Validate executable Spec queue
         shell: bash

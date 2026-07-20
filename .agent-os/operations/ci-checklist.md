@@ -14,7 +14,8 @@
 - `.github/workflows/frontend-ci.yml`에서 프론트엔드 린트, 테스트, 빌드를 검증합니다.
 - `.github/workflows/container.yml`에서 compose 기반 스모크 테스트를 함께 검증합니다.
 - compose 기반 통합 검증은 `fixture` 모드 기준으로 텍스트/PDF/DOCX 흐름을 확인합니다.
-- 보호 브랜치 required check와 충돌하지 않도록 백엔드/프론트 CI는 경로 필터 없이 항상 실행합니다.
+- PR은 `.github/workflows/pr-ci-router.yml`이 변경 경로를 분류하고 필요한 CI workflow만 호출합니다. `main` push에서는 각 workflow의 `paths` 필터가 직접 동작합니다.
+- 보호 브랜치 required check는 Router의 선택 결과를 반영하는 `PR CI Gate`로 전환해야 하며, workflow-level path filter만 먼저 적용해 required check를 누락시키지 않습니다.
 
 ## 권장 트리거
 
@@ -41,7 +42,6 @@
 
 - `.github/workflows/docs-harness.yml`
 - `.github/workflows/backend-ci.yml`
-- PR 운영 스크립트 변경 시 `scripts/pr-feedback-detector-test.sh`와 `scripts/open-issue-work-dispatcher-test.sh`로 반려·CI 오류·이슈 분류·환경 실패 경계를 검증하고 Docs Harness에서 실행합니다.
 - PR 운영 스크립트 변경 시 `scripts/pr-feedback-detector-test.sh`와 `scripts/open-issue-work-dispatcher-test.sh`로 반려·CI 오류·이슈 분류·환경 실패 경계를 검증하고 Docs Harness에서 실행합니다.
 
 ### 2. 백엔드 CI

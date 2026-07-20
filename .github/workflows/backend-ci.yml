@@ -1,10 +1,12 @@
 name: Backend CI
 
 on:
-  pull_request:
+  workflow_call:
   push:
     branches:
       - main
+    paths:
+      - 'backend/**'
   workflow_dispatch:
 
 permissions:
@@ -22,35 +24,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Detect changes
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-
       - name: Setup Java
-        if: steps.changes.outputs.backend == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Setup Gradle
-        if: steps.changes.outputs.backend == 'true'
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.4.1"
 
       - name: Test
-        if: steps.changes.outputs.backend == 'true'
         run: gradle test
 
       - name: Build boot jar
-        if: steps.changes.outputs.backend == 'true'
         run: gradle bootJar
-
-      - name: Skip notice
-        if: steps.changes.outputs.backend != 'true'
-        run: echo "backend/ 변경 없음 → 백엔드 테스트/빌드 건너뜀."

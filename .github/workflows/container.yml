@@ -1,10 +1,16 @@
 name: Container Flow
 
 on:
-  pull_request:
+  workflow_call:
   push:
     branches:
       - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'compose.local.yaml'
+      - 'compose.prod.yaml'
+      - 'scripts/smoke-test.sh'
   workflow_dispatch:
 
 permissions:
@@ -20,20 +26,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Detect changes
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-
       - name: Setup Docker Buildx
-        if: steps.changes.outputs.backend == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Build backend image
-        if: steps.changes.outputs.backend == 'true'
         uses: docker/build-push-action@v6
         with:
           context: backend
@@ -43,7 +39,6 @@ jobs:
           tags: jdsnack-backend:ci
 
       - name: Run container
-        if: steps.changes.outputs.backend == 'true'
         run: |
           docker run --rm -d \
             --name jdsnack-backend-ci \
@@ -51,7 +46,6 @@ jobs:
             jdsnack-backend:ci
 
       - name: Check health endpoint
-        if: steps.changes.outputs.backend == 'true'
         run: |
           set -euo pipefail
 
@@ -72,12 +66,8 @@ jobs:
           exit 1
 
       - name: Stop container
-        if: always() && steps.changes.outputs.backend == 'true'
+        if: always()
         run: docker stop jdsnack-backend-ci || true
-
-      - name: Skip notice
-        if: steps.changes.outputs.backend != 'true'
-        run: echo "backend/ 변경 없음 → 백엔드 컨테이너 빌드 건너뜀."
 
   compose-smoke:
     name: Run compose smoke test
@@ -87,38 +77,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Detect changes
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            stack:
-              - 'backend/**'
-              - 'frontend/**'
-              - 'compose.local.yaml'
-              - 'scripts/smoke-test.sh'
-
       - name: Start compose stack
-        if: steps.changes.outputs.stack == 'true'
         env:
           JDSNACK_DIAGNOSIS_MODE: fixture
         run: docker compose -f compose.local.yaml up --build -d
 
       - name: Run smoke test
-        if: steps.changes.outputs.stack == 'true'
         run: bash ./scripts/smoke-test.sh
 
       - name: Print compose logs
-        if: failure() && steps.changes.outputs.stack == 'true'
+        if: failure()
         run: docker compose -f compose.local.yaml logs --no-color
 
       - name: Stop compose stack
-        if: always() && steps.changes.outputs.stack == 'true'
+        if: always()
         run: docker compose -f compose.local.yaml down -v
-
-      - name: Skip notice
-        if: steps.changes.outputs.stack != 'true'
-        run: echo "스택 관련 변경 없음 → compose smoke test 건너뜀."
 
   publish-images:
     name: Publish images to GHCR

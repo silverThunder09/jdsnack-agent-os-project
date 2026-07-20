@@ -52,6 +52,7 @@ documents:
     - .agent-os/operations/gemini-local-test-policy.md
   automation:
     - .github/workflows/docs-harness.yml
+    - .github/workflows/pr-ci-router.yml
     - .github/workflows/backend-ci.yml
     - .github/workflows/container.yml
     - .github/pull_request_template.md
@@ -75,6 +76,7 @@ documents:
     - scripts/backends-contract-test.sh
     - scripts/create-codex-worktree.sh
     - scripts/create-codex-worktree-test.sh
+    - scripts/pr-ci-router-test.sh
     - scripts/autonomous_spec_loop.py
     - scripts/autonomous-spec-loop.sh
     - scripts/autonomous-spec-loop-test.sh

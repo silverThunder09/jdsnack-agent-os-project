@@ -16,6 +16,7 @@ on:
       - Frontend CI
       - Container Flow
       - Docs Harness
+      - PR CI Router
     types: [completed]
 
 permissions:
@@ -49,7 +50,7 @@ jobs:
       ) &&
       (
         github.event_name != 'workflow_run' ||
-        contains(fromJSON('["Backend CI", "Frontend CI", "Container Flow", "Docs Harness"]'), github.event.workflow_run.name)
+        contains(fromJSON('["Backend CI", "Frontend CI", "Container Flow", "Docs Harness", "PR CI Router"]'), github.event.workflow_run.name)
       )
     runs-on: [self-hosted, jdsnack]
     timeout-minutes: 30
