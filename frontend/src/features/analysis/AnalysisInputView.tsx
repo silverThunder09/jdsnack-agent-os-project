@@ -21,6 +21,7 @@ interface AnalysisInputViewProps {
   canStart: boolean
   isFetchingJd: boolean
   isPreviewSubmitting: boolean
+  isAtsSubmitting: boolean
   isSentenceSubmitting: boolean
   jdFetchState: JdFetchState
   handleJdUrlChange: (value: string) => void
@@ -35,7 +36,7 @@ interface AnalysisInputViewProps {
 }
 
 export function AnalysisInputView(props: AnalysisInputViewProps) {
-  const { jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput } = props
+  const { jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isAtsSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput } = props
   return (
     <section className="start-page" aria-label="새로운 분석 시작">
       <header className="start-page__head">
@@ -224,11 +225,11 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
               <button
                 type="button"
                 className="cta-button"
-                disabled={!canStart || isPreviewSubmitting || isSentenceSubmitting}
-                aria-disabled={!canStart || isPreviewSubmitting || isSentenceSubmitting}
+                disabled={!canStart || isPreviewSubmitting || isAtsSubmitting || isSentenceSubmitting}
+                aria-disabled={!canStart || isPreviewSubmitting || isAtsSubmitting || isSentenceSubmitting}
                 onClick={handleStartAnalysis}
               >
-                {isPreviewSubmitting || isSentenceSubmitting ? '분석 중...' : '분석 시작하기 →'}
+                {isPreviewSubmitting || isAtsSubmitting || isSentenceSubmitting ? '분석 중...' : '분석 시작하기 →'}
               </button>
               <button type="button" className="text-button" onClick={handleResetInput}>
                 입력 초기화

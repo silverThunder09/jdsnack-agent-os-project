@@ -39,6 +39,6 @@
 
 ## 관련 문서
 
-- API 계약: [Service MVP API spec](../../.agent-os/specs/2026-07-18-service-mvp/api-spec.md)
+- API 계약: [ATS 점수·포맷 진단 API spec](../../.agent-os/specs/2026-07-20-ats-score-format/api-spec.md)
 - 테스트 기준: [테스트 표준](../../.agent-os/standards/testing-standards.md)
 - 모듈 진입점: [backend README](../../backend/README.md)

@@ -10,6 +10,7 @@ import {
   listAnalysisHistories,
   previewInterview,
   previewMatch,
+  previewAts,
   previewSentence,
   retryAnalysisHistory,
 } from './api'
@@ -48,6 +49,10 @@ describe('보호 API 서비스 계층', () => {
       {
         path: '/api/match/preview',
         invoke: () => previewMatch({ resumeSource: { type: 'TEXT', value: 'resume' }, jdText: 'jd' }),
+      },
+      {
+        path: '/api/ats/preview',
+        invoke: () => previewAts({ resumeSource: { type: 'TEXT', value: 'resume' }, jdText: 'jd' }),
       },
       {
         path: '/api/sentence/preview',

@@ -2,6 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { buildResultMarkdown } from './features/analysis/analysisUtils'
 
 const validJdText =
   'Spring Boot 기반 REST API 개발과 운영 경험이 필요하며, 테스트 자동화와 협업 경험을 중요하게 봅니다.'
@@ -61,6 +62,22 @@ function matchPayload() {
       matchedKeywords: ['Spring Boot', 'REST API'],
       partialKeywords: [],
       missingKeywords: ['Kubernetes'],
+    },
+  })
+}
+
+function atsPayload() {
+  return mockJsonResponse({
+    success: true,
+    data: {
+      atsScore: 72,
+      summary: 'ATS 진단 요약입니다.',
+      strengths: ['연락처 단서가 확인됩니다.'],
+      risks: ['Kubernetes 키워드가 누락되었습니다.'],
+      suggestions: ['Kubernetes 경험과 성과를 추가해 보세요.'],
+      matchedKeywords: ['Spring Boot'],
+      missingKeywords: ['Kubernetes'],
+      formatChecks: [{ label: '연락처 단서', passed: true, message: '연락처가 확인됩니다.' }],
     },
   })
 }
@@ -217,25 +234,27 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByText(`${resumeSourceText.length} / 10,000`)).toBeInTheDocument()
   })
 
-  it('키워드 분석과 문장 첨삭은 선택 가능하고 준비중 태그가 표시되지 않는다', async () => {
+  it('ATS 분석과 키워드 분석·문장 첨삭은 선택 가능하고 준비중 태그가 표시되지 않는다', async () => {
     await renderAuthenticatedApp()
 
     expect(screen.getByText('JD 적합도')).toBeInTheDocument()
     expect(screen.getByText('ATS 분석')).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /문장 첨삭/ })).toBeEnabled()
     expect(screen.getByText('키워드 분석')).toBeInTheDocument()
-    expect(screen.getAllByText('준비중')).toHaveLength(1)
+    expect(screen.getByRole('checkbox', { name: /ATS 분석/ })).toBeEnabled()
+    expect(screen.queryByText('준비중')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /맞춤 첨삭/ })).not.toBeInTheDocument()
     for (const item of ['이력서 관리', '요금제']) {
       expect(screen.getByRole('button', { name: item })).toBeDisabled()
     }
   })
 
-  it('분석 시작하기는 JD 적합도(매칭) 결과와 준비중 패널을 보여준다', async () => {
+  it('분석 시작하기는 JD 적합도와 ATS 결과 패널을 보여준다', async () => {
     const user = userEvent.setup()
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(atsPayload())
       .mockResolvedValueOnce(sentencePayload())
       .mockResolvedValueOnce(historyPayload())
 
@@ -244,11 +263,15 @@ describe('새로운 분석 시작 페이지', () => {
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
 
     expect(await screen.findByText('79점')).toBeInTheDocument()
+    expect(await screen.findByText('72점')).toBeInTheDocument()
+    expect(screen.getByText('ATS 진단 요약입니다.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Spring Boot')
+    expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Kubernetes')
     expect(await screen.findByText('Spring Boot 운영 경험이 JD와 맞습니다.')).toBeInTheDocument()
-    expect(await screen.findByText('Kubernetes')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Kubernetes')
     expect(await screen.findByText('Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.')).toBeInTheDocument()
     expect(screen.getByText('해당 키워드가 없습니다.')).toBeInTheDocument()
-    expect(screen.getAllByText('준비 중인 분석입니다').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('준비 중인 분석입니다')).not.toBeInTheDocument()
   })
 
   it('키워드만 선택해도 매칭을 호출하고 JD 적합도 패널 없이 키워드 결과를 보여준다', async () => {
@@ -261,6 +284,7 @@ describe('새로운 분석 시작 페이지', () => {
     await renderAuthenticatedApp()
     await fillJdAndResume(user)
     await user.click(screen.getByRole('checkbox', { name: /JD 적합도/ }))
+    await user.click(screen.getByRole('checkbox', { name: /ATS 분석/ }))
     await user.click(screen.getByRole('checkbox', { name: /문장 첨삭/ }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
 
@@ -283,6 +307,7 @@ describe('새로운 분석 시작 페이지', () => {
     await fillJdAndResume(user)
     await user.click(screen.getByRole('checkbox', { name: /JD 적합도/ }))
     await user.click(screen.getByRole('checkbox', { name: /키워드 분석/ }))
+    await user.click(screen.getByRole('checkbox', { name: /ATS 분석/ }))
     await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
 
     expect(await screen.findByRole('heading', { name: '문장 첨삭' })).toBeInTheDocument()
@@ -298,6 +323,7 @@ describe('새로운 분석 시작 페이지', () => {
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(atsPayload())
       .mockResolvedValueOnce(sentencePayload([]))
       .mockResolvedValueOnce(historyPayload())
 
@@ -352,6 +378,7 @@ describe('새로운 분석 시작 페이지', () => {
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(atsPayload())
       .mockResolvedValueOnce(sentencePayload())
       .mockResolvedValueOnce(historyPayload())
       .mockResolvedValueOnce(
@@ -389,6 +416,7 @@ describe('새로운 분석 시작 페이지', () => {
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(diagnosePayload())
       .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(atsPayload())
       .mockResolvedValueOnce(sentencePayload())
       .mockResolvedValueOnce(historyPayload())
     const createObjectURL = vi.fn(() => 'blob:mock')
@@ -404,6 +432,23 @@ describe('새로운 분석 시작 페이지', () => {
 
     await user.click(screen.getByRole('button', { name: '내보내기' }))
     expect(createObjectURL).toHaveBeenCalled()
+    const markdown = buildResultMarkdown(
+      undefined,
+      undefined,
+      {
+        atsScore: 72,
+        summary: 'ATS 진단 요약입니다.',
+        strengths: [],
+        risks: [],
+        suggestions: ['Kubernetes 경험과 성과를 추가해 보세요.'],
+        matchedKeywords: ['Spring Boot'],
+        missingKeywords: ['Kubernetes'],
+        formatChecks: [],
+      },
+      { jdMatch: false, ats: true, sentence: false, keyword: false },
+    )
+    expect(markdown).toContain('### 매칭 키워드')
+    expect(markdown).toContain('- Spring Boot')
 
     await user.click(screen.getByRole('button', { name: '인쇄' }))
     expect(printSpy).toHaveBeenCalled()
