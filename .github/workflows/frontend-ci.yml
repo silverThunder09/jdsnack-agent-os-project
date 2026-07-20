@@ -1,10 +1,11 @@
 name: Frontend CI
 
 on:
-  pull_request:
   push:
     branches:
       - main
+    paths:
+      - 'frontend/**'
   workflow_dispatch:
 
 permissions:
@@ -22,16 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Detect changes
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            frontend:
-              - 'frontend/**'
-
       - name: Setup Node
-        if: steps.changes.outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -39,21 +31,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        if: steps.changes.outputs.frontend == 'true'
         run: npm ci
 
       - name: Lint
-        if: steps.changes.outputs.frontend == 'true'
         run: npm run lint
 
       - name: Test
-        if: steps.changes.outputs.frontend == 'true'
         run: npm run test
 
       - name: Build
-        if: steps.changes.outputs.frontend == 'true'
         run: npm run build
-
-      - name: Skip notice
-        if: steps.changes.outputs.frontend != 'true'
-        run: echo "frontend/ 변경 없음 → 프론트 lint/test/build 건너뜀."

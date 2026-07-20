@@ -30,7 +30,7 @@ body:
     attributes:
       label: Failed Check
       description: 실패한 GitHub Actions job 또는 리뷰 항목을 입력합니다.
-      placeholder: "Docs Harness / Backend CI / Container Flow"
+      placeholder: "PR CI Gate / Docs Harness / Backend CI"
     validations:
       required: true
   - type: textarea

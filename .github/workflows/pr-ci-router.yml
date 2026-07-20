@@ -1,0 +1,214 @@
+name: PR CI Router
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    name: Detect changed CI areas
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      container: ${{ steps.filter.outputs.container }}
+      docs: ${{ steps.filter.outputs.docs }}
+      workflow: ${{ steps.filter.outputs.workflow }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed areas
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            container:
+              - 'backend/Dockerfile'
+              - 'frontend/Dockerfile'
+              - 'compose.local.yaml'
+              - 'compose.prod.yaml'
+              - 'scripts/smoke-test.sh'
+            docs:
+              - '.agent-os/**'
+              - '.github/ISSUE_TEMPLATE/**'
+              - 'docs/**'
+              - 'evals/**'
+              - 'scripts/**'
+              - 'AGENTS.md'
+              - 'README.md'
+              - 'config.yml'
+              - 'backends.json'
+              - 'backend/README.md'
+              - 'frontend/README.md'
+            workflow:
+              - '.github/workflows/**'
+
+  backend:
+    name: Test and build backend
+    needs: detect
+    if: ${{ needs.detect.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.4.1"
+      - name: Test
+        run: gradle test
+      - name: Build boot jar
+        run: gradle bootJar
+
+  frontend:
+    name: Test and build frontend
+    needs: detect
+    if: ${{ needs.detect.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm run test
+      - name: Build
+        run: npm run build
+
+  backend_container:
+    name: Build backend container
+    needs: detect
+    if: ${{ needs.detect.outputs.container == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: false
+          load: true
+          tags: jdsnack-backend:ci
+      - name: Run container
+        run: |
+          docker run --rm -d \
+            --name jdsnack-backend-ci \
+            -p 8080:8080 \
+            jdsnack-backend:ci
+      - name: Check health endpoint
+        run: |
+          set -euo pipefail
+          for attempt in {1..30}; do
+            if curl -fsS http://localhost:8080/api/health | tee /tmp/health.json; then
+              grep -q '"success":true' /tmp/health.json
+              grep -q '"status":"UP"' /tmp/health.json
+              grep -q '"service":"JDSnack"' /tmp/health.json
+              grep -q '"version":"1.0.0"' /tmp/health.json
+              exit 0
+            fi
+            echo "Waiting for backend container health check... ${attempt}/30"
+            sleep 2
+          done
+          docker logs jdsnack-backend-ci
+          exit 1
+      - name: Stop container
+        if: always()
+        run: docker stop jdsnack-backend-ci || true
+
+  compose_smoke:
+    name: Run compose smoke test
+    needs: detect
+    if: ${{ needs.detect.outputs.container == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Start compose stack
+        env:
+          JDSNACK_DIAGNOSIS_MODE: fixture
+        run: docker compose -f compose.local.yaml up --build -d
+      - name: Run smoke test
+        run: bash ./scripts/smoke-test.sh
+      - name: Print compose logs
+        if: failure()
+        run: docker compose -f compose.local.yaml logs --no-color
+      - name: Stop compose stack
+        if: always()
+        run: docker compose -f compose.local.yaml down -v
+
+  docs:
+    name: Validate Agent OS docs
+    needs: detect
+    if: ${{ needs.detect.outputs.docs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run docs harness
+        run: bash scripts/docs-harness.sh
+
+  workflow:
+    name: Workflow CI
+    needs: detect
+    if: ${{ needs.detect.outputs.workflow == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate workflow contracts
+        run: bash scripts/workflow-ci-test.sh
+
+  gate:
+    name: PR CI Gate
+    if: always()
+    needs: [detect, backend, frontend, backend_container, compose_smoke, docs, workflow]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when selected CI failed
+        if: >
+          needs.detect.result != 'success' ||
+          contains(fromJSON('["failure","cancelled"]'), needs.backend.result) ||
+          contains(fromJSON('["failure","cancelled"]'), needs.frontend.result) ||
+          contains(fromJSON('["failure","cancelled"]'), needs.backend_container.result) ||
+          contains(fromJSON('["failure","cancelled"]'), needs.compose_smoke.result) ||
+          contains(fromJSON('["failure","cancelled"]'), needs.docs.result) ||
+          contains(fromJSON('["failure","cancelled"]'), needs.workflow.result)
+        run: exit 1
+      - name: Report selected CI
+        run: |
+          echo "backend=${{ needs.backend.result }}"
+          echo "frontend=${{ needs.frontend.result }}"
+          echo "backend-container=${{ needs.backend_container.result }}"
+          echo "compose-smoke=${{ needs.compose_smoke.result }}"
+          echo "docs=${{ needs.docs.result }}"
+          echo "workflow=${{ needs.workflow.result }}"
