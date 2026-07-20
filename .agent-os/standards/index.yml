@@ -73,6 +73,8 @@ documents:
     - scripts/notify-needs-human.sh
     - scripts/notify-needs-human-test.sh
     - scripts/backends-contract-test.sh
+    - scripts/create-codex-worktree.sh
+    - scripts/create-codex-worktree-test.sh
     - scripts/autonomous_spec_loop.py
     - scripts/autonomous-spec-loop.sh
     - scripts/autonomous-spec-loop-test.sh

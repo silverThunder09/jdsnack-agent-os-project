@@ -7,12 +7,14 @@ readonly NEEDS_HUMAN_EXIT=20
 GH_BIN="${GH_BIN:-gh}"
 JQ_BIN="${JQ_BIN:-jq}"
 CODEX_BIN="${CODEX_BIN:-codex}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${GH_REPO:-}"
+TARGET_BRANCH=""
 APPLY=false
 
 usage() {
     cat <<'USAGE'
-Usage: scripts/open-issue-work-dispatcher.sh [--repo OWNER/REPO] [--apply]
+Usage: scripts/open-issue-work-dispatcher.sh [--repo OWNER/REPO] [--branch codex/...] [--apply]
 
 Scans open issues once and emits safe Codex work candidates as JSON.
 With --apply, each safe candidate is handed to Codex in an isolated worktree.
@@ -61,6 +63,11 @@ while [ "$#" -gt 0 ]; do
             APPLY=true
             shift
             ;;
+        --branch)
+            [ "$#" -ge 2 ] || { usage >&2; exit 2; }
+            TARGET_BRANCH="$2"
+            shift 2
+            ;;
         --help|-h)
             usage
             exit 0
@@ -71,6 +78,13 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+if [ -n "$TARGET_BRANCH" ]; then
+    case "$TARGET_BRANCH" in
+        codex/*) ;;
+        *) usage >&2; exit 2 ;;
+    esac
+fi
 
 command -v "$GH_BIN" >/dev/null 2>&1 || emit_needs_human "gh_unavailable"
 command -v "$JQ_BIN" >/dev/null 2>&1 || emit_needs_human "jq_unavailable"
@@ -93,13 +107,15 @@ if ! issue_payload="$(run_gh_json issue list --repo "$REPO" --state open --json 
 fi
 validate_json "$issue_payload"
 
-result="$($JQ_BIN -c --arg repo "$REPO" '
+result="$($JQ_BIN -c --arg repo "$REPO" --arg target_branch "$TARGET_BRANCH" '
   reduce .[] as $issue (
     {candidates: [], skipped: []};
     ($issue.labels | map(.name)) as $labels |
     (if ($issue.title | test("^리뷰 (반려|후속): codex/")) then ($issue.title | capture("^리뷰 (반려|후속): (?<branch>codex/[^ ]+)$").branch) else "" end) as $branch |
     if ($branch == "") then
       .skipped += [{number: $issue.number, title: $issue.title, reason: "unsupported_issue_type"}]
+    elif ($target_branch != "" and $branch != $target_branch) then
+      .skipped += [{number: $issue.number, title: $issue.title, branch: $branch, reason: "not_selected"}]
     elif ($labels | index("needs-human")) != null then
       .skipped += [{number: $issue.number, title: $issue.title, branch: $branch, reason: "needs_human_label"}]
     elif (($issue.body // "") | test("이미 main에 (병합|반영)된|중복 (작업|브랜치)|폐기된 (작업|브랜치|PR)|merge된 PR|머지된 PR|이미 병합됨|다른 PR에서 (이미 )?(반영됨|병합됨)")) then
@@ -150,12 +166,26 @@ EOF
         }
         trap cleanup_worktree EXIT
 
-        git fetch origin "$branch" >&2
-        git worktree add --detach "$worktree" "origin/$branch" >&2
-        "$CODEX_BIN" exec \
+        if ! git fetch origin "$branch" >&2; then
+            emit_needs_human "branch_fetch_failed" "issue #$issue_number branch $branch could not be fetched"
+        fi
+        if ! git worktree add --detach "$worktree" "origin/$branch" >&2; then
+            emit_needs_human "worktree_creation_failed" "issue #$issue_number branch $branch worktree could not be created"
+        fi
+        base_sha="$(git -C "$worktree" rev-parse HEAD)"
+        if ! "$CODEX_BIN" exec \
             --cd "$worktree" \
             --sandbox workspace-write \
-            "$prompt Issue URL: $(printf '%s' "$candidate" | "$JQ_BIN" -r '.url'). Work only in this isolated worktree. Commit and push to the existing remote branch $branch. Do not create or merge a PR." >&2
+            "$prompt Issue URL: $(printf '%s' "$candidate" | "$JQ_BIN" -r '.url'). Work only in this isolated worktree. Commit the changes on the current worktree. Do not push, create, or merge a PR; the runner will publish and verify the commit." >&2; then
+            emit_needs_human "codex_execution_failed" "issue #$issue_number Codex execution failed"
+        fi
+
+        if ! "$SCRIPT_DIR/publish-codex-branch.sh" \
+            --worktree "$worktree" \
+            --branch "$branch" \
+            --base-sha "$base_sha"; then
+            emit_needs_human "codex_publish_failed" "issue #$issue_number branch $branch publish or freshness verification failed"
+        fi
 
         cleanup_worktree
         trap - EXIT
