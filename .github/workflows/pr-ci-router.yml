@@ -7,6 +7,66 @@ permissions:
   contents: read
 
 jobs:
+  detect:
+    name: Detect changed CI areas
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      container: ${{ steps.filter.outputs.container }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed areas
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            container:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'compose.local.yaml'
+              - 'compose.prod.yaml'
+              - 'scripts/smoke-test.sh'
+            docs:
+              - '.agent-os/**'
+              - '.github/**'
+              - 'docs/**'
+              - 'evals/**'
+              - 'scripts/**'
+              - 'AGENTS.md'
+              - 'README.md'
+              - 'config.yml'
+              - 'backends.json'
+              - 'backend/README.md'
+              - 'frontend/README.md'
+
   backend:
     name: Backend CI
+    needs: detect
+    if: ${{ needs.detect.outputs.backend == 'true' }}
     uses: ./.github/workflows/backend-ci.yml
+
+  frontend:
+    name: Frontend CI
+    needs: detect
+    if: ${{ needs.detect.outputs.frontend == 'true' }}
+    uses: ./.github/workflows/frontend-ci.yml
+
+  container:
+    name: Container Flow
+    needs: detect
+    if: ${{ needs.detect.outputs.container == 'true' }}
+    uses: ./.github/workflows/container.yml
+
+  docs:
+    name: Docs Harness
+    needs: detect
+    if: ${{ needs.detect.outputs.docs == 'true' }}
+    uses: ./.github/workflows/docs-harness.yml
