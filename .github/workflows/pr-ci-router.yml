@@ -50,25 +50,25 @@ jobs:
   backend:
     name: Backend CI
     needs: detect
-    if: needs.detect.outputs.backend == 'true'
+    if: ${{ needs.detect.outputs.backend == 'true' }}
     uses: ./.github/workflows/backend-ci.yml
 
   frontend:
     name: Frontend CI
     needs: detect
-    if: needs.detect.outputs.frontend == 'true'
+    if: ${{ needs.detect.outputs.frontend == 'true' }}
     uses: ./.github/workflows/frontend-ci.yml
 
   container:
     name: Container Flow
     needs: detect
-    if: needs.detect.outputs.container == 'true'
+    if: ${{ needs.detect.outputs.container == 'true' }}
     uses: ./.github/workflows/container.yml
 
   docs:
     name: Docs Harness
     needs: detect
-    if: needs.detect.outputs.docs == 'true'
+    if: ${{ needs.detect.outputs.docs == 'true' }}
     uses: ./.github/workflows/docs-harness.yml
 
   gate:

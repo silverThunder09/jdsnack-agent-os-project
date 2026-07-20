@@ -1,7 +1,7 @@
 name: Docs Harness
 
 on:
-  workflow_call:
+  workflow_call: {}
   push:
     branches:
       - main
