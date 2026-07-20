@@ -15,7 +15,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   backend-container:
@@ -100,6 +99,9 @@ jobs:
       - backend-container
       - compose-smoke
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout
