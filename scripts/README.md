@@ -19,6 +19,17 @@
 - 새 문서 검사는 표준 라이브러리만 사용하고 CI에서 재현 가능해야 합니다.
 - 스크립트 추가·변경 시 [AI 준비도 정책](../.agent-os/ai-readiness.yml)과 [문서 인덱스](../.agent-os/standards/index.yml)를 함께 갱신합니다.
 
+## Cross-module dependencies
+
+```mermaid
+flowchart LR
+  Docs["AGENTS.md and module READMEs"] --> Gate["check-ai-readiness.py"]
+  Gate --> CI["Docs Harness CI"]
+  Eval["run-ai-readiness-evals.py"] --> Results["evals/results/"]
+  Frontend["frontend"] --> Backend["backend API"]
+  Backend --> Scripts["scripts and CI gates"]
+```
+
 ## Gotchas
 
 - `check-ai-readiness.py`의 제외 경로는 의존성·빌드 산출물·archive이며, 실제 문서 링크는 모두 검사합니다.

@@ -1,9 +1,12 @@
 version: 1
-max_drift_days: 90
+threshold: 75
+max_drift_days: 30
+eval_pass_rate_threshold: 0.8
 fail_on_broken_refs: true
 modules:
   - backend
   - frontend
+  - scripts
 exclude:
   - .agent-os/archive
   - backend/build

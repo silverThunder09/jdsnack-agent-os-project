@@ -262,7 +262,7 @@ PROMPT
   git -C "$worktree" commit -m "docs(spec): activate ${candidate_slug}"
   git -C "$worktree" push origin "HEAD:refs/heads/$branch"
   repository="${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
-  pr_url="$(gh pr create --repo "$repository" --base main --head "$branch" --title "docs(spec): activate $candidate_title" --body "Automated Spec promotion for `$candidate_id`. Docs harness and traceability checks passed before push.")"
+  pr_url="$(gh pr create --repo "$repository" --base main --head "$branch" --title "docs(spec): activate $candidate_title" --body "Automated Spec promotion for '$candidate_id'. Docs harness and traceability checks passed before push.")"
   pr_number="$(gh pr view "$pr_url" --repo "$repository" --json number --jq .number)"
   gh pr checks "$pr_number" --repo "$repository" --watch --fail-fast
   gh pr merge "$pr_number" --repo "$repository" --squash --delete-branch
