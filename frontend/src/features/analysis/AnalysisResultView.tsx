@@ -102,6 +102,13 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
                   <h3>포맷 점검</h3>
                   <FormatCheckList checks={atsResult.atsPreview?.formatChecks ?? []} />
                 </section>
+                <section className="detail-card" aria-label="ATS 키워드">
+                  <h3>키워드</h3>
+                  <h4>매칭 키워드</h4>
+                  <KeywordList items={atsResult.atsPreview?.matchedKeywords ?? []} />
+                  <h4>누락 키워드</h4>
+                  <KeywordList items={atsResult.atsPreview?.missingKeywords ?? []} />
+                </section>
                 <section className="detail-card">
                   <h3>강점·위험</h3>
                   <KeywordList items={[...(atsResult.atsPreview?.strengths ?? []), ...(atsResult.atsPreview?.risks ?? [])]} />

@@ -2,6 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { buildResultMarkdown } from './features/analysis/analysisUtils'
 
 const validJdText =
   'Spring Boot 기반 REST API 개발과 운영 경험이 필요하며, 테스트 자동화와 협업 경험을 중요하게 봅니다.'
@@ -264,8 +265,10 @@ describe('새로운 분석 시작 페이지', () => {
     expect(await screen.findByText('79점')).toBeInTheDocument()
     expect(await screen.findByText('72점')).toBeInTheDocument()
     expect(screen.getByText('ATS 진단 요약입니다.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Spring Boot')
+    expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Kubernetes')
     expect(await screen.findByText('Spring Boot 운영 경험이 JD와 맞습니다.')).toBeInTheDocument()
-    expect(await screen.findByText('Kubernetes')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Kubernetes')
     expect(await screen.findByText('Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.')).toBeInTheDocument()
     expect(screen.getByText('해당 키워드가 없습니다.')).toBeInTheDocument()
     expect(screen.queryByText('준비 중인 분석입니다')).not.toBeInTheDocument()
@@ -429,6 +432,23 @@ describe('새로운 분석 시작 페이지', () => {
 
     await user.click(screen.getByRole('button', { name: '내보내기' }))
     expect(createObjectURL).toHaveBeenCalled()
+    const markdown = buildResultMarkdown(
+      undefined,
+      undefined,
+      {
+        atsScore: 72,
+        summary: 'ATS 진단 요약입니다.',
+        strengths: [],
+        risks: [],
+        suggestions: ['Kubernetes 경험과 성과를 추가해 보세요.'],
+        matchedKeywords: ['Spring Boot'],
+        missingKeywords: ['Kubernetes'],
+        formatChecks: [],
+      },
+      { jdMatch: false, ats: true, sentence: false, keyword: false },
+    )
+    expect(markdown).toContain('### 매칭 키워드')
+    expect(markdown).toContain('- Spring Boot')
 
     await user.click(screen.getByRole('button', { name: '인쇄' }))
     expect(printSpy).toHaveBeenCalled()
