@@ -83,8 +83,8 @@ docker compose -f compose.prod.yaml config --no-env-resolution
 
 ## GitHub Actions 흐름
 
-- PR에서는 문서 하네스, 백엔드 테스트, 컨테이너 빌드와 `/api/health` 검증을 함께 실행합니다.
-- PR에서는 `compose.local.yaml` 기반 스모크 테스트로 프론트 프록시, `POST /api/diagnose`, `POST /api/diagnose/file` 흐름도 함께 확인합니다.
+- PR에서 Dockerfile·Compose·smoke 스크립트가 변경된 경우에만 컨테이너 빌드와 `/api/health` 검증을 실행합니다.
+- PR에서 Compose 또는 smoke 스크립트가 변경된 경우에만 `compose.local.yaml` 기반 스모크 테스트를 실행합니다.
 - `main` 반영 후 모든 push에서도 같은 컨테이너 검증을 다시 실행합니다.
 - `main` 반영 후 backend/frontend 이미지를 GitHub Container Registry에 `latest`와 `<git-sha>` 태그로 push합니다.
 - 배포 검증은 `compose.prod.yaml`이 push된 이미지를 pull할 수 있는지 확인합니다.

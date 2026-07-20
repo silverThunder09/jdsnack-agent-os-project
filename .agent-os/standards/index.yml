@@ -77,6 +77,8 @@ documents:
     - scripts/create-codex-worktree.sh
     - scripts/create-codex-worktree-test.sh
     - scripts/pr-ci-router-test.sh
+    - scripts/docs-harness.sh
+    - scripts/workflow-ci-test.sh
     - scripts/autonomous_spec_loop.py
     - scripts/autonomous-spec-loop.sh
     - scripts/autonomous-spec-loop-test.sh

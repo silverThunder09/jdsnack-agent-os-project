@@ -24,18 +24,27 @@ assert_not_contains() {
 
 for workflow in backend-ci.yml frontend-ci.yml container.yml docs-harness.yml; do
     file="$ROOT_DIR/.github/workflows/$workflow"
-    assert_contains "$file" 'workflow_call:'
     assert_not_contains "$file" '  pull_request:'
 done
 
 assert_contains "$ROUTER" 'name: PR CI Router'
 assert_contains "$ROUTER" "- 'backend/**'"
 assert_contains "$ROUTER" "- 'frontend/**'"
+assert_contains "$ROUTER" "- 'backend/Dockerfile'"
+assert_contains "$ROUTER" "- 'frontend/Dockerfile'"
 assert_contains "$ROUTER" "- '.agent-os/**'"
+assert_contains "$ROUTER" "- '.github/workflows/**'"
 assert_contains "$ROUTER" 'name: PR CI Gate'
-assert_contains "$ROUTER" 'uses: ./.github/workflows/backend-ci.yml'
-assert_contains "$ROUTER" 'uses: ./.github/workflows/frontend-ci.yml'
-assert_contains "$ROUTER" 'uses: ./.github/workflows/container.yml'
-assert_contains "$ROUTER" 'uses: ./.github/workflows/docs-harness.yml'
+assert_contains "$ROUTER" 'name: Test and build backend'
+assert_contains "$ROUTER" 'name: Test and build frontend'
+assert_contains "$ROUTER" 'name: Build backend container'
+assert_contains "$ROUTER" 'name: Run compose smoke test'
+assert_contains "$ROUTER" 'name: Validate Agent OS docs'
+assert_contains "$ROUTER" 'name: Workflow CI'
+assert_contains "$ROUTER" 'run: bash scripts/docs-harness.sh'
+assert_contains "$ROUTER" 'run: bash scripts/workflow-ci-test.sh'
+assert_not_contains "$ROUTER" 'uses: ./.github/workflows/'
+
+test -x "$ROOT_DIR/scripts/docs-harness.sh"
 
 printf 'PR CI router contract passed\n'

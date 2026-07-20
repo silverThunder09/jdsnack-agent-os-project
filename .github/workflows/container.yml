@@ -1,7 +1,6 @@
 name: Container Flow
 
 on:
-  workflow_call: {}
   push:
     branches:
       - main
