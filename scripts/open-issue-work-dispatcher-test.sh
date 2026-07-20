@@ -54,6 +54,20 @@ assert_eq 10 "$exit_code" "negative context exit code"
 assert_eq actionable "$(printf '%s' "$output" | jq -r .status)" "negative context status"
 assert_eq codex/example "$(printf '%s' "$output" | jq -r .candidates[0].branch)" "negative context branch"
 
+set +e
+output="$(
+    GH_BIN="$FIXTURE_GH" \
+    GH_REPO=fixture/repo \
+    OPEN_ISSUE_FIXTURE_SCENARIO=multi \
+    bash "$DISPATCHER" --branch codex/example
+)"
+exit_code=$?
+set -e
+assert_eq 10 "$exit_code" "target branch exit code"
+assert_eq 1 "$(printf '%s' "$output" | jq '.candidates | length')" "target branch candidate count"
+assert_eq codex/example "$(printf '%s' "$output" | jq -r .candidates[0].branch)" "target branch candidate"
+assert_eq not_selected "$(printf '%s' "$output" | jq -r '.skipped[] | select(.branch == "codex/other") | .reason')" "target branch skip reason"
+
 run_dispatcher malformed
 assert_eq 20 "$exit_code" "malformed exit code"
 assert_eq needs_human "$(printf '%s' "$output" | jq -r .status)" "malformed status"

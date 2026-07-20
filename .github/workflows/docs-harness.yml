@@ -126,6 +126,10 @@ jobs:
         shell: bash
         run: ./scripts/publish-codex-branch-test.sh
 
+      - name: Test Codex worktree base guard
+        shell: bash
+        run: ./scripts/create-codex-worktree-test.sh
+
       - name: Validate executable Spec queue
         shell: bash
         run: python3 scripts/autonomous_spec_loop.py validate

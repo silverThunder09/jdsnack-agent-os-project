@@ -30,6 +30,7 @@ git -C "$TEST_ROOT/work" commit -qm initial
 git -C "$TEST_ROOT/work" branch -M codex/example
 git -C "$TEST_ROOT/work" remote add origin "$TEST_ROOT/remote.git"
 git -C "$TEST_ROOT/work" push -q -u origin codex/example
+git -C "$TEST_ROOT/work" push -q origin HEAD:refs/heads/main
 base_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
 
 set +e
@@ -61,5 +62,28 @@ esac
 remote_sha="$(git -C "$TEST_ROOT/work" ls-remote origin refs/heads/codex/example | awk 'NR == 1 { print $1 }')"
 local_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
 assert_eq "$local_sha" "$remote_sha" "remote SHA"
+
+git -C "$TEST_ROOT/work" switch -q -c main
+printf 'remote main advanced\n' >> "$TEST_ROOT/work/state.txt"
+git -C "$TEST_ROOT/work" add state.txt
+git -C "$TEST_ROOT/work" commit -qm 'advance remote main'
+git -C "$TEST_ROOT/work" push -q origin main
+git -C "$TEST_ROOT/work" switch -q codex/example
+printf 'stale feature change\n' >> "$TEST_ROOT/work/state.txt"
+git -C "$TEST_ROOT/work" add state.txt
+git -C "$TEST_ROOT/work" commit -qm 'stale feature change'
+
+set +e
+stale_output="$(CODEX_PUSH_ATTEMPTS=1 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/example --base-sha "$local_sha" 2>&1)"
+stale_code=$?
+set -e
+assert_eq 20 "$stale_code" "stale base exit code"
+case "$stale_output" in
+    *"origin/main advanced; rebase the branch before publishing"*) ;;
+    *)
+        printf 'FAIL: stale base output (%s)\n' "$stale_output" >&2
+        exit 1
+        ;;
+esac
 
 printf 'Codex branch publish tests passed\n'

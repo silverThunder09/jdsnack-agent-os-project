@@ -101,7 +101,7 @@ jobs:
               exit 0
             fi
             set +e
-            event="$(bash scripts/open-issue-work-dispatcher.sh --repo "$GITHUB_REPOSITORY" --apply)"
+            event="$(bash scripts/open-issue-work-dispatcher.sh --repo "$GITHUB_REPOSITORY" --branch "$branch" --apply)"
             dispatch_code=$?
             set -e
             printf '```json\n%s\n```\n' "$event" >> "$GITHUB_STEP_SUMMARY"

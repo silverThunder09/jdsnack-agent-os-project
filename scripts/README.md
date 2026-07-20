@@ -13,6 +13,8 @@
 - `pr-review-gate.sh`: PR 리뷰 게이트 결과를 확인합니다.
 - `autonomous_spec_loop.py`: Spec 완료·승격·티켓 디스패치 결정을 결정론적으로 계산합니다.
 - `autonomous-spec-loop.sh`: GitHub 이벤트를 Spec 큐와 Claude/Codex 실행기로 연결합니다.
+- `create-codex-worktree.sh`: 최신 `origin/main`에서 Codex worktree를 생성합니다.
+- `publish-codex-branch.sh`: stale `origin/main` 기준과 원격 SHA를 검증한 뒤 Codex 브랜치를 publish합니다.
 
 ## Patterns
 

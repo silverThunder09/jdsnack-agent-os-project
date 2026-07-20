@@ -279,10 +279,8 @@ if [ "$status" = "dispatch_codex" ]; then
   python3 "$ENGINE" claim --repo "$REPO" --event-key "$EVENT_KEY" --status "$status" --branch "$branch"
   worktree="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-ticket.XXXXXX")"
   WORKTREE="$worktree"
-  git -C "$REPO" fetch origin main --prune
-  git -C "$REPO" worktree add --detach "$worktree" origin/main
+  REPO_ROOT="$REPO" "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
   base_sha="$(git -C "$worktree" rev-parse HEAD)"
-  git -C "$worktree" switch -c "$branch"
   command -v codex >/dev/null 2>&1 || {
     echo '{"status":"needs_human","reason":"codex_unavailable_for_ticket"}'
     exit 20
@@ -300,10 +298,8 @@ if [ "$status" = "dispatch_issue" ]; then
   python3 "$ENGINE" claim --repo "$REPO" --event-key "$EVENT_KEY" --status "$status" --branch "$branch"
   worktree="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-issue.XXXXXX")"
   WORKTREE="$worktree"
-  git -C "$REPO" fetch origin main --prune
-  git -C "$REPO" worktree add --detach "$worktree" origin/main
+  REPO_ROOT="$REPO" "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
   base_sha="$(git -C "$worktree" rev-parse HEAD)"
-  git -C "$worktree" switch -c "$branch"
   command -v codex >/dev/null 2>&1 || {
     echo '{"status":"needs_human","reason":"codex_unavailable_for_issue"}'
     exit 20

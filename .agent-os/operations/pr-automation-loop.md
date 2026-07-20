@@ -33,6 +33,8 @@ JDSnack 기능 구현 해줘.
 - **클로드 리뷰-머지 루프도 GitHub 이벤트로 기동합니다.** [`.github/workflows/codex-branch-review.yml`](../../.github/workflows/codex-branch-review.yml)이 `codex/**` 브랜치 push마다 로컬 `jdsnack` self-hosted runner에서 클로드 리뷰-머지 절차(`jdsnack-review-merge-loop` SKILL.md)를 즉시 1회 기동합니다. 기존 5분 폴링 감지기(`~/.claude/scripts/jdsnack-codex-watch.sh`)는 push 이벤트가 유실될 때를 대비한 백업 용도로만 유지하며, 정상 상황에서는 이 workflow가 먼저 처리합니다.
 - 반려 감지는 [pr-feedback-detector.sh](../../scripts/pr-feedback-detector.sh)가 GitHub 이벤트로 깨워진 workflow에서 한 번 실행될 때 수행합니다. 감지기는 polling loop를 내장하지 않으며 `no_action`, `actionable`, `needs_human` JSON과 종료 코드를 내보냅니다.
 - `.github/workflows/pr-feedback-detector.yml`은 반려 Issue 생성·수정, Issue/PR 댓글, PR 리뷰, required CI 완료 이벤트에만 실행됩니다. 로컬 `jdsnack` self-hosted runner가 안전한 후보를 격리 worktree에 전달해 Codex의 수정·테스트·커밋·푸시를 수행합니다.
+- Codex worktree는 `scripts/create-codex-worktree.sh`로 최신 `origin/main`에서 생성합니다. `scripts/publish-codex-branch.sh`는 publish 직전에 `origin/main`이 feature HEAD의 조상인지 확인하므로 main이 전진한 stale 브랜치는 push하지 않고 재base를 요구합니다.
+- 반려 Issue 이벤트는 해당 이슈의 `codex/*` 브랜치만 dispatcher에 전달합니다. Codex는 커밋까지만 수행하고 dispatcher가 publish와 원격 SHA를 검증합니다. push·검증 실패는 workflow 성공으로 숨기지 않고 `needs_human`으로 종료합니다.
 - `.github/workflows/autonomous-loop.yml`은 5분 폴링 대신 main 반영, 승인된 제품 Issue, workflow dispatch 이벤트에서 큐 선택·Spec 승격·Codex T1 디스패치를 수행합니다. 리뷰 반려 Issue는 기존 `pr-feedback-detector`가 담당하고 자율 루프가 중복 처리하지 않습니다.
 - Codex push 자체는 workflow 트리거가 아니므로 동일 이벤트의 무한 재실행을 만들지 않습니다. PR 생성·머지는 수행하지 않습니다.
 - 반려 자동 복구 루프는 PR 생성·갱신 뒤 CI 실패, 리뷰 `REQUEST_CHANGES`, 또는 반려 Issue가 확인되면 최신 로그·리뷰·Issue를 읽고 실패 원인을 재현합니다. 원래 수용 기준과 업무 검증 범위를 보존한 채 같은 브랜치에서 수정하고, 관련 테스트와 전체 회귀 테스트를 실행한 뒤 Conventional Commit으로 커밋·푸시하고 PR 상태를 다시 확인합니다. 테스트를 삭제하거나 assertion을 약화해 통과시키지 않습니다.

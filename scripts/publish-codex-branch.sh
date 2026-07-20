@@ -59,10 +59,22 @@ case "$MAX_ATTEMPTS" in
     ''|*[!0-9]*|0) fail "CODEX_PUSH_ATTEMPTS must be a positive integer" ;;
 esac
 
+if ! git -C "$WORKTREE" fetch origin main --prune >/dev/null 2>&1; then
+    fail "could not refresh origin/main before publishing"
+fi
+
 local_sha="$(git -C "$WORKTREE" rev-parse HEAD 2>/dev/null || true)"
 [ -n "$local_sha" ] || fail "cannot resolve worktree HEAD"
 if [ -n "$BASE_SHA" ] && [ "$local_sha" = "$BASE_SHA" ]; then
     fail "Codex did not create a new commit"
+fi
+
+if ! git -C "$WORKTREE" diff --quiet || ! git -C "$WORKTREE" diff --cached --quiet; then
+    fail "worktree has uncommitted changes"
+fi
+
+if ! git -C "$WORKTREE" merge-base --is-ancestor refs/remotes/origin/main "$local_sha"; then
+    fail "origin/main advanced; rebase the branch before publishing"
 fi
 
 last_error=""
