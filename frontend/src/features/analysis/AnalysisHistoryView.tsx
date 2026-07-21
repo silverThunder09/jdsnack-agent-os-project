@@ -9,6 +9,7 @@ interface AnalysisHistoryViewProps {
   onSelect: (historyId: string) => Promise<void>
   onRetry: (historyId: string) => Promise<void>
   onDelete: (historyId: string) => Promise<void>
+  onExport: () => void
 }
 
 function formatDate(value: string): string {
@@ -24,7 +25,7 @@ function statusLabel(status: AnalysisHistorySummary['status']): string {
   return '분석 중'
 }
 
-export function AnalysisHistoryView({ histories, selectedHistory, isLoading, error, onLoad, onSelect, onRetry, onDelete }: AnalysisHistoryViewProps) {
+export function AnalysisHistoryView({ histories, selectedHistory, isLoading, error, onLoad, onSelect, onRetry, onDelete, onExport }: AnalysisHistoryViewProps) {
   const handleDelete = async () => {
     if (!selectedHistory || !window.confirm('이 분석 이력과 입력 데이터를 삭제할까요? 삭제 후 복구할 수 없습니다.')) return
     await onDelete(selectedHistory.id)
@@ -81,6 +82,15 @@ export function AnalysisHistoryView({ histories, selectedHistory, isLoading, err
                   <p>{formatDate(selectedHistory.createdAt)}</p>
                 </div>
                 <div className="history-detail__actions">
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={onExport}
+                    disabled={isLoading || selectedHistory.status !== 'SUCCEEDED' || !selectedHistory.result?.diagnosis && !selectedHistory.result?.match}
+                    aria-disabled={selectedHistory.status !== 'SUCCEEDED' || !selectedHistory.result?.diagnosis && !selectedHistory.result?.match}
+                  >
+                    내보내기
+                  </button>
                   <button type="button" className="ghost-button" onClick={() => void onRetry(selectedHistory.id)} disabled={isLoading}>
                     재시도
                   </button>
@@ -89,6 +99,11 @@ export function AnalysisHistoryView({ histories, selectedHistory, isLoading, err
                   </button>
                 </div>
               </div>
+              {selectedHistory.status !== 'SUCCEEDED' ? (
+                <p className="history-empty" role="status">분석이 완료된 이력만 내보낼 수 있습니다.</p>
+              ) : !selectedHistory.result?.diagnosis && !selectedHistory.result?.match ? (
+                <p className="history-empty" role="status">저장된 분석 결과가 없어 내보낼 수 없습니다.</p>
+              ) : null}
               <div className="history-detail__input">
                 <h3>제출한 JD</h3>
                 <p>{selectedHistory.input.jdText}</p>

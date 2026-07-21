@@ -1,4 +1,4 @@
-import type { AtsPreviewResult, MatchPreviewResult, ResumeInputMode, SentencePreviewResult } from '../../types/diagnosis'
+import type { AnalysisHistoryDetail, AtsPreviewResult, MatchPreviewResult, ResumeInputMode, SentencePreviewResult } from '../../types/diagnosis'
 import { validateJdText } from '../../hooks/useMatchPreview'
 
 export type JdTab = 'link' | 'paste'
@@ -102,6 +102,45 @@ export function buildResultMarkdown(
     )
   }
   return sections.join('\n')
+}
+
+export function buildAnalysisHistoryMarkdown(history: AnalysisHistoryDetail): string {
+  if (history.status !== 'SUCCEEDED') return ''
+  const diagnosis = history.result?.diagnosis
+  const match = history.result?.match
+  if (!diagnosis && !match) return ''
+
+  const list = (items: string[]) => (items.length ? items.map((item) => `- ${item}`).join('\n') : '- (없음)')
+  const sections = ['# JDSnack 분석 결과', '', `- 이력 ID: ${history.id}`, `- 생성일: ${history.createdAt}`, '']
+  if (diagnosis) {
+    sections.push(
+      `## 이력서 진단 점수: ${diagnosis.score}점`, '',
+      '### 요약', diagnosis.summary, '',
+      '### 강점', list(diagnosis.strengths), '',
+      '### 개선 제안', list(diagnosis.improvements), '',
+    )
+  }
+  if (match) {
+    sections.push(
+      `## JD 적합도 점수: ${match.matchingScore}점`, '',
+      '### 요약', match.summary, '',
+      '### 강점', list(match.strengths), '',
+      '### Gap', list(match.gaps), '',
+      '### 제안', list(match.suggestions), '',
+      '### 매칭 키워드', list(match.matchedKeywords), '',
+      '### 부분 매칭 키워드', list(match.partialKeywords), '',
+      '### 누락 키워드', list(match.missingKeywords), '',
+    )
+  }
+  return sections.join('\n')
+}
+
+export function analysisHistoryExportFileName(history: AnalysisHistoryDetail): string {
+  const createdAt = new Date(history.createdAt)
+  const dateStamp = Number.isNaN(createdAt.getTime())
+    ? todayStamp()
+    : `${createdAt.getFullYear()}${String(createdAt.getMonth() + 1).padStart(2, '0')}${String(createdAt.getDate()).padStart(2, '0')}`
+  return `jdsnack-분석결과-${history.id}-${dateStamp}.md`
 }
 
 export function todayStamp(): string {

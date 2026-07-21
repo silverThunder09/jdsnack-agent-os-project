@@ -14,3 +14,6 @@
 
 - `AnalysisHistoryDetail.result.diagnosis`, `AnalysisHistoryDetail.result.match`가 있는 항목만 Markdown 섹션으로 변환한다.
 - `status`가 `SUCCEEDED`가 아니면 Markdown을 생성하지 않는다.
+- 변환 함수는 `buildAnalysisHistoryMarkdown(history)`이며, `sourceText`와 저장되지 않은 ATS·문장 첨삭 결과는 포함하지 않는다.
+- 다운로드 Blob의 content type은 `text/markdown`이며, 파일명은 `jdsnack-분석결과-{historyId}-{YYYYMMDD}.md` 형식이다.
+- `result`가 없거나 `diagnosis`·`match`가 모두 없으면 빈 성공 리포트를 만들지 않는다.

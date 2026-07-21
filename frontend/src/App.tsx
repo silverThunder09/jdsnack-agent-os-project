@@ -21,6 +21,8 @@ import {
   RESUME_REQUIRED_MESSAGE,
   UNSUPPORTED_RESUME_FILE_MESSAGE,
   buildResultMarkdown,
+  buildAnalysisHistoryMarkdown,
+  analysisHistoryExportFileName,
   clearSavedInput,
   getPrevalidationReasons,
   inferResumeMode,
@@ -135,6 +137,21 @@ function AuthenticatedApp() {
     URL.revokeObjectURL(url)
   }
 
+  const handleExportHistory = () => {
+    if (!selectedHistory) return
+    const markdown = buildAnalysisHistoryMarkdown(selectedHistory)
+    if (!markdown) return
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = analysisHistoryExportFileName(selectedHistory)
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }
+
   const handleJdUrlChange = (value: string) => { setJdUrl(value); setFormError('') }
   const handleJdTextChange = (value: string) => { setJdText(value); setFormError('') }
   const handleJdFetch = async () => { await fetchJd(jdUrl, { onFetched: (fetched) => setJdText(fetched.jdText) }) }
@@ -230,6 +247,7 @@ function AuthenticatedApp() {
           onSelect={selectHistory}
           onRetry={retryHistory}
           onDelete={removeHistory}
+          onExport={handleExportHistory}
         />
       )}
     </AppShell>
