@@ -11,7 +11,7 @@
 
 ## 관련 문서
 
-- 활성 기능 명세: [`../../.agent-os/specs/`](../../.agent-os/specs/)
+- 활성 기능 명세: 현재 없음. 완료 명세는 [`../../.agent-os/archive/specs/`](../../.agent-os/archive/specs/)
 - 문서·경로 검증: [`../../scripts/check-ai-readiness.py`](../../scripts/check-ai-readiness.py)
 
 구조·데이터 흐름이 바뀌면 `system-overview.md`의 Mermaid map을 갱신합니다.
