@@ -27,7 +27,7 @@ Spring Boot API가 인증·입력 검증·AI 분석·JD 수집을 서버 경계�
 ## Dependencies
 
 - 프론트 계약: [`../frontend/src/services/api.ts`](../frontend/src/services/api.ts)
-- API 규격: [`../.agent-os/specs/2026-07-20-ats-score-format/api-spec.md`](../.agent-os/specs/2026-07-20-ats-score-format/api-spec.md)
+- API 규격: [`../.agent-os/specs/2026-07-21-analysis-report-export/api-spec.md`](../.agent-os/specs/2026-07-21-analysis-report-export/api-spec.md)
 - 아키텍처: [`../docs/architecture/backend-architecture.md`](../docs/architecture/backend-architecture.md)
 
 ## Commands
