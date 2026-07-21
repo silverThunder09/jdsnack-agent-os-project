@@ -11,7 +11,7 @@
       "slug": "2026-07-18-service-mvp",
       "title": "Service MVP",
       "priority": 0,
-      "status": "active",
+      "status": "completed",
       "spec_path": ".agent-os/specs/2026-07-18-service-mvp",
       "auto_promote": false,
       "start_condition": {"type": "bootstrap"}
@@ -21,18 +21,19 @@
       "slug": "ats-score-format",
       "title": "ATS 점수·포맷 진단",
       "priority": 1,
-      "status": "candidate",
+      "status": "completed",
       "auto_promote": true,
       "start_condition": {"type": "feature_completed", "feature": "service-mvp"}
     },
     {
       "id": "analysis-report-export",
-      "slug": "analysis-report-export",
+      "slug": "2026-07-21-analysis-report-export",
       "title": "분석 결과 리포트 내보내기",
       "priority": 2,
-      "status": "candidate",
+      "status": "active",
+      "spec_path": ".agent-os/specs/2026-07-21-analysis-report-export",
       "auto_promote": true,
-      "start_condition": {"type": "issue_label", "label": "product-signal:analysis-history"}
+      "start_condition": {"type": "feature_completed", "feature": "ats-score-format"}
     },
     {
       "id": "ai-quality-versioning",

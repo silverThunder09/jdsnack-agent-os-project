@@ -4,13 +4,13 @@
 
 ## 현재 Feature Spec
 
-- **ATS 점수·포맷 진단**: 활성 spec `.agent-os/specs/2026-07-20-ats-score-format/` — 범위·티켓은 spec이 정본.
+- **분석 결과 리포트 내보내기**: 활성 spec `.agent-os/specs/2026-07-21-analysis-report-export/` — 범위·티켓은 spec이 정본.
+- 이전 활성 spec **ATS 점수·포맷 진단**은 완료되어 `.agent-os/archive/specs/2026-07-20-ats-score-format/`로 이동했습니다.
 
 ## Post MVP 후보
 
 | 후보 | 시작 조건 |
 |---|---|
-| 분석 결과 리포트 내보내기 | 이력 조회 사용성이 확인된 뒤 |
 | AI 품질 평가와 prompt/model version | 실제 분석 결과를 누적한 뒤 |
 | AI 호출량·비용 제한 | 호출량 또는 비용 경계가 필요해진 뒤 |
 | JobKorea JD adapter | 사람인 외 수집 수요가 확인된 뒤 |
