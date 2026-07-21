@@ -30,13 +30,13 @@
       "not_run_reason": "모델 실행 runner가 아직 연결되지 않아 경로와 검증 명령만 정적으로 확인한다."
     },
     {
-      "id": "service-mvp-contract-change",
-      "prompt": "Service MVP의 보호 API 계약을 추가하고 요구사항부터 테스트까지 연결한다.",
+      "id": "analysis-report-export-spec-change",
+      "prompt": "분석 결과 리포트 내보내기 Spec의 요구사항부터 테스트까지 연결한다.",
       "expected_paths": [
-        ".agent-os/specs/2026-07-20-ats-score-format/requirements.md",
-        ".agent-os/specs/2026-07-20-ats-score-format/acceptance-criteria.md",
-        ".agent-os/specs/2026-07-20-ats-score-format/test-scenarios.md",
-        ".agent-os/specs/2026-07-20-ats-score-format/traceability.md"
+        ".agent-os/specs/2026-07-21-analysis-report-export/requirements.md",
+        ".agent-os/specs/2026-07-21-analysis-report-export/acceptance-criteria.md",
+        ".agent-os/specs/2026-07-21-analysis-report-export/test-scenarios.md",
+        ".agent-os/specs/2026-07-21-analysis-report-export/traceability.md"
       ],
       "required_checks": ["python3 scripts/check-ai-readiness.py", "docker compose -f compose.local.yaml up -d --build"],
       "constraints": ["문서 없는 API 변경을 하지 않는다.", "Entity를 API 응답으로 직접 반환하지 않는다."],
