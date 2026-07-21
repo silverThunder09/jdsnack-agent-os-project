@@ -4,7 +4,7 @@
 
 ## 현재 Feature Spec
 
-- 현재 active Spec은 없습니다. 다음 후보는 제품 신호 `product-signal:analysis-data`가 붙은 Issue가 생성될 때 승격합니다.
+- 현재 active Spec은 **AI 품질 평가와 prompt/model version**이며 `.agent-os/specs/2026-07-21-ai-quality-versioning/`에 있습니다. GitHub Issue #168(`product-signal:analysis-data`)에서 승격됐습니다.
 - 완료된 **분석 결과 리포트 내보내기**는 `.agent-os/archive/specs/2026-07-21-analysis-report-export/`로 이동했습니다.
 - 이전 완료 Spec **ATS 점수·포맷 진단**은 `.agent-os/archive/specs/2026-07-20-ats-score-format/`에 있습니다.
 
@@ -12,7 +12,6 @@
 
 | 후보 | 시작 조건 |
 |---|---|
-| AI 품질 평가와 prompt/model version | 실제 분석 결과를 누적한 뒤 |
 | AI 호출량·비용 제한 | 호출량 또는 비용 경계가 필요해진 뒤 |
 | JobKorea JD adapter | 사람인 외 수집 수요가 확인된 뒤 |
 | RocketPunch JD adapter | JobKorea 범위와 효과를 검증한 뒤 |
