@@ -20,11 +20,11 @@
 
 `OAuth 1개 공급자 로그인 → 이력서·JD 입력 → 기존 AI 진단·JD 매칭 → 결과 저장 → 이력 조회·재시도·삭제`
 
-사람인 이미지 OCR, Service MVP, ATS 점수·포맷 진단은 구현·검증을 마치고 archive로 이동했습니다. 현재 다음 사용자 가치 기능은 `2026-07-21-analysis-report-export` Feature Spec이 유일한 active Spec입니다.
+사람인 이미지 OCR, Service MVP, ATS 점수·포맷 진단, 분석 결과 리포트 내보내기는 구현·검증을 마치고 archive로 이동했습니다. 현재 active Spec은 없으며, 다음 후보는 제품 신호가 확인될 때 승격합니다.
 
 ### 내부 수직 티켓
 
-분석 결과 리포트 내보내기는 T1 수직 티켓 하나로 끝까지 관통합니다. 티켓의 정의·의존성·진행 상태는 [plan.md](../specs/2026-07-21-analysis-report-export/plan.md)가 정본입니다.
+분석 결과 리포트 내보내기는 T1 수직 티켓 하나로 끝까지 관통했으며, 완료 Spec은 [archive plan.md](../archive/specs/2026-07-21-analysis-report-export/plan.md)에 보관합니다.
 
 ## Post MVP
 

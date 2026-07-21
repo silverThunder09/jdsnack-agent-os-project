@@ -4,8 +4,9 @@
 
 ## 현재 Feature Spec
 
-- **분석 결과 리포트 내보내기**: 활성 spec `.agent-os/specs/2026-07-21-analysis-report-export/` — 범위·티켓은 spec이 정본.
-- 이전 활성 spec **ATS 점수·포맷 진단**은 완료되어 `.agent-os/archive/specs/2026-07-20-ats-score-format/`로 이동했습니다.
+- 현재 active Spec은 없습니다. 다음 후보는 제품 신호 `product-signal:analysis-data`가 붙은 Issue가 생성될 때 승격합니다.
+- 완료된 **분석 결과 리포트 내보내기**는 `.agent-os/archive/specs/2026-07-21-analysis-report-export/`로 이동했습니다.
+- 이전 완료 Spec **ATS 점수·포맷 진단**은 `.agent-os/archive/specs/2026-07-20-ats-score-format/`에 있습니다.
 
 ## Post MVP 후보
 

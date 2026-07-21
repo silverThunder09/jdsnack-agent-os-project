@@ -30,8 +30,8 @@
       "slug": "2026-07-21-analysis-report-export",
       "title": "분석 결과 리포트 내보내기",
       "priority": 2,
-      "status": "active",
-      "spec_path": ".agent-os/specs/2026-07-21-analysis-report-export",
+      "status": "completed",
+      "spec_path": ".agent-os/archive/specs/2026-07-21-analysis-report-export",
       "auto_promote": true,
       "start_condition": {"type": "feature_completed", "feature": "ats-score-format"}
     },
