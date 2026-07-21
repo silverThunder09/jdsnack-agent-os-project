@@ -39,6 +39,6 @@
 
 ## 관련 문서
 
-- API 계약: [분석 결과 리포트 내보내기 API spec](../../.agent-os/specs/2026-07-21-analysis-report-export/api-spec.md)
+- API 계약: [분석 결과 리포트 내보내기 API spec](../../.agent-os/archive/specs/2026-07-21-analysis-report-export/api-spec.md)
 - 테스트 기준: [테스트 표준](../../.agent-os/standards/testing-standards.md)
 - 모듈 진입점: [backend README](../../backend/README.md)

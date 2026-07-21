@@ -34,6 +34,6 @@
 
 ## 관련 문서
 
-- UI 계약: [분석 결과 리포트 내보내기 UI spec](../../.agent-os/specs/2026-07-21-analysis-report-export/ui-spec.md)
-- 기능 요구사항: [분석 결과 리포트 내보내기 requirements](../../.agent-os/specs/2026-07-21-analysis-report-export/requirements.md)
+- UI 계약: [분석 결과 리포트 내보내기 UI spec](../../.agent-os/archive/specs/2026-07-21-analysis-report-export/ui-spec.md)
+- 기능 요구사항: [분석 결과 리포트 내보내기 requirements](../../.agent-os/archive/specs/2026-07-21-analysis-report-export/requirements.md)
 - 모듈 진입점: [frontend README](../../frontend/README.md)

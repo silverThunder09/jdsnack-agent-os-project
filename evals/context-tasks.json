@@ -33,10 +33,10 @@
       "id": "analysis-report-export-spec-change",
       "prompt": "분석 결과 리포트 내보내기 Spec의 요구사항부터 테스트까지 연결한다.",
       "expected_paths": [
-        ".agent-os/specs/2026-07-21-analysis-report-export/requirements.md",
-        ".agent-os/specs/2026-07-21-analysis-report-export/acceptance-criteria.md",
-        ".agent-os/specs/2026-07-21-analysis-report-export/test-scenarios.md",
-        ".agent-os/specs/2026-07-21-analysis-report-export/traceability.md"
+        ".agent-os/archive/specs/2026-07-21-analysis-report-export/requirements.md",
+        ".agent-os/archive/specs/2026-07-21-analysis-report-export/acceptance-criteria.md",
+        ".agent-os/archive/specs/2026-07-21-analysis-report-export/test-scenarios.md",
+        ".agent-os/archive/specs/2026-07-21-analysis-report-export/traceability.md"
       ],
       "required_checks": ["python3 scripts/check-ai-readiness.py", "docker compose -f compose.local.yaml up -d --build"],
       "constraints": ["문서 없는 API 변경을 하지 않는다.", "Entity를 API 응답으로 직접 반환하지 않는다."],

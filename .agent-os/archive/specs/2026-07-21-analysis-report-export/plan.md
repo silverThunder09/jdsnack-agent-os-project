@@ -2,8 +2,8 @@
 
 ## 상태
 
-- Feature Spec 상태: `active`
-- 구현 상태: `T1 completed`
+- Feature Spec 상태: `completed`
+- 구현 상태: `completed`
 
 ## 내부 수직 티켓
 
