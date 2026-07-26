@@ -85,6 +85,18 @@ export interface AtsPreviewResult {
   formatChecks: AtsFormatCheck[]
 }
 
+export interface AnalysisQualityMetric {
+  label: string
+  value: number
+  note: string
+}
+
+export interface AnalysisQualityResult {
+  score: number
+  metrics: AnalysisQualityMetric[]
+  evaluatorVersion: string
+}
+
 export interface SentenceEdit {
   original: string
   improved: string

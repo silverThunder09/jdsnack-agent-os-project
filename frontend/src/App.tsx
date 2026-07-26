@@ -13,6 +13,7 @@ import { AnalysisInputView } from './features/analysis/AnalysisInputView'
 import { AnalysisResultView } from './features/analysis/AnalysisResultView'
 import { InterviewWorkspace } from './features/analysis/InterviewWorkspace'
 import { AnalysisHistoryView } from './features/analysis/AnalysisHistoryView'
+import { AnalysisQualityPrototype } from './features/analysis/AnalysisQualityPrototype'
 import { createAnalysisHistory, createAnalysisHistoryFile } from './services/api'
 import {
   ANALYSIS_OPTIONS,
@@ -229,7 +230,9 @@ function AuthenticatedApp() {
       onNavigate={(view) => { setCurrentView(view); setIsSidebarOpen(false); if (view === 'history') void loadHistories() }}
       onToggleSidebar={() => setIsSidebarOpen((current) => !current)}
     >
-      {currentView === 'home' ? (
+      {import.meta.env.DEV && new URLSearchParams(window.location.search).get('prototype') === 'analysis-quality' ? (
+        <AnalysisQualityPrototype />
+      ) : currentView === 'home' ? (
         analysisPhase === 'input' ? (
         <AnalysisInputView {...{ jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isAtsSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput }} />
         ) : (
@@ -257,6 +260,8 @@ function AuthenticatedApp() {
 
 function AppContent() {
   const { status } = useAuthGate()
+  const isQualityPrototype = import.meta.env.DEV && new URLSearchParams(window.location.search).get('prototype') === 'analysis-quality'
+  if (isQualityPrototype) return <AnalysisQualityPrototype />
   return status === 'authenticated' ? <AuthenticatedApp /> : <PublicHomeApp />
 }
 

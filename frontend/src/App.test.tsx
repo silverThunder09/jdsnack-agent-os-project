@@ -264,6 +264,7 @@ describe('새로운 분석 시작 페이지', () => {
 
     expect(await screen.findByText('79점')).toBeInTheDocument()
     expect(await screen.findByText('72점')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'AI 분석 품질' })).not.toBeInTheDocument()
     expect(screen.getByText('ATS 진단 요약입니다.')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Spring Boot')
     expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Kubernetes')
