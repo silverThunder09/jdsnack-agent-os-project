@@ -32,7 +32,11 @@ CREATE TABLE IF NOT EXISTS analysis_history (
     snapshot_id VARCHAR(36) NOT NULL,
     status VARCHAR(16) NOT NULL,
     diagnosis_json CLOB,
+    diagnosis_model_name VARCHAR(255),
+    diagnosis_prompt_version VARCHAR(255),
     match_json CLOB,
+    match_model_name VARCHAR(255),
+    match_prompt_version VARCHAR(255),
     failure_code VARCHAR(64),
     failure_message VARCHAR(1000),
     created_at TIMESTAMP NOT NULL,
@@ -42,6 +46,11 @@ CREATE TABLE IF NOT EXISTS analysis_history (
     CONSTRAINT fk_analysis_history_snapshot
         FOREIGN KEY (snapshot_id) REFERENCES analysis_input_snapshot(snapshot_id) ON DELETE CASCADE
 );
+
+ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS diagnosis_model_name VARCHAR(255);
+ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS diagnosis_prompt_version VARCHAR(255);
+ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS match_model_name VARCHAR(255);
+ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS match_prompt_version VARCHAR(255);
 
 CREATE INDEX IF NOT EXISTS idx_analysis_history_user_created
     ON analysis_history (user_id, created_at);

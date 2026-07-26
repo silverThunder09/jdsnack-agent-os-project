@@ -9,11 +9,14 @@
 ## T1: Prompt/Model Version (내부 전용, 공개 계약 없음)
 
 - 새 공개 API 엔드포인트를 추가하지 않는다.
-- `analysis_history` 테이블에 다음 내부 컬럼을 추가한다(제안 이름, 최종 컬럼명은 구현 티켓에서 확정 가능하나 의미는 유지):
-  - `diagnosis_model_name`, `diagnosis_prompt_version` (nullable, `diagnosis_json`이 채워질 때 함께 기록)
-  - `match_model_name`, `match_prompt_version` (nullable, `match_json`이 채워질 때 함께 기록)
+- `analysis_history` 테이블에 다음 내부 nullable 컬럼을 사용한다.
+  - `diagnosis_model_name VARCHAR(255)`, `diagnosis_prompt_version VARCHAR(255)`
+  - `match_model_name VARCHAR(255)`, `match_prompt_version VARCHAR(255)`
+- 기존 `analysis_history`에도 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`로 같은 컬럼을 추가해, T1 이전에 생성된 이력의 생성·조회·재시도 계약을 유지한다.
 - 이 컬럼들은 `AnalysisHistoryResponse` 등 기존 응답 DTO에 매핑하지 않는다(REQ-02, AC-02).
-- 모델명은 각 Gemini provider(`GeminiDiagnosisProvider`, `GeminiMatchPreviewProvider`)가 실제 호출에 사용한 값(`GEMINI_MODEL` 환경변수 또는 `DEFAULT_MODEL`)을 그대로 사용한다. 프롬프트 버전은 각 provider가 소유한 버전 상수(예: `"diagnosis-v1"`)를 사용한다.
+- `AI_LOCAL` 모드에서는 각 Gemini provider(`GeminiDiagnosisProvider`, `GeminiMatchPreviewProvider`)가 실제 호출에 사용한 값(`GEMINI_MODEL` 환경변수 또는 `DEFAULT_MODEL`)과 provider 소유 프롬프트 버전(`diagnosis-v1`, `match-v1`)을 기록한다.
+- fixture·stub 실행은 실제 Gemini 모델을 기록하지 않고 provider 식별자와 고정 프롬프트 버전을 기록한다. 결정론적 매칭 미리보기는 `fixture`/`match-fixture-v1`을 기록한다.
+- `diagnosis`가 성공한 뒤 `match`가 실패하면 기존과 같이 이력은 `FAILED`로 남는다. 이때 완료된 `diagnosis`의 메타데이터만 남기고 `match` 메타데이터는 `NULL`로 유지한다. 공개 응답의 필드·상태 코드는 바꾸지 않는다.
 
 ## T2: 사용자 품질 피드백
 

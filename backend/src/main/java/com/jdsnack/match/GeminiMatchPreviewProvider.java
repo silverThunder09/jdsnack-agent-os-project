@@ -2,6 +2,7 @@ package com.jdsnack.match;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jdsnack.analysis.AnalysisExecutionVersion;
 import com.jdsnack.common.ErrorCode;
 import com.jdsnack.diagnose.GeminiApiException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import java.util.List;
 public class GeminiMatchPreviewProvider {
 
     private static final String DEFAULT_MODEL = "gemini-2.5-flash";
+    private static final String PROMPT_VERSION = "match-v1";
     private static final int MAX_KEYWORDS = 8;
 
     private final HttpClient httpClient;
@@ -85,6 +87,10 @@ public class GeminiMatchPreviewProvider {
             Thread.currentThread().interrupt();
             throw new GeminiApiException(ErrorCode.GEMINI_API_REQUEST_FAILED, exception);
         }
+    }
+
+    public AnalysisExecutionVersion executionVersion() {
+        return new AnalysisExecutionVersion(model, PROMPT_VERSION);
     }
 
     private URI geminiUri() {

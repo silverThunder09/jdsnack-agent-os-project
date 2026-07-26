@@ -1,11 +1,15 @@
 package com.jdsnack.diagnose;
 
+import com.jdsnack.analysis.AnalysisExecutionVersion;
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FixtureDiagnosisProvider implements DiagnosisProvider {
+
+    private static final AnalysisExecutionVersion EXECUTION_VERSION =
+            new AnalysisExecutionVersion("fixture", "diagnosis-fixture-v1");
 
     private final FixtureAnalysisRepository fixtureAnalysisRepository;
     private final TextNormalizer textNormalizer;
@@ -33,5 +37,10 @@ public class FixtureDiagnosisProvider implements DiagnosisProvider {
                 .orElseThrow(() -> new ApiException(ErrorCode.FIXTURE_NOT_FOUND));
 
         return analysis.toResponse(normalizedResumeText);
+    }
+
+    @Override
+    public AnalysisExecutionVersion executionVersion() {
+        return EXECUTION_VERSION;
     }
 }

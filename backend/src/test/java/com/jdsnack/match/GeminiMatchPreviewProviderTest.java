@@ -3,6 +3,7 @@ package com.jdsnack.match;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.jdsnack.analysis.AnalysisExecutionVersion;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +50,12 @@ class GeminiMatchPreviewProviderTest {
         assertThat(response.matchedKeywords()).isEmpty();
         assertThat(response.partialKeywords()).isEmpty();
         assertThat(response.missingKeywords()).isEmpty();
+    }
+
+    @Test
+    void reportsTheResolvedModelAndMatchPromptVersion() {
+        assertThat(provider.executionVersion())
+                .isEqualTo(new AnalysisExecutionVersion("test-model", "match-v1"));
     }
 
     private String geminiEnvelope(String payload) throws Exception {

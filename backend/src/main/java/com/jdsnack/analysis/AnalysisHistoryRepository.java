@@ -25,19 +25,27 @@ public class AnalysisHistoryRepository {
                             snapshot_id,
                             status,
                             diagnosis_json,
+                            diagnosis_model_name,
+                            diagnosis_prompt_version,
                             match_json,
+                            match_model_name,
+                            match_prompt_version,
                             failure_code,
                             failure_message,
                             created_at,
                             updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 history.id(),
                 history.userId(),
                 history.snapshotId(),
                 history.status().name(),
                 history.diagnosisJson(),
+                history.diagnosisModelName(),
+                history.diagnosisPromptVersion(),
                 history.matchJson(),
+                history.matchModelName(),
+                history.matchPromptVersion(),
                 history.failureCode(),
                 history.failureMessage(),
                 Timestamp.from(history.createdAt()),
@@ -54,7 +62,11 @@ public class AnalysisHistoryRepository {
                                        snapshot_id,
                                        status,
                                        diagnosis_json,
+                                       diagnosis_model_name,
+                                       diagnosis_prompt_version,
                                        match_json,
+                                       match_model_name,
+                                       match_prompt_version,
                                        failure_code,
                                        failure_message,
                                        created_at,
@@ -78,7 +90,11 @@ public class AnalysisHistoryRepository {
                                snapshot_id,
                                status,
                                diagnosis_json,
+                               diagnosis_model_name,
+                               diagnosis_prompt_version,
                                match_json,
+                               match_model_name,
+                               match_prompt_version,
                                failure_code,
                                failure_message,
                                created_at,
@@ -96,15 +112,22 @@ public class AnalysisHistoryRepository {
             String historyId,
             String userId,
             String diagnosisJson,
-            String matchJson
+            AnalysisExecutionVersion diagnosisExecutionVersion,
+            String matchJson,
+            AnalysisExecutionVersion matchExecutionVersion
     ) {
         jdbcTemplate.update(
-                "UPDATE analysis_history SET status = ?, diagnosis_json = ?, match_json = ?, "
+                "UPDATE analysis_history SET status = ?, diagnosis_json = ?, diagnosis_model_name = ?, "
+                        + "diagnosis_prompt_version = ?, match_json = ?, match_model_name = ?, match_prompt_version = ?, "
                         + "failure_code = NULL, failure_message = NULL, updated_at = CURRENT_TIMESTAMP "
                         + "WHERE history_id = ? AND user_id = ?",
                 AnalysisHistoryStatus.SUCCEEDED.name(),
                 diagnosisJson,
+                diagnosisExecutionVersion.modelName(),
+                diagnosisExecutionVersion.promptVersion(),
                 matchJson,
+                matchExecutionVersion.modelName(),
+                matchExecutionVersion.promptVersion(),
                 historyId,
                 userId
         );
@@ -129,6 +152,29 @@ public class AnalysisHistoryRepository {
         return findByIdAndUserId(historyId, userId).orElseThrow();
     }
 
+    public AnalysisHistory markFailedWithDiagnosisExecutionVersion(
+            String historyId,
+            String userId,
+            AnalysisExecutionVersion diagnosisExecutionVersion,
+            String failureCode,
+            String failureMessage
+    ) {
+        jdbcTemplate.update(
+                "UPDATE analysis_history SET status = ?, diagnosis_json = NULL, diagnosis_model_name = ?, "
+                        + "diagnosis_prompt_version = ?, match_json = NULL, match_model_name = NULL, "
+                        + "match_prompt_version = NULL, failure_code = ?, failure_message = ?, "
+                        + "updated_at = CURRENT_TIMESTAMP WHERE history_id = ? AND user_id = ?",
+                AnalysisHistoryStatus.FAILED.name(),
+                diagnosisExecutionVersion.modelName(),
+                diagnosisExecutionVersion.promptVersion(),
+                failureCode,
+                failureMessage,
+                historyId,
+                userId
+        );
+        return findByIdAndUserId(historyId, userId).orElseThrow();
+    }
+
     public boolean deleteByIdAndUserId(String historyId, String userId) {
         return jdbcTemplate.update(
                 "DELETE FROM analysis_history WHERE history_id = ? AND user_id = ?",
@@ -144,7 +190,11 @@ public class AnalysisHistoryRepository {
                 resultSet.getString("snapshot_id"),
                 AnalysisHistoryStatus.valueOf(resultSet.getString("status")),
                 resultSet.getString("diagnosis_json"),
+                resultSet.getString("diagnosis_model_name"),
+                resultSet.getString("diagnosis_prompt_version"),
                 resultSet.getString("match_json"),
+                resultSet.getString("match_model_name"),
+                resultSet.getString("match_prompt_version"),
                 resultSet.getString("failure_code"),
                 resultSet.getString("failure_message"),
                 resultSet.getTimestamp("created_at").toInstant(),
