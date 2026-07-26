@@ -1,21 +1,30 @@
 package com.jdsnack.analysis;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jdsnack.auth.GoogleAuthService;
+import com.jdsnack.diagnose.ResumeExtractionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +44,11 @@ class AnalysisHistoryControllerTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private ResumeExtractionService resumeExtractionService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private String userId;
 
@@ -176,6 +190,68 @@ class AnalysisHistoryControllerTest {
                 .andExpect(jsonPath("$.data.input.resumeText").value("Platform engineer with distributed tracing rollout, incident command ownership, and multi-region disaster recovery practice across services."));
     }
 
+    @Test
+    void storesProviderMetadataInternallyWithoutExposingItFromHistoryApis() throws Exception {
+        userId = createUser();
+
+        String createResponse = mockMvc.perform(post("/api/analysis-histories")
+                        .session(authenticatedSession(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequest()))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String historyId = historyId(createResponse);
+
+        assertNoProviderMetadataInPublicResponse(createResponse);
+        assertMetadataIsPresent(historyId);
+
+        String listResponse = mockMvc.perform(get("/api/analysis-histories")
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        assertNoProviderMetadataInPublicResponse(listResponse);
+
+        String detailResponse = mockMvc.perform(get("/api/analysis-histories/{historyId}", historyId)
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        assertNoProviderMetadataInPublicResponse(detailResponse);
+
+        String retryResponse = mockMvc.perform(post("/api/analysis-histories/{historyId}/retry", historyId)
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String retryHistoryId = historyId(retryResponse);
+        assertNoProviderMetadataInPublicResponse(retryResponse);
+        assertMetadataIsPresent(retryHistoryId);
+
+        given(resumeExtractionService.extractText(any())).willReturn(RESUME_TEXT);
+        String fileResponse = mockMvc.perform(multipart("/api/analysis-histories/file")
+                        .file(new MockMultipartFile(
+                                "resumeFile",
+                                "resume.pdf",
+                                MediaType.APPLICATION_PDF_VALUE,
+                                "fixture".getBytes()
+                        ))
+                        .param("inputType", "TEXT")
+                        .param("text", JD_TEXT)
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        assertNoProviderMetadataInPublicResponse(fileResponse);
+        assertMetadataIsPresent(historyId(fileResponse));
+    }
+
     private String createUser() {
         String id = UUID.randomUUID().toString();
         jdbcTemplate.update(
@@ -225,5 +301,41 @@ class AnalysisHistoryControllerTest {
                 Integer.class,
                 snapshotId
         );
+    }
+
+    private String historyId(String response) {
+        return response.replaceAll(".*\\\"id\\\":\\\"([^\\\"]+)\\\".*", "$1");
+    }
+
+    private void assertMetadataIsPresent(String historyId) {
+        String[] metadata = jdbcTemplate.queryForObject(
+                """
+                        SELECT diagnosis_model_name,
+                               diagnosis_prompt_version,
+                               match_model_name,
+                               match_prompt_version
+                        FROM analysis_history
+                        WHERE history_id = ? AND user_id = ?
+                        """,
+                (resultSet, rowNum) -> new String[]{
+                        resultSet.getString("diagnosis_model_name"),
+                        resultSet.getString("diagnosis_prompt_version"),
+                        resultSet.getString("match_model_name"),
+                        resultSet.getString("match_prompt_version")
+                },
+                historyId,
+                userId
+        );
+
+        assertThat(metadata).allSatisfy(value -> assertThat(value).isNotBlank());
+    }
+
+    private void assertNoProviderMetadataInPublicResponse(String response) throws Exception {
+        JsonNode root = objectMapper.readTree(response);
+
+        assertThat(root.findValues("diagnosisModelName")).isEmpty();
+        assertThat(root.findValues("diagnosisPromptVersion")).isEmpty();
+        assertThat(root.findValues("matchModelName")).isEmpty();
+        assertThat(root.findValues("matchPromptVersion")).isEmpty();
     }
 }

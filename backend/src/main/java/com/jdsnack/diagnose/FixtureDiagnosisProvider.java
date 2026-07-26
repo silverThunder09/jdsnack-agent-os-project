@@ -2,10 +2,13 @@ package com.jdsnack.diagnose;
 
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
+import com.jdsnack.common.ProviderMetadata;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FixtureDiagnosisProvider implements DiagnosisProvider {
+
+    private static final ProviderMetadata METADATA = new ProviderMetadata("fixture", "fixture-v1");
 
     private final FixtureAnalysisRepository fixtureAnalysisRepository;
     private final TextNormalizer textNormalizer;
@@ -33,5 +36,10 @@ public class FixtureDiagnosisProvider implements DiagnosisProvider {
                 .orElseThrow(() -> new ApiException(ErrorCode.FIXTURE_NOT_FOUND));
 
         return analysis.toResponse(normalizedResumeText);
+    }
+
+    @Override
+    public ProviderMetadata providerMetadata() {
+        return METADATA;
     }
 }

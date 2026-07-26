@@ -13,7 +13,7 @@
 - 의존성: 없음 (현재 `analysis_history`/`analysis_input_snapshot` 스키마, `.agent-os/adr/adr-019-postgresql-service-storage.md`, `.agent-os/adr/adr-020-analysis-input-record.md`)
 - 완료 조건: AC-01~AC-03, TC-01~TC-04
 - 상태: `ready`
-- 구현 예상 위치: `backend/src/main/resources/schema.sql`, `backend/src/main/java/com/jdsnack/analysis/AnalysisHistory.java`, `backend/src/main/java/com/jdsnack/analysis/**Repository*.java`, `backend/src/main/java/com/jdsnack/diagnose/GeminiDiagnosisProvider.java`, `backend/src/main/java/com/jdsnack/match/GeminiMatchPreviewProvider.java`
+- 구현 예상 위치: `backend/src/main/resources/schema.sql`, `backend/src/main/java/com/jdsnack/analysis/AnalysisHistory.java`, `backend/src/main/java/com/jdsnack/analysis/**Repository*.java`, `backend/src/main/java/com/jdsnack/common/ProviderMetadata.java`, `backend/src/main/java/com/jdsnack/diagnose/{DiagnoseService,*DiagnosisProvider}.java`, `backend/src/main/java/com/jdsnack/match/{MatchPreviewService,GeminiMatchPreviewProvider}.java`
 
 ### T2. 사용자 품질 피드백
 

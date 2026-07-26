@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
 import com.jdsnack.common.ErrorDetail;
+import com.jdsnack.common.ProviderMetadata;
 import com.jdsnack.diagnose.DiagnoseRequest;
 import com.jdsnack.diagnose.DiagnoseService;
 import com.jdsnack.diagnose.DiagnosisResultResponse;
@@ -118,22 +119,31 @@ public class AnalysisHistoryService {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
                 now,
                 now
         ));
 
+        ProviderMetadata diagnosisMetadata = null;
         try {
             DiagnosisResultResponse diagnosis = diagnoseService.diagnose(new DiagnoseRequest(snapshot.resumeText()));
+            diagnosisMetadata = diagnoseService.providerMetadata();
             MatchPreviewResponse match = matchPreviewService.preview(new MatchPreviewRequest(
                     new MatchPreviewRequest.ResumeSource("TEXT", snapshot.resumeText()),
                     snapshot.jdText(),
                     snapshot.sourceUrl()
             ));
+            ProviderMetadata matchMetadata = matchPreviewService.providerMetadata();
             AnalysisHistory succeeded = historyRepository.markSucceeded(
                     running.id(),
                     userId,
                     writeJson(diagnosis),
-                    writeJson(match)
+                    diagnosisMetadata,
+                    writeJson(match),
+                    matchMetadata
             );
             return toResponse(succeeded, snapshot);
         } catch (ApiException exception) {
@@ -141,7 +151,8 @@ public class AnalysisHistoryService {
                     running.id(),
                     userId,
                     exception.errorCode().name(),
-                    exception.errorCode().message()
+                    exception.errorCode().message(),
+                    diagnosisMetadata
             );
             return toResponse(failed, snapshot);
         } catch (RuntimeException exception) {
@@ -149,7 +160,8 @@ public class AnalysisHistoryService {
                     running.id(),
                     userId,
                     ErrorCode.INTERNAL_ERROR.name(),
-                    ErrorCode.INTERNAL_ERROR.message()
+                    ErrorCode.INTERNAL_ERROR.message(),
+                    diagnosisMetadata
             );
             return toResponse(failed, snapshot);
         }

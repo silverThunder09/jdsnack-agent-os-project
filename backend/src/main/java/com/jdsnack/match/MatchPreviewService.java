@@ -2,6 +2,7 @@ package com.jdsnack.match;
 
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
+import com.jdsnack.common.ProviderMetadata;
 import com.jdsnack.diagnose.DiagnosisMode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class MatchPreviewService {
     private static final int MIN_RESUME_SOURCE_LENGTH = 50;
     private static final int MAX_RESUME_SOURCE_LENGTH = 10_000;
     private static final int MAX_KEYWORDS = 8;
+    private static final ProviderMetadata RULE_BASED_METADATA = new ProviderMetadata("rule-based", "rule-based-v1");
     private static final Set<String> STOP_WORDS = Set.of(
             "and", "the", "with", "for", "from", "that", "this", "have", "will",
             "into", "your", "about", "using", "through", "then", "than", "able",
@@ -48,6 +50,13 @@ public class MatchPreviewService {
             return geminiMatchPreviewProvider.preview(request);
         }
         return buildPreview(request);
+    }
+
+    public ProviderMetadata providerMetadata() {
+        if (diagnosisMode == DiagnosisMode.AI_LOCAL) {
+            return geminiMatchPreviewProvider.providerMetadata();
+        }
+        return RULE_BASED_METADATA;
     }
 
     private void validateRequest(MatchPreviewRequest request) {

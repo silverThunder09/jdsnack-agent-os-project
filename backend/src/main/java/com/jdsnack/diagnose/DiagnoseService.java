@@ -2,6 +2,7 @@ package com.jdsnack.diagnose;
 
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
+import com.jdsnack.common.ProviderMetadata;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,6 +47,10 @@ public class DiagnoseService {
                 UploadedResumeType.fromMultipartFile(resumeFile),
                 validatedText
         );
+    }
+
+    public ProviderMetadata providerMetadata() {
+        return selectProvider().providerMetadata();
     }
 
     public String validate(DiagnoseRequest request) {

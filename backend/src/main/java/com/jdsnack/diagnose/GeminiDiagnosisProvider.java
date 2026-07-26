@@ -3,6 +3,7 @@ package com.jdsnack.diagnose;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jdsnack.common.ErrorCode;
+import com.jdsnack.common.ProviderMetadata;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ import java.util.List;
 public class GeminiDiagnosisProvider implements DiagnosisProvider {
 
     private static final String DEFAULT_MODEL = "gemini-2.5-flash";
+    private static final String PROMPT_VERSION = "diagnosis-v1";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -84,6 +86,11 @@ public class GeminiDiagnosisProvider implements DiagnosisProvider {
             Thread.currentThread().interrupt();
             throw new GeminiApiException(ErrorCode.GEMINI_API_REQUEST_FAILED, exception);
         }
+    }
+
+    @Override
+    public ProviderMetadata providerMetadata() {
+        return new ProviderMetadata(model, PROMPT_VERSION);
     }
 
     private URI geminiUri() {
