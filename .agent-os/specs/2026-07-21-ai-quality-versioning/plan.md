@@ -13,7 +13,7 @@
 - 의존성: 없음 (현재 `analysis_history`/`analysis_input_snapshot` 스키마, `.agent-os/adr/adr-019-postgresql-service-storage.md`, `.agent-os/adr/adr-020-analysis-input-record.md`)
 - 완료 조건: AC-01~AC-03, TC-01~TC-04
 - 상태: `completed`
-- 완료 근거: `AnalysisHistoryControllerTest`로 생성·파일 생성·목록·상세·재시도 응답 비노출과 내부 저장을, `AnalysisHistoryPartialFailureTest`로 매칭 실패 시 진단 메타데이터만 보존되는 경계를 검증했다. `./gradlew test bootJar --no-daemon`, Docs Harness, AI-readiness, Compose 재빌드·health 검증을 통과했다.
+- 완료 근거: `AnalysisHistoryControllerTest`로 생성·파일 생성·목록·상세·재시도 응답 비노출과 내부 저장을, `AnalysisHistoryPartialFailureTest`로 매칭 실패 시 진단 메타데이터만 보존되는 경계를, `AnalysisExecutionVersionTest`로 null·blank 메타데이터 경계를 검증했다. `./gradlew test bootJar --no-daemon`, Docs Harness, AI-readiness, Compose 재빌드·health 검증을 통과했다.
 - 구현 예상 위치: `backend/src/main/resources/schema.sql`, `backend/src/main/java/com/jdsnack/analysis/AnalysisHistory.java`, `backend/src/main/java/com/jdsnack/analysis/**Repository*.java`, `backend/src/main/java/com/jdsnack/diagnose/GeminiDiagnosisProvider.java`, `backend/src/main/java/com/jdsnack/match/GeminiMatchPreviewProvider.java`
 
 ### T2. 사용자 품질 피드백
@@ -39,4 +39,5 @@
 - 제외 범위: 공개 API/UI 노출, 사용자 피드백(T2), AI 호출 정책·비밀값 변경
 - 테스트 경계: `AnalysisHistoryRepository` 내부 저장 계약과 Analysis History REST 응답의 메타데이터 비노출/기존 계약 회귀
 - 검증 계획: T1 관련 테스트 → backend 전체 테스트·빌드 → 문서 게이트 → Compose 재빌드·health 확인
+- High-risk PR 게이트: PR 생성 뒤 `scripts/pr-review-gate.sh <PR_NUMBER>`를 실행한다. 수동 확인은 신규 외부 API 호출·비밀값·배포 정책 변경이 없고, 실행 메타데이터가 DB 내부에만 남아 공개 API/UI에 노출되지 않는지로 한정한다.
 - PR 범위: T1 하나만 포함하며 T2·PR #170·Issue #171 변경은 포함하지 않는다.

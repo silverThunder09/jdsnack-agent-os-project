@@ -1,6 +1,5 @@
 package com.jdsnack.analysis;
 
-import com.jdsnack.auth.GoogleAuthService;
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
 import com.jdsnack.match.MatchPreviewService;
@@ -12,12 +11,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.UUID;
-
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.JD_TEXT;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.RESUME_TEXT;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.authenticatedSession;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.createRequest;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.createUser;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -28,11 +29,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "jdsnack.diagnosis.mode=fixture")
 class AnalysisHistoryPartialFailureTest {
-
-    private static final String RESUME_TEXT =
-            "Experienced backend engineer with Spring Boot REST API development, validation handling, and test automation delivery across projects.";
-    private static final String JD_TEXT =
-            "Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화와 배포 경험을 요구합니다. 협업과 장애 대응 경험도 중요합니다.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -54,7 +50,7 @@ class AnalysisHistoryPartialFailureTest {
 
     @Test
     void preservesDiagnosisExecutionVersionWhenMatchFails() throws Exception {
-        userId = createUser();
+        userId = createUser(jdbcTemplate);
         given(matchPreviewService.preview(any()))
                 .willThrow(new ApiException(ErrorCode.GEMINI_API_REQUEST_FAILED));
 
@@ -107,34 +103,4 @@ class AnalysisHistoryPartialFailureTest {
         org.assertj.core.api.Assertions.assertThat(matchPromptVersion).isNull();
     }
 
-    private String createUser() {
-        String id = UUID.randomUUID().toString();
-        jdbcTemplate.update(
-                "INSERT INTO app_user (user_id, provider, provider_subject, email, display_name, created_at, updated_at) "
-                        + "VALUES (?, 'google', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                id,
-                "subject-" + id,
-                id + "@example.com",
-                "Test User"
-        );
-        return id;
-    }
-
-    private MockHttpSession authenticatedSession(String id) {
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(GoogleAuthService.SESSION_USER_ID, id);
-        return session;
-    }
-
-    private String createRequest() {
-        return """
-                {
-                  "resumeText": "%s",
-                  "jd": {
-                    "inputType": "TEXT",
-                    "text": "%s"
-                  }
-                }
-                """.formatted(RESUME_TEXT, JD_TEXT);
-    }
 }

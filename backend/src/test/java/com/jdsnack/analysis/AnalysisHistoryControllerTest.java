@@ -1,6 +1,5 @@
 package com.jdsnack.analysis;
 
-import com.jdsnack.auth.GoogleAuthService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -13,15 +12,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.UUID;
-
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.JD_TEXT;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.RESUME_TEXT;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.authenticatedSession;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.createRequest;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.createUser;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -33,11 +34,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "jdsnack.diagnosis.mode=fixture")
 class AnalysisHistoryControllerTest {
-
-    private static final String RESUME_TEXT =
-            "Experienced backend engineer with Spring Boot REST API development, validation handling, and test automation delivery across projects.";
-    private static final String JD_TEXT =
-            "Spring Boot 기반 REST API 개발과 운영 경험, 테스트 자동화와 배포 경험을 요구합니다. 협업과 장애 대응 경험도 중요합니다.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -56,7 +52,7 @@ class AnalysisHistoryControllerTest {
 
     @Test
     void authenticatedUserCanCreateAndReadOwnAnalysisHistory() throws Exception {
-        userId = createUser();
+        userId = createUser(jdbcTemplate);
 
         String response = mockMvc.perform(post("/api/analysis-histories")
                         .session(authenticatedSession(userId))
@@ -90,7 +86,7 @@ class AnalysisHistoryControllerTest {
 
     @Test
     void storesExecutionVersionsInternallyWithoutExposingThem() throws Exception {
-        userId = createUser();
+        userId = createUser(jdbcTemplate);
 
         String response = mockMvc.perform(post("/api/analysis-histories")
                         .session(authenticatedSession(userId))
@@ -141,7 +137,7 @@ class AnalysisHistoryControllerTest {
 
     @Test
     void fileHistoryCreationDoesNotExposeExecutionVersions() throws Exception {
-        userId = createUser();
+        userId = createUser(jdbcTemplate);
         MockMultipartFile resumeFile = new MockMultipartFile(
                 "resumeFile",
                 "resume.pdf",
@@ -169,7 +165,7 @@ class AnalysisHistoryControllerTest {
 
     @Test
     void retryCreatesNewHistoryAndDeleteRemovesTheRequestedHistory() throws Exception {
-        userId = createUser();
+        userId = createUser(jdbcTemplate);
 
         String createResponse = mockMvc.perform(post("/api/analysis-histories")
                         .session(authenticatedSession(userId))
@@ -229,8 +225,8 @@ class AnalysisHistoryControllerTest {
 
     @Test
     void anotherUserCannotDiscoverTheHistory() throws Exception {
-        userId = createUser();
-        String otherUserId = createUser();
+        userId = createUser(jdbcTemplate);
+        String otherUserId = createUser(jdbcTemplate);
 
         String response = mockMvc.perform(post("/api/analysis-histories")
                         .session(authenticatedSession(userId))
@@ -252,7 +248,7 @@ class AnalysisHistoryControllerTest {
 
     @Test
     void analysisFailureIsStoredAsFailedHistory() throws Exception {
-        userId = createUser();
+        userId = createUser(jdbcTemplate);
 
         mockMvc.perform(post("/api/analysis-histories")
                         .session(authenticatedSession(userId))
@@ -262,37 +258,6 @@ class AnalysisHistoryControllerTest {
                 .andExpect(jsonPath("$.data.status").value("FAILED"))
                 .andExpect(jsonPath("$.data.failure.code").value("FIXTURE_NOT_FOUND"))
                 .andExpect(jsonPath("$.data.input.resumeText").value("Platform engineer with distributed tracing rollout, incident command ownership, and multi-region disaster recovery practice across services."));
-    }
-
-    private String createUser() {
-        String id = UUID.randomUUID().toString();
-        jdbcTemplate.update(
-                "INSERT INTO app_user (user_id, provider, provider_subject, email, display_name, created_at, updated_at) "
-                        + "VALUES (?, 'google', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                id,
-                "subject-" + id,
-                id + "@example.com",
-                "Test User"
-        );
-        return id;
-    }
-
-    private MockHttpSession authenticatedSession(String id) {
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(GoogleAuthService.SESSION_USER_ID, id);
-        return session;
-    }
-
-    private String createRequest() {
-        return """
-                {
-                  "resumeText": "%s",
-                  "jd": {
-                    "inputType": "TEXT",
-                    "text": "%s"
-                  }
-                }
-                """.formatted(RESUME_TEXT, JD_TEXT);
     }
 
     private String failedRequest() {

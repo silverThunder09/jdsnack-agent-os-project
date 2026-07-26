@@ -14,7 +14,7 @@ JDSnack은 Spring Boot API와 React 프론트를 **분리 컨테이너로 배포
 - Spring Boot가 인증·입력 검증·분석 orchestration·JD 수집을 담당
 - Gemini·사람인 수집은 백엔드 provider/adapter 경계에서만 호출
 - ATS 점수·포맷 진단은 이력서 추출 텍스트와 JD를 서버의 결정론적 서비스에서 계산하며 외부 호출을 하지 않음
-- 현재 preview 흐름은 fixture/stub/ai-local 모드로 검증하며 Service MVP는 사용자 소유 분석 이력을 추가한다
+- 현재 preview 흐름은 fixture/stub/ai-local 모드로 검증하며, Service MVP는 사용자 소유 분석 이력·입력 스냅샷과 분석 실행 메타데이터를 저장한다
 
 ## Dependency & data flow
 
@@ -26,7 +26,8 @@ flowchart LR
   Backend --> Analysis["Diagnose · Match · ATS · Sentence · Interview"]
   Backend --> Jd["JD fetch adapter\nSaramin fallback / OCR"]
   Analysis --> Gemini["Gemini provider\nserver-side only"]
-  Backend --> Store["H2 fixture now\nService MVP persistence next"]
+  Backend --> Store["Analysis History Store\ninput snapshot + result\ninternal model/prompt metadata"]
+  Analysis --> Store
   Backend --> Tests["JUnit + fixture + compose smoke"]
   Frontend --> UiTests["Vitest + Playwright"]
 
@@ -65,5 +66,5 @@ flowchart LR
 - 외부 공개 엔드포인트는 reverse proxy 또는 ingress 뒤에서 하나의 서비스처럼 노출할 수 있습니다.
 - Gemini 기반 진단·매칭과 사람인 OCR 폴백은 백엔드 경계에서만 수행합니다. 프론트는 API 계약과 비밀값 비노출 규칙을 지킵니다.
 - 프론트는 API 계약에만 의존하고 외부 AI 세부 구현은 모릅니다.
-- Service MVP에서 사용자·이력서·분석 결과 영속 저장을 도입하기 전까지의 fixture·로컬 저장 흐름은 제품 검증 이력으로 취급합니다.
+- Service MVP는 사용자·이력서·분석 결과를 영속 저장합니다. 분석 결과의 model/prompt version은 서버 내부 메타데이터이며 공개 API/UI에 노출하지 않습니다.
 - Spec 자동화는 `spec-queue.json`을 유일한 실행 큐로 사용합니다. `main push`와 승인된 제품 Issue가 큐 선택·Spec 승격·Codex 디스패치를 깨우며, 5분 폴링은 정상 트리거가 아닙니다.
