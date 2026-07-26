@@ -1,5 +1,6 @@
 package com.jdsnack.diagnose;
 
+import com.jdsnack.analysis.AnalysisExecutionVersion;
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +47,10 @@ public class DiagnoseService {
                 UploadedResumeType.fromMultipartFile(resumeFile),
                 validatedText
         );
+    }
+
+    public AnalysisExecutionVersion executionVersion() {
+        return selectProvider().executionVersion();
     }
 
     public String validate(DiagnoseRequest request) {

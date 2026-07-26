@@ -1,21 +1,30 @@
 package com.jdsnack.analysis;
 
 import com.jdsnack.auth.GoogleAuthService;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -77,6 +86,85 @@ class AnalysisHistoryControllerTest {
                 .andExpect(jsonPath("$.data.input.jdText").value(JD_TEXT))
                 .andExpect(jsonPath("$.data.result.diagnosis").exists())
                 .andExpect(jsonPath("$.data.result.match").exists());
+    }
+
+    @Test
+    void storesExecutionVersionsInternallyWithoutExposingThem() throws Exception {
+        userId = createUser();
+
+        String response = mockMvc.perform(post("/api/analysis-histories")
+                        .session(authenticatedSession(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequest()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.diagnosisModelName").doesNotExist())
+                .andExpect(jsonPath("$.data.diagnosisPromptVersion").doesNotExist())
+                .andExpect(jsonPath("$.data.matchModelName").doesNotExist())
+                .andExpect(jsonPath("$.data.matchPromptVersion").doesNotExist())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String historyId = response.replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        assertStoredExecutionVersions(historyId);
+
+        mockMvc.perform(get("/api/analysis-histories")
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].diagnosisModelName").doesNotExist())
+                .andExpect(jsonPath("$.data[0].diagnosisPromptVersion").doesNotExist())
+                .andExpect(jsonPath("$.data[0].matchModelName").doesNotExist())
+                .andExpect(jsonPath("$.data[0].matchPromptVersion").doesNotExist());
+
+        mockMvc.perform(get("/api/analysis-histories/{historyId}", historyId)
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.diagnosisModelName").doesNotExist())
+                .andExpect(jsonPath("$.data.diagnosisPromptVersion").doesNotExist())
+                .andExpect(jsonPath("$.data.matchModelName").doesNotExist())
+                .andExpect(jsonPath("$.data.matchPromptVersion").doesNotExist());
+
+        String retryResponse = mockMvc.perform(post("/api/analysis-histories/{historyId}/retry", historyId)
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.diagnosisModelName").doesNotExist())
+                .andExpect(jsonPath("$.data.diagnosisPromptVersion").doesNotExist())
+                .andExpect(jsonPath("$.data.matchModelName").doesNotExist())
+                .andExpect(jsonPath("$.data.matchPromptVersion").doesNotExist())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String retryId = retryResponse.replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        assertStoredExecutionVersions(retryId);
+    }
+
+    @Test
+    void fileHistoryCreationDoesNotExposeExecutionVersions() throws Exception {
+        userId = createUser();
+        MockMultipartFile resumeFile = new MockMultipartFile(
+                "resumeFile",
+                "resume.pdf",
+                MediaType.APPLICATION_PDF_VALUE,
+                createPdfBytes(RESUME_TEXT)
+        );
+
+        String response = mockMvc.perform(multipart("/api/analysis-histories/file")
+                        .file(resumeFile)
+                        .param("inputType", "TEXT")
+                        .param("text", JD_TEXT)
+                        .session(authenticatedSession(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.diagnosisModelName").doesNotExist())
+                .andExpect(jsonPath("$.data.diagnosisPromptVersion").doesNotExist())
+                .andExpect(jsonPath("$.data.matchModelName").doesNotExist())
+                .andExpect(jsonPath("$.data.matchPromptVersion").doesNotExist())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String historyId = response.replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        assertStoredExecutionVersions(historyId);
     }
 
     @Test
@@ -225,5 +313,53 @@ class AnalysisHistoryControllerTest {
                 Integer.class,
                 snapshotId
         );
+    }
+
+    private void assertStoredExecutionVersions(String historyId) {
+        String diagnosisModelName = jdbcTemplate.queryForObject(
+                "SELECT diagnosis_model_name FROM analysis_history WHERE history_id = ? AND user_id = ?",
+                String.class,
+                historyId,
+                userId
+        );
+        String diagnosisPromptVersion = jdbcTemplate.queryForObject(
+                "SELECT diagnosis_prompt_version FROM analysis_history WHERE history_id = ? AND user_id = ?",
+                String.class,
+                historyId,
+                userId
+        );
+        String matchModelName = jdbcTemplate.queryForObject(
+                "SELECT match_model_name FROM analysis_history WHERE history_id = ? AND user_id = ?",
+                String.class,
+                historyId,
+                userId
+        );
+        String matchPromptVersion = jdbcTemplate.queryForObject(
+                "SELECT match_prompt_version FROM analysis_history WHERE history_id = ? AND user_id = ?",
+                String.class,
+                historyId,
+                userId
+        );
+
+        org.assertj.core.api.Assertions.assertThat(diagnosisModelName).isNotBlank();
+        org.assertj.core.api.Assertions.assertThat(diagnosisPromptVersion).isNotBlank();
+        org.assertj.core.api.Assertions.assertThat(matchModelName).isNotBlank();
+        org.assertj.core.api.Assertions.assertThat(matchPromptVersion).isNotBlank();
+    }
+
+    private byte[] createPdfBytes(String text) throws IOException {
+        try (PDDocument document = new PDDocument();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            document.addPage(new PDPage());
+            try (PDPageContentStream contentStream = new PDPageContentStream(document, document.getPage(0))) {
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                contentStream.newLineAtOffset(50, 700);
+                contentStream.showText(text);
+                contentStream.endText();
+            }
+            document.save(outputStream);
+            return outputStream.toByteArray();
+        }
     }
 }

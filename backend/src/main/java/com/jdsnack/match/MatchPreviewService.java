@@ -1,5 +1,6 @@
 package com.jdsnack.match;
 
+import com.jdsnack.analysis.AnalysisExecutionVersion;
 import com.jdsnack.common.ApiException;
 import com.jdsnack.common.ErrorCode;
 import com.jdsnack.diagnose.DiagnosisMode;
@@ -24,6 +25,8 @@ public class MatchPreviewService {
     private static final int MIN_RESUME_SOURCE_LENGTH = 50;
     private static final int MAX_RESUME_SOURCE_LENGTH = 10_000;
     private static final int MAX_KEYWORDS = 8;
+    private static final AnalysisExecutionVersion FIXTURE_EXECUTION_VERSION =
+            new AnalysisExecutionVersion("fixture", "match-fixture-v1");
     private static final Set<String> STOP_WORDS = Set.of(
             "and", "the", "with", "for", "from", "that", "this", "have", "will",
             "into", "your", "about", "using", "through", "then", "than", "able",
@@ -48,6 +51,13 @@ public class MatchPreviewService {
             return geminiMatchPreviewProvider.preview(request);
         }
         return buildPreview(request);
+    }
+
+    public AnalysisExecutionVersion executionVersion() {
+        if (diagnosisMode == DiagnosisMode.AI_LOCAL) {
+            return geminiMatchPreviewProvider.executionVersion();
+        }
+        return FIXTURE_EXECUTION_VERSION;
     }
 
     private void validateRequest(MatchPreviewRequest request) {

@@ -118,41 +118,75 @@ public class AnalysisHistoryService {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
                 now,
                 now
         ));
 
+        DiagnosisResultResponse diagnosis = null;
+        AnalysisExecutionVersion diagnosisExecutionVersion = null;
         try {
-            DiagnosisResultResponse diagnosis = diagnoseService.diagnose(new DiagnoseRequest(snapshot.resumeText()));
+            diagnosis = diagnoseService.diagnose(new DiagnoseRequest(snapshot.resumeText()));
+            diagnosisExecutionVersion = diagnoseService.executionVersion();
             MatchPreviewResponse match = matchPreviewService.preview(new MatchPreviewRequest(
                     new MatchPreviewRequest.ResumeSource("TEXT", snapshot.resumeText()),
                     snapshot.jdText(),
                     snapshot.sourceUrl()
             ));
+            AnalysisExecutionVersion matchExecutionVersion = matchPreviewService.executionVersion();
             AnalysisHistory succeeded = historyRepository.markSucceeded(
                     running.id(),
                     userId,
                     writeJson(diagnosis),
-                    writeJson(match)
+                    diagnosisExecutionVersion,
+                    writeJson(match),
+                    matchExecutionVersion
             );
             return toResponse(succeeded, snapshot);
         } catch (ApiException exception) {
-            AnalysisHistory failed = historyRepository.markFailed(
-                    running.id(),
+            AnalysisHistory failed = failHistory(
+                    running,
                     userId,
+                    diagnosis,
+                    diagnosisExecutionVersion,
                     exception.errorCode().name(),
                     exception.errorCode().message()
             );
             return toResponse(failed, snapshot);
         } catch (RuntimeException exception) {
-            AnalysisHistory failed = historyRepository.markFailed(
-                    running.id(),
+            AnalysisHistory failed = failHistory(
+                    running,
                     userId,
+                    diagnosis,
+                    diagnosisExecutionVersion,
                     ErrorCode.INTERNAL_ERROR.name(),
                     ErrorCode.INTERNAL_ERROR.message()
             );
             return toResponse(failed, snapshot);
         }
+    }
+
+    private AnalysisHistory failHistory(
+            AnalysisHistory running,
+            String userId,
+            DiagnosisResultResponse diagnosis,
+            AnalysisExecutionVersion diagnosisExecutionVersion,
+            String failureCode,
+        String failureMessage
+    ) {
+        if (diagnosis != null && diagnosisExecutionVersion != null) {
+            return historyRepository.markFailedWithDiagnosisExecutionVersion(
+                    running.id(),
+                    userId,
+                    diagnosisExecutionVersion,
+                    failureCode,
+                    failureMessage
+            );
+        }
+        return historyRepository.markFailed(running.id(), userId, failureCode, failureMessage);
     }
 
     private AnalysisInputSnapshot createSnapshot(String userId, AnalysisHistoryCreateRequest request) {
