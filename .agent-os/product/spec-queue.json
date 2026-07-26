@@ -37,12 +37,14 @@
     },
     {
       "id": "ai-quality-versioning",
-      "slug": "ai-quality-versioning",
+      "slug": "2026-07-21-ai-quality-versioning",
       "title": "AI 품질 평가와 prompt/model version",
       "priority": 3,
-      "status": "candidate",
+      "status": "active",
+      "spec_path": ".agent-os/specs/2026-07-21-ai-quality-versioning",
       "auto_promote": true,
-      "start_condition": {"type": "issue_label", "label": "product-signal:analysis-data"}
+      "start_condition": {"type": "issue_label", "label": "product-signal:analysis-data"},
+      "source_issue": 168
     },
     {
       "id": "ai-usage-cost-limit",
