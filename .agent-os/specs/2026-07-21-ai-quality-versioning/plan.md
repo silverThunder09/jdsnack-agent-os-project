@@ -13,8 +13,8 @@
 - 의존성: 없음 (현재 `analysis_history`/`analysis_input_snapshot` 스키마, `.agent-os/adr/adr-019-postgresql-service-storage.md`, `.agent-os/adr/adr-020-analysis-input-record.md`)
 - 완료 조건: AC-01~AC-03, TC-01~TC-04
 - 상태: `completed`
-- 완료 근거: `AnalysisHistoryControllerTest`로 생성·파일 생성·목록·상세·재시도 응답 비노출과 내부 저장을, `AnalysisHistoryPartialFailureTest`로 매칭 실패 시 진단 메타데이터만 보존되는 경계를, `AnalysisExecutionVersionTest`로 null·blank 메타데이터 경계를 검증했다. `./gradlew test bootJar --no-daemon`, Docs Harness, AI-readiness, Compose 재빌드·health 검증을 통과했다.
-- 구현 예상 위치: `backend/src/main/resources/schema.sql`, `backend/src/main/java/com/jdsnack/analysis/AnalysisHistory.java`, `backend/src/main/java/com/jdsnack/analysis/**Repository*.java`, `backend/src/main/java/com/jdsnack/diagnose/GeminiDiagnosisProvider.java`, `backend/src/main/java/com/jdsnack/match/GeminiMatchPreviewProvider.java`
+- 완료 근거: `AnalysisHistoryControllerTest`로 생성·파일 생성·목록·상세·재시도 응답 비노출과 내부 저장을, `AnalysisHistoryPartialFailureTest`·`AnalysisHistoryPartialFailureMetadataTest`로 fixture/AI_LOCAL 매칭 실패 시 진단 메타데이터만 보존되는 경계를, `GeminiDiagnosisProviderMetadataTest`·`GeminiMatchPreviewProviderTest`로 실제 provider 모델·프롬프트 버전 전달을, `AnalysisExecutionVersionTest`로 null·blank 메타데이터 경계를 검증했다. `./gradlew test bootJar --no-daemon`, Docs Harness, AI-readiness, Compose 재빌드·health 검증을 통과했다.
+- 구현 예상 위치: `backend/src/main/resources/schema.sql`, `backend/src/main/java/com/jdsnack/analysis/{AnalysisHistory,AnalysisExecutionVersion,AnalysisHistoryRepository,AnalysisHistoryService}.java`, `backend/src/main/java/com/jdsnack/diagnose/{DiagnoseService,*DiagnosisProvider}.java`, `backend/src/main/java/com/jdsnack/match/{MatchPreviewService,GeminiMatchPreviewProvider}.java`
 
 ### T2. 사용자 품질 피드백
 
