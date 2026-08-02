@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchAuthSession, startGoogleLogin } from '../services/auth'
+import { fetchAuthSession, logout as requestLogout, startGoogleLogin } from '../services/auth'
 import type { AuthSession, AuthStatus } from '../types/auth'
 
 type AuthState = {
@@ -84,8 +84,21 @@ export function useAuth() {
     }
   }, [state.status, state.session?.user])
 
+  const logout = async () => {
+    try {
+      await requestLogout()
+      setState({ status: 'unauthenticated', session: null, message: '' })
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        message: error instanceof Error ? error.message : '로그아웃하지 못했습니다.',
+      }))
+    }
+  }
+
   return {
     ...state,
     startGoogleLogin,
+    logout,
   }
 }

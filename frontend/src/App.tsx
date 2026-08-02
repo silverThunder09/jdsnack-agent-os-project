@@ -1,7 +1,7 @@
 import type { ChangeEvent, DragEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
-import { AuthGate, AuthLoginAction } from './components/AuthGate'
+import { AuthGate, AuthLoginAction, AuthLogoutAction } from './components/AuthGate'
 import { useAuthGate } from './components/AuthGateContext'
 import { useAtsPreview } from './hooks/useAtsPreview'
 import { useDiagnose } from './hooks/useDiagnose'
@@ -224,7 +224,7 @@ function AuthenticatedApp() {
 
   return (
     <AppShell
-      topbarAction={<AuthLoginAction />}
+      topbarAction={<AuthLogoutAction />}
       currentView={currentView}
       isSidebarOpen={isSidebarOpen}
       onNavigate={(view) => { setCurrentView(view); setIsSidebarOpen(false); if (view === 'history') void loadHistories() }}

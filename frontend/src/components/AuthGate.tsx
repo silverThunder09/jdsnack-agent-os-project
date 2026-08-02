@@ -17,14 +17,29 @@ export function AuthLoginAction() {
   )
 }
 
+export function AuthLogoutAction() {
+  const auth = useContext(AuthGateContext)
+
+  if (!auth || auth.status !== 'authenticated') {
+    return null
+  }
+
+  return (
+    <button type="button" className="auth-login-button" onClick={() => void auth.logout()}>
+      로그아웃
+    </button>
+  )
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { status, message, startGoogleLogin } = useAuth()
+  const { status, message, startGoogleLogin, logout } = useAuth()
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const authContext: AuthGateContextValue = {
     status,
     isLoginOpen,
     openLogin: () => setIsLoginOpen(true),
     closeLogin: () => setIsLoginOpen(false),
+    logout,
   }
 
   const isLoading = status === 'loading'

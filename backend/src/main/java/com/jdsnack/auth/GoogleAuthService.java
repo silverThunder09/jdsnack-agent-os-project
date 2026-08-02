@@ -88,6 +88,14 @@ public class GoogleAuthService {
                 });
     }
 
+    /**
+     * 내부 세션을 통째로 무효화한다. 사용자 식별자만 지우면 OAuth state 같은 잔여 속성이
+     * 남으므로, 공용 PC에서 다음 사용자에게 세션이 이어지지 않도록 세션 자체를 버린다.
+     */
+    public void logout(HttpSession session) {
+        session.invalidate();
+    }
+
     private URI redirectToFailure(ErrorCode errorCode) {
         return redirectTo(properties.frontendFailureRedirectUri(), "auth", "error", errorCode.name());
     }

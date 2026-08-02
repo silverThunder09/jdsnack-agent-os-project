@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AuthGate, AuthLoginAction } from './AuthGate'
+import { AuthGate, AuthLoginAction, AuthLogoutAction } from './AuthGate'
 
 function sessionPayload(authenticated: boolean) {
   return {
@@ -111,5 +111,80 @@ describe('AuthGate', () => {
 
     expect(await screen.findByRole('button', { name: '로그인' })).toBeInTheDocument()
     expect(window.location.search).toBe('')
+  })
+})
+
+describe('AuthGate 로그아웃', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+    window.history.replaceState({}, '', '/')
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+    window.history.replaceState({}, '', '/')
+  })
+
+  function renderWithLogout() {
+    return render(
+      <AuthGate>
+        <AuthLogoutAction />
+        <p>보호 화면</p>
+      </AuthGate>,
+    )
+  }
+
+  it('인증된 사용자에게 로그아웃 버튼을 노출한다', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(sessionPayload(true))
+    renderWithLogout()
+    expect(await screen.findByRole('button', { name: '로그아웃' })).toBeInTheDocument()
+  })
+
+  it('비로그인 상태에서는 로그아웃 버튼을 노출하지 않는다', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(sessionPayload(false))
+    renderWithLogout()
+    await waitFor(() => expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument())
+  })
+
+  it('로그아웃을 누르면 서버 세션을 끊고 비로그인 상태로 돌아간다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(sessionPayload(true))
+      .mockResolvedValueOnce({ ok: true, status: 204 } as Response)
+
+    renderWithLogout()
+
+    await user.click(await screen.findByRole('button', { name: '로그아웃' }))
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/auth/logout',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
+    await waitFor(() => expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument())
+  })
+
+  it('세션이 이미 만료돼 401이 와도 로그아웃 성공으로 처리한다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(sessionPayload(true))
+      .mockResolvedValueOnce({ ok: false, status: 401 } as Response)
+
+    renderWithLogout()
+
+    await user.click(await screen.findByRole('button', { name: '로그아웃' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument())
+  })
+
+  it('로그아웃 요청이 실패하면 로그인 상태를 유지한다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(sessionPayload(true))
+      .mockResolvedValueOnce({ ok: false, status: 500 } as Response)
+
+    renderWithLogout()
+
+    await user.click(await screen.findByRole('button', { name: '로그아웃' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument())
   })
 })
