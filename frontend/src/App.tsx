@@ -230,9 +230,7 @@ function AuthenticatedApp() {
       onNavigate={(view) => { setCurrentView(view); setIsSidebarOpen(false); if (view === 'history') void loadHistories() }}
       onToggleSidebar={() => setIsSidebarOpen((current) => !current)}
     >
-      {import.meta.env.DEV && new URLSearchParams(window.location.search).get('prototype') === 'analysis-quality' ? (
-        <AnalysisQualityPrototype />
-      ) : currentView === 'home' ? (
+      {currentView === 'home' ? (
         analysisPhase === 'input' ? (
         <AnalysisInputView {...{ jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isAtsSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput }} />
         ) : (

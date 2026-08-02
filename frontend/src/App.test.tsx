@@ -155,6 +155,16 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByRole('button', { name: '분석 시작하기 →' })).toBeInTheDocument()
   })
 
+  it('개발용 품질 프로토타입은 명시적인 쿼리에서만 앱 대신 렌더링된다', () => {
+    window.history.replaceState({}, '', '/?prototype=analysis-quality&variant=B')
+
+    render(<App />)
+
+    expect(screen.getByLabelText('품질 점수 프로토타입 변형 선택')).toBeInTheDocument()
+    expect(screen.getByText('일부 확인 필요')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '새로운 분석 시작' })).not.toBeInTheDocument()
+  })
+
   it('비로그인 사용자는 공개 홈과 로그인 CTA만 보고 보호 기능은 사용할 수 없다', async () => {
     vi.mocked(globalThis.fetch).mockReset().mockResolvedValueOnce(unauthenticatedSessionPayload())
     window.history.replaceState({}, '', '/')

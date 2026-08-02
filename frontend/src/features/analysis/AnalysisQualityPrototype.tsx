@@ -16,7 +16,7 @@ const variants: Record<VariantKey, string> = {
 
 function scoreClass(value: number): string {
   if (value >= 90) return 'quality-prototype__score quality-prototype__score--high'
-  if (value >= 80) return 'quality-prototype__score quality-prototype__score--mid'
+  if (value >= 70) return 'quality-prototype__score quality-prototype__score--mid'
   return 'quality-prototype__score quality-prototype__score--low'
 }
 
@@ -95,10 +95,10 @@ function VariantB() {
     <div className="quality-prototype quality-prototype--b">
       <PrototypeHeader />
       <section className="quality-prototype__dashboard">
-        <aside className="quality-prototype__score-rail"><span>ANALYSIS QUALITY</span><strong>86</strong><em>GOOD</em><p>분석 결과의 신뢰 신호가 안정적입니다.</p></aside>
+        <aside className="quality-prototype__score-rail"><span>ANALYSIS QUALITY</span><strong>86</strong><em>일부 확인 필요</em><p>확인이 필요한 품질 항목이 남아 있습니다.</p></aside>
         <div className="quality-prototype__dashboard-main"><div className="quality-prototype__card-title"><div><span className="quality-prototype__label">QUALITY BREAKDOWN</span><h2>품질을 만든 세 가지 신호</h2></div><QualityBadge compact /></div><div className="quality-prototype__metric-list">{metrics.map((metric) => <div key={metric.label}><div><strong>{metric.label}</strong><span>{metric.note}</span></div><b className={scoreClass(metric.value)}>{metric.value}</b></div>)}</div></div>
       </section>
-      <div className="quality-prototype__insight"><span>✓</span><p><strong>좋은 상태입니다.</strong> 다음 분석부터도 같은 평가 기준으로 비교할 수 있습니다.</p></div>
+      <div className="quality-prototype__insight"><span>!</span><p><strong>일부 확인이 필요합니다.</strong> 낮은 항목을 살펴본 뒤 결과를 활용하세요.</p></div>
     </div>
   )
 }
