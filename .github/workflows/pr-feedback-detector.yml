@@ -55,7 +55,12 @@ jobs:
     runs-on: [self-hosted, jdsnack]
     timeout-minutes: 30
     concurrency:
-      group: jdsnack-review-repair-${{ github.event.issue.number || github.event.pull_request.number || github.event.workflow_run.id || github.run_id }}
+      # 그룹 키는 "무엇을 고치는가"(이슈·PR·브랜치)로 고정한다.
+      # workflow_run.id는 실행마다 달라 그룹이 매번 새로 생기므로 중복 억제가 되지 않았다.
+      # head_branch로 바꾸면 같은 브랜치에 대한 연쇄 이벤트가 한 그룹으로 모여
+      # 진행 중 1건 + 대기 1건만 남고 그보다 오래된 대기 건은 자동 취소된다.
+      group: jdsnack-review-repair-${{ github.event.issue.number || github.event.pull_request.number || github.event.workflow_run.head_branch || github.run_id }}
+      # 진행 중인 repair는 죽이지 않는다(Codex 디스패치가 중간에 끊기면 작업이 유실될 수 있다).
       cancel-in-progress: false
     steps:
       - name: Check out automation
