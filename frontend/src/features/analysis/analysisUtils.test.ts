@@ -10,6 +10,7 @@ function history(overrides: Partial<NonNullable<AnalysisHistoryDetail['result']>
     input: { resumeText: 'resume', jdInputType: 'TEXT', jdText: 'jd', sourceUrl: null, sourceSite: null },
     result: { diagnosis: null, match: null, ...overrides },
     failure: null,
+    feedback: null,
   }
 }
 

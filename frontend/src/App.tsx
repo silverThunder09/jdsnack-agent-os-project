@@ -87,7 +87,7 @@ function AuthenticatedApp() {
   const { isSubmitting: isAtsSubmitting, result: atsResult, resetResult: resetAts, submit: submitAts } = useAtsPreview()
   const { isSubmitting: isSentenceSubmitting, resetResult: resetSentence, result: sentenceResult, submit: submitSentence } = useSentencePreview()
   const { isSubmitting: isInterviewSubmitting, result: interviewResult, submit: submitInterview } = useInterviewPreview()
-  const { histories, selectedHistory, isLoading: isHistoryLoading, error: historyError, load: loadHistories, select: selectHistory, retry: retryHistory, remove: removeHistory } = useAnalysisHistory()
+  const { histories, selectedHistory, isLoading: isHistoryLoading, error: historyError, load: loadHistories, select: selectHistory, retry: retryHistory, remove: removeHistory, submitFeedback: submitHistoryFeedback } = useAnalysisHistory()
 
   const trimmedJd = jdText.trim()
   const hasResumeSource = Boolean(diagnoseResult.status === 'success' && diagnoseResult.diagnosis?.sourceText)
@@ -248,6 +248,7 @@ function AuthenticatedApp() {
           onRetry={retryHistory}
           onDelete={removeHistory}
           onExport={handleExportHistory}
+          onSubmitFeedback={submitHistoryFeedback}
         />
       )}
     </AppShell>

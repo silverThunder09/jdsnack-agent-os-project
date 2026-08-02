@@ -1,4 +1,11 @@
-import type { AnalysisHistoryDetail, AnalysisHistorySummary } from '../../types/diagnosis'
+import { useState } from 'react'
+import type {
+  AnalysisFeedbackRating,
+  AnalysisHistoryDetail,
+  AnalysisHistoryFeedback,
+  AnalysisHistorySummary,
+} from '../../types/diagnosis'
+import { FEEDBACK_COMMENT_MAX_LENGTH } from '../../types/diagnosis'
 
 interface AnalysisHistoryViewProps {
   histories: AnalysisHistorySummary[]
@@ -10,6 +17,91 @@ interface AnalysisHistoryViewProps {
   onRetry: (historyId: string) => Promise<void>
   onDelete: (historyId: string) => Promise<void>
   onExport: () => void
+  onSubmitFeedback: (
+    historyId: string,
+    rating: AnalysisFeedbackRating,
+    comment: string | null,
+  ) => Promise<void>
+}
+
+interface AnalysisFeedbackWidgetProps {
+  historyId: string
+  feedback: AnalysisHistoryFeedback | null
+  isLoading: boolean
+  onSubmit: AnalysisHistoryViewProps['onSubmitFeedback']
+}
+
+function AnalysisFeedbackWidget({ historyId, feedback, isLoading, onSubmit }: AnalysisFeedbackWidgetProps) {
+  const [rating, setRating] = useState<AnalysisFeedbackRating | null>(feedback?.rating ?? null)
+  const [comment, setComment] = useState(feedback?.comment ?? '')
+  const [isSaved, setIsSaved] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  const handleSubmit = async () => {
+    if (!rating) return
+    setSubmitError('')
+    setIsSaved(false)
+    try {
+      await onSubmit(historyId, rating, comment.trim() ? comment : null)
+      setIsSaved(true)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : '피드백을 저장하지 못했습니다.')
+    }
+  }
+
+  const select = (next: AnalysisFeedbackRating) => {
+    setRating(next)
+    setIsSaved(false)
+  }
+
+  return (
+    <div className="history-feedback">
+      <h3>이 분석 결과가 도움이 되었나요?</h3>
+      <div className="history-feedback__ratings">
+        <button
+          type="button"
+          className={`ghost-button${rating === 'LIKE' ? ' ghost-button--active' : ''}`}
+          aria-pressed={rating === 'LIKE'}
+          onClick={() => select('LIKE')}
+          disabled={isLoading}
+        >
+          좋아요
+        </button>
+        <button
+          type="button"
+          className={`ghost-button${rating === 'DISLIKE' ? ' ghost-button--active' : ''}`}
+          aria-pressed={rating === 'DISLIKE'}
+          onClick={() => select('DISLIKE')}
+          disabled={isLoading}
+        >
+          별로예요
+        </button>
+      </div>
+      <label className="history-feedback__comment">
+        <span>남기고 싶은 의견 (선택)</span>
+        <textarea
+          value={comment}
+          maxLength={FEEDBACK_COMMENT_MAX_LENGTH}
+          onChange={(event) => {
+            setComment(event.target.value)
+            setIsSaved(false)
+          }}
+          disabled={isLoading}
+        />
+      </label>
+      <p className="char-count">{comment.length}/{FEEDBACK_COMMENT_MAX_LENGTH}</p>
+      <button
+        type="button"
+        className="cta-button"
+        onClick={() => void handleSubmit()}
+        disabled={isLoading || !rating}
+      >
+        피드백 보내기
+      </button>
+      {isSaved ? <p className="history-feedback__saved">피드백이 저장되었습니다.</p> : null}
+      {submitError ? <p className="form-error" role="alert">{submitError}</p> : null}
+    </div>
+  )
 }
 
 function formatDate(value: string): string {
@@ -25,7 +117,7 @@ function statusLabel(status: AnalysisHistorySummary['status']): string {
   return '분석 중'
 }
 
-export function AnalysisHistoryView({ histories, selectedHistory, isLoading, error, onLoad, onSelect, onRetry, onDelete, onExport }: AnalysisHistoryViewProps) {
+export function AnalysisHistoryView({ histories, selectedHistory, isLoading, error, onLoad, onSelect, onRetry, onDelete, onExport, onSubmitFeedback }: AnalysisHistoryViewProps) {
   const handleDelete = async () => {
     if (!selectedHistory || !window.confirm('이 분석 이력과 입력 데이터를 삭제할까요? 삭제 후 복구할 수 없습니다.')) return
     await onDelete(selectedHistory.id)
@@ -123,6 +215,17 @@ export function AnalysisHistoryView({ histories, selectedHistory, isLoading, err
                   <p>{selectedHistory.result.match.summary}</p>
                 </div>
               ) : null}
+              {selectedHistory.status === 'SUCCEEDED' ? (
+                <AnalysisFeedbackWidget
+                  key={selectedHistory.id}
+                  historyId={selectedHistory.id}
+                  feedback={selectedHistory.feedback}
+                  isLoading={isLoading}
+                  onSubmit={onSubmitFeedback}
+                />
+              ) : (
+                <p className="history-empty">완료된 분석 결과가 없어 아직 평가할 수 없습니다.</p>
+              )}
               {selectedHistory.failure ? <p className="form-error" role="alert">{selectedHistory.failure.message}</p> : null}
             </>
           ) : (

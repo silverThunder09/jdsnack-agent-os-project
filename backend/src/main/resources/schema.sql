@@ -55,6 +55,24 @@ ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS match_prompt_version VARCH
 CREATE INDEX IF NOT EXISTS idx_analysis_history_user_created
     ON analysis_history (user_id, created_at);
 
+CREATE TABLE IF NOT EXISTS analysis_feedback (
+    feedback_id VARCHAR(36) PRIMARY KEY,
+    history_id VARCHAR(36) NOT NULL,
+    user_id VARCHAR(36) NOT NULL,
+    rating VARCHAR(16) NOT NULL,
+    comment VARCHAR(500),
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    CONSTRAINT uq_analysis_feedback_history_user UNIQUE (history_id, user_id),
+    CONSTRAINT fk_analysis_feedback_history
+        FOREIGN KEY (history_id) REFERENCES analysis_history(history_id) ON DELETE CASCADE,
+    CONSTRAINT fk_analysis_feedback_user
+        FOREIGN KEY (user_id) REFERENCES app_user(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_feedback_history
+    ON analysis_feedback (history_id);
+
 CREATE TABLE IF NOT EXISTS resume_fixture_mapping (
     mapping_id VARCHAR(64) PRIMARY KEY,
     input_type VARCHAR(16) NOT NULL,
