@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 import { AnalysisPanel, FormatCheckList, KeywordList, SummaryCard } from './AnalysisPanels'
-import type { ResultState } from '../../types/diagnosis'
+import { AnalysisQualityCard } from './AnalysisQualityCard'
+import type { AnalysisQualityResult, ResultState } from '../../types/diagnosis'
 import type { AnalysisOptionKey } from './analysisUtils'
 
 interface AnalysisResultViewProps {
@@ -12,10 +13,11 @@ interface AnalysisResultViewProps {
   handleExportResult: () => void
   handlePrintResult: () => void
   handleNewAnalysis: () => void
+  analysisQuality?: AnalysisQualityResult | null
 }
 
 export function AnalysisResultView(props: AnalysisResultViewProps) {
-  const { submittedOptions, previewResult, atsResult, sentenceResult, resultRef, handleExportResult, handlePrintResult, handleNewAnalysis } = props
+  const { submittedOptions, previewResult, atsResult, sentenceResult, resultRef, handleExportResult, handlePrintResult, handleNewAnalysis, analysisQuality } = props
   return (
     <section className="result-page" aria-label="분석 결과" ref={resultRef} tabIndex={-1}>
       <header className="result-page__head">
@@ -63,6 +65,8 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
           />
         </div>
       ) : null}
+
+      {analysisQuality ? <AnalysisQualityCard quality={analysisQuality} /> : null}
 
       <div className="preview-grid">
         {submittedOptions.jdMatch ? (
