@@ -63,6 +63,15 @@ public class AnalysisHistoryController {
         return ApiResponse.success(historyService.get(userId(session), historyId));
     }
 
+    @PostMapping("/api/analysis-histories/{historyId}/feedback")
+    public ApiResponse<AnalysisFeedbackResponse> submitFeedback(
+            @PathVariable String historyId,
+            @RequestBody(required = false) AnalysisFeedbackRequest request,
+            HttpSession session
+    ) {
+        return ApiResponse.success(historyService.submitFeedback(userId(session), historyId, request));
+    }
+
     @PostMapping("/api/analysis-histories/{historyId}/retry")
     public ApiResponse<AnalysisHistoryResponse> retry(
             @PathVariable String historyId,

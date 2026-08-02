@@ -25,6 +25,8 @@ export type ApiErrorCode =
   | 'INTERVIEW_QUESTION_GENERATION_FAILED'
   | 'INVALID_ANALYSIS_INPUT'
   | 'ANALYSIS_HISTORY_NOT_FOUND'
+  | 'ANALYSIS_NOT_COMPLETED'
+  | 'INVALID_FEEDBACK_INPUT'
   | 'INTERNAL_ERROR'
 
 export interface DiagnoseRequest {
@@ -158,6 +160,21 @@ export interface AnalysisHistoryDetail {
     match: MatchPreviewResult | null
   } | null
   failure: ApiError | null
+  feedback: AnalysisHistoryFeedback | null
+}
+
+export type AnalysisFeedbackRating = 'LIKE' | 'DISLIKE'
+
+export const FEEDBACK_COMMENT_MAX_LENGTH = 500
+
+export interface AnalysisHistoryFeedback {
+  rating: AnalysisFeedbackRating
+  comment: string | null
+  updatedAt: string
+}
+
+export interface AnalysisFeedbackDetail extends AnalysisHistoryFeedback {
+  historyId: string
 }
 
 export interface ApiError {

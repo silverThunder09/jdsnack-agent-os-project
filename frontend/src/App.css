@@ -1785,6 +1785,53 @@ button:disabled {
   line-height: 1.6;
 }
 
+.history-feedback {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 0.9rem;
+  background: #f8f9fc;
+}
+
+.history-feedback__ratings {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.7rem 0;
+}
+
+.ghost-button--active {
+  border-color: var(--primary);
+  background: #eef0fb;
+}
+
+.history-feedback__comment {
+  display: block;
+}
+
+.history-feedback__comment span {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.history-feedback__comment textarea {
+  width: 100%;
+  min-height: 5rem;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--surface);
+  font: inherit;
+  resize: vertical;
+}
+
+.history-feedback__saved {
+  margin: 0.6rem 0 0;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 860px) {
   .history-layout {
     grid-template-columns: 1fr;

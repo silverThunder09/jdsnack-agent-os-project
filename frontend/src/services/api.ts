@@ -1,5 +1,7 @@
 import type {
   ApiErrorCode,
+  AnalysisFeedbackDetail,
+  AnalysisFeedbackRating,
   AnalysisHistoryCreateRequest,
   AnalysisHistoryDetail,
   AnalysisHistorySummary,
@@ -561,6 +563,32 @@ export async function retryAnalysisHistory(historyId: string): Promise<AnalysisH
   }
 
   const payload = await parseJson<AnalysisHistoryDetail>(response)
+  if (payload?.success && payload.data) {
+    return payload.data
+  }
+
+  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+}
+
+export async function submitAnalysisFeedback(
+  historyId: string,
+  rating: AnalysisFeedbackRating,
+  comment?: string | null,
+): Promise<AnalysisFeedbackDetail> {
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/api/analysis-histories/${historyId}/feedback`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating, comment: comment?.trim() ? comment : null }),
+    })
+  } catch {
+    throw new NetworkError()
+  }
+
+  const payload = await parseJson<AnalysisFeedbackDetail>(response)
   if (payload?.success && payload.data) {
     return payload.data
   }

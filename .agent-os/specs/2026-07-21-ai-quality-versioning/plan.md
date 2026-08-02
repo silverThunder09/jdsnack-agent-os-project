@@ -3,7 +3,7 @@
 ## 상태
 
 - Feature Spec 상태: `active`
-- 구현 상태: `T1 completed, T2 pending`
+- 구현 상태: `T1 completed, T2 completed`
 
 ## 내부 수직 티켓
 
@@ -21,7 +21,9 @@
 - 범위: `analysis_feedback` 테이블 신설(이력당 사용자 1건, upsert), `POST /api/analysis-histories/{historyId}/feedback`, `GET /api/analysis-histories/{historyId}` 응답에 `feedback` 필드 추가, 이력 삭제 시 피드백 연쇄 삭제, `AnalysisHistoryView` 피드백 위젯, 기능 테스트
 - 의존성: T1 완료(같은 Feature Spec 내 순차 진행), 기존 `GET/DELETE/retry /api/analysis-histories/**` 소유권·상태 경계 재사용
 - 완료 조건: AC-04~AC-07, TC-05~TC-13
-- 상태: `pending`
+- 상태: `completed`
+- 완료 근거: `AnalysisFeedbackControllerTest`(10건)로 최초 제출(TC-05), upsert 갱신 시 레코드 1건 유지(TC-06), 코멘트 501자 거부·500자 경계 허용·rating 누락/오값 거부(TC-07), 상세 응답의 `feedback` 포함과 미제출 시 `null`(TC-08), 타인 소유 제출·조회 404(TC-09), `RUNNING`/`FAILED` 제출 409(TC-10), 이력 삭제 시 피드백 연쇄 삭제(TC-11), 재시도 이력의 피드백 미상속·원본 유지(TC-12)를 검증했다. `AnalysisHistoryView.test.tsx`에 피드백 위젯 6건(TC-13)을 추가해 성공 이력 노출, 미선택 시 제출 비활성, 제출 위임과 저장 표시, 기존 피드백 프리필, `RUNNING`/`FAILED` 미노출, 서버 오류 메시지 표시를 검증했다. `./gradlew test`, `npm run lint && npm test && npm run build`, Docs Harness, AI-readiness를 통과했다.
+- 백엔드 배정: `claude-fallback` (Codex outage로 `.agent-os/operations/worker-backends.md` 폴백 규칙 적용, 사용자 승인 2026-08-02)
 - 구현 예상 위치: `backend/src/main/resources/schema.sql`, `backend/src/main/java/com/jdsnack/analysis/**`, `frontend/src/features/analysis/AnalysisHistoryView.tsx`, `frontend/src/services/**`
 
 ## 공통 검증

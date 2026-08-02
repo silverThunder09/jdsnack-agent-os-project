@@ -10,6 +10,7 @@ public record AnalysisHistoryResponse(
         Instant createdAt,
         AnalysisHistoryInputResponse input,
         AnalysisHistoryResult result,
-        ErrorDetail failure
+        ErrorDetail failure,
+        AnalysisHistoryFeedbackResponse feedback
 ) {
 }

@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class AnalysisHistoryService {
 
     private final AnalysisHistoryRepository historyRepository;
+    private final AnalysisFeedbackRepository feedbackRepository;
     private final AnalysisInputSnapshotRepository snapshotRepository;
     private final AnalysisInputSnapshotService snapshotService;
     private final DiagnoseService diagnoseService;
@@ -34,6 +35,7 @@ public class AnalysisHistoryService {
 
     public AnalysisHistoryService(
             AnalysisHistoryRepository historyRepository,
+            AnalysisFeedbackRepository feedbackRepository,
             AnalysisInputSnapshotRepository snapshotRepository,
             AnalysisInputSnapshotService snapshotService,
             DiagnoseService diagnoseService,
@@ -42,6 +44,7 @@ public class AnalysisHistoryService {
             ObjectMapper objectMapper
     ) {
         this.historyRepository = historyRepository;
+        this.feedbackRepository = feedbackRepository;
         this.snapshotRepository = snapshotRepository;
         this.snapshotService = snapshotService;
         this.diagnoseService = diagnoseService;
@@ -76,7 +79,66 @@ public class AnalysisHistoryService {
 
     public AnalysisHistoryResponse get(String userId, String historyId) {
         AnalysisHistory history = findHistory(userId, historyId);
-        return toResponse(history, snapshotFor(history, userId));
+        return toResponse(
+                history,
+                snapshotFor(history, userId),
+                feedbackRepository.findByHistoryIdAndUserId(historyId, userId).orElse(null)
+        );
+    }
+
+    @Transactional
+    public AnalysisFeedbackResponse submitFeedback(
+            String userId,
+            String historyId,
+            AnalysisFeedbackRequest request
+    ) {
+        AnalysisHistory history = findHistory(userId, historyId);
+        if (history.status() != AnalysisHistoryStatus.SUCCEEDED) {
+            throw new ApiException(ErrorCode.ANALYSIS_NOT_COMPLETED);
+        }
+
+        AnalysisFeedbackRating rating = parseRating(request);
+        String comment = normalizeComment(request.comment());
+
+        Instant now = Instant.now();
+        AnalysisFeedback saved = feedbackRepository.upsert(new AnalysisFeedback(
+                UUID.randomUUID().toString(),
+                historyId,
+                userId,
+                rating,
+                comment,
+                now,
+                now
+        ));
+
+        return new AnalysisFeedbackResponse(
+                saved.historyId(),
+                saved.rating(),
+                saved.comment(),
+                saved.updatedAt()
+        );
+    }
+
+    private AnalysisFeedbackRating parseRating(AnalysisFeedbackRequest request) {
+        if (request == null || isBlank(request.rating())) {
+            throw new ApiException(ErrorCode.INVALID_FEEDBACK_INPUT);
+        }
+
+        try {
+            return AnalysisFeedbackRating.valueOf(request.rating().trim().toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            throw new ApiException(ErrorCode.INVALID_FEEDBACK_INPUT);
+        }
+    }
+
+    private String normalizeComment(String comment) {
+        if (comment == null) {
+            return null;
+        }
+        if (comment.length() > AnalysisFeedback.COMMENT_MAX_LENGTH) {
+            throw new ApiException(ErrorCode.INVALID_FEEDBACK_INPUT);
+        }
+        return comment.isBlank() ? null : comment;
     }
 
     public AnalysisHistoryResponse retry(String userId, String historyId) {
@@ -99,6 +161,7 @@ public class AnalysisHistoryService {
     @Transactional
     public void delete(String userId, String historyId) {
         AnalysisHistory history = findHistory(userId, historyId);
+        feedbackRepository.deleteByHistoryIdAndUserId(history.id(), userId);
         if (!historyRepository.deleteByIdAndUserId(history.id(), userId)) {
             throw new ApiException(ErrorCode.ANALYSIS_HISTORY_NOT_FOUND);
         }
@@ -235,6 +298,14 @@ public class AnalysisHistoryService {
     }
 
     private AnalysisHistoryResponse toResponse(AnalysisHistory history, AnalysisInputSnapshot snapshot) {
+        return toResponse(history, snapshot, null);
+    }
+
+    private AnalysisHistoryResponse toResponse(
+            AnalysisHistory history,
+            AnalysisInputSnapshot snapshot,
+            AnalysisFeedback feedback
+    ) {
         return new AnalysisHistoryResponse(
                 history.id(),
                 history.status(),
@@ -247,7 +318,14 @@ public class AnalysisHistoryService {
                         snapshot.sourceSite()
                 ),
                 readResult(history),
-                failure(history)
+                failure(history),
+                feedback == null
+                        ? null
+                        : new AnalysisHistoryFeedbackResponse(
+                                feedback.rating(),
+                                feedback.comment(),
+                                feedback.updatedAt()
+                        )
         );
     }
 

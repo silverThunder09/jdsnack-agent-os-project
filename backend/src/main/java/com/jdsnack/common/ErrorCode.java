@@ -103,6 +103,14 @@ public enum ErrorCode {
             HttpStatus.NOT_FOUND,
             "요청한 분석 이력을 찾을 수 없습니다."
     ),
+    ANALYSIS_NOT_COMPLETED(
+            HttpStatus.CONFLICT,
+            "분석이 완료된 이력에만 피드백을 남길 수 있습니다."
+    ),
+    INVALID_FEEDBACK_INPUT(
+            HttpStatus.BAD_REQUEST,
+            "피드백 입력을 확인해주세요."
+    ),
     INTERVIEW_QUESTION_GENERATION_FAILED(
             HttpStatus.BAD_GATEWAY,
             "모의 면접 질문 생성에 실패했습니다. 잠시 후 다시 시도해주세요."
