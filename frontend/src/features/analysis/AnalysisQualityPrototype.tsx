@@ -56,7 +56,7 @@ function PrototypeHeader() {
         <h1>분석 결과</h1>
         <p>기존 사용자 점수와 AI 분석 품질 점수를 함께 배치한 화면 목업입니다.</p>
       </div>
-      <span className="quality-prototype__version">model v2.5 · prompt v3</span>
+      <span className="quality-prototype__version">결정론적 품질 검증</span>
     </header>
   )
 }
@@ -109,7 +109,7 @@ function VariantC() {
       <PrototypeHeader />
       <section className="quality-prototype__report">
         <div className="quality-prototype__report-top"><div><span className="quality-prototype__label">ANALYSIS REPORT / 2026.07.22</span><h2>이 결과의 품질 리포트</h2><p>사용자 결과 점수와 별개로, AI 응답 자체를 검증한 기록입니다.</p></div><div className="quality-prototype__ring"><strong>86</strong><span>품질점수</span></div></div>
-        <div className="quality-prototype__report-body"><div><span className="quality-prototype__label">결과에 반영된 버전</span><dl><div><dt>모델</dt><dd>gemini-2.5</dd></div><div><dt>프롬프트</dt><dd>diagnosis-v3</dd></div><div><dt>평가기준</dt><dd>quality-v1</dd></div></dl></div><div className="quality-prototype__evidence"><span className="quality-prototype__label">평가 요약</span><ul><li><b>형식</b><span>필수 필드와 데이터 형식이 정확합니다.</span><strong>100</strong></li><li><b>근거</b><span>입력 문서와 제안의 연결이 양호합니다.</span><strong>82</strong></li><li><b>완성도</b><span>요약과 필수 결과 영역이 모두 채워졌습니다.</span><strong>88</strong></li></ul></div></div>
+        <div className="quality-prototype__report-body"><div><span className="quality-prototype__label">결과에 반영된 평가 기준</span><dl><div><dt>평가 기준</dt><dd>quality-v1</dd></div></dl></div><div className="quality-prototype__evidence"><span className="quality-prototype__label">평가 요약</span><ul><li><b>형식</b><span>필수 필드와 데이터 형식이 정확합니다.</span><strong>100</strong></li><li><b>근거</b><span>입력 문서와 제안의 연결이 양호합니다.</span><strong>82</strong></li><li><b>완성도</b><span>요약과 필수 결과 영역이 모두 채워졌습니다.</span><strong>88</strong></li></ul></div></div>
       </section>
     </div>
   )
