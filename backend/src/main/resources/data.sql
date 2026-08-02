@@ -1,4 +1,25 @@
-    MERGE INTO fixture_analysis (
+-- 시드 삽입은 H2와 PostgreSQL 양쪽에서 동작해야 한다(ADR-019).
+--
+-- 이전에는 H2 전용 `MERGE INTO ... KEY (...)`를 썼다. PostgreSQL의 MERGE는
+-- `USING ... ON ... WHEN MATCHED` 형태라 이 문법을 받지 않으며, PostgreSQL 15
+-- 이전에는 MERGE 자체가 없다.
+--
+-- `INSERT ... ON CONFLICT`도 대안이 아니다. PostgreSQL은 지원하지만 H2가 거부한다
+-- (ScriptStatementFailedException으로 확인).
+--
+-- 따라서 두 DBMS가 모두 지원하는 표준 SQL만 쓴다. 먼저 해당 시드 행을 지우고 다시
+-- 넣어 재실행 시 멱등성을 유지하며, 파일 내용이 항상 최종 상태가 된다(기존 MERGE와
+-- 동일한 의미). 두 테이블 모두 외래키 참조가 없어 삭제 순서에 제약이 없다.
+
+DELETE FROM resume_fixture_mapping WHERE mapping_id IN (
+    'map-text-backend-junior-001',
+    'map-pdf-backend-junior-001',
+    'map-docx-backend-junior-001'
+);
+
+DELETE FROM fixture_analysis WHERE fixture_key = 'fixture-backend-junior-001';
+
+    INSERT INTO fixture_analysis (
         fixture_key,
         version,
         score,
@@ -8,7 +29,7 @@
         keywords_json,
         locale,
         created_at
-    ) KEY (fixture_key) VALUES (
+    ) VALUES (
         'fixture-backend-junior-001',
         'v1',
         78,
@@ -20,7 +41,7 @@
         TIMESTAMP '2026-05-22 17:00:00'
     );
 
-    MERGE INTO resume_fixture_mapping (
+    INSERT INTO resume_fixture_mapping (
         mapping_id,
         input_type,
         match_type,
@@ -29,7 +50,7 @@
         title,
         active,
         created_at
-    ) KEY (mapping_id) VALUES
+    ) VALUES
     (
         'map-text-backend-junior-001',
         'TEXT',
