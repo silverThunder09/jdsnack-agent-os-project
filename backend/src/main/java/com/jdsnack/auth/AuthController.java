@@ -4,6 +4,7 @@ import com.jdsnack.common.ApiResponse;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
@@ -34,6 +35,12 @@ public class AuthController {
     @GetMapping("/api/auth/session")
     public ApiResponse<AuthSessionResponse> session(HttpSession session) {
         return ApiResponse.success(googleAuthService.session(session));
+    }
+
+    @PostMapping("/api/auth/logout")
+    public ResponseEntity<Void> logout(HttpSession session) {
+        googleAuthService.logout(session);
+        return ResponseEntity.noContent().build();
     }
 
     private ResponseEntity<Void> redirect(URI location) {

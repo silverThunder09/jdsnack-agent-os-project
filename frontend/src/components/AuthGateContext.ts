@@ -6,6 +6,7 @@ export type AuthGateContextValue = {
   isLoginOpen: boolean
   openLogin: () => void
   closeLogin: () => void
+  logout: () => Promise<void>
 }
 
 export const AuthGateContext = createContext<AuthGateContextValue | null>(null)
