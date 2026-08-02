@@ -75,6 +75,62 @@ jobs:
       - name: Build boot jar
         run: gradle bootJar
 
+  postgres_schema:
+    # ADR-019는 운영 저장소를 PostgreSQL로 정했지만 로컬·테스트는 H2만 쓴다.
+    # 그래서 PostgreSQL에 없는 문법이 들어와도 어떤 게이트에도 걸리지 않았다(Issue #175).
+    # 초기화 스크립트를 실제 PostgreSQL에 올려 그 구멍을 막는다.
+    name: Verify schema on PostgreSQL
+    needs: detect
+    if: ${{ needs.detect.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jdsnack
+          POSTGRES_PASSWORD: jdsnack
+          POSTGRES_DB: jdsnack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jdsnack"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply schema and seed
+        env:
+          PGPASSWORD: jdsnack
+        run: |
+          set -euo pipefail
+          psql -h localhost -U jdsnack -d jdsnack -v ON_ERROR_STOP=1 \
+            -f backend/src/main/resources/schema.sql
+          psql -h localhost -U jdsnack -d jdsnack -v ON_ERROR_STOP=1 \
+            -f backend/src/main/resources/data.sql
+      - name: Re-apply to prove idempotency
+        env:
+          PGPASSWORD: jdsnack
+        run: |
+          set -euo pipefail
+          psql -h localhost -U jdsnack -d jdsnack -v ON_ERROR_STOP=1 \
+            -f backend/src/main/resources/schema.sql
+          psql -h localhost -U jdsnack -d jdsnack -v ON_ERROR_STOP=1 \
+            -f backend/src/main/resources/data.sql
+      - name: Assert seed rows are not duplicated
+        env:
+          PGPASSWORD: jdsnack
+        run: |
+          set -euo pipefail
+          mappings="$(psql -h localhost -U jdsnack -d jdsnack -tAc \
+            'SELECT COUNT(*) FROM resume_fixture_mapping')"
+          fixtures="$(psql -h localhost -U jdsnack -d jdsnack -tAc \
+            'SELECT COUNT(*) FROM fixture_analysis')"
+          echo "resume_fixture_mapping=$mappings fixture_analysis=$fixtures"
+          [ "$mappings" = "3" ] || { echo "기대 3행, 실제 $mappings행"; exit 1; }
+          [ "$fixtures" = "1" ] || { echo "기대 1행, 실제 $fixtures행"; exit 1; }
+
   frontend:
     name: Test and build frontend
     needs: detect
@@ -191,13 +247,14 @@ jobs:
   gate:
     name: PR CI Gate
     if: always()
-    needs: [detect, backend, frontend, backend_container, compose_smoke, docs, workflow]
+    needs: [detect, backend, postgres_schema, frontend, backend_container, compose_smoke, docs, workflow]
     runs-on: ubuntu-latest
     steps:
       - name: Fail when selected CI failed
         if: >
           needs.detect.result != 'success' ||
           contains(fromJSON('["failure","cancelled"]'), needs.backend.result) ||
+          contains(fromJSON('["failure","cancelled"]'), needs.postgres_schema.result) ||
           contains(fromJSON('["failure","cancelled"]'), needs.frontend.result) ||
           contains(fromJSON('["failure","cancelled"]'), needs.backend_container.result) ||
           contains(fromJSON('["failure","cancelled"]'), needs.compose_smoke.result) ||
@@ -207,6 +264,7 @@ jobs:
       - name: Report selected CI
         run: |
           echo "backend=${{ needs.backend.result }}"
+          echo "postgres-schema=${{ needs.postgres_schema.result }}"
           echo "frontend=${{ needs.frontend.result }}"
           echo "backend-container=${{ needs.backend_container.result }}"
           echo "compose-smoke=${{ needs.compose_smoke.result }}"
