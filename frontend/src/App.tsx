@@ -13,6 +13,7 @@ import { AnalysisInputView } from './features/analysis/AnalysisInputView'
 import { AnalysisResultView } from './features/analysis/AnalysisResultView'
 import { InterviewWorkspace } from './features/analysis/InterviewWorkspace'
 import { AnalysisHistoryView } from './features/analysis/AnalysisHistoryView'
+import { AnalysisQualityPrototype } from './features/analysis/AnalysisQualityPrototype'
 import { createAnalysisHistory, createAnalysisHistoryFile } from './services/api'
 import {
   ANALYSIS_OPTIONS,
@@ -257,6 +258,8 @@ function AuthenticatedApp() {
 
 function AppContent() {
   const { status } = useAuthGate()
+  const isQualityPrototype = import.meta.env.DEV && new URLSearchParams(window.location.search).get('prototype') === 'analysis-quality'
+  if (isQualityPrototype) return <AnalysisQualityPrototype />
   return status === 'authenticated' ? <AuthenticatedApp /> : <PublicHomeApp />
 }
 

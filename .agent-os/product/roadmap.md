@@ -20,7 +20,7 @@
 
 `OAuth 1개 공급자 로그인 → 이력서·JD 입력 → 기존 AI 진단·JD 매칭 → 결과 저장 → 이력 조회·재시도·삭제`
 
-사람인 이미지 OCR, Service MVP, ATS 점수·포맷 진단, 분석 결과 리포트 내보내기는 구현·검증을 마치고 archive로 이동했습니다. 현재 active Spec은 **AI 품질 평가와 prompt/model version**이며, 상세는 [spec plan.md](../specs/2026-07-21-ai-quality-versioning/plan.md)를 따릅니다.
+사람인 이미지 OCR, Service MVP, ATS 점수·포맷 진단, 분석 결과 리포트 내보내기, AI 품질 평가와 prompt/model version은 구현·검증을 마치고 archive로 이동했습니다. 현재 active Spec은 없으며, 다음 후보는 제품 신호가 확인될 때 승격합니다. 완료 Spec의 상세는 [archive plan.md](../archive/specs/2026-07-21-ai-quality-versioning/plan.md)에 보관합니다.
 
 ### 내부 수직 티켓
 

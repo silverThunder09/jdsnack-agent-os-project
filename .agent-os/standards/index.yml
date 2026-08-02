@@ -14,6 +14,7 @@ documents:
     - .agent-os/adr/adr-015-oauth-provider.md
     - .agent-os/adr/adr-016-jd-source-adapter.md
     - .agent-os/adr/adr-020-analysis-input-record.md
+    - .agent-os/adr/adr-021-deterministic-ai-quality-assessment.md
     - .agent-os/adr/adr-018-analysis-worker.md
   harness:
     - .agent-os/standards/codex-harness.md
@@ -83,8 +84,7 @@ documents:
     - scripts/autonomous-spec-loop.sh
     - scripts/autonomous-spec-loop-test.sh
     - .github/workflows/autonomous-loop.yml
-active_specs:
-  - .agent-os/specs/2026-07-21-ai-quality-versioning
+active_specs: []
 # 상세 pending Spec을 미리 만들지 않는다. 후보는 제품 백로그에만 둔다.
 pending_specs: []
 candidate_backlog: .agent-os/product/spec-backlog.md

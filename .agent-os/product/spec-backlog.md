@@ -4,8 +4,9 @@
 
 ## 현재 Feature Spec
 
-- 현재 active Spec은 **AI 품질 평가와 prompt/model version**이며 `.agent-os/specs/2026-07-21-ai-quality-versioning/`에 있습니다. GitHub Issue #168(`product-signal:analysis-data`)에서 승격됐습니다.
-- 완료된 **분석 결과 리포트 내보내기**는 `.agent-os/archive/specs/2026-07-21-analysis-report-export/`로 이동했습니다.
+- 현재 active Spec은 없습니다. 다음 후보는 해당 `product-signal:*` 라벨이 붙은 Issue가 생성될 때 승격합니다.
+- 완료된 **AI 품질 평가와 prompt/model version**은 `.agent-os/archive/specs/2026-07-21-ai-quality-versioning/`로 이동했습니다. GitHub Issue #168(`product-signal:analysis-data`)에서 승격됐습니다.
+- 이전 완료 Spec **분석 결과 리포트 내보내기**는 `.agent-os/archive/specs/2026-07-21-analysis-report-export/`에 있습니다.
 - 이전 완료 Spec **ATS 점수·포맷 진단**은 `.agent-os/archive/specs/2026-07-20-ats-score-format/`에 있습니다.
 
 ## Post MVP 후보
@@ -20,6 +21,7 @@
 | 분석·수집 관측성과 장애 대응 | 운영 신호가 필요한 뒤 |
 | EC2 실배포 (ADR-004) | OAuth 운영 redirect·결제가 고정 도메인+HTTPS를 전제하므로 MVP 운영 전환 전 |
 | 요금제·사용량 제한 — 횟수 미터링 방식 확정 | 실사용자·비용 신호 확인 뒤 (기존 "AI 호출량·비용 제한" 후보와 통합 검토) |
+| 결정론적 AI 품질 평가 (quality-v1) — [ADR-021](../adr/adr-021-deterministic-ai-quality-assessment.md) | 설계는 승인 완료(2026-07-24). 품질 점수 계산·`analysis_history` 저장·백엔드 응답 계약 구현은 `product-signal:analysis-quality` 신호 확인 뒤 |
 
 결정 근거: [2026-07-16 spec backlog grill decisions](../archive/research/2026-07-16-spec-backlog-grill-decisions.md)
 
