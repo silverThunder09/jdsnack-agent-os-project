@@ -13,7 +13,8 @@
 - `pr-review-gate.sh`: PR 리뷰 게이트 결과를 확인합니다.
 - `../.github/workflows/pr-ci-router.yml`: PR 변경 경로에 맞는 CI만 선택적으로 실행합니다.
 - `docs-harness.sh`: 문서 계약과 자동화 회귀 검사를 실행합니다.
-- `workflow-ci-test.sh`: GitHub Actions YAML과 PR Router 계약을 검사합니다.
+- `workflow-ci-test.sh`: GitHub Actions YAML과 PR Router·Feedback Detector 계약을 검사합니다.
+- `pr-feedback-workflow-test.sh`: repair 잡의 동시성 그룹 키와 `cancel-in-progress` 계약을 고정합니다.
 - `autonomous_spec_loop.py`: Spec 완료·승격·티켓 디스패치 결정을 결정론적으로 계산합니다.
 - `autonomous-spec-loop.sh`: GitHub 이벤트를 Spec 큐와 Claude/Codex 실행기로 연결합니다.
 - `create-codex-worktree.sh`: 최신 `origin/main`에서 Codex worktree를 생성합니다.
