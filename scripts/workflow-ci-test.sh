@@ -6,5 +6,6 @@ cd "$ROOT_DIR"
 
 ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].each { |file| YAML.load_file(file) }'
 ./scripts/pr-ci-router-test.sh
+./scripts/pr-feedback-workflow-test.sh
 
 echo "Workflow CI contract passed"
