@@ -43,6 +43,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+        shell: bash
         run: |
           bash scripts/autonomous-spec-loop.sh \
             --event "$GITHUB_EVENT_NAME" \

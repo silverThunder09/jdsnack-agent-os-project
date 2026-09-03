@@ -14,6 +14,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Run Claude review-merge loop
+        shell: bash
         run: |
           claude -p "다음 절차 문서를 읽고 그 절차를 정확히 1회 실행하라: $HOME/.claude/scheduled-tasks/jdsnack-review-merge-loop/SKILL.md" \
             --dangerously-skip-permissions
