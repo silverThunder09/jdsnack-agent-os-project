@@ -17,8 +17,9 @@ assert_contains() {
 
 assert_not_contains() {
     local unexpected="$1"
-    grep -Fq -- "$unexpected" "$WORKFLOW" \
-        && fail "신뢰되지 않은 PR 실행을 허용하는 계약이 있습니다: $unexpected"
+    if grep -Fq -- "$unexpected" "$WORKFLOW"; then
+        fail "신뢰되지 않은 PR 실행을 허용하는 계약이 있습니다: $unexpected"
+    fi
 }
 
 assert_contains "      - 'codex/**'"
