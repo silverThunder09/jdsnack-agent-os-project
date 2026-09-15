@@ -8,6 +8,10 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   review:
     if: >-
@@ -38,6 +42,8 @@ jobs:
           }
       - name: Run Claude review-merge loop
         shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $skillPath = Join-Path $env:GITHUB_WORKSPACE '.claude/skills/review-loop/SKILL.md'
           claude --model sonnet --effort medium -p "다음 절차 문서를 읽고 그 절차를 정확히 1회 실행하라: $skillPath" --dangerously-skip-permissions

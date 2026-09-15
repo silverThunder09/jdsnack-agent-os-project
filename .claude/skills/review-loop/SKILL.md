@@ -47,10 +47,24 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
    - 마지막 점수·미해결 findings를 사용자에게 에스컬레이션.
    - `pr-automation-loop.md` 기준 실패 Issue 생성 여부 판단.
 
-## 3. 통과 후 (Claude 담당)
-- PR 생성/갱신은 Claude가 수행. High-risk PR은 `scripts/pr-review-gate.sh <N>`와 `merge-rules.md` 머지 조건을 따름.
-- 통과 점수·회차 수를 PR 본문 검증 섹션에 한 줄로 기록.
-- merge도 Claude가 수행.
+## 3. 통과 후: PR 코멘트와 머지 (Claude 담당)
+리뷰 통과는 로컬 판정만 끝났다는 뜻이 아닙니다. **PR에 결과를 코멘트로 남기고, 머지 가능한 일반 PR이면 실제로 머지된 상태까지 확인해야 합니다.** PR 본문만 수정하고 코멘트를 생략하거나, `Ready to merge` 상태를 성공으로 보고 멈추면 안 됩니다.
+
+1. 현재 PR 번호와 저장소를 확인합니다.
+   - `gh pr view --json number,state,headRefName,mergeStateStatus`
+   - PR이 이미 `MERGED`이면 중복 실행으로 간주하고 종료합니다.
+2. 리뷰 결과를 구조화된 **PR 코멘트**로 작성합니다.
+   - `gh pr comment <N> --body-file <review-report-file>`
+   - 코멘트에는 `review-loop`, `attempt`, 점수, 결정(`PASS`/`REQUEST_CHANGES`/`NEEDS_HUMAN`), findings를 포함합니다.
+   - 통과 결과를 PR 본문에 기록할 수는 있지만, 본문 수정만으로 코멘트를 대체하지 않습니다.
+3. `score < 4`, 결정론 게이트 실패, 충돌, 필수 체크 미통과이면 `REQUEST_CHANGES` 또는 `NEEDS_HUMAN` 코멘트만 남기고 머지하지 않습니다.
+4. High-risk 변경은 `scripts/pr-review-gate.sh <N>`와 `merge-rules.md` 조건을 적용하고, 사람 승인이 필요한 경우 `NEEDS_HUMAN`으로 멈춥니다.
+5. High-risk가 아니고 모든 필수 체크가 통과한 일반 Codex PR이면 다음으로 squash merge합니다.
+   - `gh pr merge <N> --squash --delete-branch --repo <owner>/<repo>`
+6. 명령 성공 메시지만 믿지 말고 최종 상태를 확인합니다.
+   - `gh pr view <N> --json state,mergedAt,mergeCommit`
+   - `state == MERGED`이고 `mergedAt`이 있을 때만 머지 완료로 보고합니다.
+   - 실패하거나 여전히 `OPEN`이면 재시도 폭주 없이 실패 원인과 `NEEDS_HUMAN` 상태를 코멘트로 남깁니다.
 
 ## 경계 규칙 (반드시 준수)
 - **Claude는 소스 코드를 수정/커밋하지 않는다.** 수정의 주체는 항상 Codex.
