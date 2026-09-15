@@ -4,7 +4,9 @@
 
 ## 현재 Feature Spec
 
-- 현재 active Spec은 없습니다. 다음 후보는 해당 `product-signal:*` 라벨이 붙은 Issue가 생성될 때 승격합니다.
+- 현재 active Spec은 [분석 진행 상태 피드백](../specs/2026-09-15-analysis-progress-feedback/)입니다.
+- 분석 시작 후 결과 화면으로 먼저 전환되어 사용자가 전체 분석의 진행 여부를 알기 어려운 문제를 해결합니다.
+- 백엔드 진행률 스트리밍·비동기 worker·가짜 퍼센트는 이번 범위에 포함하지 않고, 브라우저가 실제로 알고 있는 요청 상태만 표시합니다.
 - 완료된 **AI 품질 평가와 prompt/model version**은 `.agent-os/archive/specs/2026-07-21-ai-quality-versioning/`로 이동했습니다. GitHub Issue #168(`product-signal:analysis-data`)에서 승격됐습니다.
 - 이전 완료 Spec **분석 결과 리포트 내보내기**는 `.agent-os/archive/specs/2026-07-21-analysis-report-export/`에 있습니다.
 - 이전 완료 Spec **ATS 점수·포맷 진단**은 `.agent-os/archive/specs/2026-07-20-ats-score-format/`에 있습니다.

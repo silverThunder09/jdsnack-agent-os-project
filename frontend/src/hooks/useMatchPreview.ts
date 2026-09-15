@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { fetchJdFromUrl, NetworkError, previewMatch } from '../services/api'
 import type {
   ApiErrorCode,
+  AnalysisRequestOutcome,
   JdFetchResult,
   MatchPreviewRequest,
   ResultState,
@@ -127,7 +128,7 @@ export function useMatchPreview() {
     setJdFetchState(jdFetchIdleState)
   }
 
-  const handleValidationError = (code: ApiErrorCode, message: string) => {
+  const handleValidationError = (code: ApiErrorCode, message: string): AnalysisRequestOutcome => {
     if (
       code === 'EMPTY_JD' ||
       code === 'JD_TEXT_TOO_SHORT' ||
@@ -146,9 +147,10 @@ export function useMatchPreview() {
       message,
       code,
     })
+    return { ok: false, message, code }
   }
 
-  const submit = async (request: MatchPreviewRequest) => {
+  const submit = async (request: MatchPreviewRequest): Promise<AnalysisRequestOutcome> => {
     const nextTextError = validateJdText(request.jdText)
     const nextUrlError = validateJdUrl(request.jdUrl ?? '')
 
@@ -162,7 +164,7 @@ export function useMatchPreview() {
         title: 'JD 입력 확인이 필요합니다',
         message: nextTextError || nextUrlError,
       })
-      return
+      return { ok: false, message: nextTextError || nextUrlError }
     }
 
     setIsSubmitting(true)
@@ -178,12 +180,11 @@ export function useMatchPreview() {
           message: outcome.result.summary,
           matchPreview: outcome.result,
         })
-        return
+        return { ok: true }
       }
 
       if (outcome.kind === 'validation-error') {
-        handleValidationError(outcome.code, outcome.message)
-        return
+        return handleValidationError(outcome.code, outcome.message)
       }
 
       if (outcome.kind === 'error') {
@@ -200,7 +201,7 @@ export function useMatchPreview() {
           message: outcome.message,
           code: outcome.code,
         })
-        return
+        return { ok: false, message: outcome.message, code: outcome.code }
       }
 
       setResult({
@@ -208,6 +209,7 @@ export function useMatchPreview() {
         title: 'JD 비교 요청을 완료하지 못했습니다',
         message: '예상하지 못한 응답 형식입니다.',
       })
+      return { ok: false, message: '예상하지 못한 응답 형식입니다.' }
     } catch (error) {
       const message =
         error instanceof NetworkError
@@ -219,6 +221,7 @@ export function useMatchPreview() {
         title: 'JD 비교 요청을 완료하지 못했습니다',
         message,
       })
+      return { ok: false, message }
     } finally {
       setIsSubmitting(false)
     }

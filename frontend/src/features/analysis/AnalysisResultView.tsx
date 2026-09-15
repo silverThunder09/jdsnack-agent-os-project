@@ -1,5 +1,7 @@
 import type { RefObject } from 'react'
 import { AnalysisPanel, FormatCheckList, KeywordList, SummaryCard } from './AnalysisPanels'
+import { AnalysisProgress } from './AnalysisProgress'
+import type { AnalysisProgressState } from './analysisProgressState'
 import { AnalysisQualityCard } from './AnalysisQualityCard'
 import type { AnalysisQualityResult, ResultState } from '../../types/diagnosis'
 import type { AnalysisOptionKey } from './analysisUtils'
@@ -13,11 +15,12 @@ interface AnalysisResultViewProps {
   handleExportResult: () => void
   handlePrintResult: () => void
   handleNewAnalysis: () => void
+  analysisProgress: AnalysisProgressState
   analysisQuality?: AnalysisQualityResult | null
 }
 
 export function AnalysisResultView(props: AnalysisResultViewProps) {
-  const { submittedOptions, previewResult, atsResult, sentenceResult, resultRef, handleExportResult, handlePrintResult, handleNewAnalysis, analysisQuality } = props
+  const { submittedOptions, previewResult, atsResult, sentenceResult, resultRef, handleExportResult, handlePrintResult, handleNewAnalysis, analysisProgress, analysisQuality } = props
   return (
     <section className="result-page" aria-label="분석 결과" ref={resultRef} tabIndex={-1}>
       <header className="result-page__head">
@@ -38,11 +41,13 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
               </button>
             </>
           ) : null}
-          <button type="button" className="ghost-button" onClick={handleNewAnalysis}>
+          <button type="button" className="ghost-button" onClick={handleNewAnalysis} disabled={analysisProgress.status === 'running'} aria-disabled={analysisProgress.status === 'running'}>
             새 분석
           </button>
         </div>
       </header>
+
+      <AnalysisProgress state={analysisProgress} />
 
       {submittedOptions.jdMatch ? (
         <div className="summary-grid">

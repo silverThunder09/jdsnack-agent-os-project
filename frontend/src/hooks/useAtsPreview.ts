@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NetworkError, previewAts } from '../services/api'
 import { validateJdText, validateJdUrl } from './useMatchPreview'
-import type { ApiErrorCode, MatchPreviewRequest, ResultState } from '../types/diagnosis'
+import type { AnalysisRequestOutcome, ApiErrorCode, MatchPreviewRequest, ResultState } from '../types/diagnosis'
 
 const idleState: ResultState = {
   status: 'idle',
@@ -21,11 +21,11 @@ export function useAtsPreview() {
 
   const resetResult = () => setResult(idleState)
 
-  const submit = async (request: MatchPreviewRequest) => {
+  const submit = async (request: MatchPreviewRequest): Promise<AnalysisRequestOutcome> => {
     const validationMessage = validateJdText(request.jdText) || validateJdUrl(request.jdUrl ?? '')
     if (validationMessage) {
       setResult({ status: 'error', title: 'ATS 진단 입력을 확인해 주세요', message: validationMessage })
-      return
+      return { ok: false, message: validationMessage }
     }
 
     setIsSubmitting(true)
@@ -40,7 +40,7 @@ export function useAtsPreview() {
           message: outcome.result.summary,
           atsPreview: outcome.result,
         })
-        return
+        return { ok: true }
       }
 
       setResult({
@@ -49,12 +49,14 @@ export function useAtsPreview() {
         message: outcome.message,
         code: outcome.code as ApiErrorCode,
       })
+      return { ok: false, message: outcome.message, code: outcome.code as ApiErrorCode }
     } catch (error) {
       setResult({
         status: 'error',
         title: 'ATS 진단을 완료하지 못했습니다',
         message: error instanceof NetworkError ? error.message : '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       })
+      return { ok: false, message: error instanceof NetworkError ? error.message : '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' }
     } finally {
       setIsSubmitting(false)
     }
