@@ -4,9 +4,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -30,6 +32,31 @@ class AuthLogoutControllerTest {
                 .andExpect(status().isNoContent());
 
         assertThat(session.isInvalid()).isTrue();
+    }
+
+    /**
+     * 로그아웃 응답은 브라우저의 세션 쿠키도 만료시킨다.
+     *
+     * <p>{@code session.invalidate()}는 서버 쪽 세션만 폐기한다. 그것만으로는 브라우저에
+     * JSESSIONID가 그대로 남아, 공용 PC에서 개발자도구나 쿠키 목록에 값이 계속 보인다.
+     * 서버가 이미 무효화했으므로 탈취 위험은 없지만, 사용자가 "로그아웃했는데 쿠키가 남아 있다"고
+     * 인지하는 상태 자체를 없앤다.
+     */
+    @Test
+    void logoutExpiresTheSessionCookieInTheBrowser() throws Exception {
+        MockHttpSession session = authenticatedSession();
+
+        MvcResult result = mockMvc.perform(post("/api/auth/logout").session(session))
+                .andExpect(status().isNoContent())
+                .andReturn();
+
+        String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+
+        assertThat(setCookie)
+                .as("로그아웃 응답의 Set-Cookie 헤더")
+                .isNotNull();
+        assertThat(setCookie).contains("JSESSIONID=");
+        assertThat(setCookie.toLowerCase()).contains("max-age=0");
     }
 
     /** 로그아웃 후 보호 API는 인증 오류를 반환한다. */
