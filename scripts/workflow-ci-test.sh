@@ -7,6 +7,8 @@ AUTONOMOUS_WORKFLOW="$ROOT_DIR/.github/workflows/autonomous-loop.yml"
 
 grep -Fq -- '        shell: powershell' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must run the Windows runner step through PowerShell' >&2; exit 1; }
+grep -Fq -- 'git -c core.autocrlf=false checkout-index --all --force' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must restore LF shell scripts on the Windows runner' >&2; exit 1; }
 grep -Fq -- 'wsl.exe wslpath -a' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must convert Windows paths before invoking WSL' >&2; exit 1; }
 grep -Fq -- "-replace '\\\\', '/'" "$AUTONOMOUS_WORKFLOW" \

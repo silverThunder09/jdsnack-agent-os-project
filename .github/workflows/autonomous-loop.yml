@@ -39,6 +39,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Normalize shell script line endings
+        shell: powershell
+        run: |
+          git -c core.autocrlf=false checkout-index --all --force
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Run event-driven autonomous loop
         env:
           GH_TOKEN: ${{ github.token }}

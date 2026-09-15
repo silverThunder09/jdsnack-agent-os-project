@@ -27,7 +27,7 @@ JDSnack 기능 구현 해줘.
 - 구현 대상은 `index.yml`의 `active_specs`(정확히 1개) 안에서 준비된 티켓 하나입니다. `plan.md`가 없는 레거시 active Spec은 Spec 전체를 한 작업으로 취급합니다.
 - 티켓 브랜치는 `codex/<active-spec-slug>-<ticket-id>`로 만들고, 티켓별 구현·테스트·PR·리뷰·머지를 독립적으로 수행합니다.
 - **티켓 전진(원자적)**: 티켓 PR에는 코드뿐 아니라 `plan.md`의 티켓 상태와 관련 traceability·테스트 결과 갱신을 포함합니다. 머지 후 active Spec은 유지한 채 다음 준비 티켓을 claim합니다.
-- **Feature 완료**: 마지막 티켓과 전체 수용 기준이 통과한 PR을 main에 반영하면 `autonomous-loop.yml`이 완료 Spec을 archive하고 `active_specs`를 비운 뒤 `spec-queue.json`의 첫 eligible 후보를 자동 승격합니다. Windows self-hosted runner에서는 PowerShell이 Windows 경로 구분자를 정규화하고 `wsl.exe wslpath`로 runner 경로를 변환한 뒤 Bash coordinator를 호출합니다. 자동 판정 가능한 후보가 없을 때만 `needs-human`으로 중단합니다.
+- **Feature 완료**: 마지막 티켓과 전체 수용 기준이 통과한 PR을 main에 반영하면 `autonomous-loop.yml`이 완료 Spec을 archive하고 `active_specs`를 비운 뒤 `spec-queue.json`의 첫 eligible 후보를 자동 승격합니다. Windows self-hosted runner에서는 checkout 직후 `core.autocrlf=false`로 shell script를 LF로 복원하고, PowerShell이 Windows 경로 구분자를 정규화하고 `wsl.exe wslpath`로 runner 경로를 변환한 뒤 Bash coordinator를 호출합니다. 자동 판정 가능한 후보가 없을 때만 `needs-human`으로 중단합니다.
 - **Spec 순환**: 자동 승격된 후보는 문서 필수 세트와 traceability를 생성·검증한 뒤 Spec promotion PR을 만들고, 통과하면 T1을 Codex에 디스패치합니다. 한 시점에 active Spec은 하나만 유지합니다.
 - 변경요청(`리뷰 반려: <branch>` 또는 `리뷰 후속: <branch>` 이슈)이 있으면 같은 `codex/*` 브랜치에서 반영합니다.
 - **클로드 리뷰-머지 루프도 GitHub 이벤트로 기동합니다.** [`.github/workflows/codex-branch-review.yml`](../../.github/workflows/codex-branch-review.yml)이 신뢰된 동일 저장소 PR의 생성·갱신·재오픈 이벤트에서 로컬 `jdsnack` self-hosted runner로 클로드 리뷰-머지 절차(`.claude/skills/review-loop/SKILL.md`)를 즉시 1회 기동합니다. 수동 `workflow_dispatch`도 지원합니다. 외부 fork PR은 self-hosted runner 보안을 위해 실행하지 않습니다. 현재 review job 자체가 보호 브랜치의 required check일 수 있으므로, 통과 PR은 `gh pr merge --auto`로 머지를 큐에 넣고 job이 성공한 뒤 GitHub가 머지를 완료합니다.
