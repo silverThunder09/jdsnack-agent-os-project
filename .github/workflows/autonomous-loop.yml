@@ -48,11 +48,23 @@ jobs:
           $ErrorActionPreference = 'Stop'
           function Convert-ToWslPath([string] $windowsPath) {
             $normalizedPath = [System.IO.Path]::GetFullPath($windowsPath) -replace '\\', '/'
-            $convertedPath = wsl.exe wslpath -a $normalizedPath 2>&1
-            $conversionExitCode = $LASTEXITCODE
-            $convertedPathText = ($convertedPath -join "`n").Trim()
+            $stderrPath = [System.IO.Path]::GetTempFileName()
+            try {
+              $convertedPath = wsl.exe wslpath -a $normalizedPath 2> $stderrPath
+              $conversionExitCode = $LASTEXITCODE
+              $conversionError = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue
+              if ($null -eq $conversionError) {
+                $conversionError = ''
+              } else {
+                $conversionError = $conversionError.Trim()
+              }
+            } finally {
+              Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+            }
+            $convertedPathText = if ($null -eq $convertedPath) { '' } else { ($convertedPath -join "`n").Trim() }
             if ($conversionExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($convertedPathText)) {
-              throw "WSL path conversion failed for '$windowsPath'."
+              $details = if ([string]::IsNullOrWhiteSpace($conversionError)) { "exit code $conversionExitCode" } else { $conversionError }
+              throw "WSL path conversion failed for '$windowsPath': $details"
             }
             return $convertedPathText
           }
