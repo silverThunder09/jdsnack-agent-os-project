@@ -62,6 +62,7 @@
 - 정확히 50자와 정확히 10,000자 경계값 검증
 - `resumeText` 누락, `null`, 공백 문자만 있는 입력 검증
 - `POST /api/diagnose/file` 업로드 검증과 fixture 오류 코드 검증
+- 저장소 변경 시 PR CI Router의 `Verify Flyway migrations on PostgreSQL` 잡에서 실제 PostgreSQL 프로파일의 최초 migration·재적용·fixture 중복 여부를 함께 검증합니다.
 
 대표 명령 후보:
 

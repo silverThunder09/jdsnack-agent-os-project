@@ -45,11 +45,12 @@ assert_contains "$ROUTER" 'run: bash scripts/docs-harness.sh'
 assert_contains "$ROUTER" 'run: bash scripts/workflow-ci-test.sh'
 assert_not_contains "$ROUTER" 'uses: ./.github/workflows/'
 
-# 초기화 스크립트를 실제 PostgreSQL에 올려보는 검증(Issue #175).
-# H2만 쓰는 게이트로는 PostgreSQL 비호환 문법을 잡을 수 없어 추가된 잡이며,
+# Flyway migration을 실제 PostgreSQL 프로파일로 검증하는 잡(Issue #175).
+# H2만 쓰는 게이트로는 PostgreSQL 연결·마이그레이션 동작을 확인할 수 없어 추가된 잡이며,
 # 집계 게이트에 연결돼 있지 않으면 실패해도 머지를 막지 못한다.
-assert_contains "$ROUTER" 'name: Verify schema on PostgreSQL'
+assert_contains "$ROUTER" 'name: Verify Flyway migrations on PostgreSQL'
 assert_contains "$ROUTER" 'image: postgres:16'
+assert_contains "$ROUTER" 'com.jdsnack.schema.PostgresMigrationTest'
 assert_contains "$ROUTER" 'needs.postgres_schema.result'
 grep -Fq 'needs: [detect, backend, postgres_schema,' "$ROUTER" || {
     printf 'PR CI Gate must depend on postgres_schema in %s\n' "$ROUTER" >&2

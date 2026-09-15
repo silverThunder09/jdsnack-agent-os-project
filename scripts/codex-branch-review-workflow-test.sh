@@ -29,7 +29,9 @@ assert_contains "  workflow_dispatch:"
 assert_contains "github.event_name == 'pull_request'"
 assert_contains "github.event.pull_request.head.repo.full_name == github.repository"
 assert_contains "github.event.pull_request.author_association"
-assert_contains "shell: bash"
+assert_contains "shell: powershell"
+assert_contains 'Join-Path $env:USERPROFILE'
+assert_not_contains "shell: bash"
 assert_not_contains "pull_request_target"
 
 printf 'Codex branch review workflow contract passed\n'

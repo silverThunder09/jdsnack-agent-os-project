@@ -30,6 +30,7 @@ React/Vite SPA가 공개 홈, 인증 게이트, 이력서·JD 분석 흐름과 �
 - UI 계약: [`../.agent-os/archive/specs/2026-07-21-analysis-report-export/ui-spec.md`](../.agent-os/archive/specs/2026-07-21-analysis-report-export/ui-spec.md)
 - 기능 요구사항: [`../.agent-os/archive/specs/2026-07-21-analysis-report-export/requirements.md`](../.agent-os/archive/specs/2026-07-21-analysis-report-export/requirements.md)
 - 아키텍처: [`../docs/architecture/frontend-architecture.md`](../docs/architecture/frontend-architecture.md)
+- 백엔드 저장소·Flyway migration 세부 구현은 프론트가 직접 의존하지 않고 `/api` 계약과 `services` 계층으로만 연결합니다.
 
 ## Commands
 

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS app_user (
+CREATE TABLE app_user (
     user_id VARCHAR(36) PRIMARY KEY,
     provider VARCHAR(32) NOT NULL,
     provider_subject VARCHAR(255) NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS app_user (
     CONSTRAINT uq_app_user_provider_subject UNIQUE (provider, provider_subject)
 );
 
-CREATE TABLE IF NOT EXISTS analysis_input_snapshot (
+CREATE TABLE analysis_input_snapshot (
     snapshot_id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     resume_text TEXT NOT NULL,
@@ -23,10 +23,10 @@ CREATE TABLE IF NOT EXISTS analysis_input_snapshot (
         FOREIGN KEY (user_id) REFERENCES app_user(user_id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_analysis_input_snapshot_user_created
+CREATE INDEX idx_analysis_input_snapshot_user_created
     ON analysis_input_snapshot (user_id, created_at);
 
-CREATE TABLE IF NOT EXISTS analysis_history (
+CREATE TABLE analysis_history (
     history_id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     snapshot_id VARCHAR(36) NOT NULL,
@@ -47,15 +47,10 @@ CREATE TABLE IF NOT EXISTS analysis_history (
         FOREIGN KEY (snapshot_id) REFERENCES analysis_input_snapshot(snapshot_id) ON DELETE CASCADE
 );
 
-ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS diagnosis_model_name VARCHAR(255);
-ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS diagnosis_prompt_version VARCHAR(255);
-ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS match_model_name VARCHAR(255);
-ALTER TABLE analysis_history ADD COLUMN IF NOT EXISTS match_prompt_version VARCHAR(255);
-
-CREATE INDEX IF NOT EXISTS idx_analysis_history_user_created
+CREATE INDEX idx_analysis_history_user_created
     ON analysis_history (user_id, created_at);
 
-CREATE TABLE IF NOT EXISTS analysis_feedback (
+CREATE TABLE analysis_feedback (
     feedback_id VARCHAR(36) PRIMARY KEY,
     history_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
@@ -70,10 +65,10 @@ CREATE TABLE IF NOT EXISTS analysis_feedback (
         FOREIGN KEY (user_id) REFERENCES app_user(user_id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_analysis_feedback_history
+CREATE INDEX idx_analysis_feedback_history
     ON analysis_feedback (history_id);
 
-CREATE TABLE IF NOT EXISTS resume_fixture_mapping (
+CREATE TABLE resume_fixture_mapping (
     mapping_id VARCHAR(64) PRIMARY KEY,
     input_type VARCHAR(16) NOT NULL,
     match_type VARCHAR(32) NOT NULL,
@@ -84,7 +79,7 @@ CREATE TABLE IF NOT EXISTS resume_fixture_mapping (
     created_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS fixture_analysis (
+CREATE TABLE fixture_analysis (
     fixture_key VARCHAR(64) PRIMARY KEY,
     version VARCHAR(16) NOT NULL,
     score INTEGER NOT NULL,

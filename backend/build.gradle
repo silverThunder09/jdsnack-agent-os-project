@@ -23,10 +23,12 @@ dependencies {
     implementation 'org.apache.pdfbox:pdfbox:3.0.5'
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
     implementation 'org.jsoup:jsoup:1.18.3'
+    implementation 'org.flywaydb:flyway-core'
     runtimeOnly 'com.h2database:h2'
     // ADR-019의 운영 영속 저장소. 기본 프로파일은 여전히 H2이며,
     // `--spring.profiles.active=postgres`로 띄울 때만 사용된다.
     runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

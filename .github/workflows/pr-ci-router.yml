@@ -76,10 +76,10 @@ jobs:
         run: gradle bootJar
 
   postgres_schema:
-    # ADR-019는 운영 저장소를 PostgreSQL로 정했지만 로컬·테스트는 H2만 쓴다.
-    # 그래서 PostgreSQL에 없는 문법이 들어와도 어떤 게이트에도 걸리지 않았다(Issue #175).
-    # 초기화 스크립트를 실제 PostgreSQL에 올려 그 구멍을 막는다.
-    name: Verify schema on PostgreSQL
+    # ADR-019는 운영 저장소를 PostgreSQL로 정했고, ADR-022는 Flyway를
+    # H2/PostgreSQL 공통 migration 도구로 선택한다(Issue #175).
+    # 실제 postgres 프로파일로 기동해 migration 최초 적용·재적용을 검증한다.
+    name: Verify Flyway migrations on PostgreSQL
     needs: detect
     if: ${{ needs.detect.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
@@ -100,36 +100,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Apply schema and seed
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.4.1"
+      - name: Run Flyway migration integration test
+        working-directory: backend
         env:
-          PGPASSWORD: jdsnack
-        run: |
-          set -euo pipefail
-          psql -h localhost -U jdsnack -d jdsnack -v ON_ERROR_STOP=1 \
-            -f backend/src/main/resources/schema.sql
-          psql -h localhost -U jdsnack -d jdsnack -v ON_ERROR_STOP=1 \
-            -f backend/src/main/resources/data.sql
-      - name: Re-apply to prove idempotency
-        env:
-          PGPASSWORD: jdsnack
-        run: |
-          set -euo pipefail
-          psql -h localhost -U jdsnack -d jdsnack -v ON_ERROR_STOP=1 \
-            -f backend/src/main/resources/schema.sql
-          psql -h localhost -U jdsnack -d jdsnack -v ON_ERROR_STOP=1 \
-            -f backend/src/main/resources/data.sql
-      - name: Assert seed rows are not duplicated
-        env:
-          PGPASSWORD: jdsnack
-        run: |
-          set -euo pipefail
-          mappings="$(psql -h localhost -U jdsnack -d jdsnack -tAc \
-            'SELECT COUNT(*) FROM resume_fixture_mapping')"
-          fixtures="$(psql -h localhost -U jdsnack -d jdsnack -tAc \
-            'SELECT COUNT(*) FROM fixture_analysis')"
-          echo "resume_fixture_mapping=$mappings fixture_analysis=$fixtures"
-          [ "$mappings" = "3" ] || { echo "기대 3행, 실제 $mappings행"; exit 1; }
-          [ "$fixtures" = "1" ] || { echo "기대 1행, 실제 $fixtures행"; exit 1; }
+          JDSNACK_DB_URL: jdbc:postgresql://localhost:5432/jdsnack
+          JDSNACK_DB_USERNAME: jdsnack
+          JDSNACK_DB_PASSWORD: jdsnack
+        run: gradle test --tests com.jdsnack.schema.PostgresMigrationTest
 
   frontend:
     name: Test and build frontend

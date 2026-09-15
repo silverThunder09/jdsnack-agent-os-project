@@ -15,6 +15,7 @@ JDSnack은 Spring Boot API와 React 프론트를 **분리 컨테이너로 배포
 - Gemini·사람인 수집은 백엔드 provider/adapter 경계에서만 호출
 - ATS 점수·포맷 진단은 이력서 추출 텍스트와 JD를 서버의 결정론적 서비스에서 계산하며 외부 호출을 하지 않음
 - 현재 preview 흐름은 fixture/stub/ai-local 모드로 검증하며, Service MVP는 사용자 소유 분석 이력·입력 스냅샷과 분석 실행 메타데이터를 저장한다
+- 저장 스키마는 H2·PostgreSQL 공통 Flyway migration으로 기동 시 버전 관리하며, SQL 초기화 파일을 매 부팅 재실행하지 않는다
 
 ## Dependency & data flow
 
@@ -28,6 +29,8 @@ flowchart LR
   Analysis --> Gemini["Gemini provider\nserver-side only"]
   Backend --> Store["Analysis History Store\ninput snapshot + result\ninternal model/prompt metadata"]
   Analysis --> Store
+  Backend -->|"startup"| Flyway["Flyway\nversioned migrations"]
+  Flyway --> Store
   Backend --> Tests["JUnit + fixture + compose smoke"]
   Frontend --> UiTests["Vitest + Playwright"]
 

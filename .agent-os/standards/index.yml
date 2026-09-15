@@ -15,6 +15,7 @@ documents:
     - .agent-os/adr/adr-016-jd-source-adapter.md
     - .agent-os/adr/adr-020-analysis-input-record.md
     - .agent-os/adr/adr-021-deterministic-ai-quality-assessment.md
+    - .agent-os/adr/adr-022-flyway-schema-migrations.md
     - .agent-os/adr/adr-018-analysis-worker.md
   harness:
     - .agent-os/standards/codex-harness.md
