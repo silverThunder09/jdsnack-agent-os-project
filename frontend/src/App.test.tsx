@@ -279,6 +279,8 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Spring Boot')
     expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Kubernetes')
     expect(await screen.findByText('Spring Boot 운영 경험이 JD와 맞습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '분석이 완료되었습니다' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '분석 진행 상태' })).toHaveAttribute('aria-busy', 'false')
     expect(screen.getByRole('region', { name: 'ATS 키워드' })).toHaveTextContent('Kubernetes')
     expect(await screen.findByText('Spring Boot REST API를 설계하고 테스트 자동화로 배포 안정성을 높였습니다.')).toBeInTheDocument()
     expect(screen.getByText('해당 키워드가 없습니다.')).toBeInTheDocument()

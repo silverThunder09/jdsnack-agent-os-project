@@ -194,6 +194,12 @@ export interface ApiError {
   message: string
 }
 
+export interface AnalysisRequestOutcome {
+  ok: boolean
+  message?: string
+  code?: ApiErrorCode
+}
+
 export interface ApiResponse<T> {
   success: boolean
   data: T | null

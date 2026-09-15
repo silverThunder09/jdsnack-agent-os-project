@@ -784,6 +784,167 @@ button:disabled {
   animation: loading-slide 1s ease-in-out infinite;
 }
 
+.analysis-progress {
+  margin-bottom: 1.25rem;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--line);
+  border-radius: 1.1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.analysis-progress--running {
+  border-color: rgba(79, 70, 229, 0.3);
+  background: #f7f8ff;
+}
+
+.analysis-progress--succeeded {
+  border-color: rgba(22, 163, 74, 0.25);
+  background: #f0fdf4;
+}
+
+.analysis-progress--partial-failure,
+.analysis-progress--failed {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: #fff8f8;
+}
+
+.analysis-progress__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.analysis-progress__eyebrow {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.analysis-progress__header h2 {
+  margin: 0.35rem 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.analysis-progress__header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.analysis-progress__run-badge {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: #e9edff;
+  color: var(--primary);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.analysis-progress__bar {
+  position: relative;
+  height: 0.35rem;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfe5ff;
+}
+
+.analysis-progress__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  animation: loading-slide 1s ease-in-out infinite;
+}
+
+.analysis-progress__tasks {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-progress__task {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.analysis-progress__task-icon {
+  display: grid;
+  flex: 0 0 1.35rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.analysis-progress__task--running .analysis-progress__task-icon {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.analysis-progress__task--succeeded .analysis-progress__task-icon {
+  border-color: rgba(22, 163, 74, 0.35);
+  color: #15803d;
+}
+
+.analysis-progress__task--failed .analysis-progress__task-icon {
+  border-color: rgba(220, 38, 38, 0.35);
+  color: #b91c1c;
+}
+
+.analysis-progress__task-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.analysis-progress__task-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.analysis-progress__task-line strong {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.analysis-progress__task-line span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.analysis-progress__task--running .analysis-progress__task-line span {
+  color: var(--primary);
+}
+
+.analysis-progress__task--failed .analysis-progress__task-line span {
+  color: #b91c1c;
+}
+
+.analysis-progress__task-content p {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .context-note,
 .strategy-card {
   padding: 1rem 1.1rem;
@@ -812,6 +973,15 @@ button:disabled {
   }
   100% {
     transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-bar::after,
+  .analysis-progress__bar::after {
+    animation: none;
+    left: 0;
+    width: 100%;
   }
 }
 
