@@ -52,7 +52,8 @@ jobs:
             throw 'WSL path conversion failed for GITHUB_WORKSPACE or GITHUB_EVENT_PATH.'
           }
           $env:WSLENV = 'GH_TOKEN/u:GITHUB_REPOSITORY/u'
-          $eventKey = '{0}:{1}:{2}' -f $env:GITHUB_EVENT_NAME, $env:GITHUB_RUN_ID, $env:GITHUB_SHA
+          $eventSha = if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) { 'none' } else { $env:GITHUB_SHA }
+          $eventKey = '{0}:{1}:{2}' -f $env:GITHUB_EVENT_NAME, $env:GITHUB_RUN_ID, $eventSha
           $command = "cd '$wslWorkspace' && bash scripts/autonomous-spec-loop.sh --event '$($env:GITHUB_EVENT_NAME)' --event-key '$eventKey' --event-path '$wslEventPath' --apply"
           wsl.exe bash -lc $command
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
