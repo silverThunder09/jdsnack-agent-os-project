@@ -46,11 +46,18 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          $wslWorkspace = (wsl.exe wslpath -a "$env:GITHUB_WORKSPACE").Trim()
-          $wslEventPath = (wsl.exe wslpath -a "$env:GITHUB_EVENT_PATH").Trim()
-          if ([string]::IsNullOrWhiteSpace($wslWorkspace) -or [string]::IsNullOrWhiteSpace($wslEventPath)) {
-            throw 'WSL path conversion failed for GITHUB_WORKSPACE or GITHUB_EVENT_PATH.'
+          function Convert-ToWslPath([string] $windowsPath) {
+            $normalizedPath = [System.IO.Path]::GetFullPath($windowsPath) -replace '\\', '/'
+            $convertedPath = wsl.exe wslpath -a $normalizedPath 2>&1
+            $conversionExitCode = $LASTEXITCODE
+            $convertedPathText = ($convertedPath -join "`n").Trim()
+            if ($conversionExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($convertedPathText)) {
+              throw "WSL path conversion failed for '$windowsPath'."
+            }
+            return $convertedPathText
           }
+          $wslWorkspace = Convert-ToWslPath $env:GITHUB_WORKSPACE
+          $wslEventPath = Convert-ToWslPath $env:GITHUB_EVENT_PATH
           $env:WSLENV = 'GH_TOKEN/u:GITHUB_REPOSITORY/u'
           $eventSha = if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) { 'none' } else { $env:GITHUB_SHA }
           $eventKey = '{0}:{1}:{2}' -f $env:GITHUB_EVENT_NAME, $env:GITHUB_RUN_ID, $eventSha

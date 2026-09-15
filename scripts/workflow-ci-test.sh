@@ -9,6 +9,10 @@ grep -Fq -- '        shell: powershell' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must run the Windows runner step through PowerShell' >&2; exit 1; }
 grep -Fq -- 'wsl.exe wslpath -a' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must convert Windows paths before invoking WSL' >&2; exit 1; }
+grep -Fq -- "-replace '\\\\', '/'" "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must normalize Windows separators before wslpath' >&2; exit 1; }
+grep -Fq -- 'Convert-ToWslPath' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must validate WSL path conversion results' >&2; exit 1; }
 grep -Fq -- 'wsl.exe bash -lc' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must invoke Bash through WSL explicitly' >&2; exit 1; }
 grep -Fq -- 'bash scripts/autonomous-spec-loop.sh' "$AUTONOMOUS_WORKFLOW" \
