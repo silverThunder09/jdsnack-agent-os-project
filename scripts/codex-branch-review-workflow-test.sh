@@ -36,6 +36,7 @@ assert_contains "shell: powershell"
 assert_contains 'Join-Path $env:GITHUB_WORKSPACE'
 assert_contains "'.claude/skills/review-loop/SKILL.md'"
 assert_contains 'Test-Path -LiteralPath $skillPath -PathType Leaf'
+assert_contains 'claude --model sonnet --effort medium -p'
 [[ -f "$CLAUDE_SKILL" ]] || fail "저장소의 Claude review-loop 스킬 파일이 없습니다: $CLAUDE_SKILL"
 assert_not_contains "shell: bash"
 assert_not_contains "pull_request_target"
