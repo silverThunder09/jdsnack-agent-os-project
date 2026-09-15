@@ -43,8 +43,10 @@ assert_contains 'GH_TOKEN: ${{ github.token }}'
 [[ -f "$CLAUDE_SKILL" ]] || fail "저장소의 Claude review-loop 스킬 파일이 없습니다: $CLAUDE_SKILL"
 for skill_contract in \
     'gh pr comment <N> --body-file <review-report-file>' \
-    'gh pr merge <N> --squash --delete-branch --repo <owner>/<repo>' \
-    'gh pr view <N> --json state,mergedAt,mergeCommit' \
+    'gh pr merge <N> --squash --delete-branch --auto --repo <owner>/<repo>' \
+    'gh pr view <N> --json state,mergedAt,mergeCommit,autoMergeRequest,mergeStateStatus' \
+    'autoMergeRequest' \
+    '현재 실행 중인 자기 자신의 체크' \
     'state == MERGED' \
     'NEEDS_HUMAN'; do
     grep -Fq -- "$skill_contract" "$CLAUDE_SKILL" \

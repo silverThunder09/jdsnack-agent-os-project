@@ -57,14 +57,17 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
    - `gh pr comment <N> --body-file <review-report-file>`
    - 코멘트에는 `review-loop`, `attempt`, 점수, 결정(`PASS`/`REQUEST_CHANGES`/`NEEDS_HUMAN`), findings를 포함합니다.
    - 통과 결과를 PR 본문에 기록할 수는 있지만, 본문 수정만으로 코멘트를 대체하지 않습니다.
-3. `score < 4`, 결정론 게이트 실패, 충돌, 필수 체크 미통과이면 `REQUEST_CHANGES` 또는 `NEEDS_HUMAN` 코멘트만 남기고 머지하지 않습니다.
+3. `score < 4`, 결정론 게이트 실패, 충돌, 또는 현재 리뷰 job 이외의 필수 체크 미통과이면 `REQUEST_CHANGES` 또는 `NEEDS_HUMAN` 코멘트만 남기고 머지하지 않습니다.
+   - 이 스킬은 보호 규칙의 필수 체크인 `Codex Branch Review / review` job 안에서 실행될 수 있습니다. 현재 실행 중인 자기 자신의 체크는 명령이 끝나기 전까지 `IN_PROGRESS`인 것이 정상이며, 이를 외부 blocker로 판정하거나 완료될 때까지 무한 대기하지 않습니다.
 4. High-risk 변경은 `scripts/pr-review-gate.sh <N>`와 `merge-rules.md` 조건을 적용하고, 사람 승인이 필요한 경우 `NEEDS_HUMAN`으로 멈춥니다.
 5. High-risk가 아니고 모든 필수 체크가 통과한 일반 Codex PR이면 다음으로 squash merge합니다.
-   - `gh pr merge <N> --squash --delete-branch --repo <owner>/<repo>`
+   - 현재 review job이 required check인 경우에도 실제 머지가 job 종료 뒤 진행되도록 auto-merge를 큐에 넣습니다.
+   - `gh pr merge <N> --squash --delete-branch --auto --repo <owner>/<repo>`
 6. 명령 성공 메시지만 믿지 말고 최종 상태를 확인합니다.
-   - `gh pr view <N> --json state,mergedAt,mergeCommit`
+   - `gh pr view <N> --json state,mergedAt,mergeCommit,autoMergeRequest,mergeStateStatus`
    - `state == MERGED`이고 `mergedAt`이 있을 때만 머지 완료로 보고합니다.
-   - 실패하거나 여전히 `OPEN`이면 재시도 폭주 없이 실패 원인과 `NEEDS_HUMAN` 상태를 코멘트로 남깁니다.
+   - 명령 직후 `state == OPEN`이어도 `autoMergeRequest`가 존재하고 현재 review job만 대기 중이면 auto-merge가 큐에 등록된 정상 중간 상태입니다. 이 경우 성공적으로 종료하여 현재 체크를 통과시킵니다.
+   - 실패하거나 `OPEN`인데 auto-merge가 큐에 없으면 재시도 폭주 없이 실패 원인과 `NEEDS_HUMAN` 상태를 코멘트로 남깁니다.
 
 ## 경계 규칙 (반드시 준수)
 - **Claude는 소스 코드를 수정/커밋하지 않는다.** 수정의 주체는 항상 Codex.
