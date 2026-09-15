@@ -25,8 +25,19 @@ jobs:
       group: jdsnack-review-loop
       cancel-in-progress: false
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify Claude review skill
+        shell: powershell
+        run: |
+          $skillPath = Join-Path $env:GITHUB_WORKSPACE '.claude/skills/review-loop/SKILL.md'
+          if (-not (Test-Path -LiteralPath $skillPath -PathType Leaf)) {
+            throw "Claude review skill not found: $skillPath"
+          }
       - name: Run Claude review-merge loop
         shell: powershell
         run: |
-          $skillPath = Join-Path $env:USERPROFILE '.claude/scheduled-tasks/jdsnack-review-merge-loop/SKILL.md'
-          claude -p "다음 절차 문서를 읽고 그 절차를 정확히 1회 실행하라: $skillPath" --dangerously-skip-permissions
+          $skillPath = Join-Path $env:GITHUB_WORKSPACE '.claude/skills/review-loop/SKILL.md'
+          claude --model sonnet --effort medium -p "다음 절차 문서를 읽고 그 절차를 정확히 1회 실행하라: $skillPath" --dangerously-skip-permissions
