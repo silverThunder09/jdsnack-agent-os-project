@@ -5,6 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 AUTONOMOUS_WORKFLOW="$ROOT_DIR/.github/workflows/autonomous-loop.yml"
 
+grep -Fxq -- '*.sh text eol=lf' "$ROOT_DIR/.gitattributes" \
+  || { echo '.gitattributes must force tracked shell scripts to LF' >&2; exit 1; }
+
 grep -Fq -- '        shell: powershell' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must run the Windows runner step through PowerShell' >&2; exit 1; }
 grep -Fq -- '$trackedShellScriptOutput = git -c core.quotepath=false ls-files -z -- '\''*.sh'\''' "$AUTONOMOUS_WORKFLOW" \

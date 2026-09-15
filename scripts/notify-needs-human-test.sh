@@ -17,6 +17,19 @@ assert_eq() {
     fi
 }
 
+missing_binary_stderr="$TEMP_DIR/missing-binary.stderr"
+missing_binary_summary="$TEMP_DIR/missing-binary-summary"
+set +e
+GITHUB_STEP_SUMMARY="$missing_binary_summary" \
+SECURITY_BIN=missing-security-binary \
+CURL_BIN="$FIXTURE_DIR/curl" \
+bash "$NOTIFIER" --source pr-feedback-detector --reason gh_unavailable 2>"$missing_binary_stderr"
+missing_binary_exit_code=$?
+set -e
+assert_eq 0 "$missing_binary_exit_code" "missing notification binary must not block the caller"
+grep -Fq "missing-security-binary" "$missing_binary_stderr"
+grep -Fq "missing-security-binary" "$missing_binary_summary"
+
 arguments_file="$TEMP_DIR/curl-arguments"
 NOTIFY_SECURITY_SCENARIO=configured \
 NOTIFY_CURL_ARGUMENTS_FILE="$arguments_file" \

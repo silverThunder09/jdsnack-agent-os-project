@@ -71,7 +71,7 @@ jobs:
       - name: Dispatch event to Codex
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
+        shell: 'C:\Program Files\Git\bin\bash.exe --noprofile --norc -eo pipefail {0}'
         run: |
           set -euo pipefail
 

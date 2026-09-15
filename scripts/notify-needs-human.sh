@@ -55,8 +55,21 @@ done
 
 [ -n "$SOURCE" ] && [ -n "$REASON" ] || { usage >&2; exit 2; }
 
+report_missing_binary() {
+    local binary="$1"
+    local message="Needs-human notification unavailable: required binary '$binary' was not found on PATH."
+
+    printf '%s\n' "$message" >&2
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        printf '%s\n' "- $message" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+    fi
+}
+
 for binary in "$SECURITY_BIN" "$CURL_BIN"; do
-    command -v "$binary" >/dev/null 2>&1 || exit 0
+    if ! command -v "$binary" >/dev/null 2>&1; then
+        report_missing_binary "$binary"
+        exit 0
+    fi
 done
 
 if ! webhook_url="$("$SECURITY_BIN" find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null)"; then
