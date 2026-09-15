@@ -11,6 +11,7 @@ Spring Boot API가 인증·입력 검증·AI 분석·JD 수집을 서버 경계�
 - `src/main/java/com/jdsnack/jd/JdFetchService.java`: JD URL 수집과 사람인 fallback
 - `src/main/java/com/jdsnack/common/GlobalExceptionHandler.java`: 공통 오류 응답
 - `src/test/java/com/jdsnack/jd/JdFetchServiceTest.java`: 외부 HTTP 없이 JD 수집 회귀 검증
+- `src/main/resources/db/migration/`: H2·PostgreSQL 공통 Flyway migration
 
 ## Patterns
 
@@ -23,6 +24,8 @@ Spring Boot API가 인증·입력 검증·AI 분석·JD 수집을 서버 경계�
 - 브라우저·프론트 코드에 OAuth secret이나 Gemini key를 노출하지 않습니다.
 - 사람인 수집 회귀는 실 URL이 아니라 `src/test/resources/jd/fixtures/`와 mock `HttpClient`로 검증합니다.
 - Entity를 API 응답으로 직접 반환하지 않습니다.
+- 스키마 변경은 이미 적용된 migration을 수정하지 않고 `V3__...` 이상의 새 migration으로 추가합니다.
+- 운영 PostgreSQL로 실행할 때는 `postgres` 프로파일과 `JDSNACK_DB_URL`, `JDSNACK_DB_USERNAME`, `JDSNACK_DB_PASSWORD` 환경변수를 사용합니다.
 
 ## Dependencies
 
@@ -35,4 +38,6 @@ Spring Boot API가 인증·입력 검증·AI 분석·JD 수집을 서버 경계�
 ```bash
 ./gradlew test
 ./gradlew bootJar
+# 예시: 환경변수 주입 후 PostgreSQL 프로파일로 실행
+./gradlew bootRun --args='--spring.profiles.active=postgres'
 ```

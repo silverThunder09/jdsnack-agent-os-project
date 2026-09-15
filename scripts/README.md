@@ -12,6 +12,7 @@
 - `smoke-test.sh`: 실행 중인 서비스의 기본 API smoke test를 수행합니다.
 - `pr-review-gate.sh`: PR 리뷰 게이트 결과를 확인합니다.
 - `../.github/workflows/pr-ci-router.yml`: PR 변경 경로에 맞는 CI만 선택적으로 실행합니다.
+- `pr-ci-router-test.sh`: 백엔드 저장소 변경 시 실제 PostgreSQL 프로파일의 Flyway migration 검증이 PR CI Gate에 연결됐는지 확인합니다.
 - `docs-harness.sh`: 문서 계약과 자동화 회귀 검사를 실행합니다.
 - `workflow-ci-test.sh`: GitHub Actions YAML과 PR Router·Feedback Detector 계약을 검사합니다.
 - `pr-feedback-workflow-test.sh`: repair 잡의 동시성 그룹 키와 `cancel-in-progress` 계약을 고정합니다.

@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 동작해야 한다고 규정한다. 그러나 로컬·테스트가 H2만 사용하기 때문에 PostgreSQL에 없는 문법이
  * 들어와도 어떤 게이트에도 걸리지 않았다(Issue #175, 회귀 커밋 #144).
  *
- * <p>이 테스트는 그 빈 구멍을 막는다. 초기화 스크립트가 한쪽 DBMS에서만 통하는 문법을 쓰면 실패한다.
+ * <p>이 테스트는 그 빈 구멍을 막는다. Flyway migration이 한쪽 DBMS에서만 통하는 문법을 쓰면 실패한다.
  *
  * <p>정규식 기반이라 열거한 패턴만 잡는다. 실제 PostgreSQL에 스크립트를 올려보는 검증이
  * 상위 방어선이며, 이 테스트는 그보다 빠르게 도는 1차 가드다.
@@ -41,11 +41,14 @@ class SchemaPortabilityTest {
             "INSERT OR REPLACE", "SQLite 전용입니다."
     ));
 
-    private static final String[] INIT_SCRIPTS = {"/schema.sql", "/data.sql"};
+    private static final String[] MIGRATION_SCRIPTS = {
+            "/db/migration/V1__baseline.sql",
+            "/db/migration/V2__fixture_seed.sql"
+    };
 
     @Test
-    void initScriptsUseOnlyTypesAvailableInBothPostgresAndH2() throws IOException {
-        for (String script : INIT_SCRIPTS) {
+    void migrationScriptsUseOnlyTypesAvailableInBothPostgresAndH2() throws IOException {
+        for (String script : MIGRATION_SCRIPTS) {
             String sql = read(script);
 
             for (Map.Entry<String, String> entry : UNSUPPORTED_BY_POSTGRES.entrySet()) {
@@ -66,8 +69,8 @@ class SchemaPortabilityTest {
     }
 
     @Test
-    void initScriptsAvoidDialectOnlyUpsertSyntax() throws IOException {
-        for (String script : INIT_SCRIPTS) {
+    void migrationScriptsAvoidDialectOnlyUpsertSyntax() throws IOException {
+        for (String script : MIGRATION_SCRIPTS) {
             String sql = read(script);
 
             for (Map.Entry<String, String> entry : DIALECT_ONLY_UPSERTS.entrySet()) {

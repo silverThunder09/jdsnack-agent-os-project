@@ -147,3 +147,11 @@
 - 제외: 첫 버전은 별도 AI 평가기 호출과 동일 입력 반복 실행을 하지 않습니다.
 - 이유: 품질 신호를 재현·설명 가능하게 제공하면서 추가 AI 비용과 지연을 피합니다.
 - 상세: [adr-021-deterministic-ai-quality-assessment](../adr/adr-021-deterministic-ai-quality-assessment.md)
+
+## ADR-022 H2·PostgreSQL 스키마 마이그레이션
+
+- 결정: Flyway를 사용하고 H2·PostgreSQL이 `backend/src/main/resources/db/migration/`의 같은 versioned migration을 실행합니다.
+- 결정: `spring.sql.init`의 매 부팅 SQL 재실행은 사용하지 않습니다.
+- 범위: 기존 수동 운영 DB 전환과 backup/restore는 별도 운영 작업으로 둡니다.
+- 상태: `accepted` (Issue #175 implementation scope, 2026-09-15)
+- 상세: [adr-022-flyway-schema-migrations](../adr/adr-022-flyway-schema-migrations.md)

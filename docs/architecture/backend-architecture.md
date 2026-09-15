@@ -31,6 +31,13 @@
 - Controller는 Service만 의존하고 Entity를 직접 응답하지 않습니다.
 - 구조 변경 시 [코딩 표준](../../.agent-os/standards/coding-standards.md)을 함께 갱신합니다.
 
+## Persistence and migrations
+
+- 운영 저장소는 ADR-019에 따라 PostgreSQL이며, 접속 정보는 `postgres` 프로파일 환경변수로 주입합니다.
+- H2 테스트와 PostgreSQL 운영은 `backend/src/main/resources/db/migration/`의 같은 Flyway migration을 사용합니다.
+- `spring.sql.init`의 매 부팅 초기화는 사용하지 않으며, 적용된 migration은 수정하지 않고 새 버전 파일을 추가합니다.
+- 실제 PostgreSQL 연결·최초 migration·재기동 멱등성은 `PostgresMigrationTest`와 PR CI의 PostgreSQL 서비스로 확인합니다.
+
 ## Common changes and gotchas
 
 - 새 보호 API는 authentication filter, Controller test, API spec을 함께 갱신합니다.
