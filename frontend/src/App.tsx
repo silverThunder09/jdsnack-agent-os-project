@@ -9,6 +9,7 @@ import { useInterviewPreview } from './hooks/useInterviewPreview'
 import { useMatchPreview } from './hooks/useMatchPreview'
 import { useSentencePreview } from './hooks/useSentencePreview'
 import { useAnalysisHistory } from './hooks/useAnalysisHistory'
+import { useAnalysisProgress } from './hooks/useAnalysisProgress'
 import { AnalysisInputView } from './features/analysis/AnalysisInputView'
 import { AnalysisResultView } from './features/analysis/AnalysisResultView'
 import { InterviewWorkspace } from './features/analysis/InterviewWorkspace'
@@ -35,6 +36,7 @@ import {
   type JdTab,
   type ResumeInputTab,
 } from './features/analysis/analysisUtils'
+import type { AnalysisTaskKey } from './features/analysis/analysisProgressState'
 import './App.css'
 
 function PublicHomeApp() {
@@ -89,6 +91,8 @@ function AuthenticatedApp() {
   const { isSubmitting: isSentenceSubmitting, resetResult: resetSentence, result: sentenceResult, submit: submitSentence } = useSentencePreview()
   const { isSubmitting: isInterviewSubmitting, result: interviewResult, submit: submitInterview } = useInterviewPreview()
   const { histories, selectedHistory, isLoading: isHistoryLoading, error: historyError, load: loadHistories, select: selectHistory, retry: retryHistory, remove: removeHistory, submitFeedback: submitHistoryFeedback } = useAnalysisHistory()
+  const { reset: resetAnalysisProgress, start: startAnalysisProgress, state: analysisProgress, updateTask: updateAnalysisTask } = useAnalysisProgress()
+  const analysisRunStarted = useRef(false)
 
   const trimmedJd = jdText.trim()
   const hasResumeSource = Boolean(diagnoseResult.status === 'success' && diagnoseResult.diagnosis?.sourceText)
@@ -167,18 +171,22 @@ function AuthenticatedApp() {
   const toggleOption = (key: AnalysisOptionKey) => { setOptions((current) => ({ ...current, [key]: !current[key] })); setFormError('') }
 
   const handleStartAnalysis = async () => {
+    if (analysisRunStarted.current || analysisProgress.status === 'running') return
     if (resumeInputTab === 'file' && !resumeFile) { setFormError(RESUME_REQUIRED_MESSAGE); return }
     const mode = resumeFile ? inferResumeMode(resumeFile) : null
     if (resumeInputTab === 'file' && !mode) { setFormError(UNSUPPORTED_RESUME_FILE_MESSAGE); return }
     if (prevalidationReasons.length > 0) { setFormError(prevalidationReasons[0] ?? ANALYSIS_OPTION_REQUIRED_MESSAGE); return }
 
     setFormError('')
+    analysisRunStarted.current = true
     setSubmittedOptions({ ...options })
     resetDiagnose()
     resetPreview()
     resetAts()
     resetSentence()
+    const runId = startAnalysisProgress({ ...options })
     setAnalysisPhase('result')
+    updateAnalysisTask(runId, 'resume', 'running')
     const outcome = resumeInputTab === 'text'
       ? await submit(resumeText)
       : await submitFile(mode!, resumeFile)
@@ -196,16 +204,56 @@ function AuthenticatedApp() {
       : resumeInputTab === 'text'
         ? createAnalysisHistory({ resumeText, ...historyInput })
         : createAnalysisHistoryFile(resumeFile!, historyInput)
+
+    const saveHistory = async () => {
+      updateAnalysisTask(runId, 'history', 'running')
+      try {
+        await runHistoryRequest()
+        updateAnalysisTask(runId, 'history', 'succeeded')
+      } catch {
+        updateAnalysisTask(runId, 'history', 'failed', { message: '분석 결과를 분석 내역에 저장하지 못했습니다.' })
+      }
+    }
+
     if (!outcome.ok || !outcome.diagnosis?.sourceText) {
-      await runHistoryRequest().catch(() => undefined)
+      updateAnalysisTask(runId, 'resume', 'failed', { message: outcome.message ?? '이력서 분석을 완료하지 못했습니다.', code: 'code' in outcome ? outcome.code : undefined })
+      for (const key of ['match', 'ats', 'sentence'] as AnalysisTaskKey[]) {
+        updateAnalysisTask(runId, key, 'skipped', { message: '이력서 분석이 완료되지 않아 실행하지 못했습니다.' })
+      }
+      await saveHistory()
       return
     }
+    updateAnalysisTask(runId, 'resume', 'succeeded')
     const request = { resumeSource: { type: 'FILE', value: outcome.diagnosis.sourceText }, jdText: trimmedJd, jdUrl: jdUrl.trim() } as const
     const requests: Promise<void>[] = []
-    if (options.jdMatch || options.keyword) requests.push(submitPreview(request))
-    if (options.ats) requests.push(submitAts(request))
-    if (options.sentence) requests.push(submitSentence(request))
-    requests.push(runHistoryRequest().then(() => undefined).catch(() => undefined))
+    if (options.jdMatch || options.keyword) {
+      updateAnalysisTask(runId, 'match', 'running')
+      requests.push(submitPreview(request).then((taskOutcome) => {
+        updateAnalysisTask(runId, 'match', taskOutcome.ok ? 'succeeded' : 'failed', {
+          message: taskOutcome.message,
+          code: taskOutcome.code,
+        })
+      }))
+    }
+    if (options.ats) {
+      updateAnalysisTask(runId, 'ats', 'running')
+      requests.push(submitAts(request).then((taskOutcome) => {
+        updateAnalysisTask(runId, 'ats', taskOutcome.ok ? 'succeeded' : 'failed', {
+          message: taskOutcome.message,
+          code: taskOutcome.code,
+        })
+      }))
+    }
+    if (options.sentence) {
+      updateAnalysisTask(runId, 'sentence', 'running')
+      requests.push(submitSentence(request).then((taskOutcome) => {
+        updateAnalysisTask(runId, 'sentence', taskOutcome.ok ? 'succeeded' : 'failed', {
+          message: taskOutcome.message,
+          code: taskOutcome.code,
+        })
+      }))
+    }
+    requests.push(saveHistory())
     await Promise.all(requests)
   }
 
@@ -215,6 +263,8 @@ function AuthenticatedApp() {
     resetPreview()
     resetAts()
     resetSentence()
+    analysisRunStarted.current = false
+    resetAnalysisProgress()
   }
 
   const handleInterviewSubmit = async () => {
@@ -234,7 +284,7 @@ function AuthenticatedApp() {
         analysisPhase === 'input' ? (
         <AnalysisInputView {...{ jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isAtsSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput }} />
         ) : (
-          <AnalysisResultView {...{ submittedOptions, previewResult, atsResult, sentenceResult, resultRef, handleExportResult, handlePrintResult: () => window.print(), handleNewAnalysis }} />
+          <AnalysisResultView {...{ submittedOptions, previewResult, atsResult, sentenceResult, resultRef, handleExportResult, handlePrintResult: () => window.print(), handleNewAnalysis, analysisProgress }} />
         )
       ) : currentView === 'interview' ? (
         <InterviewWorkspace {...{ jobTitle, setJobTitle, hasResumeSource, trimmedJd, isInterviewSubmitting, handleInterviewSubmit, interviewResult }} />

@@ -85,7 +85,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return { ok: false as const }
+      return { ok: false as const, message: outcome.message, code: outcome.code }
     }
 
     if (outcome.kind === 'validation-error') {
@@ -96,7 +96,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return { ok: false as const }
+      return { ok: false as const, message: outcome.message, code: outcome.code }
     }
 
     if (
@@ -109,7 +109,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return { ok: false as const }
+      return { ok: false as const, message: outcome.message, code: outcome.code }
     }
 
     if (
@@ -123,7 +123,7 @@ export function useDiagnose() {
         message: outcome.message,
         code: outcome.code,
       })
-      return { ok: false as const }
+      return { ok: false as const, message: outcome.message, code: outcome.code }
     }
 
     setResult({
@@ -132,7 +132,7 @@ export function useDiagnose() {
       message: outcome.message,
       code: outcome.code,
     })
-    return { ok: false as const }
+    return { ok: false as const, message: outcome.message, code: outcome.code }
   }
 
   const handleRequest = async (request: Promise<Awaited<ReturnType<typeof diagnoseResume>>>) => {
@@ -154,7 +154,7 @@ export function useDiagnose() {
         title: '요청을 완료하지 못했습니다',
         message,
       })
-      return { ok: false as const }
+      return { ok: false as const, message }
     } finally {
       setIsSubmitting(false)
     }
@@ -170,7 +170,7 @@ export function useDiagnose() {
         title: '입력 확인이 필요합니다',
         message: validationError,
       })
-      return { ok: false as const }
+      return { ok: false as const, message: validationError }
     }
 
     return handleRequest(diagnoseResume({ resumeText }))
@@ -186,7 +186,7 @@ export function useDiagnose() {
         title: '파일 확인이 필요합니다',
         message: validationError,
       })
-      return { ok: false as const }
+      return { ok: false as const, message: validationError }
     }
 
     return handleRequest(diagnoseResumeFile(file as File))

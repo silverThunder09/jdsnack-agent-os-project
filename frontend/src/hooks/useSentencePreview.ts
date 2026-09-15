@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NetworkError, previewSentence } from '../services/api'
-import type { MatchPreviewRequest, ResultState } from '../types/diagnosis'
+import type { AnalysisRequestOutcome, MatchPreviewRequest, ResultState } from '../types/diagnosis'
 
 const idleState: ResultState = {
   status: 'idle',
@@ -14,7 +14,7 @@ export function useSentencePreview() {
 
   const resetResult = () => setResult(idleState)
 
-  const submit = async (request: MatchPreviewRequest) => {
+  const submit = async (request: MatchPreviewRequest): Promise<AnalysisRequestOutcome> => {
     setIsSubmitting(true)
     setResult({
       status: 'loading',
@@ -31,7 +31,7 @@ export function useSentencePreview() {
           message: '원문과 개선문, 개선 사유를 확인하세요.',
           sentencePreview: outcome.result,
         })
-        return
+        return { ok: true }
       }
 
       setResult({
@@ -40,6 +40,7 @@ export function useSentencePreview() {
         message: outcome.message,
         code: outcome.code,
       })
+      return { ok: false, message: outcome.message, code: outcome.code }
     } catch (error) {
       setResult({
         status: 'error',
@@ -49,6 +50,12 @@ export function useSentencePreview() {
             ? error.message
             : '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       })
+      return {
+        ok: false,
+        message: error instanceof NetworkError
+          ? error.message
+          : '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      }
     } finally {
       setIsSubmitting(false)
     }
