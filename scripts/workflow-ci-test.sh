@@ -84,7 +84,7 @@ NORMALIZE_BLOCK="$(awk '
 test -n "$NORMALIZE_BLOCK" \
   || { echo 'failed to extract shell script normalization block from autonomous workflow' >&2; exit 1; }
 NORMALIZE_BLOCK="$NORMALIZE_BLOCK" pwsh -NoLogo -NoProfile -NonInteractive -Command '
-$workspace = Join-Path $env:TEMP ("jdsnack-shell-normalize-" + [guid]::NewGuid().ToString())
+$workspace = Join-Path ([System.IO.Path]::GetTempPath()) ("jdsnack-shell-normalize-" + [guid]::NewGuid().ToString())
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 New-Item -ItemType Directory -Path $workspace | Out-Null
 try {
