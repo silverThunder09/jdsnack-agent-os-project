@@ -7,8 +7,12 @@ AUTONOMOUS_WORKFLOW="$ROOT_DIR/.github/workflows/autonomous-loop.yml"
 
 grep -Fq -- '        shell: powershell' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must run the Windows runner step through PowerShell' >&2; exit 1; }
-grep -Fq -- 'git -c core.autocrlf=false checkout-index --all --force' "$AUTONOMOUS_WORKFLOW" \
-  || { echo 'autonomous loop must restore LF shell scripts on the Windows runner' >&2; exit 1; }
+grep -Fq -- "\$trackedShellScripts = git ls-files -- '*.sh'" "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must enumerate tracked shell scripts on the Windows runner' >&2; exit 1; }
+grep -Fq -- '[System.IO.File]::WriteAllText' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must write normalized shell scripts on the Windows runner' >&2; exit 1; }
+grep -Fq -- '-replace "`r`n", "`n" -replace "`r", "`n"' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must normalize CRLF and CR shell scripts on the Windows runner' >&2; exit 1; }
 grep -Fq -- 'wsl.exe wslpath -a' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must convert Windows paths before invoking WSL' >&2; exit 1; }
 grep -Fq -- "-replace '\\\\', '/'" "$AUTONOMOUS_WORKFLOW" \

@@ -42,8 +42,16 @@ jobs:
       - name: Normalize shell script line endings
         shell: powershell
         run: |
-          git -c core.autocrlf=false checkout-index --all --force
+          $trackedShellScripts = git ls-files -- '*.sh'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          foreach ($relativePath in $trackedShellScripts) {
+            $absolutePath = Join-Path $env:GITHUB_WORKSPACE $relativePath
+            if (-not (Test-Path -LiteralPath $absolutePath -PathType Leaf)) { continue }
+            $content = [System.IO.File]::ReadAllText($absolutePath)
+            $normalizedContent = $content -replace "`r`n", "`n" -replace "`r", "`n"
+            [System.IO.File]::WriteAllText($absolutePath, $normalizedContent, $utf8NoBom)
+          }
 
       - name: Run event-driven autonomous loop
         env:
