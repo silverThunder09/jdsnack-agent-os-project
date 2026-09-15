@@ -23,10 +23,12 @@ assert_not_contains() {
     fi
 }
 
-assert_contains "      - 'codex/**'"
 assert_contains "  pull_request:"
 assert_contains "    types: [opened, synchronize, reopened]"
 assert_contains "  workflow_dispatch:"
+assert_contains "permissions:"
+assert_contains "  contents: write"
+assert_contains "  pull-requests: write"
 assert_contains "github.event_name == 'pull_request'"
 assert_contains "github.event.pull_request.head.repo.full_name == github.repository"
 assert_contains "github.event.pull_request.author_association"
@@ -37,8 +39,20 @@ assert_contains 'Join-Path $env:GITHUB_WORKSPACE'
 assert_contains "'.claude/skills/review-loop/SKILL.md'"
 assert_contains 'Test-Path -LiteralPath $skillPath -PathType Leaf'
 assert_contains 'claude --model sonnet --effort medium -p'
+assert_contains 'GH_TOKEN: ${{ github.token }}'
 [[ -f "$CLAUDE_SKILL" ]] || fail "저장소의 Claude review-loop 스킬 파일이 없습니다: $CLAUDE_SKILL"
+for skill_contract in \
+    'gh pr comment <N> --body-file <review-report-file>' \
+    'gh pr merge <N> --squash --delete-branch --repo <owner>/<repo>' \
+    'gh pr view <N> --json state,mergedAt,mergeCommit' \
+    'state == MERGED' \
+    'NEEDS_HUMAN'; do
+    grep -Fq -- "$skill_contract" "$CLAUDE_SKILL" \
+        || fail "Claude review-loop 스킬에 다음 코멘트·머지 계약이 없습니다: $skill_contract"
+done
 assert_not_contains "shell: bash"
+assert_not_contains "  push:"
+assert_not_contains "github.event_name == 'push'"
 assert_not_contains "pull_request_target"
 assert_not_contains 'Join-Path $env:USERPROFILE'
 
