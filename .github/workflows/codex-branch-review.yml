@@ -1,9 +1,6 @@
 name: Codex Branch Review
 
 on:
-  push:
-    branches:
-      - 'codex/**'
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -15,7 +12,6 @@ permissions:
 jobs:
   review:
     if: >-
-      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       (
         github.event_name == 'pull_request' &&

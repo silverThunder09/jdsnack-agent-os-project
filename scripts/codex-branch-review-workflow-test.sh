@@ -23,7 +23,6 @@ assert_not_contains() {
     fi
 }
 
-assert_contains "      - 'codex/**'"
 assert_contains "  pull_request:"
 assert_contains "    types: [opened, synchronize, reopened]"
 assert_contains "  workflow_dispatch:"
@@ -52,6 +51,8 @@ for skill_contract in \
         || fail "Claude review-loop 스킬에 다음 코멘트·머지 계약이 없습니다: $skill_contract"
 done
 assert_not_contains "shell: bash"
+assert_not_contains "  push:"
+assert_not_contains "github.event_name == 'push'"
 assert_not_contains "pull_request_target"
 assert_not_contains 'Join-Path $env:USERPROFILE'
 
