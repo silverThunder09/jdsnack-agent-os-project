@@ -2,6 +2,7 @@ package com.jdsnack.auth;
 
 import com.jdsnack.common.ApiResponse;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -20,9 +21,12 @@ public class AuthController {
     private final GoogleAuthService googleAuthService;
     private final ServerProperties serverProperties;
 
-    public AuthController(GoogleAuthService googleAuthService, ServerProperties serverProperties) {
+    public AuthController(
+            GoogleAuthService googleAuthService,
+            ObjectProvider<ServerProperties> serverPropertiesProvider
+    ) {
         this.googleAuthService = googleAuthService;
-        this.serverProperties = serverProperties;
+        this.serverProperties = serverPropertiesProvider.getIfAvailable(ServerProperties::new);
     }
 
     @GetMapping("/api/auth/google/start")
