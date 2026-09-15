@@ -34,7 +34,7 @@ assert_eq() {
 if grep -Fq -- 'shell: bash' "$WORKFLOW"; then
     fail 'Windows detector job must not use the runner bash alias. Pin it to Git Bash.'
 fi
-grep -Fq -- "shell: 'C:\\Program Files\\Git\\bin\\bash.exe --noprofile --norc -eo pipefail {0}'" "$WORKFLOW" \
+grep -Fq -- "shell: '\"C:\\Program Files\\Git\\bin\\bash.exe\" --noprofile --norc -eo pipefail {0}'" "$WORKFLOW" \
     || fail 'detector job must use the absolute Git Bash executable on Windows'
 grep -Fq -- 'if ! command -v jq >/dev/null 2>&1; then' "$WORKFLOW" \
     || fail 'detector job must guard jq before the workflow wrapper parses event JSON'
