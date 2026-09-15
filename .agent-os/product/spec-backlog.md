@@ -2,9 +2,9 @@
 
 이 문서는 다음 기획 후보의 사람이 읽는 설명을 관리합니다. 실행 상태·우선순위·자동 승격 조건의 정본은 [`spec-queue.json`](spec-queue.json)입니다.
 
-## 현재 Feature Spec
+## 최근 완료 Feature Spec
 
-- 현재 active Spec은 [분석 진행 상태 피드백](../specs/2026-09-15-analysis-progress-feedback/)입니다.
+- `analysis-progress-feedback`는 PR #194에서 완료되었고 [archive](../archive/specs/2026-09-15-analysis-progress-feedback/)로 이동했습니다.
 - 분석 시작 후 결과 화면으로 먼저 전환되어 사용자가 전체 분석의 진행 여부를 알기 어려운 문제를 해결합니다.
 - 백엔드 진행률 스트리밍·비동기 worker·가짜 퍼센트는 이번 범위에 포함하지 않고, 브라우저가 실제로 알고 있는 요청 상태만 표시합니다.
 - 완료된 **AI 품질 평가와 prompt/model version**은 `.agent-os/archive/specs/2026-07-21-ai-quality-versioning/`로 이동했습니다. GitHub Issue #168(`product-signal:analysis-data`)에서 승격됐습니다.
