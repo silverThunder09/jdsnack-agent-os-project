@@ -1,13 +1,13 @@
 # 분석 진행 상태 피드백 구현 계획
 
-- 구현 상태: `in_progress`
+- 구현 상태: `completed`
 - 위험도: `Low`
 - 구현 경계: `frontend/src`의 진행 상태 모듈·표시 컴포넌트·테스트
 - 서버 endpoint, DB schema, Docker dependency 변경 없음
 
 ## T1. 메인 분석 진행 coordinator와 UI
 
-- 상태: `in_progress`
+- 상태: `completed`
 - 범위:
   - 메인 분석 실행의 run id와 task 상태를 한 곳에서 관리
   - 이력서 진단·선택 분석·이력 저장의 실제 Promise 생명주기 연결
@@ -22,12 +22,13 @@
   - `docker compose -f compose.local.yaml up -d --build` 후 컨테이너·health 확인
   - traceability에 실제 테스트 결과 기록
 
-## 현재 검증 기록
+## 완료 검증 기록
 
-- 코드 구현: 완료, PR 리뷰 대기
+- 코드 구현: 완료, PR #194 머지 완료 (`52628d4`)
 - `npm run lint`: 통과
 - `npm test -- --testTimeout=15000`: 9개 파일, 54개 테스트 통과
 - `npm run build`: 통과
 - `docker compose -f compose.local.yaml up -d --build`: 통과
 - 컨테이너: `jdsnack-frontend`, `jdsnack-backend` 실행 중
 - `GET http://localhost:8080/api/health`: `success=true`, `status=UP`
+- Feature 완료 처리: 2026-09-15

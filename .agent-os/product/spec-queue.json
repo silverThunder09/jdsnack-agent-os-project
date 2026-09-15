@@ -51,8 +51,8 @@
       "slug": "2026-09-15-analysis-progress-feedback",
       "title": "분석 진행 상태 피드백",
       "priority": 4,
-      "status": "active",
-      "spec_path": ".agent-os/specs/2026-09-15-analysis-progress-feedback",
+      "status": "completed",
+      "spec_path": ".agent-os/archive/specs/2026-09-15-analysis-progress-feedback",
       "auto_promote": false,
       "start_condition": {"type": "manual_request"}
     },
