@@ -20,6 +20,26 @@ cat > "$TEST_ROOT/.agent-os/specs/current/plan.md" <<'EOF'
 EOF
 cp "$ROOT_DIR/.agent-os/product/spec-queue.json" "$TEST_ROOT/.agent-os/product/spec-queue.json"
 
+mkdir -p "$TEST_ROOT/bin"
+cat > "$TEST_ROOT/bin/python3" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"idle"}'
+EOF
+chmod +x "$TEST_ROOT/bin/python3"
+
+set +e
+missing_jq_output="$(
+  PATH="$TEST_ROOT/bin:$PATH" \
+  JQ_BIN=missing-jq \
+  bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+    --repo "$TEST_ROOT" --event push --event-key missing-jq
+)"
+missing_jq_code=$?
+set -e
+test "$missing_jq_code" -eq 20
+grep -q '"status":"needs_human"' <<<"$missing_jq_output"
+grep -q '"reason":"jq_unavailable"' <<<"$missing_jq_output"
+
 # Replace the production queue with a minimal deterministic fixture.
 python3 - "$TEST_ROOT/.agent-os/product/spec-queue.json" <<'PY'
 import json

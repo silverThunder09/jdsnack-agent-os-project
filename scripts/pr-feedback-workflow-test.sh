@@ -31,6 +31,16 @@ assert_eq() {
 
 [ -f "$WORKFLOW" ] || fail "워크플로 파일이 없습니다: $WORKFLOW"
 
+if grep -Fq -- 'shell: bash' "$WORKFLOW"; then
+    fail 'Windows detector job must not use the runner bash alias. Pin it to Git Bash.'
+fi
+grep -Fq -- "shell: 'C:\\PROGRA~1\\Git\\bin\\bash.exe --noprofile --norc -eo pipefail {0}'" "$WORKFLOW" \
+    || fail 'detector job must use the absolute Git Bash executable on Windows'
+grep -Fq -- 'if ! command -v jq >/dev/null 2>&1; then' "$WORKFLOW" \
+    || fail 'detector job must guard jq before the workflow wrapper parses event JSON'
+grep -Fq -- '"reason":"jq_unavailable"' "$WORKFLOW" \
+    || fail 'detector job must emit structured jq_unavailable output'
+
 group_line="$(grep -F 'group: jdsnack-review-repair-' "$WORKFLOW" || true)"
 [ -n "$group_line" ] && [ "$(printf '%s\n' "$group_line" | grep -c .)" -eq 1 ] \
     || fail 'repair 잡의 concurrency group 줄을 정확히 하나 찾지 못했습니다.'

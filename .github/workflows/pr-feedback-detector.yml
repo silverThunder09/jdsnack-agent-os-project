@@ -71,9 +71,16 @@ jobs:
       - name: Dispatch event to Codex
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
+        shell: 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -eo pipefail {0}'
         run: |
           set -euo pipefail
+
+          if ! command -v jq >/dev/null 2>&1; then
+            event='{"status":"needs_human","reason":"jq_unavailable"}'
+            printf '```json\n%s\n```\n' "$event" >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$event"
+            exit 20
+          fi
 
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             set +e
