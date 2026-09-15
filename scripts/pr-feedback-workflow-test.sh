@@ -36,6 +36,10 @@ if grep -Fq -- 'shell: bash' "$WORKFLOW"; then
 fi
 grep -Fq -- "shell: 'C:\\Program Files\\Git\\bin\\bash.exe --noprofile --norc -eo pipefail {0}'" "$WORKFLOW" \
     || fail 'detector job must use the absolute Git Bash executable on Windows'
+grep -Fq -- 'if ! command -v jq >/dev/null 2>&1; then' "$WORKFLOW" \
+    || fail 'detector job must guard jq before the workflow wrapper parses event JSON'
+grep -Fq -- '"reason":"jq_unavailable"' "$WORKFLOW" \
+    || fail 'detector job must emit structured jq_unavailable output'
 
 group_line="$(grep -F 'group: jdsnack-review-repair-' "$WORKFLOW" || true)"
 [ -n "$group_line" ] && [ "$(printf '%s\n' "$group_line" | grep -c .)" -eq 1 ] \
