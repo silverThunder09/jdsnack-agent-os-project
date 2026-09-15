@@ -44,6 +44,7 @@
 - `.github/workflows/backend-ci.yml`
 - PR 운영 스크립트 변경 시 `scripts/pr-feedback-detector-test.sh`와 `scripts/open-issue-work-dispatcher-test.sh`로 반려·CI 오류·이슈 분류·환경 실패 경계를 검증하고 Docs Harness에서 실행합니다.
 - Workflow 변경 시 `scripts/workflow-ci-test.sh`가 YAML 구조, PR CI Router, 반려 감지기, Codex 리뷰 workflow의 trigger·신뢰 경계를 함께 검증합니다.
+- Windows self-hosted runner의 Bash coordinator는 `shell: powershell`에서 `wsl.exe wslpath`로 Windows 경로를 WSL 경로로 변환한 뒤 실행합니다. `shell: bash`는 WSL shim에 Windows 임시 스크립트 경로를 그대로 넘겨 실행 실패를 만들 수 있으므로 사용하지 않습니다.
 
 ### 2. 백엔드 CI
 

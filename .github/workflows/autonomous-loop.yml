@@ -43,10 +43,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        shell: bash
+        shell: powershell
         run: |
-          bash scripts/autonomous-spec-loop.sh \
-            --event "$GITHUB_EVENT_NAME" \
-            --event-key "$GITHUB_EVENT_NAME:${GITHUB_RUN_ID}:${GITHUB_SHA:-none}" \
-            --event-path "$GITHUB_EVENT_PATH" \
-            --apply
+          $ErrorActionPreference = 'Stop'
+          $wslWorkspace = (wsl.exe wslpath -a "$env:GITHUB_WORKSPACE").Trim()
+          $wslEventPath = (wsl.exe wslpath -a "$env:GITHUB_EVENT_PATH").Trim()
+          if ([string]::IsNullOrWhiteSpace($wslWorkspace) -or [string]::IsNullOrWhiteSpace($wslEventPath)) {
+            throw 'WSL path conversion failed for GITHUB_WORKSPACE or GITHUB_EVENT_PATH.'
+          }
+          $env:WSLENV = 'GH_TOKEN/u:GITHUB_REPOSITORY/u'
+          $eventSha = if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) { 'none' } else { $env:GITHUB_SHA }
+          $eventKey = '{0}:{1}:{2}' -f $env:GITHUB_EVENT_NAME, $env:GITHUB_RUN_ID, $eventSha
+          $command = "cd '$wslWorkspace' && bash scripts/autonomous-spec-loop.sh --event '$($env:GITHUB_EVENT_NAME)' --event-key '$eventKey' --event-path '$wslEventPath' --apply"
+          wsl.exe bash -lc $command
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
