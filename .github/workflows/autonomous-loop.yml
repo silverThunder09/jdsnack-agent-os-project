@@ -42,8 +42,9 @@ jobs:
       - name: Normalize shell script line endings
         shell: powershell
         run: |
-          $trackedShellScripts = git ls-files -- '*.sh'
+          $trackedShellScriptOutput = git -c core.quotepath=false ls-files -z -- '*.sh'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $trackedShellScripts = ($trackedShellScriptOutput -join '') -split [char]0 | Where-Object { $_ }
           $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
           foreach ($relativePath in $trackedShellScripts) {
             $absolutePath = Join-Path $env:GITHUB_WORKSPACE $relativePath
