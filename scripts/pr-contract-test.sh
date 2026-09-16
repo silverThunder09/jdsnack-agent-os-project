@@ -88,8 +88,8 @@ for section in "${required_sections[@]}"; do
   fi
 done
 
-if grep -Eiq -- '\bTBD\b' <<< "$pr_body"; then
-  add_error "PR 본문에 TBD가 남아 있습니다."
+if grep -Eiq -- '^[[:space:]]*(TBD|[-*][[:space:]]*[^:]+:[[:space:]]*TBD)[[:space:]]*$' <<< "$pr_body"; then
+  add_error "PR 본문에 미완성 placeholder 값(TBD)이 남아 있습니다."
 fi
 
 has_feature=0
