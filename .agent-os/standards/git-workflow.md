@@ -28,6 +28,8 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 | `test` | 테스트 추가/수정 | `test/diagnose-validation` |
 | `refactor` | 동작 변경 없는 구조 개선 | `refactor/api-response-wrapper` |
 | `chore` | 설정/빌드/운영 보조 작업 | `chore/git-hooks` |
+| `build` | 빌드·패키징 변경 | `build/backend-image` |
+| `revert` | 기존 변경 되돌리기 | `revert/failed-migration` |
 
 ## 작업 시작 규칙
 
@@ -45,7 +47,7 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 <type>(<scope>): <summary>
 ```
 
-`type(scope)` 접두어는 영어를 사용하고, 이 저장소의 작업 summary와 PR 제목은 한국어를 기본으로 사용합니다. API path, 에러 코드, 클래스명처럼 고정된 기술 식별자만 영어로 남길 수 있습니다.
+`type(scope)` 접두어는 영어를 사용하고, 이 저장소의 작업 summary와 PR 제목은 한국어 문장으로 작성해야 합니다. `HTTP 500`, `/api/resumes`처럼 고정된 기술 식별자만으로 구성된 summary는 영어를 남길 수 있습니다. 기존 PR의 영어 문장 summary도 머지 전에 이 규칙에 맞게 정리합니다.
 
 예시:
 

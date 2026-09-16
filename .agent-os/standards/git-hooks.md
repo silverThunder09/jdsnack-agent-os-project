@@ -27,7 +27,7 @@ msg_file="$1"
 first_line="$(head -n 1 "$msg_file")"
 
 case "$first_line" in
-  feat\(*\):*|fix\(*\):*|docs\(*\):*|test\(*\):*|refactor\(*\):*|style\(*\):*|chore\(*\):*|ci\(*\):*|perf\(*\):*) ;;
+  feat\(*\):*|fix\(*\):*|docs\(*\):*|test\(*\):*|refactor\(*\):*|style\(*\):*|chore\(*\):*|ci\(*\):*|perf\(*\):*|build\(*\):*|revert\(*\):*) ;;
   *)
     echo "커밋 메시지 형식 오류: <type>(<scope>): <summary>"
     exit 1

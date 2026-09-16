@@ -86,11 +86,24 @@ run_case() {
 
 - 설명: TBD라는 용어를 설명합니다."
       ;;
-   placeholder_tbd)
-     GH_FIXTURE_BODY="$GH_FIXTURE_BODY
+    placeholder_tbd)
+      GH_FIXTURE_BODY="$GH_FIXTURE_BODY
 
 - 검증 결과: TBD (추가 예정)"
-     ;;
+      ;;
+    placeholder_bullet)
+      GH_FIXTURE_BODY="$GH_FIXTURE_BODY
+
+  - TBD"
+      ;;
+    technical_summary)
+      GH_FIXTURE_TITLE="fix(api): HTTP 500"
+      GH_FIXTURE_COMMITS="fix(api): HTTP 500"
+      ;;
+    english_summary)
+      GH_FIXTURE_TITLE="fix(ci): recover Windows automation runtime"
+      GH_FIXTURE_COMMITS="fix(ci): recover Windows automation runtime"
+      ;;
     mixed_operations)
       GH_FIXTURE_FILES=$'backend/src/main/java/example/ExampleController.java\n.github/workflows/example.yml'
       ;;
@@ -141,6 +154,9 @@ run_case() {
 run_case valid 0 "PR contract passed"
 run_case prose_tbd 0 "PR contract passed"
 run_case placeholder_tbd 1 "미완성 placeholder 값"
+run_case placeholder_bullet 1 "미완성 placeholder 값"
+run_case technical_summary 0 "PR contract passed"
+run_case english_summary 1 "한국어 문장 또는 고정된 기술 식별자"
 run_case mixed_operations 1 "기능 코드와 CI/운영/자동화 변경은 별도 PR"
 run_case mixed_backend_frontend 1 "backend/** 와 frontend/** 변경은 기본적으로 별도 PR"
 run_case api_contract_missing 1 "API 구현 계약 변경에는 api-spec.md"

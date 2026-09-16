@@ -124,7 +124,7 @@ grep -Fq -- 'pr_contract' "$PR_CI_ROUTER" \
 test -f "$ROOT_DIR/scripts/pr-contract-test.sh" \
   || { echo 'scripts/pr-contract-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pr-contract-test.sh"
-grep -Fq -- '^[[:space:]]*(TBD([[:space:][:punct:]]|$)|[-*][[:space:]]*[^:]+:[[:space:]]*TBD([[:space:][:punct:]]|$))' "$ROOT_DIR/scripts/pr-contract-test.sh" \
+grep -Fq -- '^[[:space:]]*(TBD([[:space:][:punct:]]|$)|[-*][[:space:]]+TBD([[:space:][:punct:]]|$)|[-*][[:space:]]*[^:]+:[[:space:]]*TBD([[:space:][:punct:]]|$))' "$ROOT_DIR/scripts/pr-contract-test.sh" \
   || { echo 'PR contract must only reject standalone or field-value TBD placeholders' >&2; exit 1; }
 if grep -Fq -- "'\bTBD\b'" "$ROOT_DIR/scripts/pr-contract-test.sh"; then
   echo 'PR contract must not reject prose mentions of TBD' >&2

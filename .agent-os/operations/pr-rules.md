@@ -138,7 +138,7 @@ docs(pr): PR 범위 규칙 강화
 <type>(<scope>): <summary>
 ```
 
-`type(scope)` 접두어는 영어를 사용하고, 이 저장소의 `<summary>`와 PR 제목은 한국어를 기본으로 사용합니다. API path, 에러 코드, 클래스명처럼 고정된 기술 식별자만 영어로 남길 수 있습니다.
+`type(scope)` 접두어는 영어를 사용하고, 이 저장소의 `<summary>`와 PR 제목은 한국어 문장으로 작성해야 합니다. `HTTP 500`, `/api/resumes`처럼 고정된 기술 식별자만으로 구성된 summary는 영어를 남길 수 있습니다. 기존 PR의 영어 문장 summary도 머지 전에 이 규칙에 맞게 정리합니다.
 
 예시:
 

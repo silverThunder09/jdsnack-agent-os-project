@@ -39,7 +39,7 @@ if command -v python3 >/dev/null 2>&1 && python3 -c 'import re' >/dev/null 2>&1;
 elif command -v python >/dev/null 2>&1 && python -c 'import re' >/dev/null 2>&1; then
   PYTHON_BIN="python"
 else
-  echo "ERROR: PR 제목·커밋 summary의 한국어 검증에는 실행 가능한 Python이 필요합니다." >&2
+  echo "ERROR: PR 제목·커밋 summary의 언어 검증에는 실행 가능한 Python이 필요합니다." >&2
   exit 1
 fi
 
@@ -55,19 +55,25 @@ add_error() {
   errors+=("$1")
 }
 
-has_korean() {
+has_korean_or_technical_summary() {
   "$PYTHON_BIN" - "$1" <<'PY'
 import re
 import sys
 
-raise SystemExit(0 if re.search(r"[가-힣]", sys.argv[1]) else 1)
+summary = sys.argv[1].strip()
+if re.search(r"[가-힣]", summary):
+    raise SystemExit(0)
+
+tokens = summary.split()
+technical_token = re.compile(r"(?=.*(?:[/_.:#$<>-]|\d|[A-Z]{2,}|[a-z][A-Z]))[A-Za-z0-9_./:#$<>-]+$")
+raise SystemExit(0 if tokens and all(technical_token.fullmatch(token) for token in tokens) else 1)
 PY
 }
 
 validate_conventional_title() {
   local label="$1"
   local line="$2"
-  local pattern='^(feat|fix|docs|test|refactor|style|chore|ci|perf)(\([a-z0-9][a-z0-9._/-]*\))?: .+'
+  local pattern='^(feat|fix|docs|test|refactor|style|chore|ci|perf|build|revert)(\([a-z0-9][a-z0-9._/-]*\))?: .+'
 
   if [[ ! "$line" =~ $pattern ]]; then
     add_error "$label이 Conventional Commits 형식이 아닙니다: $line"
@@ -75,8 +81,8 @@ validate_conventional_title() {
   fi
 
   local summary="${line#*: }"
-  if ! has_korean "$summary"; then
-    add_error "$label summary는 이 저장소의 기본 언어인 한국어로 작성해야 합니다: $line"
+  if ! has_korean_or_technical_summary "$summary"; then
+    add_error "$label summary는 한국어 문장 또는 고정된 기술 식별자로 작성해야 합니다: $line"
   fi
 }
 
@@ -102,7 +108,7 @@ for section in "${required_sections[@]}"; do
   fi
 done
 
-if grep -Eiq -- '^[[:space:]]*(TBD([[:space:][:punct:]]|$)|[-*][[:space:]]*[^:]+:[[:space:]]*TBD([[:space:][:punct:]]|$))' <<< "$pr_body"; then
+if grep -Eiq -- '^[[:space:]]*(TBD([[:space:][:punct:]]|$)|[-*][[:space:]]+TBD([[:space:][:punct:]]|$)|[-*][[:space:]]*[^:]+:[[:space:]]*TBD([[:space:][:punct:]]|$))' <<< "$pr_body"; then
   add_error "PR 본문에 미완성 placeholder 값(TBD)이 남아 있습니다."
 fi
 
@@ -133,7 +139,7 @@ while IFS= read -r file; do
   esac
 
   case "$file" in
-    */controller/*|*/api/*|*Controller.java|*Controller.kt|*Controller.ts|*Controller.js)
+    backend/*/controller/*|backend/*/api/*|backend/*Controller.java|backend/*Controller.kt|backend/*Controller.ts|backend/*Controller.js)
       has_api_implementation=1
       ;;
     frontend/src/components/*|frontend/src/hooks/*|frontend/src/pages/*|frontend/src/routes/*|frontend/src/services/*)
