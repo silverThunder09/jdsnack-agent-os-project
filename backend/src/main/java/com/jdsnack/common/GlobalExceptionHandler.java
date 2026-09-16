@@ -3,6 +3,8 @@ package com.jdsnack.common;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -14,12 +16,21 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(errorCode.status())
-                .body(ApiResponse.failure(errorCode.toDetail()));
+                .body(ApiResponse.failure(exception.toDetail()));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException exception) {
         ErrorCode errorCode = ErrorCode.NOT_FOUND;
+
+        return ResponseEntity
+                .status(errorCode.status())
+                .body(ApiResponse.failure(errorCode.toDetail()));
+    }
+
+    @ExceptionHandler({MaxUploadSizeExceededException.class, MultipartException.class})
+    public ResponseEntity<ApiResponse<Void>> handleMultipartException(MultipartException exception) {
+        ErrorCode errorCode = ErrorCode.FILE_TEXT_EXTRACTION_FAILED;
 
         return ResponseEntity
                 .status(errorCode.status())

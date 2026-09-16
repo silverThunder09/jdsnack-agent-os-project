@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,9 +30,10 @@ public class AnalysisHistoryController {
     @PostMapping("/api/analysis-histories")
     public ApiResponse<AnalysisHistoryResponse> create(
             @RequestBody(required = false) AnalysisHistoryCreateRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             HttpSession session
     ) {
-        return ApiResponse.success(historyService.create(userId(session), request));
+        return ApiResponse.success(historyService.create(userId(session), request, idempotencyKey));
     }
 
     @PostMapping(value = "/api/analysis-histories/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -41,13 +43,14 @@ public class AnalysisHistoryController {
             @RequestParam(value = "text", required = false) String text,
             @RequestParam(value = "sourceUrl", required = false) String sourceUrl,
             @RequestParam(value = "sourceSite", required = false) String sourceSite,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             HttpSession session
     ) {
         AnalysisHistoryCreateRequest request = new AnalysisHistoryCreateRequest(
                 null,
                 new AnalysisHistoryCreateRequest.JdInput(inputType, text, sourceUrl, sourceSite)
         );
-        return ApiResponse.success(historyService.createFile(userId(session), resumeFile, request));
+        return ApiResponse.success(historyService.createFile(userId(session), resumeFile, request, idempotencyKey));
     }
 
     @GetMapping("/api/analysis-histories")
