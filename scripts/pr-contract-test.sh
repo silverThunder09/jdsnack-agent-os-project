@@ -73,7 +73,7 @@ PY
 validate_conventional_title() {
   local label="$1"
   local line="$2"
-  local pattern='^(feat|fix|docs|test|refactor|style|chore|ci|perf|build|revert)(\([a-z0-9][a-z0-9._/-]*\))?: .+'
+  local pattern='^(feat|fix|docs|test|refactor|style|chore|ci|perf|build|revert)(\([a-z0-9][a-z0-9._/-]*\)): .+'
 
   if [[ ! "$line" =~ $pattern ]]; then
     add_error "$label이 Conventional Commits 형식이 아닙니다: $line"

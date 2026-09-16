@@ -16,7 +16,7 @@
 - compose 기반 통합 검증은 `fixture` 모드 기준으로 텍스트/PDF/DOCX 흐름을 확인합니다.
 - PR은 `.github/workflows/pr-ci-router.yml`이 변경 경로를 분류하고 필요한 Backend/Frontend/Container/Docs/Workflow job만 조건부 실행합니다. `main` push에서는 각 workflow의 `paths` 필터가 직접 동작합니다.
 - 보호 브랜치 required check는 Router의 선택 결과를 반영하는 `PR CI Gate`로 전환해야 하며, workflow-level path filter만 먼저 적용해 required check를 누락시키지 않습니다.
-- 모든 PR은 `Validate PR contract` job에서 Conventional Commits 제목·커밋 summary, PR 본문 필수 섹션, 기능/CI·운영 범위를 먼저 검증합니다. 실패한 PR은 기능 CI와 무관하게 `PR CI Gate`에서 실패합니다.
+- 모든 PR은 `Validate PR contract` job에서 Conventional Commits 제목·커밋 summary, PR 본문 필수 섹션, 기능/CI·운영 범위를 검증합니다. Router는 변경 경로에 해당하는 기능 CI를 병렬로 선택 실행하며, 계약 또는 선택된 CI가 실패한 PR은 `PR CI Gate`에서 실패합니다.
 
 ## 권장 트리거
 

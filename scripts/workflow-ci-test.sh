@@ -134,6 +134,10 @@ test -f "$ROOT_DIR/scripts/pr-contract-test-test.sh" \
   || { echo 'scripts/pr-contract-test-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pr-contract-test-test.sh"
 bash "$ROOT_DIR/scripts/pr-contract-test-test.sh"
+test -f "$ROOT_DIR/scripts/pr-review-gate-test.sh" \
+  || { echo 'scripts/pr-review-gate-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pr-review-gate-test.sh"
+bash "$ROOT_DIR/scripts/pr-review-gate-test.sh"
 ./scripts/pr-ci-router-test.sh
 ./scripts/pr-feedback-workflow-test.sh
 ./scripts/codex-branch-review-workflow-test.sh

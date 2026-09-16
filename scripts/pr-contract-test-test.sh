@@ -104,6 +104,10 @@ run_case() {
       GH_FIXTURE_TITLE="fix(ci): recover Windows automation runtime"
       GH_FIXTURE_COMMITS="fix(ci): recover Windows automation runtime"
       ;;
+    missing_scope)
+      GH_FIXTURE_TITLE="fix: 범위 없는 커밋 제목"
+      GH_FIXTURE_COMMITS="fix: 범위 없는 커밋 제목"
+      ;;
     mixed_operations)
       GH_FIXTURE_FILES=$'backend/src/main/java/example/ExampleController.java\n.github/workflows/example.yml'
       ;;
@@ -160,6 +164,7 @@ run_case placeholder_tbd 1 "미완성 placeholder 값"
 run_case placeholder_bullet 1 "미완성 placeholder 값"
 run_case technical_summary 0 "PR contract passed"
 run_case english_summary 1 "한국어 문장 또는 고정된 기술 식별자"
+run_case missing_scope 1 "Conventional Commits 형식"
 run_case mixed_operations 1 "기능 코드와 CI/운영/자동화 변경은 별도 PR"
 run_case mixed_compose_operations 1 "기능 코드와 CI/운영/자동화 변경은 별도 PR"
 run_case mixed_backend_frontend 1 "backend/** 와 frontend/** 변경은 기본적으로 별도 PR"
