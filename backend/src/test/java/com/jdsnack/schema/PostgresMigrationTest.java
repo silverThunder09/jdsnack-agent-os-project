@@ -44,7 +44,7 @@ class PostgresMigrationTest {
                 String.class
         );
 
-        assertThat(versions).containsExactly("1", "2");
+        assertThat(versions).containsExactly("1", "2", "3");
     }
 
     private void assertSeedRows() {
