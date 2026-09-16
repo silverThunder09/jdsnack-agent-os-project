@@ -67,7 +67,7 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 
 - 문서 없는 API/UI 계약 변경과 대응 테스트 없는 수용 기준 추가는 하지 않습니다.
 - 기본 탐색에서 `frontend/node_modules`, `frontend/dist`, `backend/build`, `backend/.gradle`, `./.agent-os/archive`, `.git`는 제외하며, archive 문서는 사용자 요청이나 활성 spec의 직접 참조가 있을 때만 확인합니다.
-- 커밋과 PR 제목은 Conventional Commits 형식을 따릅니다. 요약 언어는 작업 맥락에 맞게 선택합니다.
+- 커밋과 PR 제목은 Conventional Commits 형식을 따릅니다. `type(scope)`는 영어로, summary는 이 저장소 기본 언어인 한국어로 작성합니다(고정 기술 식별자는 예외).
 - 운영은 기획 스레드 하나에서 진행하고, 주제가 바뀌면 새 세션을 시작합니다.
 - 별도 작업 스레드는 사용하지 않습니다.
 - 검증은 현재 기획 스레드에서 변경 범위, 테스트 결과, CI 결과를 기준으로 확인합니다.

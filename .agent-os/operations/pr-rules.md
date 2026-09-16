@@ -118,7 +118,7 @@ PR의 주 목적은 PR 본문에 한 문장으로 설명할 수 있어야 합니
 - PR 안에서 변경한 코드 때문에 같은 PR의 테스트나 문서 하네스가 실패한 경우, 해당 실패를 고치는 최소 수정은 같은 PR에 포함할 수 있습니다.
 - required check 자체가 없거나 보호 규칙이 잘못된 경우에는 기능 PR에 섞지 않고 운영 PR을 먼저 머지한 뒤 기능 PR을 다시 검사합니다.
 - 자율 루프가 생성한 `automation/spec-*` promotion PR은 큐 승격에 필요한 문서 전용 변경으로 별도 자동화 흐름에서 처리하며, 코드 기능 PR과 섞지 않습니다.
-- 예외를 적용하면 PR 본문 `범위 판단`에 이유를 남깁니다.
+- 예외를 적용하면 PR 본문 `범위 판단`에 `예외 적용 여부: 있음`과 구체적인 `같은 PR에 포함한 이유:`를 남깁니다. 이 예외는 같은 기능의 테스트/문서 하네스 최소 수정에만 적용합니다.
 
 분리 예시:
 
@@ -127,7 +127,7 @@ feat(frontend): add no-key mvp flow
 ci(frontend): add frontend ci required check
 ci(container): run container flow on pull requests
 docs(agent-os): fix document links
-docs(pr): tighten pr scope rules
+docs(pr): PR 범위 규칙 강화
 ```
 
 ## PR 제목
@@ -138,7 +138,7 @@ docs(pr): tighten pr scope rules
 <type>(<scope>): <summary>
 ```
 
-`type(scope)` 접두어는 영어를 사용하고, `<summary>`는 작업 맥락에 맞는 언어를 선택합니다.
+`type(scope)` 접두어는 영어를 사용하고, 이 저장소의 `<summary>`와 PR 제목은 한국어 문장으로 작성해야 합니다. `HTTP 500`, `/api/resumes`처럼 고정된 기술 식별자만으로 구성된 summary는 영어를 남길 수 있습니다. 기존 PR의 영어 문장 summary도 머지 전에 이 규칙에 맞게 정리합니다.
 
 예시:
 
@@ -147,8 +147,8 @@ feat(api): 이력서 진단 API 추가
 docs(harness): Git 운영 규칙 추가
 fix(jd): 사람인 AI매치 노이즈 제거
 test(jd): 사람인 fixture 검증 추가
-feat(frontend): add resume upload flow
-docs(pr): tighten pr scope rules
+feat(frontend): 이력서 업로드 흐름 추가
+docs(pr): PR 범위 규칙 강화
 ```
 
 예외:
@@ -210,12 +210,13 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - PR 위험도(`Light` / `Standard` / `High-risk`)를 먼저 고정
 - 요구사항 변경 시 `requirements.md`, `acceptance-criteria.md`, `traceability.md` 갱신
 - API 변경 시 `api-spec.md` 갱신
-- UI 변경 시 `ui-spec.md` 갱신
+- UI 변경 시 `ui-spec.md` 또는 `test-scenarios.md` 갱신
 - 테스트 기준 변경 시 `test-scenarios.md` 갱신
 - 완료 기준은 [standards/definition-of-done.md](../standards/definition-of-done.md)를 따름
 - CI 기준은 [ci-checklist.md](ci-checklist.md)를 따름
 - PR 자동 운영 루프는 [pr-automation-loop.md](pr-automation-loop.md)를 따름
 - PR 생성 후 자체 리뷰는 [pr-review-gate.md](pr-review-gate.md)를 따름
+- PR 생성 전 `bash scripts/pr-contract-test.sh <PR_NUMBER>`로 제목·커밋·본문·범위 계약을 통과시킴
 
 ## PR 전 필수 검증 기준
 
@@ -223,12 +224,14 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - PR 주 목적이 한 문장으로 설명된다.
 - 변경 파일이 `PR 범위 경계`의 같은 PR 허용 조건 안에 있다.
 - CI/운영/템플릿/광범위한 문서 정리는 기능 PR과 분리되어 있다.
+- PR 제목과 커밋 summary가 Conventional Commits 형식이며 한국어이다.
+- PR 본문·제목·커밋·범위 계약 검증이 `pr-contract-test.sh`에서 통과했다.
 - `requirements.md`에 `REQ`가 존재한다.
 - `acceptance-criteria.md`에 `AC`가 존재한다.
 - `test-scenarios.md`에 `TC`가 존재한다.
 - `traceability.md`에 `REQ -> AC -> TC` 매핑이 존재한다.
 - API 변경이 있으면 `api-spec.md`가 갱신되어 있다.
-- UI 변경이 있으면 `ui-spec.md`가 갱신되어 있다.
+- UI 변경이 있으면 `ui-spec.md` 또는 `test-scenarios.md`가 갱신되어 있다.
 - 문서/백엔드/프론트 변경 범위에 맞는 CI 체크리스트가 확인되어 있다.
 - `Light`는 작성자 확인과 관련 CI만 통과하면 된다.
 - `Standard`는 관련 테스트와 CI 검증이 완료되어야 한다.

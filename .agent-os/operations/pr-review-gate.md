@@ -21,6 +21,7 @@ PR Review Gate는 PR을 바로 머지하지 않고, 변경 범위와 위험도�
 `High-risk` PR 생성 후, 머지 전 반드시 실행합니다.
 
 ```sh
+bash scripts/pr-contract-test.sh <PR_NUMBER>
 ./scripts/pr-review-gate.sh <PR_NUMBER>
 ```
 
@@ -32,7 +33,11 @@ PR Review Gate는 PR을 바로 머지하지 않고, 변경 범위와 위험도�
 - `COMMENT`: 머지는 가능하지만 후속 개선 필요
 - `REQUEST_CHANGES`: 머지 금지, 실패 Issue 생성 후 수정 필요
 
+`NEEDS_HUMAN`은 자동 루프의 내부 중단 사유입니다. GitHub에는 `COMMENT` Review로 제출하고 자동 머지하지 않습니다.
+
 `REQUEST_CHANGES`가 하나라도 있으면 PR은 머지할 수 없습니다.
+
+Claude workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정으로 Review를 제출합니다. 그 계정이 PR 작성자와 같으면 GitHub가 자기 PR의 approve/request changes를 거부하므로, workflow는 같은 판정을 `COMMENT`로 남기고 이를 승인으로 간주하지 않습니다. High-risk PR은 이 경우에도 `NEEDS_HUMAN`으로 중단합니다.
 
 ## 변경 범위별 확인 기준
 
@@ -74,6 +79,7 @@ gh pr review <PR_NUMBER> --comment --body-file <review-report.md>
 `scripts/pr-review-gate.sh`는 아래를 수행합니다.
 
 - PR 변경 파일 조회
+- PR 제목·커밋 summary·본문·기능/운영 범위·API/UI 계약 문서 동반 여부 결정론 검증
 - 필수 확인 범위 출력
 - PR 본문 필수 섹션 누락 확인
 - PR 범위 위반 후보 탐지
@@ -83,14 +89,17 @@ gh pr review <PR_NUMBER> --comment --body-file <review-report.md>
 
 ## 범위 위반 후보
 
-아래 조합은 스크립트가 경고합니다.
+아래 조합은 `pr-contract-test.sh`가 기본적으로 실패 처리합니다.
 
 - 기능 코드와 `.github/**` 변경이 같은 PR에 있음
 - 기능 코드와 운영 문서 변경이 같은 PR에 있음
 - `backend/**`와 `frontend/**`가 같은 PR에 있음
-- API/UI 계약 문서 변경 없이 구현 계약이 바뀐 것으로 보임
+- `backend/**`의 Controller/API 구현 변경에 `api-spec.md`가 없음
+- `frontend/src/components/**`, `hooks/**`, `pages/**`, `routes/**`, `services/**` 변경에 `ui-spec.md` 또는 `test-scenarios.md`가 없음
 
-경고는 자동 반려가 아닙니다. 단, 예외 적용 시 PR 본문 `범위 판단`에 이유를 남겨야 합니다.
+위 조합은 `pr-contract-test.sh`가 결정론적으로 실패 처리합니다. 같은 기능의 backend/frontend를 묶거나 하네스 최소 수정을 포함하는 허용 예외는 PR 본문에 `예외 적용 여부: 있음`과 구체적인 `같은 PR에 포함한 이유:`를 함께 적은 경우에만 경고로 남깁니다.
+
+CI/운영/자동화와 기능 코드를 섞는 경우에는 PR 본문의 명시된 예외 사유가 없으면 자동 반려합니다.
 
 ## 머지 조건
 

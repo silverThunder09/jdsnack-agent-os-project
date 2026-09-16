@@ -28,6 +28,8 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 | `test` | 테스트 추가/수정 | `test/diagnose-validation` |
 | `refactor` | 동작 변경 없는 구조 개선 | `refactor/api-response-wrapper` |
 | `chore` | 설정/빌드/운영 보조 작업 | `chore/git-hooks` |
+| `build` | 빌드·패키징 변경 | `build/backend-image` |
+| `revert` | 기존 변경 되돌리기 | `revert/failed-migration` |
 
 ## 작업 시작 규칙
 
@@ -45,7 +47,7 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 <type>(<scope>): <summary>
 ```
 
-`type(scope)` 접두어는 영어를 사용하고, `<summary>`는 작업 맥락에 맞는 언어를 선택합니다.
+`type(scope)` 접두어는 영어를 사용하고, 이 저장소의 작업 summary와 PR 제목은 한국어 문장으로 작성해야 합니다. `HTTP 500`, `/api/resumes`처럼 고정된 기술 식별자만으로 구성된 summary는 영어를 남길 수 있습니다. 기존 PR의 영어 문장 summary도 머지 전에 이 규칙에 맞게 정리합니다.
 
 예시:
 
@@ -54,8 +56,8 @@ docs(harness): Git 운영 규칙 추가
 feat(api): 이력서 진단 엔드포인트 추가
 test(api): 입력값 검증 테스트 추가
 fix(gemini): 응답 파싱 실패 처리
-feat(frontend): add resume upload flow
-docs(pr): tighten pr scope rules
+feat(frontend): 이력서 업로드 흐름 추가
+docs(pr): PR 범위 규칙 강화
 ```
 
 ## 커밋 타입

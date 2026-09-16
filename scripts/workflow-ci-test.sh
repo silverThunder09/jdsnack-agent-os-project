@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 AUTONOMOUS_WORKFLOW="$ROOT_DIR/.github/workflows/autonomous-loop.yml"
+PR_CI_ROUTER="$ROOT_DIR/.github/workflows/pr-ci-router.yml"
 
 grep -Fxq -- '*.sh text eol=lf' "$ROOT_DIR/.gitattributes" \
   || { echo '.gitattributes must force tracked shell scripts to LF' >&2; exit 1; }
@@ -112,6 +113,31 @@ try {
 }'
 
 ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].each { |file| YAML.load_file(file) }'
+grep -Fq -- 'pull-requests: read' "$PR_CI_ROUTER" \
+  || { echo 'PR CI Router must have pull-requests read permission for PR contract validation' >&2; exit 1; }
+grep -Fq -- 'name: Validate PR contract' "$PR_CI_ROUTER" \
+  || { echo 'PR CI Router must run the PR contract job' >&2; exit 1; }
+grep -Fq -- 'bash scripts/pr-contract-test.sh' "$PR_CI_ROUTER" \
+  || { echo 'PR CI Router must execute scripts/pr-contract-test.sh' >&2; exit 1; }
+grep -Fq -- 'pr_contract' "$PR_CI_ROUTER" \
+  || { echo 'PR CI Gate must include the PR contract result' >&2; exit 1; }
+test -f "$ROOT_DIR/scripts/pr-contract-test.sh" \
+  || { echo 'scripts/pr-contract-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pr-contract-test.sh"
+grep -Fq -- '^[[:space:]]*(TBD([[:space:][:punct:]]|$)|[-*][[:space:]]+TBD([[:space:][:punct:]]|$)|[-*][[:space:]]*[^:]+:[[:space:]]*TBD([[:space:][:punct:]]|$))' "$ROOT_DIR/scripts/pr-contract-test.sh" \
+  || { echo 'PR contract must only reject standalone or field-value TBD placeholders' >&2; exit 1; }
+if grep -Fq -- "'\bTBD\b'" "$ROOT_DIR/scripts/pr-contract-test.sh"; then
+  echo 'PR contract must not reject prose mentions of TBD' >&2
+  exit 1
+fi
+test -f "$ROOT_DIR/scripts/pr-contract-test-test.sh" \
+  || { echo 'scripts/pr-contract-test-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pr-contract-test-test.sh"
+bash "$ROOT_DIR/scripts/pr-contract-test-test.sh"
+test -f "$ROOT_DIR/scripts/pr-review-gate-test.sh" \
+  || { echo 'scripts/pr-review-gate-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pr-review-gate-test.sh"
+bash "$ROOT_DIR/scripts/pr-review-gate-test.sh"
 ./scripts/pr-ci-router-test.sh
 ./scripts/pr-feedback-workflow-test.sh
 ./scripts/codex-branch-review-workflow-test.sh
