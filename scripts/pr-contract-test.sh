@@ -19,6 +19,20 @@ fi
 
 command -v gh >/dev/null 2>&1 \
   || { echo "ERROR: GitHub CLI(gh)가 필요합니다." >&2; exit 1; }
+
+gh_pr_view() {
+  local label="$1"
+  shift
+  local output
+
+  if ! output="$(gh pr view "$PR_NUMBER" "$@" 2>&1)"; then
+    echo "ERROR: PR #$PR_NUMBER 메타데이터 조회 실패 ($label): $output" >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$output"
+}
+
 PYTHON_BIN=""
 if command -v python3 >/dev/null 2>&1 && python3 -c 'import re' >/dev/null 2>&1; then
   PYTHON_BIN="python3"
@@ -29,10 +43,10 @@ else
   exit 1
 fi
 
-pr_title="$(gh pr view "$PR_NUMBER" --json title --template '{{.title}}')"
-pr_body="$(gh pr view "$PR_NUMBER" --json body --template '{{.body}}')"
-files="$(gh pr view "$PR_NUMBER" --json files --jq '.files[].path')"
-commits="$(gh pr view "$PR_NUMBER" --json commits --jq '.commits[].messageHeadline')"
+pr_title="$(gh_pr_view "title" --json title --template '{{.title}}')"
+pr_body="$(gh_pr_view "body" --json body --template '{{.body}}')"
+files="$(gh_pr_view "files" --json files --jq '.files[].path')"
+commits="$(gh_pr_view "commits" --json commits --jq '.commits[].messageHeadline')"
 
 errors=()
 warnings=()
@@ -88,19 +102,48 @@ for section in "${required_sections[@]}"; do
   fi
 done
 
-if grep -Eiq -- '^[[:space:]]*(TBD|[-*][[:space:]]*[^:]+:[[:space:]]*TBD)[[:space:]]*$' <<< "$pr_body"; then
+if grep -Eiq -- '^[[:space:]]*(TBD([[:space:][:punct:]]|$)|[-*][[:space:]]*[^:]+:[[:space:]]*TBD([[:space:][:punct:]]|$))' <<< "$pr_body"; then
   add_error "PR 본문에 미완성 placeholder 값(TBD)이 남아 있습니다."
 fi
 
 has_feature=0
 has_operations=0
+has_backend=0
+has_frontend=0
+has_api_implementation=0
+has_ui_implementation=0
+has_api_contract_doc=0
+has_ui_contract_doc=0
 while IFS= read -r file; do
   case "$file" in
-    backend/*|frontend/*|.agent-os/specs/*|docs/architecture/*)
+    backend/*)
+      has_feature=1
+      has_backend=1
+      ;;
+    frontend/*)
+      has_feature=1
+      has_frontend=1
+      ;;
+    .agent-os/specs/*|docs/architecture/*)
       has_feature=1
       ;;
     .github/*|.agent-os/operations/*|.agent-os/standards/*|.claude/*|.agents/*|scripts/*|.githooks/*|AGENTS.md|CLAUDE.md|backends.json|Dockerfile|docker-compose*.yml|compose*.yml)
       has_operations=1
+      ;;
+  esac
+
+  case "$file" in
+    */controller/*|*/api/*|*Controller.java|*Controller.kt|*Controller.ts|*Controller.js)
+      has_api_implementation=1
+      ;;
+    frontend/src/components/*|frontend/src/hooks/*|frontend/src/pages/*|frontend/src/routes/*|frontend/src/services/*)
+      has_ui_implementation=1
+      ;;
+    *api-spec.md)
+      has_api_contract_doc=1
+      ;;
+    *ui-spec.md|*test-scenarios.md)
+      has_ui_contract_doc=1
       ;;
   esac
 done <<< "$files"
@@ -119,10 +162,30 @@ if [ "$has_feature" -eq 1 ] && [ "$has_operations" -eq 1 ]; then
   fi
 fi
 
+if [ "$has_backend" -eq 1 ] && [ "$has_frontend" -eq 1 ]; then
+  if [ "$scope_exception" -eq 1 ]; then
+    warnings+=("backend/** 와 frontend/** 변경이 함께 있지만 PR 본문에 명시된 같은 기능의 예외 사유가 있습니다.")
+  else
+    add_error "backend/** 와 frontend/** 변경은 기본적으로 별도 PR로 분리해야 합니다. PR 본문에 허용된 예외 사유도 없습니다."
+  fi
+fi
+
+if [ "$has_api_implementation" -eq 1 ] && [ "$has_api_contract_doc" -eq 0 ]; then
+  add_error "API 구현 계약 변경에는 api-spec.md 갱신이 필요합니다."
+fi
+
+if [ "$has_ui_implementation" -eq 1 ] && [ "$has_ui_contract_doc" -eq 0 ]; then
+  add_error "UI 구현 계약 변경에는 ui-spec.md 또는 test-scenarios.md 갱신이 필요합니다."
+fi
+
 echo "PR contract: #$PR_NUMBER"
 echo "- title: $pr_title"
 echo "- feature scope: $has_feature"
 echo "- operations scope: $has_operations"
+echo "- backend scope: $has_backend"
+echo "- frontend scope: $has_frontend"
+echo "- API contract doc: $has_api_contract_doc"
+echo "- UI contract doc: $has_ui_contract_doc"
 
 if [ "${#warnings[@]}" -gt 0 ]; then
   printf '%s\n' "${warnings[@]}" | sed 's/^/- WARNING: /'

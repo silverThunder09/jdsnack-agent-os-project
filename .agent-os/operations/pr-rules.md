@@ -210,7 +210,7 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - PR 위험도(`Light` / `Standard` / `High-risk`)를 먼저 고정
 - 요구사항 변경 시 `requirements.md`, `acceptance-criteria.md`, `traceability.md` 갱신
 - API 변경 시 `api-spec.md` 갱신
-- UI 변경 시 `ui-spec.md` 갱신
+- UI 변경 시 `ui-spec.md` 또는 `test-scenarios.md` 갱신
 - 테스트 기준 변경 시 `test-scenarios.md` 갱신
 - 완료 기준은 [standards/definition-of-done.md](../standards/definition-of-done.md)를 따름
 - CI 기준은 [ci-checklist.md](ci-checklist.md)를 따름
@@ -231,7 +231,7 @@ PR 본문은 `.github/pull_request_template.md`를 기본으로 사용합니다.
 - `test-scenarios.md`에 `TC`가 존재한다.
 - `traceability.md`에 `REQ -> AC -> TC` 매핑이 존재한다.
 - API 변경이 있으면 `api-spec.md`가 갱신되어 있다.
-- UI 변경이 있으면 `ui-spec.md`가 갱신되어 있다.
+- UI 변경이 있으면 `ui-spec.md` 또는 `test-scenarios.md`가 갱신되어 있다.
 - 문서/백엔드/프론트 변경 범위에 맞는 CI 체크리스트가 확인되어 있다.
 - `Light`는 작성자 확인과 관련 CI만 통과하면 된다.
 - `Standard`는 관련 테스트와 CI 검증이 완료되어야 한다.

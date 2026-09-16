@@ -128,7 +128,7 @@ npm run build
 - 문서만 변경한 PR은 문서 하네스 검증을 통과해야 합니다.
 - 백엔드 변경 PR은 백엔드 CI 기준을 통과해야 합니다.
 - 프론트엔드 변경 PR은 프론트엔드 CI 기준을 통과해야 합니다.
-- API/UI 계약 변경 PR은 관련 spec 문서와 테스트 시나리오가 함께 갱신되어야 합니다.
+- API/UI 계약 변경 PR은 `Validate PR contract`에서 `api-spec.md`, `ui-spec.md` 또는 `test-scenarios.md` 동반 여부를 먼저 통과해야 하며, 관련 spec 문서와 테스트 시나리오를 함께 갱신해야 합니다.
 
 ## 실패 처리
 

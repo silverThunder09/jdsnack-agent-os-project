@@ -77,7 +77,7 @@ gh pr review <PR_NUMBER> --comment --body-file <review-report.md>
 `scripts/pr-review-gate.sh`는 아래를 수행합니다.
 
 - PR 변경 파일 조회
-- PR 제목·커밋 summary·본문·기능/운영 범위 결정론 검증
+- PR 제목·커밋 summary·본문·기능/운영 범위·API/UI 계약 문서 동반 여부 결정론 검증
 - 필수 확인 범위 출력
 - PR 본문 필수 섹션 누락 확인
 - PR 범위 위반 후보 탐지
@@ -92,9 +92,12 @@ gh pr review <PR_NUMBER> --comment --body-file <review-report.md>
 - 기능 코드와 `.github/**` 변경이 같은 PR에 있음
 - 기능 코드와 운영 문서 변경이 같은 PR에 있음
 - `backend/**`와 `frontend/**`가 같은 PR에 있음
-- API/UI 계약 문서 변경 없이 구현 계약이 바뀐 것으로 보임
+- `backend/**`의 Controller/API 구현 변경에 `api-spec.md`가 없음
+- `frontend/src/components/**`, `hooks/**`, `pages/**`, `routes/**`, `services/**` 변경에 `ui-spec.md` 또는 `test-scenarios.md`가 없음
 
-백엔드와 프론트엔드가 같은 사용자 기능을 구현하는 경우처럼 허용 가능한 조합은 경고로 남길 수 있습니다. CI/운영/자동화와 기능 코드를 섞는 경우에는 PR 본문의 명시된 예외 사유가 없으면 자동 반려합니다.
+위 조합은 `pr-contract-test.sh`가 결정론적으로 실패 처리합니다. 같은 기능의 backend/frontend를 묶거나 하네스 최소 수정을 포함하는 허용 예외는 PR 본문에 `예외 적용 여부: 있음`과 구체적인 `같은 PR에 포함한 이유:`를 함께 적은 경우에만 경고로 남깁니다.
+
+CI/운영/자동화와 기능 코드를 섞는 경우에는 PR 본문의 명시된 예외 사유가 없으면 자동 반려합니다.
 
 ## 머지 조건
 
