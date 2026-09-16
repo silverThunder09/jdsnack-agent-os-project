@@ -1,6 +1,6 @@
 ---
 name: review-loop
-description: JDSnack 코드 리뷰 핸드오프 루프. Claude가 결정론 게이트(빌드/테스트/lint/diff 줄수)와 code-reviewer 서브에이전트로 5점 채점·판정만 하고, 4점 미만이면 구조화된 변경요청을 Codex에 넘긴다. Codex가 수정·푸시하면 Claude가 재리뷰하며, 4점 또는 5회까지 반복한다. Claude는 코드를 직접 수정하지 않는다.
+description: JDSnack 코드 리뷰 핸드오프 루프. Claude가 결정론 게이트(빌드/테스트/lint/diff 줄수/PR 계약)와 code-reviewer 서브에이전트로 5점 채점·판정만 하고, 4점 미만이면 구조화된 변경요청을 Codex에 넘긴다. Codex가 수정·푸시하면 Claude가 재리뷰하며, 4점 또는 최대 3회까지 반복한다. Claude는 코드를 직접 수정하지 않는다.
 ---
 
 # review-loop (Claude = 게이트키퍼)
@@ -18,11 +18,12 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
 
 1. **diff 줄수 한도** — 변경 1,000줄 초과면 PR 분할을 Codex에 요구하고 중단.
    `git diff --stat origin/main...HEAD` 합계(또는 `gh pr diff <N> | wc -l`) 확인.
-2. **backend 변경 시** — `cd backend && ./gradlew test`
-3. **frontend 변경 시** — `cd frontend && npm run lint && npm test`
-4. 셋 다 통과해야 2단계로 진행. (게이트용 재실행은 Claude가 수행, 코드 수정은 하지 않음)
+2. **PR 계약** — `bash scripts/pr-contract-test.sh <N>`
+3. **backend 변경 시** — `cd backend && ./gradlew test`
+4. **frontend 변경 시** — `cd frontend && npm run lint && npm test`
+5. 모두 통과해야 2단계로 진행. (게이트용 재실행은 Claude가 수행, 코드 수정은 하지 않음)
 
-## 2. 리뷰 핸드오프 루프 (최대 5회)
+## 2. 리뷰 핸드오프 루프 (최대 3회)
 `attempt = 1`로 시작. 각 회차:
 
 1. **diff 추출** — 로컬이면 `git diff origin/main...HEAD`, PR이면 `gh pr diff <N>`.
@@ -43,23 +44,24 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
      ```
      이후 **Codex가 같은 브랜치에서 수정·커밋·푸시**한다. 푸시 완료를 확인하면
      `attempt += 1` 후 1번(결정론 게이트 포함)부터 재리뷰. 재리뷰는 **델타만** 평가.
-4. **시도 소진** — `attempt == 5`인데도 `score < 4`면 **루프 중단**. 자동 merge 금지:
+4. **시도 소진** — `attempt == 3`인데도 `score < 4`면 **루프 중단**. 자동 merge 금지:
    - 마지막 점수·미해결 findings를 사용자에게 에스컬레이션.
    - `pr-automation-loop.md` 기준 실패 Issue 생성 여부 판단.
 
-## 3. 통과 후: PR 코멘트와 머지 (Claude 담당)
-리뷰 통과는 로컬 판정만 끝났다는 뜻이 아닙니다. **PR에 결과를 코멘트로 남기고, 머지 가능한 일반 PR이면 실제로 머지된 상태까지 확인해야 합니다.** PR 본문만 수정하고 코멘트를 생략하거나, `Ready to merge` 상태를 성공으로 보고 멈추면 안 됩니다.
+## 3. 통과 후: 정식 PR Review와 머지 (Claude 담당)
+리뷰 통과는 로컬 판정만 끝났다는 뜻이 아닙니다. **GitHub PR Review를 제출하고, 머지 가능한 일반 PR이면 실제로 머지된 상태까지 확인해야 합니다.** PR 본문만 수정하거나 일반 댓글만 남기고, `Ready to merge` 상태를 성공으로 보고 멈추면 안 됩니다.
 
 1. 현재 PR 번호와 저장소를 확인합니다.
    - `gh pr view --json number,state,headRefName,mergeStateStatus`
    - PR이 이미 `MERGED`이면 중복 실행으로 간주하고 종료합니다.
-2. 리뷰 결과를 구조화된 **PR 코멘트**로 작성합니다.
-   - `gh pr comment <N> --body-file <review-report-file>`
-   - 코멘트에는 `review-loop`, `attempt`, 점수, 결정(`PASS`/`REQUEST_CHANGES`/`NEEDS_HUMAN`), findings를 포함합니다.
-   - 통과 결과를 PR 본문에 기록할 수는 있지만, 본문 수정만으로 코멘트를 대체하지 않습니다.
-3. `score < 4`, 결정론 게이트 실패, 충돌, 또는 현재 리뷰 job 이외의 필수 체크 미통과이면 `REQUEST_CHANGES` 또는 `NEEDS_HUMAN` 코멘트만 남기고 머지하지 않습니다.
+2. 구조화된 결과를 **정식 GitHub PR Review**로 제출합니다. workflow가 확인한 runner의 GitHub CLI 계정을 사용합니다.
+   - `PASS`: `gh pr review <N> --approve --body-file <review-report-file>`
+   - `REQUEST_CHANGES`: `gh pr review <N> --request-changes --body-file <review-report-file>`
+   - `COMMENT` 또는 `NEEDS_HUMAN`: `gh pr review <N> --comment --body-file <review-report-file>`
+   - 본문에는 `review-loop`, `attempt`, 점수, 결정, findings를 포함합니다.
+3. `score < 4`, 결정론 게이트 실패, 충돌, 또는 현재 리뷰 job 이외의 필수 체크 미통과이면 정식 `REQUEST_CHANGES` 또는 `COMMENT` Review만 남기고 머지하지 않습니다.
    - 이 스킬은 보호 규칙의 필수 체크인 `Codex Branch Review / review` job 안에서 실행될 수 있습니다. 현재 실행 중인 자기 자신의 체크는 명령이 끝나기 전까지 `IN_PROGRESS`인 것이 정상이며, 이를 외부 blocker로 판정하거나 완료될 때까지 무한 대기하지 않습니다.
-4. High-risk 변경은 `scripts/pr-review-gate.sh <N>`와 `merge-rules.md` 조건을 적용하고, 사람 승인이 필요한 경우 `NEEDS_HUMAN`으로 멈춥니다.
+4. High-risk 변경은 `scripts/pr-contract-test.sh <N>`와 `scripts/pr-review-gate.sh <N>`, `merge-rules.md` 조건을 적용하고, 사람 승인이 필요한 경우 `NEEDS_HUMAN`을 본문에 적은 `COMMENT` Review로 멈춥니다.
 5. High-risk가 아니고 모든 필수 체크가 통과한 일반 Codex PR이면 다음으로 squash merge합니다.
    - 현재 review job이 required check인 경우에도 실제 머지가 job 종료 뒤 진행되도록 auto-merge를 큐에 넣습니다.
    - `gh pr merge <N> --squash --delete-branch --auto --repo <owner>/<repo>`
@@ -67,7 +69,7 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
    - `gh pr view <N> --json state,mergedAt,mergeCommit,autoMergeRequest,mergeStateStatus`
    - `state == MERGED`이고 `mergedAt`이 있을 때만 머지 완료로 보고합니다.
    - 명령 직후 `state == OPEN`이어도 `autoMergeRequest`가 존재하고 현재 review job만 대기 중이면 auto-merge가 큐에 등록된 정상 중간 상태입니다. 이 경우 성공적으로 종료하여 현재 체크를 통과시킵니다.
-   - 실패하거나 `OPEN`인데 auto-merge가 큐에 없으면 재시도 폭주 없이 실패 원인과 `NEEDS_HUMAN` 상태를 코멘트로 남깁니다.
+   - 실패하거나 `OPEN`인데 auto-merge가 큐에 없으면 재시도 폭주 없이 실패 원인과 `NEEDS_HUMAN` 상태를 정식 `COMMENT` Review로 남깁니다.
 
 ## 경계 규칙 (반드시 준수)
 - **Claude는 소스 코드를 수정/커밋하지 않는다.** 수정의 주체는 항상 Codex.

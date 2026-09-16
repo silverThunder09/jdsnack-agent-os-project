@@ -1,4 +1,4 @@
-<!-- PR 제목은 Conventional Commits 형식(type(scope): summary)을 사용합니다. -->
+<!-- PR 제목은 Conventional Commits 형식(type(scope): summary)을 사용하고, type(scope)는 영어·summary는 한국어로 작성합니다. -->
 <!-- PR 계획, 본문 작성, 리뷰, 머지 판단은 클로드 담당입니다. 코덱스는 구현·테스트·리뷰 기반 코드 수정을 담당합니다. -->
 <!-- 아래 "구현한 기능"과 "수행한 테스트"는 리뷰어가 이 PR만 읽고 기능을 판단하는 근거입니다. 한국어로 구체적으로 작성하세요. TBD 금지. -->
 

@@ -12,6 +12,8 @@ fi
 
 PR_NUMBER="$1"
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 if ! command -v gh >/dev/null 2>&1; then
   echo "ERROR: GitHub CLI(gh)가 필요합니다." >&2
   exit 1
@@ -20,6 +22,13 @@ fi
 if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
   echo "ERROR: PR_NUMBER는 숫자여야 합니다: $PR_NUMBER" >&2
   exit 2
+fi
+
+contract_status=0
+if bash "$ROOT_DIR/scripts/pr-contract-test.sh" "$PR_NUMBER"; then
+  contract_status=0
+else
+  contract_status=$?
 fi
 
 tmp_dir="$(mktemp -d)"
@@ -164,6 +173,14 @@ echo
 echo "- 번호: #$PR_NUMBER"
 echo "- 제목: $pr_title"
 echo
+
+echo "## 결정론적 PR 계약"
+if [ "$contract_status" -eq 0 ]; then
+  echo "- PASS: 제목·커밋·본문·범위 계약을 통과했습니다."
+else
+  echo "- FAIL: scripts/pr-contract-test.sh가 PR 계약 위반을 발견했습니다."
+fi
+echo
 echo "## 변경 파일"
 echo
 sed 's/^/- /' "$files_path"
@@ -232,3 +249,7 @@ cat <<'REPORT'
 ## Required Fixes
 - 수정 필요 항목:
 REPORT
+
+if [ "$contract_status" -ne 0 ]; then
+  exit "$contract_status"
+fi

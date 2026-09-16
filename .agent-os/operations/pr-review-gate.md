@@ -21,6 +21,7 @@ PR Review Gate는 PR을 바로 머지하지 않고, 변경 범위와 위험도�
 `High-risk` PR 생성 후, 머지 전 반드시 실행합니다.
 
 ```sh
+bash scripts/pr-contract-test.sh <PR_NUMBER>
 ./scripts/pr-review-gate.sh <PR_NUMBER>
 ```
 
@@ -31,6 +32,8 @@ PR Review Gate는 PR을 바로 머지하지 않고, 변경 범위와 위험도�
 - `PASS`: 머지 가능
 - `COMMENT`: 머지는 가능하지만 후속 개선 필요
 - `REQUEST_CHANGES`: 머지 금지, 실패 Issue 생성 후 수정 필요
+
+`NEEDS_HUMAN`은 자동 루프의 내부 중단 사유입니다. GitHub에는 `COMMENT` Review로 제출하고 자동 머지하지 않습니다.
 
 `REQUEST_CHANGES`가 하나라도 있으면 PR은 머지할 수 없습니다.
 
@@ -74,6 +77,7 @@ gh pr review <PR_NUMBER> --comment --body-file <review-report.md>
 `scripts/pr-review-gate.sh`는 아래를 수행합니다.
 
 - PR 변경 파일 조회
+- PR 제목·커밋 summary·본문·기능/운영 범위 결정론 검증
 - 필수 확인 범위 출력
 - PR 본문 필수 섹션 누락 확인
 - PR 범위 위반 후보 탐지
@@ -83,14 +87,14 @@ gh pr review <PR_NUMBER> --comment --body-file <review-report.md>
 
 ## 범위 위반 후보
 
-아래 조합은 스크립트가 경고합니다.
+아래 조합은 `pr-contract-test.sh`가 기본적으로 실패 처리합니다.
 
 - 기능 코드와 `.github/**` 변경이 같은 PR에 있음
 - 기능 코드와 운영 문서 변경이 같은 PR에 있음
 - `backend/**`와 `frontend/**`가 같은 PR에 있음
 - API/UI 계약 문서 변경 없이 구현 계약이 바뀐 것으로 보임
 
-경고는 자동 반려가 아닙니다. 단, 예외 적용 시 PR 본문 `범위 판단`에 이유를 남겨야 합니다.
+백엔드와 프론트엔드가 같은 사용자 기능을 구현하는 경우처럼 허용 가능한 조합은 경고로 남길 수 있습니다. CI/운영/자동화와 기능 코드를 섞는 경우에는 PR 본문의 명시된 예외 사유가 없으면 자동 반려합니다.
 
 ## 머지 조건
 

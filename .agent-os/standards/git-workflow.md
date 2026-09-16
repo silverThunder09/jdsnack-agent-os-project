@@ -45,7 +45,7 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 <type>(<scope>): <summary>
 ```
 
-`type(scope)` 접두어는 영어를 사용하고, `<summary>`는 작업 맥락에 맞는 언어를 선택합니다.
+`type(scope)` 접두어는 영어를 사용하고, 이 저장소의 작업 summary와 PR 제목은 한국어를 기본으로 사용합니다. API path, 에러 코드, 클래스명처럼 고정된 기술 식별자만 영어로 남길 수 있습니다.
 
 예시:
 
@@ -54,8 +54,8 @@ docs(harness): Git 운영 규칙 추가
 feat(api): 이력서 진단 엔드포인트 추가
 test(api): 입력값 검증 테스트 추가
 fix(gemini): 응답 파싱 실패 처리
-feat(frontend): add resume upload flow
-docs(pr): tighten pr scope rules
+feat(frontend): 이력서 업로드 흐름 추가
+docs(pr): PR 범위 규칙 강화
 ```
 
 ## 커밋 타입

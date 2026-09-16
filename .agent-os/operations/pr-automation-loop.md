@@ -31,7 +31,7 @@ JDSnack 기능 구현 해줘.
 - **Spec 순환**: 자동 승격된 후보는 문서 필수 세트와 traceability를 생성·검증한 뒤 Spec promotion PR을 만들고, 통과하면 T1을 Codex에 디스패치합니다. 한 시점에 active Spec은 하나만 유지합니다.
 - 변경요청(`리뷰 반려: <branch>` 또는 `리뷰 후속: <branch>` 이슈)이 있으면 같은 `codex/*` 브랜치에서 반영합니다.
 - **클로드 리뷰-머지 루프도 GitHub 이벤트로 기동합니다.** [`.github/workflows/codex-branch-review.yml`](../../.github/workflows/codex-branch-review.yml)이 신뢰된 동일 저장소 PR의 생성·갱신·재오픈 이벤트에서 로컬 `jdsnack` self-hosted runner로 클로드 리뷰-머지 절차(`.claude/skills/review-loop/SKILL.md`)를 즉시 1회 기동합니다. 수동 `workflow_dispatch`도 지원합니다. 외부 fork PR은 self-hosted runner 보안을 위해 실행하지 않습니다. 현재 review job 자체가 보호 브랜치의 required check일 수 있으므로, 통과 PR은 `gh pr merge --auto`로 머지를 큐에 넣고 job이 성공한 뒤 GitHub가 머지를 완료합니다.
-- Windows self-hosted runner에서는 Git Bash의 `C:\...` 임시 스크립트 경로 변환 문제가 생길 수 있으므로 review step은 Windows PowerShell로 실행하고, Claude 절차 파일은 checkout된 `$GITHUB_WORKSPACE/.claude/skills/review-loop/SKILL.md`에서 해석합니다.
+- Windows self-hosted runner에서는 Git Bash의 `C:\...` 임시 스크립트 경로 변환 문제가 생길 수 있으므로 review step은 Windows PowerShell로 실행하고, Claude 절차 파일은 checkout된 `$GITHUB_WORKSPACE/.claude/skills/review-loop/SKILL.md`에서 해석합니다. PR Review는 runner에 로그인된 `gh` 계정을 사용하며, workflow가 `gh api user`와 `github.repository_owner` 일치를 먼저 확인합니다. Actions 기본 `github.token`을 `GH_TOKEN`으로 주입하지 않습니다.
 - Windows self-hosted runner의 PR feedback detector는 공백이 없는 8.3 절대 경로 `C:\PROGRA~1\Git\bin\bash.exe`로 Git Bash를 명시적으로 사용하고 `.gitattributes`의 `*.sh text eol=lf`를 적용합니다. autonomous loop는 `JQ_BIN`·`GH_BIN`·`PYTHON_BIN`·`CLAUDE_BIN`·`CODEX_BIN`으로 런타임 의존성을 주입할 수 있으며, 누락 시 구조화된 `needs_human` 결과를 출력합니다.
 - 반려 감지는 [pr-feedback-detector.sh](../../scripts/pr-feedback-detector.sh)가 GitHub 이벤트로 깨워진 workflow에서 한 번 실행될 때 수행합니다. 감지기는 polling loop를 내장하지 않으며 `no_action`, `actionable`, `needs_human` JSON과 종료 코드를 내보냅니다.
 - `.github/workflows/pr-feedback-detector.yml`은 반려 Issue 생성·수정, Issue/PR 댓글, PR 리뷰, required CI 완료 이벤트에만 실행됩니다. 로컬 `jdsnack` self-hosted runner가 안전한 후보를 격리 worktree에 전달해 Codex의 수정·테스트·커밋·푸시를 수행합니다.
@@ -155,6 +155,8 @@ resume_phase: test
 ## PR 생성 조건
 
 PR 생성 전 검증 기준의 정본은 [pr-rules.md](pr-rules.md)의 "PR 전 필수 검증 기준"입니다.
+
+PR 생성 전 `bash scripts/pr-contract-test.sh <PR_NUMBER>`가 제목·커밋·본문·기능/운영 범위를 통과해야 합니다. High-risk PR은 이 계약 검증 뒤 `scripts/pr-review-gate.sh <PR_NUMBER>`를 실행합니다. 리뷰 결과는 문서 기준에 따라 `gh pr review --approve`, `--request-changes`, `--comment` 중 하나로 정식 제출합니다.
 
 ## PR 실패 처리
 

@@ -52,7 +52,7 @@ assert_contains "$ROUTER" 'name: Verify Flyway migrations on PostgreSQL'
 assert_contains "$ROUTER" 'image: postgres:16'
 assert_contains "$ROUTER" 'com.jdsnack.schema.PostgresMigrationTest'
 assert_contains "$ROUTER" 'needs.postgres_schema.result'
-grep -Fq 'needs: [detect, backend, postgres_schema,' "$ROUTER" || {
+grep -Fq 'needs: [detect, pr_contract, backend, postgres_schema,' "$ROUTER" || {
     printf 'PR CI Gate must depend on postgres_schema in %s\n' "$ROUTER" >&2
     exit 1
 }

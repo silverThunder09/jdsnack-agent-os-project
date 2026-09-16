@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   detect:
@@ -49,6 +50,18 @@ jobs:
               - 'frontend/README.md'
             workflow:
               - '.github/workflows/**'
+
+  pr_contract:
+    name: Validate PR contract
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate PR title, commits, body, and scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/pr-contract-test.sh "${{ github.event.pull_request.number }}"
 
   backend:
     name: Test and build backend
@@ -233,12 +246,13 @@ jobs:
   gate:
     name: PR CI Gate
     if: always()
-    needs: [detect, backend, postgres_schema, frontend, backend_container, compose_smoke, docs, workflow]
+    needs: [detect, pr_contract, backend, postgres_schema, frontend, backend_container, compose_smoke, docs, workflow]
     runs-on: ubuntu-latest
     steps:
       - name: Fail when selected CI failed
         if: >
           needs.detect.result != 'success' ||
+          contains(fromJSON('["failure","cancelled"]'), needs.pr_contract.result) ||
           contains(fromJSON('["failure","cancelled"]'), needs.backend.result) ||
           contains(fromJSON('["failure","cancelled"]'), needs.postgres_schema.result) ||
           contains(fromJSON('["failure","cancelled"]'), needs.frontend.result) ||
@@ -250,6 +264,7 @@ jobs:
       - name: Report selected CI
         run: |
           echo "backend=${{ needs.backend.result }}"
+          echo "pr-contract=${{ needs.pr_contract.result }}"
           echo "postgres-schema=${{ needs.postgres_schema.result }}"
           echo "frontend=${{ needs.frontend.result }}"
           echo "backend-container=${{ needs.backend_container.result }}"
