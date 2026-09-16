@@ -133,7 +133,7 @@ while IFS= read -r file; do
     .agent-os/specs/*|docs/architecture/*)
       has_feature=1
       ;;
-    .github/*|.agent-os/operations/*|.agent-os/standards/*|.claude/*|.agents/*|scripts/*|.githooks/*|AGENTS.md|CLAUDE.md|backends.json|Dockerfile|docker-compose*.yml|compose*.yml)
+    .github/*|.agent-os/operations/*|.agent-os/standards/*|.claude/*|.agents/*|scripts/*|.githooks/*|AGENTS.md|CLAUDE.md|backends.json|Dockerfile|docker-compose*.yml|docker-compose*.yaml|compose*.yml|compose*.yaml)
       has_operations=1
       ;;
   esac

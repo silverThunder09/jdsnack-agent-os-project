@@ -37,6 +37,8 @@ bash scripts/pr-contract-test.sh <PR_NUMBER>
 
 `REQUEST_CHANGES`가 하나라도 있으면 PR은 머지할 수 없습니다.
 
+Claude workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정으로 Review를 제출합니다. 그 계정이 PR 작성자와 같으면 GitHub가 자기 PR의 approve/request changes를 거부하므로, workflow는 같은 판정을 `COMMENT`로 남기고 이를 승인으로 간주하지 않습니다. High-risk PR은 이 경우에도 `NEEDS_HUMAN`으로 중단합니다.
+
 ## 변경 범위별 확인 기준
 
 | 변경 범위 | 기본 확인 |

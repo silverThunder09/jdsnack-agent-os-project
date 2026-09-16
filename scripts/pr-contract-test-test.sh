@@ -107,6 +107,9 @@ run_case() {
     mixed_operations)
       GH_FIXTURE_FILES=$'backend/src/main/java/example/ExampleController.java\n.github/workflows/example.yml'
       ;;
+    mixed_compose_operations)
+      GH_FIXTURE_FILES=$'backend/src/main/java/example/ExampleController.java\ncompose.prod.yaml'
+      ;;
     mixed_backend_frontend)
       GH_FIXTURE_FILES=$'backend/src/main/java/example/ExampleController.java\nfrontend/src/components/Example.tsx\nspecs/api-spec.md\nspecs/ui-spec.md'
       ;;
@@ -158,6 +161,7 @@ run_case placeholder_bullet 1 "미완성 placeholder 값"
 run_case technical_summary 0 "PR contract passed"
 run_case english_summary 1 "한국어 문장 또는 고정된 기술 식별자"
 run_case mixed_operations 1 "기능 코드와 CI/운영/자동화 변경은 별도 PR"
+run_case mixed_compose_operations 1 "기능 코드와 CI/운영/자동화 변경은 별도 PR"
 run_case mixed_backend_frontend 1 "backend/** 와 frontend/** 변경은 기본적으로 별도 PR"
 run_case api_contract_missing 1 "API 구현 계약 변경에는 api-spec.md"
 run_case ui_contract_missing 1 "UI 구현 계약 변경에는 ui-spec.md 또는 test-scenarios.md"
