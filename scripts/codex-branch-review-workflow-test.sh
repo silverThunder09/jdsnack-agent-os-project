@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKFLOW="$ROOT_DIR/.github/workflows/codex-branch-review.yml"
 CLAUDE_SKILL="$ROOT_DIR/.claude/skills/review-loop/SKILL.md"
+AGENTS_SKILL="$ROOT_DIR/.agents/skills/review-loop/SKILL.md"
 
 fail() {
     printf 'FAIL: %s\n' "$1" >&2
@@ -41,9 +42,13 @@ assert_contains 'Test-Path -LiteralPath $skillPath -PathType Leaf'
 assert_contains 'Verify GitHub review identity'
 assert_contains "gh api user --jq '.login'"
 assert_contains 'github.repository_owner'
+assert_contains '$actualLogin -ne $expectedLogin'
+assert_contains 'throw "Claude review identity mismatch: expected $expectedLogin, got $actualLogin"'
 assert_contains 'claude --model sonnet --effort medium -p'
 assert_not_contains 'GH_TOKEN: ${{ github.token }}'
 [[ -f "$CLAUDE_SKILL" ]] || fail "저장소의 Claude review-loop 스킬 파일이 없습니다: $CLAUDE_SKILL"
+[[ -f "$AGENTS_SKILL" ]] || fail "저장소의 .agents review-loop 스킬 파일이 없습니다: $AGENTS_SKILL"
+diff -u <(sed 's/\r$//' "$CLAUDE_SKILL") <(sed 's/\r$//' "$AGENTS_SKILL") >/dev/null || fail ".claude와 .agents의 review-loop 스킬이 서로 다릅니다."
 for skill_contract in \
     'bash scripts/pr-contract-test.sh <N>' \
     'gh pr review <N> --approve --body-file <review-report-file>' \
