@@ -1,10 +1,7 @@
 package com.jdsnack.analysis;
 
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.*;
+import org.apache.pdfbox.pdmodel.font.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,20 +12,16 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import static com.jdsnack.analysis.AnalysisHistoryTestSupport.JD_TEXT;
-import static com.jdsnack.analysis.AnalysisHistoryTestSupport.RESUME_TEXT;
-import static com.jdsnack.analysis.AnalysisHistoryTestSupport.authenticatedSession;
-import static com.jdsnack.analysis.AnalysisHistoryTestSupport.createRequest;
-import static com.jdsnack.analysis.AnalysisHistoryTestSupport.createUser;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static com.jdsnack.analysis.AnalysisHistoryTestSupport.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -82,6 +75,30 @@ class AnalysisHistoryControllerTest {
                 .andExpect(jsonPath("$.data.input.jdText").value(JD_TEXT))
                 .andExpect(jsonPath("$.data.result.diagnosis").exists())
                 .andExpect(jsonPath("$.data.result.match").exists());
+    }
+
+    @Test
+    void sameUserIdempotencyKeyReturnsTheSameHistoryWithoutCreatingAnotherQuotaEntry() throws Exception {
+        userId = createUser(jdbcTemplate);
+        String firstHistoryId = historyId(mockMvc.perform(analysisRequest(userId, "same-user-key")));
+        String retryHistoryId = historyId(mockMvc.perform(analysisRequest(userId, "same-user-key")).andExpect(jsonPath("$.data.id").value(firstHistoryId)).andExpect(jsonPath("$.data.status").value("SUCCEEDED")));
+        assertThat(retryHistoryId).isEqualTo(firstHistoryId);
+        assertThat(count("analysis_history", "user_id = ? AND idempotency_key = ?", userId, "same-user-key")).isEqualTo(1);
+        assertThat(count("ai_usage_ledger")).isEqualTo(1);
+    }
+
+    @Test
+    void sameIdempotencyKeyIsIndependentAcrossUsers() throws Exception {
+        userId = createUser(jdbcTemplate);
+        String otherUserId = createUser(jdbcTemplate);
+        try {
+            String firstHistoryId = historyId(mockMvc.perform(analysisRequest(userId, "shared-key")));
+            String otherHistoryId = historyId(mockMvc.perform(analysisRequest(otherUserId, "shared-key")).andExpect(jsonPath("$.data.status").value("SUCCEEDED")));
+            assertThat(otherHistoryId).isNotEqualTo(firstHistoryId);
+            assertThat(count("ai_usage_ledger", "user_id = ?", otherUserId)).isEqualTo(1);
+        } finally {
+            jdbcTemplate.update("DELETE FROM app_user WHERE user_id = ?", otherUserId);
+        }
     }
 
     @Test
@@ -279,6 +296,15 @@ class AnalysisHistoryControllerTest {
                 snapshotId
         );
     }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder analysisRequest(String userId, String idempotencyKey) { return post("/api/analysis-histories").session(authenticatedSession(userId)).header("Idempotency-Key", idempotencyKey).contentType(MediaType.APPLICATION_JSON).content(createRequest()); }
+
+    private String historyId(ResultActions actions) throws Exception { return historyId(actions.andExpect(status().isOk()).andReturn()); }
+    private String historyId(MvcResult result) throws Exception { return result.getResponse().getContentAsString().replaceAll(".*\"id\":\"([^\"]+)\".*", "$1"); }
+
+    private int count(String table) { return count(table, "user_id = ?", userId); }
+
+    private int count(String table, String where, Object... args) { return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE " + where, Integer.class, args); }
 
     private void assertStoredExecutionVersions(String historyId) {
         String diagnosisModelName = jdbcTemplate.queryForObject(

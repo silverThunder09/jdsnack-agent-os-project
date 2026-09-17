@@ -17,12 +17,18 @@ public class AnalysisHistoryRepository {
     }
 
     public AnalysisHistory save(AnalysisHistory history) {
+        insert(history);
+        return findByIdAndUserId(history.id(), history.userId()).orElseThrow();
+    }
+
+    private void insert(AnalysisHistory history) {
         jdbcTemplate.update(
                 """
                         INSERT INTO analysis_history (
                             history_id,
                             user_id,
                             snapshot_id,
+                            idempotency_key,
                             status,
                             diagnosis_json,
                             diagnosis_model_name,
@@ -34,11 +40,12 @@ public class AnalysisHistoryRepository {
                             failure_message,
                             created_at,
                             updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 history.id(),
                 history.userId(),
                 history.snapshotId(),
+                history.idempotencyKey(),
                 history.status().name(),
                 history.diagnosisJson(),
                 history.diagnosisModelName(),
@@ -51,7 +58,6 @@ public class AnalysisHistoryRepository {
                 Timestamp.from(history.createdAt()),
                 Timestamp.from(history.updatedAt())
         );
-        return findByIdAndUserId(history.id(), history.userId()).orElseThrow();
     }
 
     public Optional<AnalysisHistory> findByIdAndUserId(String historyId, String userId) {
@@ -60,6 +66,7 @@ public class AnalysisHistoryRepository {
                                 SELECT history_id,
                                        user_id,
                                        snapshot_id,
+                                       idempotency_key,
                                        status,
                                        diagnosis_json,
                                        diagnosis_model_name,
@@ -82,12 +89,42 @@ public class AnalysisHistoryRepository {
                 .findFirst();
     }
 
+    public Optional<AnalysisHistory> findByUserIdAndIdempotencyKey(String userId, String idempotencyKey) {
+        return jdbcTemplate.query(
+                        """
+                                SELECT history_id,
+                                       user_id,
+                                       snapshot_id,
+                                       idempotency_key,
+                                       status,
+                                       diagnosis_json,
+                                       diagnosis_model_name,
+                                       diagnosis_prompt_version,
+                                       match_json,
+                                       match_model_name,
+                                       match_prompt_version,
+                                       failure_code,
+                                       failure_message,
+                                       created_at,
+                                       updated_at
+                                FROM analysis_history
+                                WHERE user_id = ? AND idempotency_key = ?
+                                """,
+                        rowMapper(),
+                        userId,
+                        idempotencyKey
+                )
+                .stream()
+                .findFirst();
+    }
+
     public List<AnalysisHistory> findAllByUserId(String userId) {
         return jdbcTemplate.query(
                 """
                         SELECT history_id,
                                user_id,
                                snapshot_id,
+                               idempotency_key,
                                status,
                                diagnosis_json,
                                diagnosis_model_name,
@@ -188,6 +225,7 @@ public class AnalysisHistoryRepository {
                 resultSet.getString("history_id"),
                 resultSet.getString("user_id"),
                 resultSet.getString("snapshot_id"),
+                resultSet.getString("idempotency_key"),
                 AnalysisHistoryStatus.valueOf(resultSet.getString("status")),
                 resultSet.getString("diagnosis_json"),
                 resultSet.getString("diagnosis_model_name"),

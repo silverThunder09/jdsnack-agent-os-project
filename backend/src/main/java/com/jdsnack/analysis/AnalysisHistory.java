@@ -6,6 +6,7 @@ public record AnalysisHistory(
         String id,
         String userId,
         String snapshotId,
+        String idempotencyKey,
         AnalysisHistoryStatus status,
         String diagnosisJson,
         String diagnosisModelName,

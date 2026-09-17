@@ -31,33 +31,43 @@ public class GeminiMatchPreviewProvider {
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final String model;
+    private final Duration requestTimeout;
 
     @Autowired
     public GeminiMatchPreviewProvider(
             ObjectMapper objectMapper,
             @Value("${GEMINI_API_KEY:}") String apiKey,
-            @Value("${GEMINI_MODEL:" + DEFAULT_MODEL + "}") String model
+            @Value("${GEMINI_MODEL:" + DEFAULT_MODEL + "}") String model,
+            @Value("${jdsnack.gemini.connect-timeout-seconds:10}") long connectTimeoutSeconds,
+            @Value("${jdsnack.gemini.request-timeout-seconds:30}") long requestTimeoutSeconds
     ) {
         this(
                 objectMapper,
                 HttpClient.newBuilder()
-                        .connectTimeout(Duration.ofSeconds(10))
+                        .connectTimeout(Duration.ofSeconds(connectTimeoutSeconds))
                         .build(),
                 apiKey,
-                model
+                model,
+                Duration.ofSeconds(requestTimeoutSeconds)
         );
     }
 
-    private GeminiMatchPreviewProvider(
+    public GeminiMatchPreviewProvider(ObjectMapper objectMapper, String apiKey, String model) {
+        this(objectMapper, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(), apiKey, model, Duration.ofSeconds(30));
+    }
+
+    GeminiMatchPreviewProvider(
             ObjectMapper objectMapper,
             HttpClient httpClient,
             String apiKey,
-            String model
+            String model,
+            Duration requestTimeout
     ) {
         this.objectMapper = objectMapper;
         this.httpClient = httpClient;
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.model = model == null || model.isBlank() ? DEFAULT_MODEL : model.trim();
+        this.requestTimeout = requestTimeout;
     }
 
     public MatchPreviewResponse preview(MatchPreviewRequest request) {
@@ -68,7 +78,7 @@ public class GeminiMatchPreviewProvider {
         try {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(geminiUri())
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(requestTimeout)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody(request)))
                     .build();
@@ -82,7 +92,7 @@ public class GeminiMatchPreviewProvider {
         } catch (GeminiApiException exception) {
             throw exception;
         } catch (IOException exception) {
-            throw new GeminiApiException(ErrorCode.GEMINI_API_RESPONSE_INVALID, exception);
+            throw new GeminiApiException(ErrorCode.GEMINI_API_REQUEST_FAILED, exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new GeminiApiException(ErrorCode.GEMINI_API_REQUEST_FAILED, exception);
@@ -92,6 +102,9 @@ public class GeminiMatchPreviewProvider {
     public AnalysisExecutionVersion executionVersion() {
         return new AnalysisExecutionVersion(model, PROMPT_VERSION);
     }
+
+    Duration connectTimeout() { return httpClient.connectTimeout().orElseThrow(); }
+    Duration requestTimeout() { return requestTimeout; }
 
     private URI geminiUri() {
         String encodedModel = URLEncoder.encode(model, StandardCharsets.UTF_8);

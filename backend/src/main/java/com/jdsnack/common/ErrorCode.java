@@ -83,6 +83,10 @@ public enum ErrorCode {
             HttpStatus.BAD_GATEWAY,
             "Gemini AI 응답 형식을 해석하지 못했습니다. 다시 시도해주세요."
     ),
+    AI_QUOTA_EXCEEDED(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "오늘 사용할 수 있는 AI 분석 횟수를 초과했습니다."
+    ),
     AI_ANALYSIS_NOT_ENABLED(
             HttpStatus.NOT_IMPLEMENTED,
             "AI 분석 기능은 준비 중입니다. 현재는 이력서 입력 검증만 가능합니다."

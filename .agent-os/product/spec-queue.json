@@ -61,7 +61,8 @@
       "slug": "ai-usage-cost-limit",
       "title": "AI 호출량·비용 제한",
       "priority": 5,
-      "status": "candidate",
+      "status": "active",
+      "spec_path": ".agent-os/specs/2026-09-16-ai-usage-cost-limit",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:cost"}
     },

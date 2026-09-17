@@ -14,6 +14,7 @@ import com.jdsnack.match.MatchPreviewResponse;
 import com.jdsnack.match.MatchPreviewService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Instant;
 import java.util.List;
@@ -32,6 +33,7 @@ public class AnalysisHistoryService {
     private final MatchPreviewService matchPreviewService;
     private final ResumeExtractionService resumeExtractionService;
     private final ObjectMapper objectMapper;
+    private final AiUsageQuotaService aiUsageQuotaService;
 
     public AnalysisHistoryService(
             AnalysisHistoryRepository historyRepository,
@@ -41,7 +43,8 @@ public class AnalysisHistoryService {
             DiagnoseService diagnoseService,
             MatchPreviewService matchPreviewService,
             ResumeExtractionService resumeExtractionService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            AiUsageQuotaService aiUsageQuotaService
     ) {
         this.historyRepository = historyRepository;
         this.feedbackRepository = feedbackRepository;
@@ -51,11 +54,29 @@ public class AnalysisHistoryService {
         this.matchPreviewService = matchPreviewService;
         this.resumeExtractionService = resumeExtractionService;
         this.objectMapper = objectMapper;
+        this.aiUsageQuotaService = aiUsageQuotaService;
     }
 
     public AnalysisHistoryResponse create(String userId, AnalysisHistoryCreateRequest request) {
-        AnalysisInputSnapshot snapshot = createSnapshot(userId, request);
-        return runAnalysis(userId, snapshot);
+        return create(userId, request, null);
+    }
+
+    public AnalysisHistoryResponse create(
+            String userId,
+            AnalysisHistoryCreateRequest request,
+            String idempotencyKey
+    ) {
+        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
+        if (normalizedKey == null) {
+            return runAnalysis(userId, createSnapshot(userId, request), null, "/api/analysis-histories");
+        }
+
+        return runAnalysis(
+                userId,
+                createSnapshot(userId, request),
+                normalizedKey,
+                "/api/analysis-histories"
+        );
     }
 
     public AnalysisHistoryResponse createFile(
@@ -63,12 +84,36 @@ public class AnalysisHistoryService {
             MultipartFile resumeFile,
             AnalysisHistoryCreateRequest request
     ) {
+        return createFile(userId, resumeFile, request, null);
+    }
+
+    public AnalysisHistoryResponse createFile(
+            String userId,
+            MultipartFile resumeFile,
+            AnalysisHistoryCreateRequest request,
+            String idempotencyKey
+    ) {
+        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
+        return createFileWithoutIdempotency(userId, resumeFile, request, normalizedKey);
+    }
+
+    private AnalysisHistoryResponse createFileWithoutIdempotency(
+            String userId,
+            MultipartFile resumeFile,
+            AnalysisHistoryCreateRequest request,
+            String idempotencyKey
+    ) {
         if (resumeFile == null || resumeFile.isEmpty()) {
             throw new ApiException(ErrorCode.FILE_TEXT_EXTRACTION_FAILED);
         }
 
         String extractedResumeText = resumeExtractionService.extractText(resumeFile);
-        return create(userId, new AnalysisHistoryCreateRequest(extractedResumeText, request.jd()));
+        return runAnalysis(
+                userId,
+                createSnapshot(userId, new AnalysisHistoryCreateRequest(extractedResumeText, request.jd())),
+                idempotencyKey,
+                "/api/analysis-histories/file"
+        );
     }
 
     public List<AnalysisHistorySummaryResponse> list(String userId) {
@@ -155,7 +200,7 @@ public class AnalysisHistoryService {
                 originalSnapshot.fetchMode(),
                 Instant.now()
         ));
-        return runAnalysis(userId, retrySnapshot);
+        return runAnalysis(userId, retrySnapshot, null, "/api/analysis-histories/" + historyId + "/retry");
     }
 
     @Transactional
@@ -170,24 +215,39 @@ public class AnalysisHistoryService {
         }
     }
 
-    private AnalysisHistoryResponse runAnalysis(String userId, AnalysisInputSnapshot snapshot) {
+    private AnalysisHistoryResponse runAnalysis(
+            String userId,
+            AnalysisInputSnapshot snapshot,
+            String idempotencyKey,
+            String endpoint
+    ) {
         Instant now = Instant.now();
-        AnalysisHistory running = historyRepository.save(new AnalysisHistory(
-                UUID.randomUUID().toString(),
-                userId,
-                snapshot.id(),
-                AnalysisHistoryStatus.RUNNING,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                now,
-                now
-        ));
+        String historyId = UUID.randomUUID().toString();
+        AnalysisHistory running = null;
+        if (idempotencyKey != null) {
+            try {
+                running = historyRepository.save(runningHistory(historyId, userId, snapshot.id(), idempotencyKey, now));
+            } catch (DuplicateKeyException exception) {
+                snapshotRepository.deleteByIdAndUserId(snapshot.id(), userId);
+                return findIdempotentResponse(userId, idempotencyKey);
+            }
+        }
+
+        AiUsageReservation reservation;
+        try {
+            reservation = aiUsageQuotaService.reserve(userId, historyId, endpoint);
+        } catch (AiQuotaExceededException exception) {
+            if (idempotencyKey != null) {
+                historyRepository.deleteByIdAndUserId(historyId, userId);
+            }
+            snapshotRepository.deleteByIdAndUserId(snapshot.id(), userId);
+            throw exception;
+        }
+
+        if (idempotencyKey == null) {
+            running = historyRepository.save(runningHistory(historyId, userId, snapshot.id(), idempotencyKey, now));
+        }
+        aiUsageQuotaService.markRunning(reservation.usageId());
 
         DiagnosisResultResponse diagnosis = null;
         AnalysisExecutionVersion diagnosisExecutionVersion = null;
@@ -208,6 +268,7 @@ public class AnalysisHistoryService {
                     writeJson(match),
                     matchExecutionVersion
             );
+            aiUsageQuotaService.markSucceeded(reservation.usageId(), diagnosisExecutionVersion, matchExecutionVersion);
             return toResponse(succeeded, snapshot);
         } catch (ApiException exception) {
             AnalysisHistory failed = failHistory(
@@ -218,6 +279,7 @@ public class AnalysisHistoryService {
                     exception.errorCode().name(),
                     exception.errorCode().message()
             );
+            aiUsageQuotaService.markFailed(reservation.usageId(), diagnosisExecutionVersion, exception.errorCode().name());
             return toResponse(failed, snapshot);
         } catch (RuntimeException exception) {
             AnalysisHistory failed = failHistory(
@@ -228,8 +290,35 @@ public class AnalysisHistoryService {
                     ErrorCode.INTERNAL_ERROR.name(),
                     ErrorCode.INTERNAL_ERROR.message()
             );
+            aiUsageQuotaService.markFailed(reservation.usageId(), diagnosisExecutionVersion, ErrorCode.INTERNAL_ERROR.name());
             return toResponse(failed, snapshot);
         }
+    }
+
+    private AnalysisHistory runningHistory(String historyId, String userId, String snapshotId, String idempotencyKey, Instant now) {
+        return new AnalysisHistory(historyId, userId, snapshotId, idempotencyKey, AnalysisHistoryStatus.RUNNING,
+                null, null, null, null, null, null, null, null, now, now);
+    }
+
+    private AnalysisHistoryResponse findIdempotentResponse(String userId, String idempotencyKey) {
+        return historyRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
+                .map(history -> toResponse(
+                        history,
+                        snapshotFor(history, userId),
+                        feedbackRepository.findByHistoryIdAndUserId(history.id(), userId).orElse(null)
+                ))
+                .orElse(null);
+    }
+
+    private String normalizeIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return null;
+        }
+        String normalized = idempotencyKey.trim();
+        if (normalized.length() > 255) {
+            throw new ApiException(ErrorCode.INVALID_ANALYSIS_INPUT);
+        }
+        return normalized;
     }
 
     private AnalysisHistory failHistory(

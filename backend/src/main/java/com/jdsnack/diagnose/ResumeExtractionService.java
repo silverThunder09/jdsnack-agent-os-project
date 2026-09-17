@@ -14,7 +14,12 @@ import java.io.IOException;
 @Service
 public class ResumeExtractionService {
 
+    public static final long MAX_FILE_SIZE_BYTES = 10L * 1024 * 1024;
+
     public String extractText(MultipartFile resumeFile) {
+        if (resumeFile == null || resumeFile.getSize() > MAX_FILE_SIZE_BYTES) {
+            throw new ApiException(ErrorCode.FILE_TEXT_EXTRACTION_FAILED);
+        }
         UploadedResumeType uploadedResumeType = UploadedResumeType.fromMultipartFile(resumeFile);
 
         try {

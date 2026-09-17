@@ -1,0 +1,1 @@
+- 정상 loading/success/error 및 분석 결과·이력 흐름을 유지한다. API 해석은 `frontend/src/services/api.ts`만 담당하고 컴포넌트는 직접 fetch하지 않는다. `AI_QUOTA_EXCEEDED`는 안전한 안내와 선택 `resetAt`/`remaining`을 표시하며 validation/file-size 오류와 구분하고 상태를 색상만으로 구분하지 않는다. Compose/health 미검증 사유는 공통 검증 기록에 남긴다.
