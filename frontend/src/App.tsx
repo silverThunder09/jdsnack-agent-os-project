@@ -15,7 +15,7 @@ import { AnalysisResultView } from './features/analysis/AnalysisResultView'
 import { InterviewWorkspace } from './features/analysis/InterviewWorkspace'
 import { AnalysisHistoryView } from './features/analysis/AnalysisHistoryView'
 import { AnalysisQualityPrototype } from './features/analysis/AnalysisQualityPrototype'
-import { createAnalysisHistory, createAnalysisHistoryFile } from './services/api'
+import { ApiContractError, createAnalysisHistory, createAnalysisHistoryFile } from './services/api'
 import {
   ANALYSIS_OPTIONS,
   ANALYSIS_OPTION_REQUIRED_MESSAGE,
@@ -37,7 +37,31 @@ import {
   type ResumeInputTab,
 } from './features/analysis/analysisUtils'
 import type { AnalysisTaskKey } from './features/analysis/analysisProgressState'
+import type { ApiErrorCode } from './types/diagnosis'
 import './App.css'
+
+const HISTORY_ERROR_GUIDANCE: Partial<Record<ApiErrorCode, string>> = {
+  EMPTY_RESUME: '이력서 내용을 다시 입력해주세요.',
+  TEXT_TOO_SHORT: '이력서 내용을 50자 이상 입력해주세요.',
+  TEXT_TOO_LONG: '이력서 내용을 10,000자 이내로 줄여주세요.',
+  EMPTY_JD: '채용 공고 내용을 다시 입력해주세요.',
+  JD_TEXT_TOO_SHORT: '채용 공고 내용을 50자 이상 입력해주세요.',
+  JD_TEXT_TOO_LONG: '채용 공고 내용을 10,000자 이내로 줄여주세요.',
+  UNSUPPORTED_FILE_TYPE: 'PDF 또는 DOCX 파일로 교체해주세요.',
+  FILE_TEXT_EXTRACTION_FAILED: '파일을 확인하거나 다른 PDF/DOCX 파일로 교체해주세요.',
+}
+
+function quotaExceededMessage(error: ApiContractError): string {
+  const metadata = error.metadata
+  const usageMessage = typeof metadata?.remaining === 'number' && typeof metadata.limit === 'number'
+    ? ` 남은 횟수: ${metadata.remaining}/${metadata.limit}회.`
+    : ''
+  const resetDate = metadata?.resetAt ? new Date(metadata.resetAt) : null
+  const resetMessage = resetDate && !Number.isNaN(resetDate.getTime())
+    ? ` 다음 이용 가능 시각: ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(resetDate)}`
+    : ''
+  return `${error.message}${usageMessage}${resetMessage}`
+}
 
 function PublicHomeApp() {
   const { openLogin } = useAuthGate()
@@ -198,20 +222,35 @@ function AuthenticatedApp() {
         sourceSite: jdUrl.trim() ? 'saramin' : null,
       },
     }
+    const idempotencyKey = globalThis.crypto?.randomUUID?.()
     const hasExtractedResume = outcome.ok && Boolean(outcome.diagnosis?.sourceText)
     const runHistoryRequest = () => hasExtractedResume
-      ? createAnalysisHistory({ resumeText: outcome.diagnosis!.sourceText, ...historyInput })
+      ? createAnalysisHistory({ resumeText: outcome.diagnosis!.sourceText, ...historyInput }, idempotencyKey)
       : resumeInputTab === 'text'
-        ? createAnalysisHistory({ resumeText, ...historyInput })
-        : createAnalysisHistoryFile(resumeFile!, historyInput)
+        ? createAnalysisHistory({ resumeText, ...historyInput }, idempotencyKey)
+        : createAnalysisHistoryFile(resumeFile!, historyInput, idempotencyKey)
 
     const saveHistory = async () => {
       updateAnalysisTask(runId, 'history', 'running')
       try {
         await runHistoryRequest()
         updateAnalysisTask(runId, 'history', 'succeeded')
-      } catch {
-        updateAnalysisTask(runId, 'history', 'failed', { message: '분석 결과를 분석 내역에 저장하지 못했습니다.' })
+      } catch (error) {
+        if (error instanceof ApiContractError && error.code === 'AI_QUOTA_EXCEEDED') {
+          updateAnalysisTask(runId, 'history', 'failed', {
+            message: quotaExceededMessage(error),
+            code: error.code,
+          })
+          return
+        }
+
+        const message = error instanceof ApiContractError
+          ? HISTORY_ERROR_GUIDANCE[error.code] ?? error.message
+          : '분석 결과를 분석 내역에 저장하지 못했습니다.'
+        updateAnalysisTask(runId, 'history', 'failed', {
+          message,
+          code: error instanceof ApiContractError ? error.code : undefined,
+        })
       }
     }
 

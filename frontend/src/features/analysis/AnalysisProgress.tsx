@@ -32,6 +32,9 @@ function overallTitle(state: AnalysisProgressState): string {
 
 function overallMessage(state: AnalysisProgressState): string {
   if (state.status === 'succeeded') return '모든 선택 항목과 분석 이력 저장을 마쳤습니다.'
+  if (state.tasks.history?.code === 'AI_QUOTA_EXCEEDED') {
+    return state.tasks.history.message ?? '오늘 사용할 수 있는 AI 분석 횟수를 초과했습니다. 다음 이용 가능 시각을 확인해 주세요.'
+  }
   if (state.status === 'partial-failure') return '완료된 결과는 확인할 수 있습니다. 실패한 항목은 안내를 확인해 주세요.'
   if (state.status === 'failed') return '이력서 분석을 완료하지 못했습니다. 입력을 확인한 뒤 새 분석을 시작해 주세요.'
   if (state.currentStage === 'preparing') return '이력서 내용을 읽고 분석에 필요한 정보를 준비하고 있습니다.'

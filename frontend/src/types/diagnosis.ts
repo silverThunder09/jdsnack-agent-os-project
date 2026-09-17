@@ -18,6 +18,7 @@ export type ApiErrorCode =
   | 'GEMINI_API_KEY_MISSING'
   | 'GEMINI_API_REQUEST_FAILED'
   | 'GEMINI_API_RESPONSE_INVALID'
+  | 'AI_QUOTA_EXCEEDED'
   | 'FIXTURE_NOT_FOUND'
   | 'AI_ANALYSIS_NOT_ENABLED'
   | 'JD_MATCH_PREVIEW_NOT_ENABLED'
@@ -192,6 +193,12 @@ export interface AnalysisFeedbackDetail extends AnalysisHistoryFeedback {
 export interface ApiError {
   code: ApiErrorCode
   message: string
+  metadata?: {
+    retryAfter?: number
+    limit?: number
+    remaining?: number
+    resetAt?: string
+  }
 }
 
 export interface AnalysisRequestOutcome {

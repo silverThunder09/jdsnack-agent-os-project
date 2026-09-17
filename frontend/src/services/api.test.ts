@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  ApiContractError,
   createAnalysisHistoryFile,
   createAnalysisHistory,
   deleteAnalysisHistory,
@@ -104,5 +105,56 @@ describe('보호 API 서비스 계층', () => {
       '/api/analysis-histories/history-1',
       expect.objectContaining({ credentials: 'include', method: 'DELETE' }),
     )
+  })
+
+  it('분석 이력 요청에 idempotency key를 전달한다', async () => {
+    await createAnalysisHistory(
+      { resumeText: 'resume', jd: { inputType: 'TEXT', text: 'jd' } },
+      ' key ',
+    )
+
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      '/api/analysis-histories',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'Idempotency-Key': 'key' }),
+      }),
+    )
+
+    await createAnalysisHistoryFile(
+      new File(['resume'], 'resume.pdf', { type: 'application/pdf' }),
+      { jd: { inputType: 'TEXT', text: 'jd' } },
+      'file-key',
+    )
+
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      '/api/analysis-histories/file',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'Idempotency-Key': 'file-key' }),
+      }),
+    )
+  })
+
+  it('429 quota errors preserve metadata for the UI', async () => {
+    const error = {
+      code: 'AI_QUOTA_EXCEEDED',
+      message: '오늘 사용할 수 있는 AI 분석 횟수를 초과했습니다.',
+      metadata: { limit: 20, remaining: 0, resetAt: '2026-09-18T00:00:00+09:00' },
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ success: false, data: null, error, timestamp: '' }),
+    } as Response))
+
+    const request = createAnalysisHistory({
+      resumeText: 'resume',
+      jd: { inputType: 'TEXT', text: 'jd' },
+    })
+
+    await expect(request).rejects.toBeInstanceOf(ApiContractError)
+    await expect(request).rejects.toMatchObject({
+      code: 'AI_QUOTA_EXCEEDED',
+      metadata: error.metadata,
+    })
   })
 })
