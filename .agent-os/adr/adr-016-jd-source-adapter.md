@@ -2,11 +2,11 @@
 
 ```yaml
 id: adr-016-jd-source-adapter
-status: proposed
+status: accepted
 risk: Standard
 author: Codex
-approved_by:
-related_specs: 2026-07-16-canonical-jd-intake, 2026-07-16-saramin-jd-persistence, 2026-07-16-jobkorea-jd-adapter, 2026-07-16-rocketpunch-jd-adapter
+approved_by: user (2026-09-18)
+related_specs: 2026-07-16-canonical-jd-intake, 2026-07-16-saramin-jd-persistence, 2026-07-16-jobkorea-jd-adapter, 2026-09-18-jobkorea-jd-adapter, 2026-07-16-rocketpunch-jd-adapter
 ```
 
 ## Context
