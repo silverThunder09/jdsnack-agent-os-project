@@ -58,16 +58,30 @@ public class AnalysisInputSnapshotService {
     }
 
     public AnalysisInputSnapshot saveSaraminUrlInput(String userId, String resumeText, String jdUrl) {
+        return saveUrlInput(userId, resumeText, jdUrl);
+    }
+
+    public AnalysisInputSnapshot saveUrlInput(String userId, String resumeText, String jdUrl) {
         JdFetchResponse fetchedJd = jdFetchService.fetch(new JdFetchRequest(jdUrl));
         return save(
                 userId,
                 resumeText,
-                JdInputType.SARAMIN_URL,
+                inputTypeForSource(fetchedJd.sourceSite()),
                 fetchedJd.jdText(),
                 fetchedJd.sourceUrl(),
                 fetchedJd.sourceSite(),
                 fetchedJd.fetchMode()
         );
+    }
+
+    private JdInputType inputTypeForSource(String sourceSite) {
+        if ("saramin".equalsIgnoreCase(sourceSite)) {
+            return JdInputType.SARAMIN_URL;
+        }
+        if ("jobkorea".equalsIgnoreCase(sourceSite)) {
+            return JdInputType.JOBKOREA_URL;
+        }
+        throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
     }
 
     public AnalysisInputSnapshot saveResolvedInput(

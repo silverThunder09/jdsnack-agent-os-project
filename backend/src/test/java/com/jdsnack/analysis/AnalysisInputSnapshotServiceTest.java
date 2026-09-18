@@ -112,6 +112,29 @@ class AnalysisInputSnapshotServiceTest {
     }
 
     @Test
+    void jobKoreaUrlInputUsesFetchedOcrMetadataAndStoresCanonicalSnapshot() {
+        AnalysisInputSnapshotService service = service();
+        JdFetchResponse fetched = new JdFetchResponse(
+                JD_TEXT,
+                "https://www.jobkorea.co.kr/Recruit/GI_Read/777777",
+                "백엔드 엔지니어 | 잡코리아",
+                "image-ocr",
+                "jobkorea"
+        );
+        when(jdFetchService.fetch(any(JdFetchRequest.class))).thenReturn(fetched);
+        when(repository.save(any(AnalysisInputSnapshot.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AnalysisInputSnapshot snapshot = service.saveUrlInput(USER_ID, RESUME_TEXT, fetched.sourceUrl());
+
+        assertThat(snapshot.jdInputType()).isEqualTo(JdInputType.JOBKOREA_URL);
+        assertThat(snapshot.jdText()).isEqualTo(JD_TEXT);
+        assertThat(snapshot.sourceUrl()).isEqualTo(fetched.sourceUrl());
+        assertThat(snapshot.sourceSite()).isEqualTo("jobkorea");
+        assertThat(snapshot.fetchMode()).isEqualTo("image-ocr");
+    }
+
+    @Test
     void failedJdFetchDoesNotPersistInput() {
         AnalysisInputSnapshotService service = service();
         when(jdFetchService.fetch(any(JdFetchRequest.class)))

@@ -27,6 +27,7 @@ import {
   analysisHistoryExportFileName,
   clearSavedInput,
   getPrevalidationReasons,
+  inferJdSourceMetadata,
   inferResumeMode,
   loadSavedInput,
   saveInput,
@@ -216,10 +217,9 @@ function AuthenticatedApp() {
       : await submitFile(mode!, resumeFile)
     const historyInput = {
       jd: {
-        inputType: jdUrl.trim() ? 'SARAMIN_URL' as const : 'TEXT' as const,
+        ...inferJdSourceMetadata(jdUrl),
         text: trimmedJd,
         sourceUrl: jdUrl.trim() || null,
-        sourceSite: jdUrl.trim() ? 'saramin' : null,
       },
     }
     const idempotencyKey = globalThis.crypto?.randomUUID?.()

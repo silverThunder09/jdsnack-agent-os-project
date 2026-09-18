@@ -5,6 +5,7 @@ public record AnalysisHistoryInputResponse(
         JdInputType jdInputType,
         String jdText,
         String sourceUrl,
-        String sourceSite
+        String sourceSite,
+        String fetchMode
 ) {
 }

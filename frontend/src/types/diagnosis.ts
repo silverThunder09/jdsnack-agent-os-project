@@ -138,10 +138,13 @@ export interface JdFetchResult {
   sections?: Partial<JdSections>
 }
 
+export type JdInputType = 'TEXT' | 'SARAMIN_URL' | 'JOBKOREA_URL'
+export type JdSourceSite = 'saramin' | 'jobkorea'
+
 export interface AnalysisHistoryCreateRequest {
   resumeText: string
   jd: {
-    inputType: 'TEXT' | 'SARAMIN_URL'
+    inputType: JdInputType
     text?: string
     sourceUrl?: string | null
     sourceSite?: string | null
@@ -163,10 +166,11 @@ export interface AnalysisHistoryDetail {
   createdAt: string
   input: {
     resumeText: string
-    jdInputType: 'TEXT' | 'SARAMIN_URL'
+    jdInputType: JdInputType
     jdText: string
     sourceUrl: string | null
     sourceSite: string | null
+    fetchMode: string | null
   }
   result: {
     diagnosis: DiagnosisResult | null

@@ -49,7 +49,7 @@ const jdFetchLoadingState: JdFetchState = {
   status: 'fetching',
   title: 'JD 링크에서 본문을 불러오고 있습니다',
   message:
-    '사람인 정적 HTML 기준으로 공고 본문을 확인하고 있습니다. 실패하면 직접 붙여넣기 안내로 이어집니다.',
+    '사람인·잡코리아 정적 HTML을 먼저 확인하고, 이미지형 공고는 OCR fallback으로 인식합니다. 실패하면 직접 붙여넣기 안내로 이어집니다.',
 }
 
 function getJdFetchErrorMessage(code: ApiErrorCode, fallbackMessage: string): string {
@@ -256,10 +256,13 @@ export function useMatchPreview() {
 
       if (outcome.kind === 'success') {
         handlers.onFetched(outcome.result)
+        const fetchedWithOcr = outcome.result.fetchMode === 'image-ocr'
         setJdFetchState({
           status: 'fetched',
           title: 'JD 본문을 불러왔습니다',
-          message: '자동 수집된 본문을 비어 있는 JD 섹션에 채웠습니다. 필요하면 각 칸을 다듬은 뒤 비교를 진행해 주세요.',
+          message: fetchedWithOcr
+            ? '이미지형 채용 공고를 OCR로 인식해 본문을 채웠습니다. 인식 결과를 확인·수정한 뒤 비교를 진행해 주세요.'
+            : '자동 수집된 본문을 비어 있는 JD 섹션에 채웠습니다. 필요하면 각 칸을 다듬은 뒤 비교를 진행해 주세요.',
         })
         return
       }

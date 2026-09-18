@@ -347,10 +347,9 @@ public class AnalysisHistoryService {
         }
 
         JdInputType inputType = parseInputType(request.jd().inputType());
-        if (inputType == JdInputType.SARAMIN_URL
-                && isBlank(request.jd().text())
+        if ((inputType == JdInputType.SARAMIN_URL || inputType == JdInputType.JOBKOREA_URL)
                 && !isBlank(request.jd().sourceUrl())) {
-            return snapshotService.saveSaraminUrlInput(userId, request.resumeText(), request.jd().sourceUrl());
+            return snapshotService.saveUrlInput(userId, request.resumeText(), request.jd().sourceUrl());
         }
 
         return snapshotService.saveResolvedInput(
@@ -404,7 +403,8 @@ public class AnalysisHistoryService {
                         snapshot.jdInputType(),
                         snapshot.jdText(),
                         snapshot.sourceUrl(),
-                        snapshot.sourceSite()
+                        snapshot.sourceSite(),
+                        snapshot.fetchMode()
                 ),
                 readResult(history),
                 failure(history),
