@@ -5,6 +5,7 @@ import type {
   AnalysisHistoryCreateRequest,
   AnalysisHistoryDetail,
   AnalysisHistorySummary,
+  ApiError,
   ApiResponse,
   AtsPreviewOutcome,
   AtsPreviewResult,
@@ -34,6 +35,18 @@ export class NetworkError extends Error {
   }
 }
 
+export class ApiContractError extends Error {
+  readonly code: ApiError['code']
+  readonly metadata: ApiError['metadata']
+
+  constructor(error: ApiError) {
+    super(error.message)
+    this.name = 'ApiContractError'
+    this.code = error.code
+    this.metadata = error.metadata
+  }
+}
+
 const KNOWN_ERROR_CODES: ApiErrorCode[] = [
   'AUTHENTICATION_REQUIRED',
   'EMPTY_RESUME',
@@ -51,6 +64,7 @@ const KNOWN_ERROR_CODES: ApiErrorCode[] = [
   'GEMINI_API_KEY_MISSING',
   'GEMINI_API_REQUEST_FAILED',
   'GEMINI_API_RESPONSE_INVALID',
+  'AI_QUOTA_EXCEEDED',
   'FIXTURE_NOT_FOUND',
   'AI_ANALYSIS_NOT_ENABLED',
   'JD_MATCH_PREVIEW_NOT_ENABLED',
@@ -453,6 +467,7 @@ export async function previewInterview(
 
 export async function createAnalysisHistory(
   request: AnalysisHistoryCreateRequest,
+  idempotencyKey?: string,
 ): Promise<AnalysisHistoryDetail> {
   let response: Response
 
@@ -463,6 +478,7 @@ export async function createAnalysisHistory(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(idempotencyKey?.trim() ? { 'Idempotency-Key': idempotencyKey.trim() } : {}),
       },
       body: JSON.stringify(request),
     })
@@ -475,12 +491,13 @@ export async function createAnalysisHistory(
     return payload.data
   }
 
-  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+  throw payload?.error ? new ApiContractError(payload.error) : new Error(DEFAULT_SERVER_ERROR_MESSAGE)
 }
 
 export async function createAnalysisHistoryFile(
   resumeFile: File,
   request: Omit<AnalysisHistoryCreateRequest, 'resumeText'>,
+  idempotencyKey?: string,
 ): Promise<AnalysisHistoryDetail> {
   const formData = new FormData()
   formData.append('resumeFile', resumeFile)
@@ -494,7 +511,10 @@ export async function createAnalysisHistoryFile(
     response = await fetch(`${API_BASE_URL}/api/analysis-histories/file`, {
       method: 'POST',
       credentials: 'include',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        ...(idempotencyKey?.trim() ? { 'Idempotency-Key': idempotencyKey.trim() } : {}),
+      },
       body: formData,
     })
   } catch {
@@ -506,7 +526,7 @@ export async function createAnalysisHistoryFile(
     return payload.data
   }
 
-  throw new Error(payload?.error?.message ?? DEFAULT_SERVER_ERROR_MESSAGE)
+  throw payload?.error ? new ApiContractError(payload.error) : new Error(DEFAULT_SERVER_ERROR_MESSAGE)
 }
 
 export async function listAnalysisHistories(): Promise<AnalysisHistorySummary[]> {

@@ -5,5 +5,6 @@
 | REQ-02 | AC-03 | TC-04 | api-spec.md | idempotency |
 | REQ-02 | AC-03 | TC-05 | api-spec.md | 사용자 격리 |
 | REQ-03 | AC-02 | TC-02 | api-spec.md | 429 계약 |
+| REQ-03 | AC-02 | TC-08 | ui-spec.md | frontend quota 안내 |
 | REQ-04 | AC-04 | TC-06 | api-spec.md | validation |
 | REQ-05 | AC-06 | TC-07 | api-spec.md | timeout |

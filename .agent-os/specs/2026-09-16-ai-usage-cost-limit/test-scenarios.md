@@ -9,5 +9,6 @@
 - TC-05: 다른 user의 같은 key가 격리되는지 확인한다.
 - TC-06: 입력·파일 validation 오류의 quota 무소비를 확인한다.
 - TC-07: provider timeout 기본값과 override를 확인한다.
+- TC-08: frontend가 quota 429의 code, remaining/limit, resetAt을 보존·안내하고 일반 저장 실패와 구분하는지 확인한다.
 
 게이트는 Gradle test, frontend lint/test/build, AI readiness, PR 검증이다. Docker 부재로 Compose/health는 미실행하고 사유를 기록한다.

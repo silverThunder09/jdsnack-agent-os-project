@@ -1,1 +1,14 @@
-- T1 `ready_for_review`/High/`codex/ai-usage-cost-limit-T1`: backend quota·idempotency·429·입력·timeout·migration, frontend 계약/UI/tests, active Spec을 포함한다. Redis·결제·가격표·비인증 preview·CI 운영 변경은 제외하고 H2/PostgreSQL migration/session userId를 사용한다. 게이트는 AC-01~06, backend Gradle test, frontend lint/test/build, `python scripts/check-ai-readiness.py`, PR 검증이다. Compose/health는 `docker` 실행 파일 부재로 미검증이며 사유를 완료 기록에 남긴다.
+- 구현 상태: `completed`
+
+### T1. 백엔드 quota·idempotency·오류 계약
+
+- 상태: `completed`
+- 범위: 사용자별 일일 quota 예약, ledger, idempotency, 429 metadata, 입력·파일 검증, Gemini timeout, migration
+- 완료 PR: #205
+
+### T2. 프론트 quota 오류 안내
+
+- 상태: `completed`
+- 범위: `AI_QUOTA_EXCEEDED` metadata 해석, idempotency header 전달, quota 초과 안내와 재사용 가능 시각 표시
+- 완료 조건: AC-02·AC-03과 TC-08을 포함한 frontend lint·test·build 통과
+- 검증: lint 통과, Vitest 58/58 통과, production build 통과, AI readiness 통과

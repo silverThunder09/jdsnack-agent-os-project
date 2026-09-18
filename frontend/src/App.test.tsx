@@ -287,6 +287,40 @@ describe('새로운 분석 시작 페이지', () => {
     expect(screen.queryByText('준비 중인 분석입니다')).not.toBeInTheDocument()
   })
 
+  it('quota 초과 시 분석 이력 저장 안내와 metadata를 표시한다', async () => {
+    const user = userEvent.setup()
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(diagnosePayload())
+      .mockResolvedValueOnce(matchPayload())
+      .mockResolvedValueOnce(atsPayload())
+      .mockResolvedValueOnce(sentencePayload())
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: async () => ({
+          success: false,
+          data: null,
+          error: {
+            code: 'AI_QUOTA_EXCEEDED',
+            message: '오늘 사용할 수 있는 AI 분석 횟수를 초과했습니다.',
+            metadata: { limit: 20, remaining: 0, resetAt: '2026-09-18T00:00:00+09:00' },
+          },
+          timestamp: '',
+        }),
+      } as Response)
+
+    await renderAuthenticatedApp()
+    await fillJdAndResume(user)
+    await user.click(screen.getByRole('button', { name: '분석 시작하기 →' }))
+
+    expect((await screen.findAllByText(/남은 횟수: 0\/20회/)).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/다음 이용 가능 시각/).length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('분석 결과를 분석 내역에 저장하지 못했습니다.')).not.toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenLastCalledWith('/api/analysis-histories', expect.objectContaining({
+      headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+    }))
+  })
+
   it('키워드만 선택해도 매칭을 호출하고 JD 적합도 패널 없이 키워드 결과를 보여준다', async () => {
     const user = userEvent.setup()
     vi.mocked(globalThis.fetch)
