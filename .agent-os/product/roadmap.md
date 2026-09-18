@@ -20,11 +20,11 @@
 
 `OAuth 1개 공급자 로그인 → 이력서·JD 입력 → 기존 AI 진단·JD 매칭 → 결과 저장 → 이력 조회·재시도·삭제`
 
-사람인 이미지 OCR, Service MVP, ATS 점수·포맷 진단, 분석 결과 리포트 내보내기, AI 품질 평가와 prompt/model version은 구현·검증을 마치고 archive로 이동했습니다. 현재 active Spec은 없으며, 다음 후보는 제품 신호가 확인될 때 승격합니다. 완료 Spec의 상세는 [archive plan.md](../archive/specs/2026-07-21-ai-quality-versioning/plan.md)에 보관합니다.
+사람인 이미지 OCR, Service MVP, ATS 점수·포맷 진단, 분석 결과 리포트 내보내기, AI 품질 평가와 prompt/model version, AI 호출량·비용 제한은 구현·검증을 마치고 archive로 이동했습니다. 현재 active Spec은 [JobKorea JD adapter](../specs/2026-09-18-jobkorea-jd-adapter/requirements.md)이며, 기존 공통 JD fetch 경계에 JobKorea 출처만 추가합니다.
 
 ### 내부 수직 티켓
 
-분석 결과 리포트 내보내기는 T1 수직 티켓 하나로 끝까지 관통했으며, 완료 Spec은 [archive plan.md](../archive/specs/2026-07-21-analysis-report-export/plan.md)에 보관합니다. 현재 active Spec은 T1(prompt/model version 내부 기록)·T2(사용자 품질 피드백) 두 수직 티켓으로 진행하며, T1이 `ready`이고 T2는 `pending`입니다.
+분석 결과 리포트 내보내기는 T1 수직 티켓 하나로 끝까지 관통했으며, 완료 Spec은 [archive plan.md](../archive/specs/2026-07-21-analysis-report-export/plan.md)에 보관합니다. 현재 active Spec은 T1(백엔드 JobKorea 수집 어댑터)·T2(분석 이력 출처 식별)·T3(프론트 출처 판별과 실패 안내) 세 수직 티켓으로 진행하며, T1이 `ready`이고 T2·T3는 `pending`입니다.
 
 ## Post MVP
 
