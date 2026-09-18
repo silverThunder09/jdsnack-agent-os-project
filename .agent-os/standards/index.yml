@@ -86,7 +86,7 @@ documents:
     - scripts/autonomous-spec-loop-test.sh
     - .github/workflows/autonomous-loop.yml
 active_specs:
-  - .agent-os/specs/2026-09-16-ai-usage-cost-limit
+  - .agent-os/specs/2026-09-18-jobkorea-jd-adapter
 # 상세 pending Spec을 미리 만들지 않는다. 후보는 제품 백로그에만 둔다.
 pending_specs: []
 candidate_backlog: .agent-os/product/spec-backlog.md

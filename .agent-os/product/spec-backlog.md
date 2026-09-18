@@ -2,8 +2,13 @@
 
 이 문서는 다음 기획 후보의 사람이 읽는 설명을 관리합니다. 실행 상태·우선순위·자동 승격 조건의 정본은 [`spec-queue.json`](spec-queue.json)입니다.
 
+## 현재 active Feature Spec
+
+- `jobkorea-jd-adapter`: [.agent-os/specs/2026-09-18-jobkorea-jd-adapter](../specs/2026-09-18-jobkorea-jd-adapter/plan.md). 기존 공통 JD fetch 경계에 JobKorea 출처만 추가하며, fixture 기준 검증으로 한정합니다.
+
 ## 최근 완료 Feature Spec
 
+- 완료된 **AI 호출량·비용 제한**은 [archive](../archive/specs/2026-09-16-ai-usage-cost-limit/)로 이동했습니다(PR #205·#208).
 - `analysis-progress-feedback`는 PR #194에서 완료되었고 [archive](../archive/specs/2026-09-15-analysis-progress-feedback/)로 이동했습니다.
 - 분석 시작 후 결과 화면으로 먼저 전환되어 사용자가 전체 분석의 진행 여부를 알기 어려운 문제를 해결합니다.
 - 백엔드 진행률 스트리밍·비동기 worker·가짜 퍼센트는 이번 범위에 포함하지 않고, 브라우저가 실제로 알고 있는 요청 상태만 표시합니다.
@@ -15,8 +20,6 @@
 
 | 후보 | 시작 조건 |
 |---|---|
-| AI 호출량·비용 제한 | 호출량 또는 비용 경계가 필요해진 뒤 |
-| JobKorea JD adapter | 사람인 외 수집 수요가 확인된 뒤 |
 | RocketPunch JD adapter | JobKorea 범위와 효과를 검증한 뒤 |
 | 비동기 analysis worker와 Redis | 동기 분석이 사용자 경험을 막는다고 확인된 뒤 |
 | 결제 연동 — 토스페이먼츠 빌링 확정 | 요금제 도입 뒤 |
