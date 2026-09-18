@@ -2,11 +2,11 @@
 
 ### T1. 백엔드 JobKorea 수집 어댑터
 
-- 상태: `ready`
+- 상태: `completed`
 - 범위: host allowlist 확장, `sourceSite=jobkorea` 판정, fixture 기반 후보 selector·noise 규칙, 실패 error code 매핑, SSRF·timeout·본문 상한 재사용, JobKorea fixture 4종 추가
 - 의존성: 없음
 - 완료 조건: AC-01~AC-09와 TC-01~TC-10을 포함한 `./gradlew test` 통과, 사람인 회귀 유지, 새 error code·새 endpoint 없음
-- 검증: 미실행
+- 검증: `cd backend && .\\gradlew.bat test` 통과, `python scripts/check-ai-readiness.py` 통과, `python scripts/autonomous_spec_loop.py validate` 통과. Docker CLI 미설치로 Compose/health 검증은 미실행.
 
 ### T2. JobKorea 링크 분석 이력 출처 식별
 

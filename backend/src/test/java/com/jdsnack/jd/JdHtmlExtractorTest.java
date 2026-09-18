@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JdHtmlExtractorTest {
 
@@ -151,6 +152,63 @@ class JdHtmlExtractorTest {
                 "Spring Boot 기반 API 설계와 운영을 담당합니다. MySQL, Redis, 메시지 큐 기반 서비스 개발 경험이 필요합니다. 테스트 자동화와 장애 대응 경험을 우대합니다.",
                 response.jdText()
         );
+    }
+
+    @Test
+    void extractsJobKoreaFixtureAndDetectsSourceSite() throws IOException {
+        String html = fixture("jd/fixtures/jobkorea-backend-engineer.html");
+
+        JdFetchResponse response = extractor.extract(
+                html,
+                "https://www.jobkorea.co.kr/Recruit/GI_Read/123456"
+        );
+
+        assertEquals("백엔드 엔지니어 | 잡코리아", response.title());
+        assertEquals("jobkorea", response.sourceSite());
+        assertEquals("static-html", response.fetchMode());
+        assertEquals(
+                "Spring Boot 기반 백엔드 API를 설계하고 운영합니다. Java와 Kotlin 서비스를 개발하고 장애 대응을 수행합니다. REST API와 데이터베이스 운영 경험이 필요합니다. 테스트 자동화와 배포 파이프라인을 이해해야 합니다. 클라우드 환경에서 협업하고 서비스 품질을 개선한 경험을 우대합니다.",
+                response.jdText()
+        );
+    }
+
+    @Test
+    void removesJobKoreaNoiseFromFixture() throws IOException {
+        String html = fixture("jd/fixtures/jobkorea-noise-heavy.html");
+
+        JdFetchResponse response = extractor.extract(
+                html,
+                "https://jobkorea.co.kr/Recruit/GI_Read/654321"
+        );
+
+        assertEquals("jobkorea", response.sourceSite());
+        assertTrue(response.jdText().contains("플랫폼 백엔드 API를 설계하고 운영하며 서비스 장애를 분석합니다."));
+        assertTrue(response.jdText().contains("Spring Boot와 PostgreSQL 기반 서비스 개발 경험이 필요합니다."));
+        assertTrue(response.jdText().contains("테스트 자동화와 배포 파이프라인 개선 경험을 우대합니다."));
+        assertTrue(!response.jdText().contains("추천공고"));
+        assertTrue(!response.jdText().contains("유사공고"));
+        assertTrue(!response.jdText().contains("지원하기"));
+        assertTrue(!response.jdText().contains("광고"));
+    }
+
+    @Test
+    void shortJobKoreaFixtureThrowsEmptyContent() throws IOException {
+        String html = fixture("jd/fixtures/jobkorea-empty-content.html");
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> extractor.extract(html, "https://www.jobkorea.co.kr/Recruit/GI_Read/333333"));
+
+        assertEquals("JD_FETCH_EMPTY_CONTENT", exception.errorCode().name());
+    }
+
+    @Test
+    void rejectsJobKoreaErrorPageFixture() throws IOException {
+        String html = fixture("jd/fixtures/jobkorea-error-page.html");
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> extractor.extract(html, "https://www.jobkorea.co.kr/Recruit/GI_Read/444444"));
+
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", exception.errorCode().name());
     }
 
     @Test
