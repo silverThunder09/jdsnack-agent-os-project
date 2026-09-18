@@ -39,6 +39,13 @@
 - PR CI: backend test, PR contract, PR review gate, PostgreSQL/migration 관련 체크
 - Docker Desktop이 설치되어 있으면 `docker compose -f compose.local.yaml up -d --build`, 컨테이너 상태와 health endpoint 확인
 
+## Verification Record
+
+- `cd backend && .\\gradlew.bat test`: PASS
+- `python scripts/check-ai-readiness.py`: PASS
+- `python scripts/autonomous_spec_loop.py validate`: PASS (`candidate_count=14`)
+- Docker Compose/health: NOT RUN — 이 실행 환경에 Docker CLI가 설치되어 있지 않음
+
 ## PR Scope
 
 - PR 주 목적: 기존 JD fetch 경계에 JobKorea 출처를 fixture 기반으로 추가

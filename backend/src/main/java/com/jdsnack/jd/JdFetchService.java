@@ -228,6 +228,9 @@ public class JdFetchService {
             throw new ApiException(ErrorCode.JD_FETCH_FAILED);
         }
         URI responseUri = response.uri() == null ? httpRequest.uri() : response.uri();
+        if (!isSupportedHost(responseUri.getHost())) {
+            throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+        }
         return new FetchedHtml(responseUri, response.body());
     }
 
@@ -240,7 +243,7 @@ public class JdFetchService {
 
     private boolean isSaraminRelayView(URI uri) {
         String path = uri.getPath() == null ? "" : uri.getPath();
-        return isSupportedHost(uri.getHost()) && path.equals("/zf_user/jobs/relay/view");
+        return isSaraminHost(uri.getHost()) && path.equals("/zf_user/jobs/relay/view");
     }
 
     private String requireQueryParam(URI uri, String name) {
@@ -293,7 +296,7 @@ public class JdFetchService {
         }
 
         URI detailUri = pageUri.resolve(src);
-        if (!isSupportedHost(detailUri.getHost()) || !"/zf_user/jobs/relay/view-detail".equals(detailUri.getPath())) {
+        if (!isSaraminHost(detailUri.getHost()) || !"/zf_user/jobs/relay/view-detail".equals(detailUri.getPath())) {
             return "";
         }
 
@@ -333,6 +336,21 @@ public class JdFetchService {
     }
 
     private boolean isSupportedHost(String host) {
+        if (host == null) {
+            return false;
+        }
+
+        String normalizedHost = host.toLowerCase(Locale.ROOT);
+        return isSaraminHost(normalizedHost)
+                || normalizedHost.equals("www.jobkorea.co.kr")
+                || normalizedHost.equals("jobkorea.co.kr");
+    }
+
+    private boolean isSaraminHost(String host) {
+        if (host == null) {
+            return false;
+        }
+
         String normalizedHost = host.toLowerCase(Locale.ROOT);
         return normalizedHost.equals("www.saramin.co.kr") || normalizedHost.equals("saramin.co.kr");
     }
