@@ -11,6 +11,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.when;
 class JdFetchImageOcrTest {
 
     private static final String JOB_URL = "https://www.saramin.co.kr/zf_user/jobs/view?rec_idx=123";
+    private static final String JOBKOREA_URL = "https://www.jobkorea.co.kr/Recruit/GI_Read/777777";
     private static final String IMAGE_HTML = """
             <html><head><title>백엔드 개발자 채용</title></head><body>
               <div class="user_content"><img src="/images/jd.png" width="1200" height="2400"></div>
@@ -79,6 +81,78 @@ class JdFetchImageOcrTest {
         verify(httpClient, times(2)).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
         assertThat(requestCaptor.getAllValues().get(1).uri())
                 .isEqualTo(URI.create("https://www.saramin.co.kr/images/jd.png"));
+    }
+
+    @Test
+    void jobKoreaImageOnlyPostingUsesSourceSpecificOcrAndPreservesMetadata() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdImageOcr ocr = mock(JdImageOcr.class);
+        when(ocr.isAvailable()).thenReturn(true);
+        when(ocr.extractText(any(), any())).thenReturn(OCR_TEXT);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenAnswer(invocation -> {
+                    HttpRequest request = invocation.getArgument(0);
+                    if (request.uri().getPath().endsWith(".png")) {
+                        return imageResponse("image/png", new byte[]{9, 8, 7}, request.uri());
+                    }
+                    return htmlResponse(fixture("jd/fixtures/jobkorea-image-only.html"), URI.create(JOBKOREA_URL));
+                });
+
+        JdFetchResponse result = new JdFetchService(httpClient, new JdHtmlExtractor(), ocr)
+                .fetch(new JdFetchRequest(JOBKOREA_URL));
+
+        assertThat(result.fetchMode()).isEqualTo("image-ocr");
+        assertThat(result.sourceSite()).isEqualTo("jobkorea");
+        assertThat(result.sourceUrl()).isEqualTo(JOBKOREA_URL);
+        assertThat(result.title()).isEqualTo("백엔드 엔지니어 | 잡코리아");
+        assertThat(result.jdText()).isEqualTo(OCR_TEXT);
+        verify(ocr).extractText(new byte[]{9, 8, 7}, "image/png");
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient, times(2)).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(requestCaptor.getAllValues().get(1).uri())
+                .isEqualTo(URI.create("https://img.jobkorea.co.kr/job-description/backend-engineer.png"));
+    }
+
+    @Test
+    void jobKoreaUntrustedImageHostIsNeverDownloaded() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdImageOcr ocr = availableOcr();
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(htmlResponse(
+                        "<main id=\"jobkorea-job-description\"><img src=\"https://evil.example.com/job.png\"></main>",
+                        URI.create(JOBKOREA_URL)
+                ));
+
+        assertThrows(ApiException.class, () ->
+                new JdFetchService(httpClient, new JdHtmlExtractor(), ocr)
+                        .fetch(new JdFetchRequest(JOBKOREA_URL)));
+        verify(httpClient).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(ocr, never()).extractText(any(), any());
+    }
+
+    @Test
+    void jobKoreaImageRedirectToUntrustedHostIsRejectedBeforeOcr() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdImageOcr ocr = availableOcr();
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenAnswer(invocation -> {
+                    HttpRequest request = invocation.getArgument(0);
+                    if (!request.uri().getPath().endsWith(".png")) {
+                        return htmlResponse(fixture("jd/fixtures/jobkorea-image-only.html"), URI.create(JOBKOREA_URL));
+                    }
+                    return new TestResponse<>(
+                            302,
+                            new ByteArrayInputStream(new byte[0]),
+                            request.uri(),
+                            Map.of("Location", List.of("https://evil.example.com/final.png"))
+                    );
+                });
+
+        assertThrows(ApiException.class, () ->
+                new JdFetchService(httpClient, new JdHtmlExtractor(), ocr)
+                        .fetch(new JdFetchRequest(JOBKOREA_URL)));
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(ocr, never()).extractText(any(), any());
     }
 
     @Test
@@ -297,6 +371,13 @@ class JdFetchImageOcrTest {
                 uri,
                 Map.of("Content-Type", List.of(mimeType))
         );
+    }
+
+    private String fixture(String name) throws Exception {
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream(name)) {
+            assertThat(input).isNotNull();
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private record TestResponse<T>(

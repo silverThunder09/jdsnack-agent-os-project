@@ -1,4 +1,4 @@
-import type { AnalysisHistoryDetail, AtsPreviewResult, MatchPreviewResult, ResumeInputMode, SentencePreviewResult } from '../../types/diagnosis'
+import type { AnalysisHistoryDetail, AtsPreviewResult, JdInputType, JdSourceSite, MatchPreviewResult, ResumeInputMode, SentencePreviewResult } from '../../types/diagnosis'
 import { validateJdText } from '../../hooks/useMatchPreview'
 
 export type JdTab = 'link' | 'paste'
@@ -10,6 +10,35 @@ export const JD_MAX_LENGTH = 10_000
 export const RESUME_REQUIRED_MESSAGE = '이력서 파일을 업로드해 주세요.'
 export const UNSUPPORTED_RESUME_FILE_MESSAGE = '지원하지 않는 파일 형식입니다. PDF 또는 DOCX 파일을 올려 주세요.'
 export const ANALYSIS_OPTION_REQUIRED_MESSAGE = '분석 항목을 1개 이상 선택해 주세요.'
+
+export interface JdSourceMetadata {
+  inputType: JdInputType
+  sourceSite: JdSourceSite | null
+}
+
+export function inferJdSourceMetadata(value: string): JdSourceMetadata {
+  const trimmed = value.trim()
+  if (!trimmed) return { inputType: 'TEXT', sourceSite: null }
+
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { inputType: 'TEXT', sourceSite: null }
+    }
+
+    const host = parsed.hostname.toLowerCase()
+    if (host === 'saramin.co.kr' || host === 'www.saramin.co.kr') {
+      return { inputType: 'SARAMIN_URL', sourceSite: 'saramin' }
+    }
+    if (host === 'jobkorea.co.kr' || host === 'www.jobkorea.co.kr') {
+      return { inputType: 'JOBKOREA_URL', sourceSite: 'jobkorea' }
+    }
+  } catch {
+    // URL validation and source validation are handled by the backend.
+  }
+
+  return { inputType: 'TEXT', sourceSite: null }
+}
 
 export const ANALYSIS_OPTIONS: {
   key: AnalysisOptionKey

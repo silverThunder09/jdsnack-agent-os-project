@@ -81,6 +81,7 @@ public class JdFetchService {
     public JdFetchResponse fetch(JdFetchRequest request) {
         URI uri = validateUrl(request);
         String jdUrl = uri.toString();
+        String sourceSite = sourceSiteFor(uri);
         List<FetchedHtml> fetchedPages = new ArrayList<>();
 
         try {
@@ -90,7 +91,7 @@ public class JdFetchService {
                 return jdHtmlExtractor.extract(page.html(), jdUrl);
             } catch (ApiException exception) {
                 if (!shouldTrySaraminAjaxFallback(exception, uri)) {
-                    Optional<JdFetchResponse> ocrResponse = imageOcrFallback.tryExtract(fetchedPages, jdUrl);
+                    Optional<JdFetchResponse> ocrResponse = imageOcrFallback.tryExtract(fetchedPages, jdUrl, sourceSite);
                     if (ocrResponse.isPresent()) {
                         return ocrResponse.get();
                     }
@@ -99,7 +100,7 @@ public class JdFetchService {
                 try {
                     return fetchSaraminFallback(uri, jdUrl, exception, fetchedPages);
                 } catch (ApiException fallbackException) {
-                    Optional<JdFetchResponse> ocrResponse = imageOcrFallback.tryExtract(fetchedPages, jdUrl);
+                    Optional<JdFetchResponse> ocrResponse = imageOcrFallback.tryExtract(fetchedPages, jdUrl, sourceSite);
                     if (ocrResponse.isPresent()) {
                         return ocrResponse.get();
                     }
@@ -344,6 +345,17 @@ public class JdFetchService {
         return isSaraminHost(normalizedHost)
                 || normalizedHost.equals("www.jobkorea.co.kr")
                 || normalizedHost.equals("jobkorea.co.kr");
+    }
+
+    private String sourceSiteFor(URI uri) {
+        if (isSaraminHost(uri.getHost())) {
+            return "saramin";
+        }
+        String normalizedHost = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        if (normalizedHost.equals("www.jobkorea.co.kr") || normalizedHost.equals("jobkorea.co.kr")) {
+            return "jobkorea";
+        }
+        return "";
     }
 
     private boolean isSaraminHost(String host) {

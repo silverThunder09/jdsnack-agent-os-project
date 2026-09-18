@@ -21,5 +21,13 @@
 | REQ-08 | AC-10 | TC-12 | api-spec.md | SARAMIN_URL 하위 호환 |
 | REQ-09 | AC-11 | TC-13 | ui-spec.md | host 기반 출처 판별 전송 |
 | REQ-09 | AC-11 | TC-14 | ui-spec.md | error code별 안내·지원 사이트 문구 |
+| REQ-02 | AC-12 | TC-15 | api-spec.md | JobKorea OCR 응답 metadata |
+| REQ-05 | AC-13 | TC-16 | api-spec.md | OCR 이미지 SSRF·리소스 경계 |
+| REQ-07 | AC-12 | TC-15 | test-scenarios.md | OCR fixture·mock 전용 검증 |
+| REQ-08 | AC-10 | TC-17 | api-spec.md | OCR fetchMode 서버 정본 저장 |
+| REQ-09 | AC-11 | TC-18 | ui-spec.md | OCR 성공·실패 안내 |
+| REQ-10 | AC-12 | TC-15 | api-spec.md | JobKorea image-only OCR fallback |
+| REQ-10 | AC-13 | TC-16 | api-spec.md | OCR source host·MIME·크기·redirect 차단 |
+| REQ-10 | AC-11 | TC-18 | ui-spec.md | OCR 결과 확인 및 수동 입력 대안 |
 
-커버리지: REQ 9개, AC 11개, TC 14개가 모두 최소 1개 행에 연결된다. 티켓별 구현 결과는 [plan.md](plan.md)에 기록한다.
+커버리지: REQ 10개, AC 13개, TC 18개가 모두 최소 1개 행에 연결된다. 티켓별 구현 결과는 [plan.md](plan.md)에 기록한다.

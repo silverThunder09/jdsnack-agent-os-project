@@ -99,7 +99,7 @@ function historyPayload(id = 'history-1') {
       id,
       status: 'SUCCEEDED',
       createdAt: '2026-07-19T12:00:00Z',
-      input: { resumeText: resumeSourceText, jdInputType: 'TEXT', jdText: validJdText, sourceUrl: null, sourceSite: null },
+      input: { resumeText: resumeSourceText, jdInputType: 'TEXT', jdText: validJdText, sourceUrl: null, sourceSite: null, fetchMode: null },
       result: { diagnosis: null, match: null },
       failure: null,
     },

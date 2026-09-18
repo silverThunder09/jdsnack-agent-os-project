@@ -8,10 +8,12 @@ function detail(
   status: AnalysisHistoryDetail['status'],
   hasResult = true,
   feedback: AnalysisHistoryDetail['feedback'] = null,
+  sourceSite: string | null = null,
+  fetchMode: string | null = null,
 ): AnalysisHistoryDetail {
   return {
     id: 'history-1', status, createdAt: '2026-07-19T12:00:00Z',
-    input: { resumeText: 'resume', jdInputType: 'TEXT', jdText: 'jd', sourceUrl: null, sourceSite: null },
+    input: { resumeText: 'resume', jdInputType: sourceSite === 'jobkorea' ? 'JOBKOREA_URL' : 'TEXT', jdText: 'jd', sourceUrl: null, sourceSite, fetchMode },
     result: hasResult ? {
       diagnosis: { score: 84, summary: '요약', strengths: [], improvements: [], sourceText: '원문' },
       match: null,
@@ -94,6 +96,13 @@ describe('AnalysisHistoryView 내보내기', () => {
 
     await user.click(screen.getByRole('button', { name: '내보내기' }))
     expect(onExport).toHaveBeenCalledOnce()
+  })
+
+  it('잡코리아 OCR 이력은 출처와 OCR 저장 사실을 표시한다', () => {
+    renderView(detail('SUCCEEDED', true, null, 'jobkorea', 'image-ocr'))
+
+    expect(screen.getByRole('heading', { name: '잡코리아' })).toBeInTheDocument()
+    expect(screen.getByText('이미지 공고를 OCR로 인식해 저장한 JD')).toBeInTheDocument()
   })
 })
 
