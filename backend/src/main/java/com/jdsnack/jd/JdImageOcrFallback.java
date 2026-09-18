@@ -18,19 +18,24 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Optional Saramin image fallback. It owns image candidate discovery, redirect
- * handling, byte limits, and OCR validation so {@link JdFetchService} remains
- * responsible for the primary HTML and Saramin relay flow.
+ * Optional image fallback for supported job boards. It owns source-specific
+ * candidate discovery, redirect handling, byte limits, and OCR validation so
+ * {@link JdFetchService} remains responsible for the primary HTML flow.
  */
 final class JdImageOcrFallback {
 
     private static final int MAX_IMAGE_BODY_LENGTH = 8 * 1024 * 1024;
     private static final int MAX_IMAGE_REDIRECTS = 3;
     private static final String IMAGE_OCR_FETCH_MODE = "image-ocr";
-    private static final List<String> IMAGE_CONTAINER_SELECTORS = List.of(
+    private static final List<String> SARAMIN_IMAGE_CONTAINER_SELECTORS = List.of(
             ".user_content",
             ".wrap_jv_cont",
             ".jv_cont"
+    );
+    private static final List<String> JOBKOREA_IMAGE_CONTAINER_SELECTORS = List.of(
+            "#jobkorea-job-description",
+            ".jobkorea-job-description",
+            "[data-jobkorea-description]"
     );
 
     private final HttpClient httpClient;
@@ -43,18 +48,18 @@ final class JdImageOcrFallback {
         this.imageOcr = imageOcr;
     }
 
-    Optional<JdFetchResponse> tryExtract(List<FetchedHtml> fetchedPages, String jdUrl) {
+    Optional<JdFetchResponse> tryExtract(List<FetchedHtml> fetchedPages, String jdUrl, String sourceSite) {
         if (!imageOcr.isAvailable()) {
             return Optional.empty();
         }
 
-        Optional<ImageCandidate> candidate = findImageCandidate(fetchedPages);
+        Optional<ImageCandidate> candidate = findImageCandidate(fetchedPages, sourceSite);
         if (candidate.isEmpty()) {
             return Optional.empty();
         }
 
         try {
-            Optional<DownloadedImage> image = downloadImage(candidate.get().uri());
+            Optional<DownloadedImage> image = downloadImage(candidate.get().uri(), sourceSite);
             if (image.isEmpty()) {
                 return Optional.empty();
             }
@@ -71,7 +76,7 @@ final class JdImageOcrFallback {
                     jdUrl,
                     candidate.get().title(),
                     IMAGE_OCR_FETCH_MODE,
-                    "saramin"
+                    sourceSite
             ));
         } catch (IOException | RuntimeException exception) {
             return Optional.empty();
@@ -81,14 +86,19 @@ final class JdImageOcrFallback {
         }
     }
 
-    private Optional<ImageCandidate> findImageCandidate(List<FetchedHtml> fetchedPages) {
+    private Optional<ImageCandidate> findImageCandidate(List<FetchedHtml> fetchedPages, String sourceSite) {
+        List<String> selectors = imageContainerSelectors(sourceSite);
+        if (selectors.isEmpty()) {
+            return Optional.empty();
+        }
+
         List<ImageCandidate> candidates = new ArrayList<>();
         for (int pageIndex = 0; pageIndex < fetchedPages.size(); pageIndex++) {
             FetchedHtml page = fetchedPages.get(pageIndex);
             int candidatePageIndex = pageIndex;
             Document document = Jsoup.parse(page.html(), page.uri().toString());
             String title = extractPageTitle(document);
-            for (String selector : IMAGE_CONTAINER_SELECTORS) {
+            for (String selector : selectors) {
                 for (Element image : document.select(selector + " img[src]")) {
                     resolveImageUri(page.uri(), image.attr("src")).ifPresent(uri -> candidates.add(
                             new ImageCandidate(uri, title, imageScore(image, candidatePageIndex))
@@ -137,15 +147,15 @@ final class JdImageOcrFallback {
         }
     }
 
-    private Optional<DownloadedImage> downloadImage(URI imageUri) throws IOException, InterruptedException {
-        if (!isTrustedImageUri(imageUri)) {
+    private Optional<DownloadedImage> downloadImage(URI imageUri, String sourceSite) throws IOException, InterruptedException {
+        if (!isTrustedImageUri(imageUri, sourceSite)) {
             return Optional.empty();
         }
 
         URI currentUri = imageUri;
         HttpResponse<InputStream> response = null;
         for (int redirectCount = 0; redirectCount <= MAX_IMAGE_REDIRECTS; redirectCount++) {
-            if (!isTrustedImageUri(currentUri)) {
+            if (!isTrustedImageUri(currentUri, sourceSite)) {
                 return Optional.empty();
             }
             response = httpClient.send(buildImageRequest(currentUri), HttpResponse.BodyHandlers.ofInputStream());
@@ -159,7 +169,7 @@ final class JdImageOcrFallback {
                 return Optional.empty();
             }
             Optional<URI> redirectedUri = resolveImageUri(currentUri, location.get());
-            if (redirectedUri.isEmpty() || !isTrustedImageUri(redirectedUri.get())) {
+            if (redirectedUri.isEmpty() || !isTrustedImageUri(redirectedUri.get(), sourceSite)) {
                 return Optional.empty();
             }
             currentUri = redirectedUri.get();
@@ -170,7 +180,7 @@ final class JdImageOcrFallback {
             return Optional.empty();
         }
         URI finalUri = response.uri() == null ? currentUri : response.uri();
-        if (response.statusCode() < 200 || response.statusCode() >= 300 || !isTrustedImageUri(finalUri)) {
+        if (response.statusCode() < 200 || response.statusCode() >= 300 || !isTrustedImageUri(finalUri, sourceSite)) {
             closeQuietly(response.body());
             return Optional.empty();
         }
@@ -234,7 +244,7 @@ final class JdImageOcrFallback {
         }
     }
 
-    private boolean isTrustedImageUri(URI uri) {
+    private boolean isTrustedImageUri(URI uri, String sourceSite) {
         String scheme = uri.getScheme();
         String host = uri.getHost();
         if (scheme == null || host == null || uri.getUserInfo() != null) {
@@ -243,15 +253,32 @@ final class JdImageOcrFallback {
         String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
         return ("http".equals(normalizedScheme) || "https".equals(normalizedScheme))
                 && !isUnsafeHost(host)
-                && isTrustedImageHost(host);
+                && isTrustedImageHost(host, sourceSite);
     }
 
-    private boolean isTrustedImageHost(String host) {
+    private boolean isTrustedImageHost(String host, String sourceSite) {
         String normalizedHost = host.toLowerCase(Locale.ROOT);
-        return normalizedHost.equals("saramin.co.kr")
-                || normalizedHost.endsWith(".saramin.co.kr")
-                || normalizedHost.equals("saraminimage.co.kr")
-                || normalizedHost.endsWith(".saraminimage.co.kr");
+        if ("saramin".equals(sourceSite)) {
+            return normalizedHost.equals("saramin.co.kr")
+                    || normalizedHost.endsWith(".saramin.co.kr")
+                    || normalizedHost.equals("saraminimage.co.kr")
+                    || normalizedHost.endsWith(".saraminimage.co.kr");
+        }
+        if ("jobkorea".equals(sourceSite)) {
+            return normalizedHost.equals("jobkorea.co.kr")
+                    || normalizedHost.endsWith(".jobkorea.co.kr");
+        }
+        return false;
+    }
+
+    private List<String> imageContainerSelectors(String sourceSite) {
+        if ("saramin".equals(sourceSite)) {
+            return SARAMIN_IMAGE_CONTAINER_SELECTORS;
+        }
+        if ("jobkorea".equals(sourceSite)) {
+            return JOBKOREA_IMAGE_CONTAINER_SELECTORS;
+        }
+        return List.of();
     }
 
     private boolean isUnsafeHost(String host) {

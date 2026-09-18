@@ -8,6 +8,8 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -44,6 +46,11 @@ public class JdHtmlExtractor {
             ".job-description",
             "#content .recruit_detail",
             "#content .job-description"
+    );
+    static final List<String> JOBKOREA_CANDIDATE_SELECTORS = List.of(
+            "#jobkorea-job-description",
+            ".jobkorea-job-description",
+            "[data-jobkorea-description]"
     );
     static final Set<String> PRIORITY_HINTS = Set.of(
             "job", "description", "detail", "posting", "position", "role", "opening", "hiring",
@@ -122,10 +129,21 @@ public class JdHtmlExtractor {
             "[id*=recommend]",
             "[id*=similar]"
     );
+    static final List<String> JOBKOREA_NOISE_SELECTORS = List.of(
+            ".jobkorea-ad",
+            ".jobkorea-recommendation",
+            ".jobkorea-similar-jobs",
+            ".jobkorea-navigation",
+            ".jobkorea-apply"
+    );
     static final Set<String> SARAMIN_NOISE_HINTS = Set.of(
             "ai매치", "ai match", "매치율", "추천공고", "유사공고", "다른 공고", "다른채용", "공고를 추천",
             "similar jobs", "recommended jobs", "recommended role", "match score",
             "사람인 인공지능 기술 기반", "맞춤 공고를 추천해드리는", "채용정보제공 서비스입니다"
+    );
+    private static final Set<String> JOBKOREA_ERROR_PAGE_HINTS = Set.of(
+            "채용공고를 찾을 수 없습니다", "채용공고가 없습니다", "공고가 존재하지 않습니다",
+            "공고가 종료되었습니다", "접근이 제한되었습니다"
     );
 
     private final JdCandidateSelector candidateSelector = new JdCandidateSelector();
@@ -143,7 +161,7 @@ public class JdHtmlExtractor {
         String title = extractTitle(document);
         String candidateText = normalize(candidate.text());
         String jdText = trimDuplicatedTitlePrefix(extractCandidateText(candidate, title, sourceSite), title);
-        if (looksLikeErrorPage(document, jdText, title)) {
+        if (looksLikeErrorPage(document, jdText, title, sourceSite)) {
             throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
         }
         if ("saramin".equals(sourceSite) && jdText.isBlank() && !candidateText.isBlank()) {
@@ -200,11 +218,11 @@ public class JdHtmlExtractor {
 
     private String extractCandidateText(Element candidate, String title, String sourceSite) {
         Element sanitizedCandidate = candidate.clone();
-        removeNestedNoise(sanitizedCandidate);
+        removeNestedNoise(sanitizedCandidate, sourceSite);
         removeDuplicatedHeadings(sanitizedCandidate, title);
 
         String blockSelector = "p, li";
-        if ("saramin".equals(sourceSite)) {
+        if ("saramin".equals(sourceSite) || "jobkorea".equals(sourceSite)) {
             blockSelector = "dt, dd, pre, p, li, .jv_cont > div, .wrap_jv_cont > div, .cont";
         }
 
@@ -238,8 +256,8 @@ public class JdHtmlExtractor {
         return normalize(sanitizedCandidate.text());
     }
 
-    private void removeNestedNoise(Element candidate) {
-        candidateSelector.removeNestedNoise(candidate);
+    private void removeNestedNoise(Element candidate, String sourceSite) {
+        candidateSelector.removeNestedNoise(candidate, sourceSite);
     }
 
     private void removeDuplicatedHeadings(Element candidate, String title) {
@@ -403,11 +421,25 @@ public class JdHtmlExtractor {
     }
 
     private String detectSourceSite(String sourceUrl) {
-        String normalized = sourceUrl == null ? "" : sourceUrl.toLowerCase(Locale.ROOT);
-        if (normalized.contains("saramin.co.kr")) {
-            return "saramin";
+        if (sourceUrl == null || sourceUrl.isBlank()) {
+            return "unknown";
         }
-        return "unknown";
+
+        try {
+            URI uri = new URI(sourceUrl);
+            String host = uri.getHost();
+            if (host == null) {
+                return "unknown";
+            }
+
+            return switch (host.toLowerCase(Locale.ROOT)) {
+                case "www.saramin.co.kr", "saramin.co.kr" -> "saramin";
+                case "www.jobkorea.co.kr", "jobkorea.co.kr" -> "jobkorea";
+                default -> "unknown";
+            };
+        } catch (URISyntaxException exception) {
+            return "unknown";
+        }
     }
 
     private boolean hasMinimumJdQuality(String text) {
@@ -449,11 +481,18 @@ public class JdHtmlExtractor {
         return jdSignalCount;
     }
 
-    private boolean looksLikeErrorPage(Document document, String jdText, String title) {
+    private boolean looksLikeErrorPage(Document document, String jdText, String title, String sourceSite) {
         String combined = normalize(title + " " + jdText + " " + document.title()).toLowerCase(Locale.ROOT);
         for (String hint : ERROR_PAGE_HINTS) {
             if (combined.contains(hint)) {
                 return true;
+            }
+        }
+        if ("jobkorea".equals(sourceSite)) {
+            for (String hint : JOBKOREA_ERROR_PAGE_HINTS) {
+                if (combined.contains(hint)) {
+                    return true;
+                }
             }
         }
         return false;

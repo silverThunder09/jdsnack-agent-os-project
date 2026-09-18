@@ -170,7 +170,8 @@ export function AnalysisHistoryView({ histories, selectedHistory, isLoading, err
                   <span className={`history-status history-status--${selectedHistory.status.toLowerCase()}`}>
                     {statusLabel(selectedHistory.status)}
                   </span>
-                  <h2>{selectedHistory.input.sourceSite ?? '직접 입력 JD'}</h2>
+                  <h2>{selectedHistory.input.sourceSite === 'jobkorea' ? '잡코리아' : selectedHistory.input.sourceSite === 'saramin' ? '사람인' : '직접 입력 JD'}</h2>
+                  {selectedHistory.input.fetchMode === 'image-ocr' ? <p>이미지 공고를 OCR로 인식해 저장한 JD</p> : null}
                   <p>{formatDate(selectedHistory.createdAt)}</p>
                 </div>
                 <div className="history-detail__actions">
