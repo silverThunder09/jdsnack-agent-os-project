@@ -63,7 +63,8 @@ function Invoke-Tool {
     param(
         [string]$Name,
         [string[]]$Arguments,
-        [string]$OutputPath
+        [string]$OutputPath,
+        [int]$TimeoutSeconds = 600
     )
 
     $toolPath = Resolve-ToolPath $Name
@@ -72,10 +73,35 @@ function Invoke-Tool {
         return 127
     }
 
-    # GitHub Windows runners expose a non-interactive stdin stream. Close it explicitly so
-    # codex exec does not wait for an implicit <stdin> prompt after the positional prompt.
-    $null | & $toolPath @Arguments *> $OutputPath
-    return [int]$LASTEXITCODE
+    $job = Start-Job -ScriptBlock {
+        param(
+            [string]$ToolPath,
+            [string[]]$ToolArguments,
+            [string]$OutputFile
+        )
+
+        # GitHub Windows runners expose a non-interactive stdin stream. Close it explicitly so
+        # codex exec does not wait for an implicit <stdin> prompt after the positional prompt.
+        $null | & $ToolPath @ToolArguments *> $OutputFile
+        [int]$LASTEXITCODE
+    } -ArgumentList @($toolPath, (,$Arguments), $OutputPath)
+
+    try {
+        $completedJob = Wait-Job -Job $job -Timeout $TimeoutSeconds
+        if ($null -eq $completedJob) {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            [System.IO.File]::WriteAllText($OutputPath, "$Name timed out after $TimeoutSeconds seconds.")
+            return 124
+        }
+
+        $exitCode = Receive-Job -Job $job -ErrorAction SilentlyContinue | Select-Object -Last 1
+        if ($null -eq $exitCode) {
+            return 1
+        }
+        return [int]$exitCode
+    } finally {
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Add-StepSummary {
@@ -125,14 +151,14 @@ $claudeExitCode = Invoke-Tool $claudeBin @(
     '--effort', 'medium',
     '-p', $claudePrompt,
     '--dangerously-skip-permissions'
-) $claudeLog
+) $claudeLog 120
 $claudeOutput = Read-ToolOutput $claudeLog
 
 if ($claudeExitCode -eq 0) {
     exit 0
 }
 
-$availabilityPattern = '(?i)(disabled\s+.*subscription|subscription access|quota|rate limit|not authenticated|authentication failed|credential|claude.*unavailable|command.*not found)'
+$availabilityPattern = '(?i)(disabled\s+.*subscription|subscription access|quota|rate limit|not authenticated|authentication failed|credential|claude.*unavailable|command.*not found|timed\s*out|timeout)'
 if (-not [regex]::IsMatch($claudeOutput, $availabilityPattern)) {
     Add-StepSummary 'Claude review failed with a review or workflow error; Codex fallback was not selected.'
     Write-Error $claudeOutput
@@ -169,7 +195,7 @@ $codexExitCode = Invoke-Tool $codexBin @(
     '--cd', $Workspace,
     '--sandbox', 'read-only',
     $codexPrompt
-) $codexLog
+) $codexLog 600
 $codexOutput = Read-ToolOutput $codexLog
 
 $decisionMatch = [regex]::Match($codexOutput, '(?im)^\s*decision\s*:\s*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)\s*$')

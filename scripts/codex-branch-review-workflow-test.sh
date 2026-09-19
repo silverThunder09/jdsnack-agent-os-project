@@ -64,7 +64,9 @@ for fallback_contract in \
     "'codex'" \
     "'exec'" \
     "'--sandbox', 'read-only'" \
-    '$null | & $toolPath @Arguments' \
+    '$null | & $ToolPath @ToolArguments' \
+    'Wait-Job -Job $job -Timeout $TimeoutSeconds' \
+    'timed out after' \
     'decision: PASS | COMMENT | REQUEST_CHANGES | NEEDS_HUMAN' \
     'score: 0-5' \
     'risk: Light | Standard | High-risk' \
