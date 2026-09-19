@@ -194,6 +194,7 @@ Use PASS only when the change is safe and complete at score 4 or higher. Use NEE
 
 $codexExitCode = Invoke-Tool $codexBin @(
     'exec',
+    '--ephemeral',
     '--model', 'gpt-5.6-luna',
     '--cd', $Workspace,
     '--sandbox', 'read-only',

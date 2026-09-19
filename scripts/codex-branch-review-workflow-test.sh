@@ -63,6 +63,7 @@ for fallback_contract in \
     "--effort', 'medium" \
     "'codex'" \
     "'exec'" \
+    "'--ephemeral'" \
     "'--model', 'gpt-5.6-luna'" \
     "'--sandbox', 'read-only'" \
     '$null | & $ToolPath @ToolArguments' \
