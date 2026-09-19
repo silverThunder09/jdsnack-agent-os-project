@@ -92,6 +92,31 @@ function Limit-ReportText {
     return $Text.Substring(0, $MaximumCharacters) + "`r`n`r`n[Codex output truncated for GitHub review size limits.]"
 }
 
+function Get-StructuredField {
+    param(
+        [string]$Text,
+        [string]$Name,
+        [int]$MaximumCharacters = 2000
+    )
+
+    $pattern = "(?im)^\s*" + [regex]::Escape($Name) + "\s*:\s*(?<value>.*)$"
+    $match = [regex]::Match($Text, $pattern)
+    if (-not $match.Success) {
+        return ''
+    }
+
+    $value = $match.Groups['value'].Value.Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return ''
+    }
+
+    $value = $value -replace '\s+', ' '
+    if ($value.Length -gt $MaximumCharacters) {
+        return $value.Substring(0, $MaximumCharacters) + ' [truncated]'
+    }
+    return $value
+}
+
 function Invoke-Tool {
     param(
         [string]$Name,
@@ -362,19 +387,35 @@ $decisionMatch = [regex]::Match($codexOutput, '(?im)^\s*decision\s*:\s*(PASS|COM
 $scoreMatch = [regex]::Match($codexOutput, '(?im)^\s*score\s*:\s*([0-5])(?:\s*/\s*5)?\s*$')
 $riskMatch = [regex]::Match($codexOutput, '(?im)^\s*risk\s*:\s*(Light|Standard|High-risk)\s*$')
 
+$decisionLabel = if ($decisionMatch.Success) { $decisionMatch.Groups[1].Value } else { 'unavailable' }
+$scoreLabel = if ($scoreMatch.Success) { "$($scoreMatch.Groups[1].Value)/5" } else { 'unavailable' }
+$riskLabel = if ($riskMatch.Success) { $riskMatch.Groups[1].Value } else { 'unavailable' }
+$findings = Get-StructuredField -Text $codexOutput -Name 'findings'
+$reviewSummary = Get-StructuredField -Text $codexOutput -Name 'review_summary'
+if ([string]::IsNullOrWhiteSpace($findings)) {
+    $findings = 'Structured review findings were not returned.'
+}
+if ([string]::IsNullOrWhiteSpace($reviewSummary)) {
+    $reviewSummary = 'Structured review fields were missing or malformed; detailed runner output is intentionally omitted from the GitHub comment.'
+}
+
 $reportBody = @"
 # Review Result
 
 - reviewer backend: codex-fallback
 - fallback reason: $fallbackReason
-- evidence: $($reviewInputs.DiffPath), $($reviewInputs.CriteriaPath)
-- decision: $($decisionMatch.Value)
-- score: $($scoreMatch.Value)
-- risk: $($riskMatch.Value)
+- decision: $decisionLabel
+- score: $scoreLabel
+- risk: $riskLabel
+- evidence: read-only PR diff and repository review criteria (local runner paths omitted)
 
-## Codex report
+## Findings
 
-$codexReportOutput
+$findings
+
+## Summary
+
+$reviewSummary
 "@
 Set-Content -LiteralPath $reviewReport -Value $reportBody -Encoding utf8
 

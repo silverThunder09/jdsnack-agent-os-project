@@ -96,10 +96,25 @@ for fallback_contract in \
     'Remove-Item -LiteralPath $reviewInputPath' \
     'Limit-ReportText' \
     'Codex output truncated for GitHub review size limits' \
+    'Get-StructuredField' \
+    '$decisionLabel' \
+    '$scoreLabel' \
+    '$riskLabel' \
+    'detailed runner output is intentionally omitted from the GitHub comment' \
     'ghPath pr merge' \
     ' --auto'; do
     grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
+done
+for unsafe_report_contract in \
+    '- decision: $($decisionMatch.Value)' \
+    '- score: $($scoreMatch.Value)' \
+    '- risk: $($riskMatch.Value)' \
+    '- evidence: $($reviewInputs.DiffPath), $($reviewInputs.CriteriaPath)' \
+    '## Codex report'; do
+    if grep -Fq -- "$unsafe_report_contract" "$FALLBACK_SCRIPT"; then
+        fail "Codex 리뷰 댓글에 원시 출력 또는 임시 경로를 포함하는 포맷이 남아 있습니다: $unsafe_report_contract"
+    fi
 done
 if grep -Fq -- '--admin' "$FALLBACK_SCRIPT"; then
     fail 'Codex review fallback은 관리자 우회 머지를 포함하면 안 됩니다.'
