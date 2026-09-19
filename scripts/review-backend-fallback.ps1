@@ -310,6 +310,7 @@ try {
 $reviewInputPaths = @($reviewInputs.DiffPath, $reviewInputs.CriteriaPath)
 
 $codexBin = if ([string]::IsNullOrWhiteSpace($env:CODEX_BIN)) { 'codex' } else { $env:CODEX_BIN }
+$codexAnswerPath = Join-Path $fallbackRoot "codex-answer-$PullRequestNumber.md"
 $codexPrompt = @"
 Claude review backend is unavailable with reason: $fallbackReason.
 Act as the Codex review fallback for PR #$PullRequestNumber in $Repository.
@@ -343,6 +344,7 @@ try {
         '--cd', $Workspace,
         '--sandbox', 'read-only',
         '--ignore-rules',
+        '--output-last-message', $codexAnswerPath,
         '-'
     ) $codexLog 600 $reviewInputs.CriteriaPath
 } catch {
@@ -352,7 +354,8 @@ try {
         Remove-Item -LiteralPath $reviewInputPath -Force -ErrorAction SilentlyContinue
     }
 }
-$codexOutput = Read-ToolOutput $codexLog
+$codexOutput = if (Test-Path -LiteralPath $codexAnswerPath -PathType Leaf) { Read-ToolOutput $codexAnswerPath } else { Read-ToolOutput $codexLog }
+Remove-Item -LiteralPath $codexAnswerPath -Force -ErrorAction SilentlyContinue
 $codexReportOutput = Limit-ReportText -Text $codexOutput
 
 $decisionMatch = [regex]::Match($codexOutput, '(?im)^\s*decision\s*:\s*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)\s*$')

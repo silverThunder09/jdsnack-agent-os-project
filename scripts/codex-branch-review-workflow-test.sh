@@ -92,6 +92,7 @@ for fallback_contract in \
     'Do not call tools, shell, git, gh, web' \
     'Get-Content -LiteralPath $reviewInputs.DiffPath -Raw' \
     "'--ignore-rules'" \
+    "'--output-last-message'" \
     'Remove-Item -LiteralPath $reviewInputPath' \
     'Limit-ReportText' \
     'Codex output truncated for GitHub review size limits' \
