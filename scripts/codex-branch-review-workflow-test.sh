@@ -77,6 +77,10 @@ for fallback_contract in \
     'Stop-NeedsHuman' \
     'needs-human' \
     'High-risk' \
+    'origin/main...HEAD' \
+    '.codex-review-input-' \
+    'do not run git or gh' \
+    'Remove-Item -LiteralPath $reviewInputPath' \
     'ghPath pr merge' \
     ' --auto'; do
     grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
