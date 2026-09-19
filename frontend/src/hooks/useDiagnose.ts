@@ -1,6 +1,48 @@
 import { useState } from 'react'
 import { diagnoseResume, diagnoseResumeFile, NetworkError } from '../services/api'
-import type { ResultState, ResumeInputMode } from '../types/diagnosis'
+import type { ApiErrorCode, ResultState, ResumeInputMode } from '../types/diagnosis'
+
+type GeminiErrorCode = Extract<
+  ApiErrorCode,
+  | 'GEMINI_API_KEY_MISSING'
+  | 'GEMINI_API_REQUEST_FAILED'
+  | 'GEMINI_API_RESPONSE_INVALID'
+>
+
+interface DiagnosisErrorGuidance {
+  title: string
+  message: string
+}
+
+const geminiErrorGuidance: Record<GeminiErrorCode, DiagnosisErrorGuidance> = {
+  GEMINI_API_KEY_MISSING: {
+    title: 'AI 분석 설정을 확인해주세요',
+    message:
+      'AI 연결 설정이 없어 분석을 시작하지 못했어요. 이력서 내용을 다시 입력하기보다 관리자에게 AI 설정을 확인해달라고 알려주세요.',
+  },
+  GEMINI_API_REQUEST_FAILED: {
+    title: 'AI 서비스가 잠시 바쁩니다',
+    message:
+      'AI 서비스가 일시적으로 응답하지 않아 분석을 끝내지 못했어요. 입력한 이력서에는 문제가 없으니 잠시 후 다시 시도해주세요.',
+  },
+  GEMINI_API_RESPONSE_INVALID: {
+    title: 'AI 결과를 읽지 못했어요',
+    message:
+      'AI가 분석 결과를 완성하지 못해 결과를 표시할 수 없어요. 잠시 후 다시 시도해주세요. 같은 문제가 계속되면 관리자에게 알려주세요.',
+  },
+}
+
+export function getDiagnosisErrorGuidance(
+  code: GeminiErrorCode,
+  fallbackMessage: string,
+): DiagnosisErrorGuidance {
+  return (
+    geminiErrorGuidance[code] ?? {
+      title: 'AI 분석을 완료하지 못했어요',
+      message: fallbackMessage,
+    }
+  )
+}
 
 const idleState: ResultState = {
   status: 'idle',
@@ -13,7 +55,7 @@ const loadingState: ResultState = {
   status: 'loading',
   title: '요청을 확인하고 있습니다',
   message:
-    '입력 길이와 요청 형식을 검증하고 있습니다. 모드에 따라 stub, fixture, ai-local 결과를 반환합니다.',
+    '잠시만 기다려주세요. 이력서 내용을 확인한 뒤 분석을 진행하고 있습니다.',
 }
 
 const validationMessages = {
@@ -117,13 +159,14 @@ export function useDiagnose() {
       outcome.code === 'GEMINI_API_REQUEST_FAILED' ||
       outcome.code === 'GEMINI_API_RESPONSE_INVALID'
     ) {
+      const guidance = getDiagnosisErrorGuidance(outcome.code, outcome.message)
       setResult({
         status: 'error',
-        title: '로컬 AI 분석을 완료하지 못했습니다',
-        message: outcome.message,
+        title: guidance.title,
+        message: guidance.message,
         code: outcome.code,
       })
-      return { ok: false as const, message: outcome.message, code: outcome.code }
+      return { ok: false as const, message: guidance.message, code: outcome.code }
     }
 
     setResult({
@@ -147,7 +190,7 @@ export function useDiagnose() {
       const message =
         error instanceof NetworkError
           ? error.message
-          : '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+          : '요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.'
 
       setResult({
         status: 'error',
