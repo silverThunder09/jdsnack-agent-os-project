@@ -76,6 +76,8 @@ documents:
     - scripts/notify-needs-human.sh
     - scripts/notify-needs-human-test.sh
     - scripts/backends-contract-test.sh
+    - scripts/pr-contract-test.sh
+    - scripts/pr-contract-test-test.sh
     - scripts/create-codex-worktree.sh
     - scripts/create-codex-worktree-test.sh
     - scripts/sync-main-checkout.sh

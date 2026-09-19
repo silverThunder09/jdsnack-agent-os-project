@@ -51,6 +51,7 @@ python3 scripts/check-ai-readiness.py
 ./scripts/notify-needs-human-test.sh
 ./scripts/backends-contract-test.sh
 ./scripts/open-issue-work-dispatcher-test.sh
+./scripts/pr-contract-test-test.sh
 ./scripts/publish-codex-branch-test.sh
 ./scripts/create-codex-worktree-test.sh
 ./scripts/sync-main-checkout-test.sh
