@@ -13,6 +13,8 @@
 
 ## 기본 전략
 
+Claude review backend가 unavailable하여 Codex read-only reviewer로 전환된 경우에도 동일한 5점 루브릭과 결정론 게이트를 적용합니다. `High-risk` 변경 또는 구현 backend와 reviewer backend가 같은 PR은 fallback 점수만으로 자동 머지하지 않고 `needs-human`으로 멈춥니다.
+
 - 기본 브랜치는 `main`입니다.
 - MVP 초기에는 작은 PR 단위로 `main`에 머지합니다.
 - 머지 방식은 `Squash and merge`를 기본값으로 둡니다.

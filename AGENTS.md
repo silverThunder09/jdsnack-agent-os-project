@@ -6,10 +6,11 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 
 ## 코덱스와 분업 운영
 
-클로드는 **기획·검증·리뷰·통합**을 맡고, **기능 구현·테스트는 코덱스**가 맡습니다.
+클로드는 **기획·검증·리뷰·통합**을 맡고, **기능 구현·테스트는 코덱스**가 맡습니다. Claude review backend가 인증·구독·쿼터·자격 증명 장애로 실행되지 않으면 [`review-backend-fallback.md`](./.agent-os/operations/review-backend-fallback.md)의 절차에 따라 Codex 읽기 전용 리뷰어에게 위임합니다.
 
-- 클로드: 문서 계획(spec), 게이트 검증, 독립 리뷰(`code-reviewer` 서브에이전트에 diff만 넘겨 채점), PR 작성/관리, merge 판단/실행. `backend`/`frontend` 소스는 직접 수정하지 않습니다.
-- 코덱스: 활성 spec 기준 기능 **구현 + 기능 테스트 작성**을 담당합니다. 리뷰·판정은 담당하지 않습니다.
+- 클로드: 문서 계획(spec), 게이트 검증, 독립 리뷰(`code-reviewer` 서브에이전트에 diff만 넘겨 채점), PR 작성/관리, merge 판단/실행. `backend`/`frontend` 소스는 직접 수정하지 않습니다. Claude 리뷰 서비스 장애 시에는 Codex fallback을 호출하고, fallback이 `needs-human`이면 자동 머지를 중단합니다.
+- 코덱스: 활성 spec 기준 기능 **구현 + 기능 테스트 작성**을 담당합니다. 기본 리뷰·판정은 담당하지 않으며, Claude review backend unavailable 시에만 명시된 Codex review fallback 예외를 적용합니다.
+- Claude review fallback: Codex가 diff와 acceptance/test 기준만 읽고 5점 리뷰를 수행합니다. fallback reviewer는 소스·테스트를 수정하지 않으며, `High-risk` PR은 사람 확인 없이 머지하지 않습니다.
 - 폴백: 코덱스가 토큰이 없어 막힐 때만, 사용자가 "네가 구현해"라고 지시하면 클로드가 직접 구현·테스트합니다. 전환·복귀·가드레일은 `.agent-os/operations/worker-backends.md`의 폴백 규칙을 따릅니다.
 - **무인 배치**: Codex 구현 PR은 이벤트 기반 리뷰-머지 루프가 리뷰·CI를 확인합니다. 마지막 Feature가 머지되면 `spec-queue.json`의 eligible 후보를 자동으로 Spec으로 승격하고 T1을 다시 Codex에 디스패치합니다. 사람이 필요한 제품 판단·High-risk·충돌은 `needs-human`으로 멈춥니다.
 
@@ -17,7 +18,8 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 
 - 기능 구현과 테스트 코드 작성·결과 분석의 모델 배정은 [backends.json](backends.json)과 [Worker 모델 배정](./.agent-os/operations/worker-backends.md)을 따릅니다.
 - 빌드·lint·test·E2E 명령 실행 자체: 모델을 사용하지 않습니다.
-- 리뷰·판정은 Codex 모델 대상이 아니며, Claude `code-reviewer`가 담당합니다.
+- 기본 리뷰·판정은 Codex 모델 대상이 아니며 Claude `code-reviewer`가 담당합니다. Claude review backend unavailable 시에는 Codex fallback 규칙을 적용합니다.
+- 단, Claude review backend가 unavailable이면 `.agent-os/operations/review-backend-fallback.md`에 따라 Codex review fallback으로 위임하고, 결과·점수·위험도를 PR review에 기록합니다.
 
 ## 먼저 읽을 문서
 

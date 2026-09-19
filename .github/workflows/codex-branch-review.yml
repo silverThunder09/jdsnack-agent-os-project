@@ -4,6 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -42,10 +47,20 @@ jobs:
           $expectedLogin = '${{ github.repository_owner }}'
           $actualLogin = (& gh api user --jq '.login').Trim()
           if ($actualLogin -ne $expectedLogin) {
-            throw "Claude review identity mismatch: expected $expectedLogin, got $actualLogin"
+            throw "Review runner identity mismatch: expected $expectedLogin, got $actualLogin"
           }
-      - name: Run Claude review-merge loop
+      - name: Run Claude review loop with Codex fallback
         shell: powershell
+        env:
+          CLAUDE_BIN: claude
+          CODEX_BIN: codex
         run: |
-          $skillPath = Join-Path $env:GITHUB_WORKSPACE '.claude/skills/review-loop/SKILL.md'
-          claude --model sonnet --effort medium -p "다음 절차 문서를 읽고 그 절차를 정확히 1회 실행하라: $skillPath" --dangerously-skip-permissions
+          $fallback = Join-Path $env:GITHUB_WORKSPACE 'scripts/review-backend-fallback.ps1'
+          if (-not (Test-Path -LiteralPath $fallback -PathType Leaf)) {
+            throw "Review backend fallback not found: $fallback"
+          }
+          $pullRequestNumber = '${{ github.event.pull_request.number || inputs.pr_number }}'
+          if ([string]::IsNullOrWhiteSpace($pullRequestNumber)) {
+            throw 'A pull request number is required for review workflow.'
+          }
+          & $fallback -PullRequestNumber ([int]$pullRequestNumber) -Repository '${{ github.repository }}' -Workspace $env:GITHUB_WORKSPACE
