@@ -78,6 +78,8 @@ documents:
     - scripts/backends-contract-test.sh
     - scripts/create-codex-worktree.sh
     - scripts/create-codex-worktree-test.sh
+    - scripts/sync-main-checkout.sh
+    - scripts/sync-main-checkout-test.sh
     - scripts/pr-ci-router-test.sh
     - scripts/docs-harness.sh
     - scripts/workflow-ci-test.sh

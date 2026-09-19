@@ -53,6 +53,7 @@ python3 scripts/check-ai-readiness.py
 ./scripts/open-issue-work-dispatcher-test.sh
 ./scripts/publish-codex-branch-test.sh
 ./scripts/create-codex-worktree-test.sh
+./scripts/sync-main-checkout-test.sh
 python3 scripts/autonomous_spec_loop.py validate
 ./scripts/autonomous-spec-loop-test.sh
 

@@ -72,7 +72,8 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 - 별도 작업 스레드는 사용하지 않습니다.
 - 검증은 현재 기획 스레드에서 변경 범위, 테스트 결과, CI 결과를 기준으로 확인합니다.
 - AI eval은 `evals/context-tasks.json`의 대표 작업을 기준으로 정적으로 검증하며, 모델 품질 측정은 runner가 연결되기 전까지 `not-run`으로 기록합니다.
-- `frontend/` 또는 `backend/` 코드 변경 후에는 테스트·lint·build와 함께 `docker compose -f compose.local.yaml up -d --build`, 컨테이너 상태, 관련 health endpoint를 자동 확인합니다. Docker 재빌드·재실행을 생략한 상태는 로컬 실행 검증 완료로 보고하지 않습니다.
+- 새 작업을 시작하거나 PR 머지가 확인된 뒤 primary checkout은 `scripts/sync-main-checkout.sh`로 `origin/main`을 fetch하고, 변경 없는 `main`에서만 `--ff-only`로 동기화합니다. feature branch, dirty worktree, ahead/diverged 상태에서는 자동 pull·reset·checkout을 하지 않고 `needs-human`으로 멈춥니다.
+- `frontend/` 또는 `backend/` 코드 변경 후에는 테스트·lint·build와 함께 `docker compose -f compose.local.yaml up -d --build`, 컨테이너 상태, 관련 health endpoint, `scripts/smoke-test.sh`를 자동 확인합니다. Docker 재빌드·재실행 또는 runtime smoke를 생략한 상태는 로컬 실행 검증 완료로 보고하지 않습니다.
 - 사용자가 브라우저에서 비밀 키를 넣거나 프론트에 저장하는 흐름은 만들지 않습니다.
 - 백엔드는 `Controller -> Service -> Repository/External API` 경계를 지킵니다.
 - 프론트는 컴포넌트에서 직접 API 호출을 하지 않고 서비스 계층을 둡니다.

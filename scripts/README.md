@@ -20,6 +20,8 @@
 - `autonomous-spec-loop.sh`: GitHub 이벤트를 Spec 큐와 Claude/Codex 실행기로 연결합니다.
 - `create-codex-worktree.sh`: 최신 `origin/main`에서 Codex worktree를 생성합니다.
 - `publish-codex-branch.sh`: stale `origin/main` 기준과 원격 SHA를 검증한 뒤 Codex 브랜치를 publish합니다.
+- `sync-main-checkout.sh`: 머지 후 변경 없는 primary `main` checkout만 `origin/main`으로 fast-forward합니다.
+- `sync-main-checkout-test.sh`: primary `main` 동기화의 clean/dirty/ahead/feature branch 계약을 검증합니다.
 
 ## Patterns
 
@@ -58,4 +60,5 @@ python3 scripts/check-ai-readiness.py
 sh scripts/install-git-hooks.sh
 python3 scripts/run-ai-readiness-evals.py --dry-run
 bash scripts/smoke-test.sh
+bash scripts/sync-main-checkout.sh
 ```

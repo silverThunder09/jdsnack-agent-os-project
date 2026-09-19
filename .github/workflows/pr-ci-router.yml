@@ -31,6 +31,9 @@ jobs:
             frontend:
               - 'frontend/**'
             container:
+              # App source changes must prove the built Compose runtime before merge.
+              - 'backend/**'
+              - 'frontend/**'
               - 'backend/Dockerfile'
               - 'frontend/Dockerfile'
               - 'compose.local.yaml'
