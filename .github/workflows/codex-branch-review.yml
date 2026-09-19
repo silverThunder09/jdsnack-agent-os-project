@@ -33,7 +33,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || format('refs/pull/{0}/head', inputs.pr_number) }}
           fetch-depth: 0
+      - name: Fetch review base
+        shell: powershell
+        run: git fetch --no-tags origin main
       - name: Verify Claude review skill
         shell: powershell
         run: |
@@ -54,13 +58,14 @@ jobs:
         env:
           CLAUDE_BIN: claude
           CODEX_BIN: codex
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           $fallback = Join-Path $env:GITHUB_WORKSPACE 'scripts/review-backend-fallback.ps1'
           if (-not (Test-Path -LiteralPath $fallback -PathType Leaf)) {
             throw "Review backend fallback not found: $fallback"
           }
-          $pullRequestNumber = '${{ github.event.pull_request.number || inputs.pr_number }}'
-          if ([string]::IsNullOrWhiteSpace($pullRequestNumber)) {
-            throw 'A pull request number is required for review workflow.'
+          $pullRequestNumber = $env:PR_NUMBER
+          if ($pullRequestNumber -notmatch '^\d+$') {
+            throw 'A numeric pull request number is required for review workflow.'
           }
           & $fallback -PullRequestNumber ([int]$pullRequestNumber) -Repository '${{ github.repository }}' -Workspace $env:GITHUB_WORKSPACE

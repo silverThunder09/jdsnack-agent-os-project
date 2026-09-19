@@ -50,6 +50,27 @@ function Resolve-ToolPath {
     }
 }
 
+function Get-ConfiguredCodexReviewModel {
+    param([string]$ReviewWorkspace)
+
+    $backendsPath = Join-Path $ReviewWorkspace 'backends.json'
+    if (-not (Test-Path -LiteralPath $backendsPath -PathType Leaf)) {
+        throw "Codex review model configuration not found: ${backendsPath}"
+    }
+
+    try {
+        $backends = Get-Content -LiteralPath $backendsPath -Raw | ConvertFrom-Json
+        $model = [string]$backends.workers.codex.'review-fallback'.model
+    } catch {
+        throw "Could not read the Codex review model from ${backendsPath}: $($_.Exception.Message)"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($model)) {
+        throw "backends.json does not define workers.codex.review-fallback.model: ${backendsPath}"
+    }
+    return $model
+}
+
 function Read-ToolOutput {
     param([string]$Path)
 
@@ -57,6 +78,18 @@ function Read-ToolOutput {
         return Get-Content -LiteralPath $Path -Raw
     }
     return ''
+}
+
+function Limit-ReportText {
+    param(
+        [string]$Text,
+        [int]$MaximumCharacters = 45000
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text) -or $Text.Length -le $MaximumCharacters) {
+        return $Text
+    }
+    return $Text.Substring(0, $MaximumCharacters) + "`r`n`r`n[Codex output truncated for GitHub review size limits.]"
 }
 
 function Invoke-Tool {
@@ -128,6 +161,60 @@ function Submit-Review {
 
     & $ghPath pr review $PullRequestNumber --repo $Repository $Action --body-file $ReportPath
     return [int]$LASTEXITCODE
+}
+
+function Confirm-RequiredChecks {
+    $ghPath = Resolve-ToolPath 'gh'
+    if ([string]::IsNullOrWhiteSpace($ghPath)) {
+        return [pscustomobject]@{
+            Passed = $false
+            Reason = 'GitHub CLI is unavailable while checking required PR checks.'
+        }
+    }
+
+    $checksJson = & $ghPath pr checks $PullRequestNumber --repo $Repository --required --json name,state,bucket 2>&1 | Out-String
+    $checkExitCode = [int]$LASTEXITCODE
+    if ($checkExitCode -ne 0) {
+        return [pscustomobject]@{
+            Passed = $false
+            Reason = "Could not read required PR checks (exit $checkExitCode): $checksJson"
+        }
+    }
+
+    try {
+        $checks = @($checksJson | ConvertFrom-Json)
+    } catch {
+        return [pscustomobject]@{
+            Passed = $false
+            Reason = "Required PR checks returned invalid JSON: $($_.Exception.Message)"
+        }
+    }
+    if ($checks.Count -eq 0) {
+        return [pscustomobject]@{
+            Passed = $false
+            Reason = 'No required PR checks were returned; refusing to treat an incomplete gate as passed.'
+        }
+    }
+
+    $currentJob = $env:GITHUB_JOB
+    $blockingChecks = @($checks | Where-Object {
+        $isCurrentReview = ($_.name -eq 'review') -or
+            (-not [string]::IsNullOrWhiteSpace($currentJob) -and $_.name -eq $currentJob) -or
+            ($_.name -match '(^| / )review$')
+        (-not $isCurrentReview) -and $_.bucket -ne 'pass'
+    })
+    if ($blockingChecks.Count -gt 0) {
+        $details = ($blockingChecks | ForEach-Object { "$($_.name)=$($_.bucket)" }) -join ', '
+        return [pscustomobject]@{
+            Passed = $false
+            Reason = "Required PR checks are not passing: $details"
+        }
+    }
+
+    return [pscustomobject]@{
+        Passed = $true
+        Reason = 'All required PR checks other than the current review job are passing.'
+    }
 }
 
 function Stop-NeedsHuman {
@@ -231,7 +318,7 @@ if ($claudeExitCode -eq 0) {
     exit 0
 }
 
-$availabilityPattern = '(?i)(disabled\s+.*subscription|subscription access|quota|rate limit|not authenticated|authentication failed|credential|claude.*unavailable|command.*not found|timed\s*out|timeout)'
+$availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
 if (-not [regex]::IsMatch($claudeOutput, $availabilityPattern)) {
     Add-StepSummary 'Claude review failed with a review or workflow error; Codex fallback was not selected.'
     Write-Error $claudeOutput
@@ -241,12 +328,13 @@ if (-not [regex]::IsMatch($claudeOutput, $availabilityPattern)) {
 $fallbackReason = switch -Regex ($claudeOutput) {
     '(?i)subscription' { 'claude-subscription'; break }
     '(?i)quota|rate\s+limit' { 'claude-quota'; break }
-    '(?i)authentication|not\s+authenticated|credential' { 'claude-auth'; break }
+    '(?i)authentication|not\s+authenticated|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired)' { 'claude-auth'; break }
     default { 'claude-unavailable' }
 }
 Add-StepSummary "Claude review backend unavailable ($fallbackReason); delegating PR #$PullRequestNumber to Codex read-only reviewer."
 
 try {
+    $codexReviewModel = Get-ConfiguredCodexReviewModel -ReviewWorkspace $Workspace
     $reviewInputs = New-CodexReviewInputs -ReviewWorkspace $Workspace -ReviewPullRequestNumber $PullRequestNumber
 } catch {
     Stop-NeedsHuman $_.Exception.Message ''
@@ -270,19 +358,26 @@ review_summary:
 Use PASS only when the change is safe and complete at score 4 or higher. Use NEEDS_HUMAN for ambiguous output, missing required evidence, high-risk automatic merge, or a service/permission boundary.
 "@
 
-$codexExitCode = Invoke-Tool $codexBin @(
-    'exec',
-    '--ephemeral',
-    '--model', 'gpt-5.6-luna',
-    '--config', 'model_reasoning_effort="medium"',
-    '--cd', $Workspace,
-    '--sandbox', 'read-only',
-    $codexPrompt
-) $codexLog 600
-$codexOutput = Read-ToolOutput $codexLog
-foreach ($reviewInputPath in $reviewInputPaths) {
-    Remove-Item -LiteralPath $reviewInputPath -Force -ErrorAction SilentlyContinue
+$codexExitCode = 1
+try {
+    $codexExitCode = Invoke-Tool $codexBin @(
+        'exec',
+        '--ephemeral',
+        '--model', $codexReviewModel,
+        '--config', 'model_reasoning_effort="medium"',
+        '--cd', $Workspace,
+        '--sandbox', 'read-only',
+        $codexPrompt
+    ) $codexLog 600
+} catch {
+    [System.IO.File]::WriteAllText($codexLog, "Codex invocation failed: $($_.Exception.Message)")
+} finally {
+    foreach ($reviewInputPath in $reviewInputPaths) {
+        Remove-Item -LiteralPath $reviewInputPath -Force -ErrorAction SilentlyContinue
+    }
 }
+$codexOutput = Read-ToolOutput $codexLog
+$codexReportOutput = Limit-ReportText -Text $codexOutput
 
 $decisionMatch = [regex]::Match($codexOutput, '(?im)^\s*decision\s*:\s*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)\s*$')
 $scoreMatch = [regex]::Match($codexOutput, '(?im)^\s*score\s*:\s*([0-5])(?:\s*/\s*5)?\s*$')
@@ -300,7 +395,7 @@ $reportBody = @"
 
 ## Codex report
 
-$codexOutput
+$codexReportOutput
 "@
 Set-Content -LiteralPath $reviewReport -Value $reportBody -Encoding utf8
 
@@ -317,7 +412,7 @@ if ($decision -eq 'REQUEST_CHANGES') {
     if ($status -ne 0) {
         Stop-NeedsHuman 'Codex requested changes but GitHub review submission failed.' $reviewReport
     }
-    exit 1
+    Stop-NeedsHuman 'Codex requested changes; the implementation backend must address the findings.' $reviewReport
 }
 
 if ($decision -ne 'PASS' -or $score -lt 4) {
@@ -326,6 +421,12 @@ if ($decision -ne 'PASS' -or $score -lt 4) {
 
 if ($risk -eq 'High-risk') {
     Stop-NeedsHuman 'High-risk PR requires human review after Codex fallback.' $reviewReport
+}
+
+$requiredChecks = Confirm-RequiredChecks
+if (-not $requiredChecks.Passed) {
+    Add-Content -LiteralPath $reviewReport -Value "`r`n## Required checks`r`n$($requiredChecks.Reason)"
+    Stop-NeedsHuman $requiredChecks.Reason $reviewReport
 }
 
 $approvalStatus = Submit-Review '--approve' $reviewReport
