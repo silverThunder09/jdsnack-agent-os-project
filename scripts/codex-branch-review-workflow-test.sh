@@ -64,6 +64,7 @@ for fallback_contract in \
     "'codex'" \
     "'exec'" \
     "'--sandbox', 'read-only'" \
+    '$null | & $toolPath @Arguments' \
     'decision: PASS | COMMENT | REQUEST_CHANGES | NEEDS_HUMAN' \
     'score: 0-5' \
     'risk: Light | Standard | High-risk' \

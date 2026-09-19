@@ -72,7 +72,9 @@ function Invoke-Tool {
         return 127
     }
 
-    & $toolPath @Arguments *> $OutputPath
+    # GitHub Windows runners expose a non-interactive stdin stream. Close it explicitly so
+    # codex exec does not wait for an implicit <stdin> prompt after the positional prompt.
+    $null | & $toolPath @Arguments *> $OutputPath
     return [int]$LASTEXITCODE
 }
 
