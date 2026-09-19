@@ -30,9 +30,11 @@ done
 assert_contains "$ROUTER" 'name: PR CI Router'
 assert_contains "$ROUTER" "- 'backend/**'"
 assert_contains "$ROUTER" "- 'frontend/**'"
+assert_contains "$ROUTER" "- 'compose.yaml'"
 assert_contains "$ROUTER" "- 'backend/Dockerfile'"
 assert_contains "$ROUTER" "- 'frontend/Dockerfile'"
 assert_contains "$ROUTER" "- '.agent-os/**'"
+assert_contains "$ROUTER" "- '.github/pull_request_template.md'"
 assert_contains "$ROUTER" "- '.github/workflows/**'"
 assert_contains "$ROUTER" 'name: PR CI Gate'
 assert_contains "$ROUTER" 'name: Test and build backend'

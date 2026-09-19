@@ -34,6 +34,7 @@ jobs:
               # App source changes must prove the built Compose runtime before merge.
               - 'backend/**'
               - 'frontend/**'
+              - 'compose.yaml'
               - 'backend/Dockerfile'
               - 'frontend/Dockerfile'
               - 'compose.local.yaml'
@@ -42,6 +43,7 @@ jobs:
             docs:
               - '.agent-os/**'
               - '.github/ISSUE_TEMPLATE/**'
+              - '.github/pull_request_template.md'
               - 'docs/**'
               - 'evals/**'
               - 'scripts/**'
