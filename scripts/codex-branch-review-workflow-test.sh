@@ -27,6 +27,9 @@ assert_not_contains() {
 assert_contains "  pull_request:"
 assert_contains "    types: [opened, synchronize, reopened]"
 assert_contains "  workflow_dispatch:"
+assert_contains "      pr_number:"
+assert_contains "        required: true"
+assert_contains "        type: string"
 assert_contains "permissions:"
 assert_contains "  contents: write"
 assert_contains "  pull-requests: write"
@@ -34,7 +37,9 @@ assert_contains "github.event_name == 'pull_request'"
 assert_contains "github.event.pull_request.head.repo.full_name == github.repository"
 assert_contains "github.event.pull_request.author_association"
 assert_contains "uses: actions/checkout@v4"
+assert_contains "ref: \${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || format('refs/pull/{0}/head', inputs.pr_number) }}"
 assert_contains "fetch-depth: 0"
+assert_contains "git fetch --no-tags origin main"
 assert_contains "shell: powershell"
 assert_contains 'Join-Path $env:GITHUB_WORKSPACE'
 assert_contains "'.claude/skills/review-loop/SKILL.md'"
@@ -43,9 +48,77 @@ assert_contains 'Verify GitHub review identity'
 assert_contains "gh api user --jq '.login'"
 assert_contains 'github.repository_owner'
 assert_contains '$actualLogin -ne $expectedLogin'
-assert_contains 'throw "Claude review identity mismatch: expected $expectedLogin, got $actualLogin"'
-assert_contains 'claude --model sonnet --effort medium -p'
+assert_contains 'throw "Review runner identity mismatch: expected $expectedLogin, got $actualLogin"'
+assert_contains 'Run Claude review loop with Codex fallback'
+assert_contains 'CLAUDE_BIN: claude'
+assert_contains 'CODEX_BIN: codex'
+assert_contains 'PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}'
+assert_contains 'scripts/review-backend-fallback.ps1'
+assert_contains '-PullRequestNumber'
+assert_contains '$pullRequestNumber = $env:PR_NUMBER'
+assert_contains "-notmatch '^\\d+\$'"
+assert_not_contains "\$pullRequestNumber = '\${{ github.event.pull_request.number || inputs.pr_number }}'"
 assert_not_contains 'GH_TOKEN: ${{ github.token }}'
+assert_not_contains 'claude --model sonnet --effort medium -p'
+FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
+[[ -f "$FALLBACK_SCRIPT" ]] || fail "리뷰 backend fallback 스크립트가 없습니다: $FALLBACK_SCRIPT"
+for fallback_contract in \
+    "--model', 'sonnet" \
+    "--effort', 'medium" \
+    "'codex'" \
+    "'exec'" \
+    "'--ephemeral'" \
+    'Get-ConfiguredCodexReviewModel' \
+    "'backends.json'" \
+    "'review-fallback'" \
+    "'--config', 'model_reasoning_effort=\"medium\"'" \
+    "'--sandbox', 'read-only'" \
+    '$null | & $ToolPath @ToolArguments' \
+    'ConvertFrom-Json' \
+    'Wait-Job -Job $job -Timeout $TimeoutSeconds' \
+    'timed out after' \
+    'decision: PASS | COMMENT | REQUEST_CHANGES | NEEDS_HUMAN' \
+    'score: 0-5' \
+    'risk: Light | Standard | High-risk' \
+    'Stop-NeedsHuman' \
+    'Get-RequiredCheckFailure' \
+    '--required --json name,state,bucket' \
+    'HighRisk' \
+    'Deterministic path classification' \
+    'needs-human' \
+    'High-risk' \
+    'origin/main...HEAD' \
+    '.codex-review-input-' \
+    'Do not call tools, shell, git, gh, web' \
+    'Get-Content -LiteralPath $reviewInputs.DiffPath -Raw' \
+    "'--ignore-rules'" \
+    "'--output-last-message'" \
+    'Remove-Item -LiteralPath $reviewInputPath' \
+    'Limit-ReportText' \
+    'Codex output truncated for GitHub review size limits' \
+    'Get-StructuredField' \
+    '$decisionLabel' \
+    '$scoreLabel' \
+    '$riskLabel' \
+    'detailed runner output is intentionally omitted from the GitHub comment' \
+    'ghPath pr merge' \
+    ' --auto'; do
+    grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
+        || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
+done
+for unsafe_report_contract in \
+    '- decision: $($decisionMatch.Value)' \
+    '- score: $($scoreMatch.Value)' \
+    '- risk: $($riskMatch.Value)' \
+    '- evidence: $($reviewInputs.DiffPath), $($reviewInputs.CriteriaPath)' \
+    '## Codex report'; do
+    if grep -Fq -- "$unsafe_report_contract" "$FALLBACK_SCRIPT"; then
+        fail "Codex 리뷰 댓글에 원시 출력 또는 임시 경로를 포함하는 포맷이 남아 있습니다: $unsafe_report_contract"
+    fi
+done
+if grep -Fq -- '--admin' "$FALLBACK_SCRIPT"; then
+    fail 'Codex review fallback은 관리자 우회 머지를 포함하면 안 됩니다.'
+fi
 [[ -f "$CLAUDE_SKILL" ]] || fail "저장소의 Claude review-loop 스킬 파일이 없습니다: $CLAUDE_SKILL"
 [[ -f "$AGENTS_SKILL" ]] || fail "저장소의 .agents review-loop 스킬 파일이 없습니다: $AGENTS_SKILL"
 diff -u <(sed 's/\r$//' "$CLAUDE_SKILL") <(sed 's/\r$//' "$AGENTS_SKILL") >/dev/null || fail ".claude와 .agents의 review-loop 스킬이 서로 다릅니다."

@@ -47,6 +47,7 @@ documents:
     - .agent-os/operations/incident-playbook.md
     - .agent-os/operations/pr-rules.md
     - .agent-os/operations/pr-review-gate.md
+    - .agent-os/operations/review-backend-fallback.md
     - .agent-os/operations/merge-rules.md
     - .agent-os/operations/work-start-checkpoint.md
     - .agent-os/operations/agent-scan-policy.md
@@ -76,8 +77,13 @@ documents:
     - scripts/notify-needs-human.sh
     - scripts/notify-needs-human-test.sh
     - scripts/backends-contract-test.sh
+    - scripts/review-backend-fallback.ps1
+    - scripts/pr-contract-test.sh
+    - scripts/pr-contract-test-test.sh
     - scripts/create-codex-worktree.sh
     - scripts/create-codex-worktree-test.sh
+    - scripts/sync-main-checkout.sh
+    - scripts/sync-main-checkout-test.sh
     - scripts/pr-ci-router-test.sh
     - scripts/docs-harness.sh
     - scripts/workflow-ci-test.sh

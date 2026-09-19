@@ -51,9 +51,21 @@ set_common_fixture() {
 
 제목·본문·범위 검사를 수행합니다.
 
+## 구현한 기능
+
+계약 검사 실행 기능을 추가합니다.
+
+## 수행한 테스트
+
+정상·실패·경계 테스트를 실행합니다.
+
 ## 범위 판단
 
 하네스 테스트 범위입니다.
+
+## 보안 영향
+
+민감정보를 다루지 않습니다.
 
 ## 연결 문서
 
@@ -66,6 +78,18 @@ set_common_fixture() {
 ## 리뷰 포인트
 
 오탐과 누락을 확인합니다.
+
+## 영향 범위
+
+PR 계약 검사 스크립트입니다.
+
+## 자체 리뷰 결과
+
+계약 테스트로 검증합니다.
+
+## 실패 시 Issue
+
+없음.
 BODY
 )"
 }
@@ -133,6 +157,12 @@ run_case() {
     ui_test_scenario_contract)
       GH_FIXTURE_FILES=$'frontend/src/components/Example.tsx\nspecs/test-scenarios.md'
       ;;
+    missing_required_section)
+      if [ -z "${GH_FIXTURE_MISSING_SECTION:-}" ]; then
+        fail "누락할 필수 PR 섹션이 지정되지 않았습니다."
+      fi
+      GH_FIXTURE_BODY="${GH_FIXTURE_BODY//$GH_FIXTURE_MISSING_SECTION/}"
+      ;;
     metadata_error)
       GH_FIXTURE_MODE="metadata_error"
       ;;
@@ -172,6 +202,26 @@ run_case api_contract_missing 1 "API 구현 계약 변경에는 api-spec.md"
 run_case ui_contract_missing 1 "UI 구현 계약 변경에는 ui-spec.md 또는 test-scenarios.md"
 run_case contracts_with_exception 0 "PR contract passed"
 run_case ui_test_scenario_contract 0 "PR contract passed"
+
+for required_section in \
+  "## 배경 · 문제" \
+  "## 변경 요약" \
+  "## 구현한 기능" \
+  "## 수행한 테스트" \
+  "## 범위 판단" \
+  "## 보안 영향" \
+  "## 연결 문서" \
+  "## 검증" \
+  "## 영향 범위" \
+  "## 리뷰 포인트" \
+  "## 자체 리뷰 결과" \
+  "## 실패 시 Issue"; do
+  GH_FIXTURE_MISSING_SECTION="$required_section"
+  export GH_FIXTURE_MISSING_SECTION
+  run_case missing_required_section 1 "PR 본문 필수 섹션이 없습니다: $required_section"
+done
+
+unset GH_FIXTURE_MISSING_SECTION
 run_case metadata_error 1 "PR #999 메타데이터 조회 실패"
 
 echo "PR contract execution tests passed"

@@ -14,7 +14,7 @@
 - `.github/workflows/frontend-ci.yml`에서 프론트엔드 린트, 테스트, 빌드를 검증합니다.
 - `.github/workflows/container.yml`에서 compose 기반 스모크 테스트를 함께 검증합니다.
 - compose 기반 통합 검증은 `fixture` 모드 기준으로 텍스트/PDF/DOCX 흐름을 확인합니다.
-- PR은 `.github/workflows/pr-ci-router.yml`이 변경 경로를 분류하고 필요한 Backend/Frontend/Container/Docs/Workflow job만 조건부 실행합니다. `main` push에서는 각 workflow의 `paths` 필터가 직접 동작합니다.
+- PR은 `.github/workflows/pr-ci-router.yml`이 변경 경로를 분류하고 필요한 Backend/Frontend/Container/Docs/Workflow job만 조건부 실행합니다. `backend/` 또는 `frontend/` 코드 변경은 테스트·빌드와 함께 Container/Compose smoke도 선택해야 합니다. `main` push에서는 각 workflow의 `paths` 필터가 직접 동작합니다.
 - 보호 브랜치 required check는 Router의 선택 결과를 반영하는 `PR CI Gate`로 전환해야 하며, workflow-level path filter만 먼저 적용해 required check를 누락시키지 않습니다.
 - 모든 PR은 `Validate PR contract` job에서 Conventional Commits 제목·커밋 summary, PR 본문 필수 섹션, 기능/CI·운영 범위를 검증합니다. Router는 변경 경로에 해당하는 기능 CI를 병렬로 선택 실행하며, 계약 또는 선택된 CI가 실패한 PR은 `PR CI Gate`에서 실패합니다.
 
@@ -128,6 +128,7 @@ npm run build
 - 문서만 변경한 PR은 문서 하네스 검증을 통과해야 합니다.
 - 백엔드 변경 PR은 백엔드 CI 기준을 통과해야 합니다.
 - 프론트엔드 변경 PR은 프론트엔드 CI 기준을 통과해야 합니다.
+- 백엔드 또는 프론트엔드 코드 변경 PR은 컨테이너 빌드, health endpoint, Compose smoke까지 통과해야 합니다.
 - API/UI 계약 변경 PR은 `Validate PR contract`에서 `api-spec.md`, `ui-spec.md` 또는 `test-scenarios.md` 동반 여부를 먼저 통과해야 하며, 관련 spec 문서와 테스트 시나리오를 함께 갱신해야 합니다.
 
 ## 실패 처리

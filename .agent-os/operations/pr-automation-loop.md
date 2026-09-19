@@ -22,26 +22,27 @@ JDSnack 기능 구현 해줘.
 세부 규칙은 저장소 문서를 기준으로 따릅니다.
 
 - Codex 담당: 구현, 테스트, 커밋, origin push.
-- Claude 담당: 문서 계획, 리뷰, PR, merge.
-- 모델 정책은 [Worker 모델 배정](worker-backends.md)과 루트 [backends.json](../../backends.json)을 따릅니다. 빌드·lint·test·E2E 명령 실행 자체에는 모델을 지정하지 않습니다. 리뷰·판정은 Codex가 아니라 Claude `code-reviewer`가 담당합니다.
+- Claude 담당: 문서 계획, 기본 리뷰, PR, merge. Claude review backend unavailable 시 리뷰만 [Codex fallback](review-backend-fallback.md)으로 위임합니다.
+- 모델 정책은 [Worker 모델 배정](worker-backends.md)과 루트 [backends.json](../../backends.json)을 따릅니다. 빌드·lint·test·E2E 명령 실행 자체에는 모델을 지정하지 않습니다. 기본 리뷰·판정은 Codex가 아니라 Claude `code-reviewer`가 담당합니다.
 - 구현 대상은 `index.yml`의 `active_specs`(정확히 1개) 안에서 준비된 티켓 하나입니다. `plan.md`가 없는 레거시 active Spec은 Spec 전체를 한 작업으로 취급합니다.
 - 티켓 브랜치는 `codex/<active-spec-slug>-<ticket-id>`로 만들고, 티켓별 구현·테스트·PR·리뷰·머지를 독립적으로 수행합니다.
 - **티켓 전진(원자적)**: 티켓 PR에는 코드뿐 아니라 `plan.md`의 티켓 상태와 관련 traceability·테스트 결과 갱신을 포함합니다. 머지 후 active Spec은 유지한 채 다음 준비 티켓을 claim합니다.
 - **Feature 완료**: 마지막 티켓과 전체 수용 기준이 통과한 PR을 main에 반영하면 `autonomous-loop.yml`이 완료 Spec을 archive하고 `active_specs`를 비운 뒤 `spec-queue.json`의 첫 eligible 후보를 자동 승격합니다. Windows self-hosted runner에서는 checkout 직후 추적된 `.sh` 파일 목록을 NUL 구분으로 읽어 PowerShell로 LF로 정규화하고, PowerShell이 Windows 경로 구분자를 정규화하고 `wsl.exe wslpath`로 runner 경로를 변환한 뒤 Bash coordinator를 호출합니다. 자동 판정 가능한 후보가 없을 때만 `needs-human`으로 중단합니다.
 - **Spec 순환**: 자동 승격된 후보는 문서 필수 세트와 traceability를 생성·검증한 뒤 Spec promotion PR을 만들고, 통과하면 T1을 Codex에 디스패치합니다. 한 시점에 active Spec은 하나만 유지합니다.
 - 변경요청(`리뷰 반려: <branch>` 또는 `리뷰 후속: <branch>` 이슈)이 있으면 같은 `codex/*` 브랜치에서 반영합니다.
-- **클로드 리뷰-머지 루프도 GitHub 이벤트로 기동합니다.** [`.github/workflows/codex-branch-review.yml`](../../.github/workflows/codex-branch-review.yml)이 신뢰된 동일 저장소 PR의 생성·갱신·재오픈 이벤트에서 로컬 `jdsnack` self-hosted runner로 클로드 리뷰-머지 절차(`.claude/skills/review-loop/SKILL.md`)를 즉시 1회 기동합니다. 수동 `workflow_dispatch`도 지원합니다. 외부 fork PR은 self-hosted runner 보안을 위해 실행하지 않습니다. 현재 review job 자체가 보호 브랜치의 required check일 수 있으므로, 통과 PR은 `gh pr merge --auto`로 머지를 큐에 넣고 job이 성공한 뒤 GitHub가 머지를 완료합니다.
+- **클로드 리뷰-머지 루프도 GitHub 이벤트로 기동합니다.** [`.github/workflows/codex-branch-review.yml`](../../.github/workflows/codex-branch-review.yml)이 신뢰된 동일 저장소 PR의 생성·갱신·재오픈 이벤트에서 로컬 `jdsnack` self-hosted runner로 클로드 리뷰-머지 절차(`.claude/skills/review-loop/SKILL.md`)를 즉시 1회 기동합니다. 수동 `workflow_dispatch`도 지원합니다. 외부 fork PR은 self-hosted runner 보안을 위해 실행하지 않습니다. Claude가 인증·구독·쿼터·자격 증명 장애로 실패하면 `review-backend-fallback.md`에 따라 Codex 읽기 전용 리뷰어로 위임하며, `High-risk` 또는 불명확한 결과는 `needs-human`으로 멈춥니다. 현재 review job 자체가 보호 브랜치의 required check일 수 있으므로, 통과 PR은 `gh pr merge --auto`로 머지를 큐에 넣고 job이 성공한 뒤 GitHub가 머지를 완료합니다.
 - Windows self-hosted runner에서는 Git Bash의 `C:\...` 임시 스크립트 경로 변환 문제가 생길 수 있으므로 review step은 Windows PowerShell로 실행하고, Claude 절차 파일은 checkout된 `$GITHUB_WORKSPACE/.claude/skills/review-loop/SKILL.md`에서 해석합니다. PR Review는 runner에 로그인된 `gh` 계정을 사용하며, workflow가 `gh api user`와 `github.repository_owner` 일치를 먼저 확인합니다. Actions 기본 `github.token`을 `GH_TOKEN`으로 주입하지 않습니다.
 - Windows self-hosted runner의 PR feedback detector는 공백이 없는 8.3 절대 경로 `C:\PROGRA~1\Git\bin\bash.exe`로 Git Bash를 명시적으로 사용하고 `.gitattributes`의 `*.sh text eol=lf`를 적용합니다. autonomous loop는 `JQ_BIN`·`GH_BIN`·`PYTHON_BIN`·`CLAUDE_BIN`·`CODEX_BIN`으로 런타임 의존성을 주입할 수 있으며, 누락 시 구조화된 `needs_human` 결과를 출력합니다.
 - 반려 감지는 [pr-feedback-detector.sh](../../scripts/pr-feedback-detector.sh)가 GitHub 이벤트로 깨워진 workflow에서 한 번 실행될 때 수행합니다. 감지기는 polling loop를 내장하지 않으며 `no_action`, `actionable`, `needs_human` JSON과 종료 코드를 내보냅니다.
 - `.github/workflows/pr-feedback-detector.yml`은 반려 Issue 생성·수정, Issue/PR 댓글, PR 리뷰, required CI 완료 이벤트에만 실행됩니다. 로컬 `jdsnack` self-hosted runner가 안전한 후보를 격리 worktree에 전달해 Codex의 수정·테스트·커밋·푸시를 수행합니다.
-- PR CI는 `.github/workflows/pr-ci-router.yml`이 변경 경로를 먼저 분류한 뒤 필요한 Backend/Frontend/Container/Docs/Workflow job만 조건부 실행합니다. 일반 backend/frontend 코드는 각 테스트만 실행하고, Dockerfile·Compose·smoke 변경만 컨테이너 검증을 추가합니다. 기존 개별 workflow는 `main` push와 수동 실행을 담당하며, PR에서는 Router가 기존 job 이름을 유지해 required check를 제공합니다.
+- PR CI는 `.github/workflows/pr-ci-router.yml`이 변경 경로를 먼저 분류한 뒤 필요한 Backend/Frontend/Container/Docs/Workflow job만 조건부 실행합니다. backend/frontend 코드도 각 테스트와 함께 컨테이너 빌드·health·Compose smoke를 실행하며, Dockerfile·Compose·smoke 변경도 같은 runtime 검증을 선택합니다. 기존 개별 workflow는 `main` push와 수동 실행을 담당하며, PR에서는 Router가 기존 job 이름을 유지해 required check를 제공합니다.
 - Codex worktree는 `scripts/create-codex-worktree.sh`로 최신 `origin/main`에서 생성합니다. `scripts/publish-codex-branch.sh`는 publish 직전에 `origin/main`이 feature HEAD의 조상인지 확인하므로 main이 전진한 stale 브랜치는 push하지 않고 재base를 요구합니다.
+- PR이 실제로 머지된 뒤에는 [머지 상태를 먼저 확인](https://cli.github.com/manual/gh_pr_view)하고 primary checkout에서 `bash scripts/sync-main-checkout.sh`를 실행합니다. 이 스크립트는 `origin/main`을 fetch한 뒤 변경 없는 `main`에서만 fast-forward하며, feature branch·dirty worktree·local ahead/diverged 상태에서는 pull·reset·checkout을 수행하지 않고 중단합니다. 동기화 후 `git rev-parse HEAD`와 `origin/main`이 같은지 확인합니다.
 - 반려 Issue 이벤트는 해당 이슈의 `codex/*` 브랜치만 dispatcher에 전달합니다. Codex는 커밋까지만 수행하고 dispatcher가 publish와 원격 SHA를 검증합니다. push·검증 실패는 workflow 성공으로 숨기지 않고 `needs_human`으로 종료합니다.
 - `.github/workflows/autonomous-loop.yml`은 5분 폴링 대신 main 반영, 승인된 제품 Issue, workflow dispatch 이벤트에서 큐 선택·Spec 승격·Codex T1 디스패치를 수행합니다. 리뷰 반려 Issue는 기존 `pr-feedback-detector`가 담당하고 자율 루프가 중복 처리하지 않습니다.
 - Codex push 자체는 workflow 트리거가 아니므로 동일 이벤트의 무한 재실행을 만들지 않습니다. PR 생성·머지는 수행하지 않습니다.
 - 반려 자동 복구 루프는 PR 생성·갱신 뒤 CI 실패, 리뷰 `REQUEST_CHANGES`, 또는 반려 Issue가 확인되면 최신 로그·리뷰·Issue를 읽고 실패 원인을 재현합니다. 원래 수용 기준과 업무 검증 범위를 보존한 채 같은 브랜치에서 수정하고, 관련 테스트와 전체 회귀 테스트를 실행한 뒤 Conventional Commit으로 커밋·푸시하고 PR 상태를 다시 확인합니다. 테스트를 삭제하거나 assertion을 약화해 통과시키지 않습니다.
-- 자동 루프는 동일 PR에서 최대 3회 리뷰 시도까지 반복합니다. 같은 실패가 반복되거나 외부 승인·비밀값·서비스 복구가 필요하면 `needs-human`으로 기록하고 담당자에게 중단 지점과 필요한 조치를 보고합니다. 일반 구현 PR은 리뷰-머지 실행기가, `automation/spec-*` promotion PR은 자율 루프가 각각 게이트 통과 후 머지합니다. 코덱스는 직접 머지하지 않습니다.
+- 자동 루프는 동일 PR에서 최대 3회 리뷰 시도까지 반복합니다. 같은 실패가 반복되거나 Claude unavailable 뒤 Codex fallback도 실행할 수 없거나, 외부 승인·비밀값·서비스 복구가 필요하면 `needs-human`으로 기록하고 담당자에게 중단 지점과 필요한 조치를 보고합니다. 일반 구현 PR은 리뷰-머지 실행기가, `automation/spec-*` promotion PR은 자율 루프가 각각 게이트 통과 후 머지합니다. Codex fallback은 읽기 전용 리뷰어이며 보호 규칙을 우회하지 않습니다.
 - 문서 없는 API/UI 계약 변경은 하지 않습니다.
 - 작업 범위 밖 파일은 스테이징하지 않습니다.
 - 할 일이 없으면 수정하지 않고 대기합니다.
