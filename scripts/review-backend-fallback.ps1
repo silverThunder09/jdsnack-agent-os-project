@@ -196,6 +196,7 @@ $codexExitCode = Invoke-Tool $codexBin @(
     'exec',
     '--ephemeral',
     '--model', 'gpt-5.6-luna',
+    '--config', 'model_reasoning_effort="medium"',
     '--cd', $Workspace,
     '--sandbox', 'read-only',
     $codexPrompt

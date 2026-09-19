@@ -65,6 +65,7 @@ for fallback_contract in \
     "'exec'" \
     "'--ephemeral'" \
     "'--model', 'gpt-5.6-luna'" \
+    "'--config', 'model_reasoning_effort=\"medium\"'" \
     "'--sandbox', 'read-only'" \
     '$null | & $ToolPath @ToolArguments' \
     'ConvertFrom-Json' \
