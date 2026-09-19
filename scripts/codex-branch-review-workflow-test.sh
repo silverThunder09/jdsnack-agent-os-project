@@ -81,7 +81,7 @@ for fallback_contract in \
     'score: 0-5' \
     'risk: Light | Standard | High-risk' \
     'Stop-NeedsHuman' \
-    'Confirm-RequiredChecks' \
+    'Get-RequiredCheckFailure' \
     '--required --json name,state,bucket' \
     'HighRisk' \
     'Deterministic path classification' \
@@ -89,7 +89,9 @@ for fallback_contract in \
     'High-risk' \
     'origin/main...HEAD' \
     '.codex-review-input-' \
-    'do not run git or gh' \
+    'Do not call tools, shell, git, gh, web' \
+    'Get-Content -LiteralPath $reviewInputs.DiffPath -Raw' \
+    "'--ignore-rules'" \
     'Remove-Item -LiteralPath $reviewInputPath' \
     'Limit-ReportText' \
     'Codex output truncated for GitHub review size limits' \
