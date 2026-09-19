@@ -65,6 +65,7 @@ for fallback_contract in \
     "'exec'" \
     "'--sandbox', 'read-only'" \
     '$null | & $ToolPath @ToolArguments' \
+    'ConvertFrom-Json' \
     'Wait-Job -Job $job -Timeout $TimeoutSeconds' \
     'timed out after' \
     'decision: PASS | COMMENT | REQUEST_CHANGES | NEEDS_HUMAN' \

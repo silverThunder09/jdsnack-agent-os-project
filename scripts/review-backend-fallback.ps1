@@ -73,18 +73,20 @@ function Invoke-Tool {
         return 127
     }
 
+    $argumentsJson = ConvertTo-Json -InputObject @($Arguments) -Compress
     $job = Start-Job -ScriptBlock {
         param(
             [string]$ToolPath,
-            [string[]]$ToolArguments,
+            [string]$ArgumentsJson,
             [string]$OutputFile
         )
 
+        $ToolArguments = @($ArgumentsJson | ConvertFrom-Json)
         # GitHub Windows runners expose a non-interactive stdin stream. Close it explicitly so
         # codex exec does not wait for an implicit <stdin> prompt after the positional prompt.
         $null | & $ToolPath @ToolArguments *> $OutputFile
         [int]$LASTEXITCODE
-    } -ArgumentList @($toolPath, (,$Arguments), $OutputPath)
+    } -ArgumentList @($toolPath, $argumentsJson, $OutputPath)
 
     try {
         $completedJob = Wait-Job -Job $job -Timeout $TimeoutSeconds
