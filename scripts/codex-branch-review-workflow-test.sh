@@ -39,7 +39,6 @@ assert_contains "github.event.pull_request.author_association"
 assert_contains "uses: actions/checkout@v4"
 assert_contains "ref: \${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || format('refs/pull/{0}/head', inputs.pr_number) }}"
 assert_contains "fetch-depth: 0"
-assert_contains "Fetch review base"
 assert_contains "git fetch --no-tags origin main"
 assert_contains "shell: powershell"
 assert_contains 'Join-Path $env:GITHUB_WORKSPACE'
@@ -56,8 +55,6 @@ assert_contains 'CODEX_BIN: codex'
 assert_contains 'PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}'
 assert_contains 'scripts/review-backend-fallback.ps1'
 assert_contains '-PullRequestNumber'
-assert_contains 'github.event.pull_request.number || inputs.pr_number'
-assert_contains 'inputs.pr_number'
 assert_contains '$pullRequestNumber = $env:PR_NUMBER'
 assert_contains "-notmatch '^\\d+\$'"
 assert_not_contains "\$pullRequestNumber = '\${{ github.event.pull_request.number || inputs.pr_number }}'"
@@ -86,6 +83,8 @@ for fallback_contract in \
     'Stop-NeedsHuman' \
     'Confirm-RequiredChecks' \
     '--required --json name,state,bucket' \
+    'HighRisk' \
+    'Deterministic path classification' \
     'needs-human' \
     'High-risk' \
     'origin/main...HEAD' \

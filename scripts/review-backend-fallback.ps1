@@ -256,6 +256,7 @@ function New-CodexReviewInputs {
     if ([string]::IsNullOrWhiteSpace($diffText)) {
         throw 'The Codex review diff is empty.'
     }
+    $highRisk = $diffText -match '(?m)^diff --git a/(?:\.github/|\.agent-os/operations/|scripts/|AGENTS\.md|backends\.json)'
     Set-Content -LiteralPath $diffPath -Value $diffText -Encoding utf8
 
     $contextPaths = @(
@@ -301,6 +302,7 @@ function New-CodexReviewInputs {
     return [pscustomobject]@{
         DiffPath = $diffPath
         CriteriaPath = $criteriaPath
+        HighRisk = $highRisk
     }
 }
 
@@ -422,6 +424,8 @@ if ($decision -ne 'PASS' -or $score -lt 4) {
 if ($risk -eq 'High-risk') {
     Stop-NeedsHuman 'High-risk PR requires human review after Codex fallback.' $reviewReport
 }
+
+if ($reviewInputs.HighRisk) { Add-Content -LiteralPath $reviewReport -Value "`r`nDeterministic risk classification: High-risk"; Stop-NeedsHuman 'Deterministic path classification marked this PR High-risk.' $reviewReport }
 
 $requiredChecks = Confirm-RequiredChecks
 if (-not $requiredChecks.Passed) {
