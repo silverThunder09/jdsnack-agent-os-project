@@ -24,7 +24,7 @@ assert_not_contains() {
     fi
 }
 
-assert_contains "  pull_request:"
+assert_contains "  pull_request_target:"
 assert_contains "    types: [opened, synchronize, reopened]"
 assert_contains "  workflow_dispatch:"
 assert_contains "      pr_number:"
@@ -33,13 +33,25 @@ assert_contains "        type: string"
 assert_contains "permissions:"
 assert_contains "  contents: write"
 assert_contains "  pull-requests: write"
-assert_contains "github.event_name == 'pull_request'"
+assert_contains "github.event_name == 'pull_request_target'"
 assert_contains "github.event.pull_request.head.repo.full_name == github.repository"
+assert_contains "github.event.pull_request.base.repo.full_name == github.repository"
 assert_contains "github.event.pull_request.author_association"
 assert_contains "uses: actions/checkout@v4"
-assert_contains "ref: \${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || format('refs/pull/{0}/head', inputs.pr_number) }}"
+assert_contains "Check out trusted review base"
+assert_contains "ref: \${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.event.repository.default_branch }}"
 assert_contains "fetch-depth: 0"
-assert_contains "git fetch --no-tags origin main"
+assert_contains "Resolve and fetch review target"
+assert_contains "git fetch --no-tags origin"
+assert_contains "refs/remotes/origin/review-base"
+assert_contains "refs/remotes/origin/review-head"
+assert_contains "REVIEW_BASE_SHA"
+assert_contains "REVIEW_HEAD_SHA"
+assert_contains "pullRequest.state -ne 'open'"
+assert_contains "pullRequest.base.repo.full_name -ne \$env:REPOSITORY"
+assert_contains "pullRequest.head.repo.full_name -ne \$env:REPOSITORY"
+assert_contains "Review target SHA is invalid"
+assert_not_contains "refs/pull/{0}/head"
 assert_contains "shell: powershell"
 assert_contains 'Join-Path $env:GITHUB_WORKSPACE'
 assert_contains "'.claude/skills/review-loop/SKILL.md'"
@@ -52,9 +64,11 @@ assert_contains 'throw "Review runner identity mismatch: expected $expectedLogin
 assert_contains 'Run Claude review loop with Codex fallback'
 assert_contains 'CLAUDE_BIN: claude'
 assert_contains 'CODEX_BIN: codex'
-assert_contains 'PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}'
+assert_contains 'PR_NUMBER_INPUT: ${{ github.event.pull_request.number || inputs.pr_number }}'
 assert_contains 'scripts/review-backend-fallback.ps1'
 assert_contains '-PullRequestNumber'
+assert_contains '-BaseSha'
+assert_contains '-HeadSha'
 assert_contains '$pullRequestNumber = $env:PR_NUMBER'
 assert_contains "-notmatch '^\\d+\$'"
 assert_not_contains "\$pullRequestNumber = '\${{ github.event.pull_request.number || inputs.pr_number }}'"
@@ -83,11 +97,19 @@ for fallback_contract in \
     'Stop-NeedsHuman' \
     'Get-RequiredCheckFailure' \
     '--required --json name,state,bucket' \
+    "'--restricted'" \
+    "'--tools', ''" \
+    "'--permission-mode', 'plan'" \
+    "'--permission-prompts', 'none'" \
     'HighRisk' \
     'Deterministic path classification' \
     'needs-human' \
     'High-risk' \
-    'origin/main...HEAD' \
+    'BaseSha' \
+    'HeadSha' \
+    '$ReviewBaseSha' \
+    '$ReviewHeadSha' \
+    '$diffRange' \
     '.codex-review-input-' \
     'Do not call tools, shell, git, gh, web' \
     'Get-Content -LiteralPath $reviewInputs.DiffPath -Raw' \
@@ -97,15 +119,19 @@ for fallback_contract in \
     'Limit-ReportText' \
     'Codex output truncated for GitHub review size limits' \
     'Get-StructuredField' \
-    '$decisionLabel' \
-    '$scoreLabel' \
-    '$riskLabel' \
+    'Get-StructuredReviewResult' \
+    'Write-ReviewReport' \
+    'Complete-ReviewDecision' \
+    'DecisionLabel' \
+    'ScoreLabel' \
+    'RiskLabel' \
     'detailed runner output is intentionally omitted from the GitHub comment' \
     'ghPath pr merge' \
     ' --auto'; do
     grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
 done
+assert_not_contains '--dangerously-skip-permissions'
 for unsafe_report_contract in \
     '- decision: $($decisionMatch.Value)' \
     '- score: $($scoreMatch.Value)' \
@@ -141,7 +167,6 @@ done
 assert_not_contains "shell: bash"
 assert_not_contains "  push:"
 assert_not_contains "github.event_name == 'push'"
-assert_not_contains "pull_request_target"
 assert_not_contains 'Join-Path $env:USERPROFILE'
 
 printf 'Codex branch review workflow contract passed\n'

@@ -1,7 +1,7 @@
 name: Codex Branch Review
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
@@ -19,7 +19,8 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
-        github.event_name == 'pull_request' &&
+        github.event_name == 'pull_request_target' &&
+        github.event.pull_request.base.repo.full_name == github.repository &&
         github.event.pull_request.head.repo.full_name == github.repository &&
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
           github.event.pull_request.author_association)
@@ -30,21 +31,69 @@ jobs:
       group: jdsnack-review-loop
       cancel-in-progress: false
     steps:
-      - name: Check out repository
+      - name: Check out trusted review base
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || format('refs/pull/{0}/head', inputs.pr_number) }}
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.event.repository.default_branch }}
           fetch-depth: 0
-      - name: Fetch review base
+
+      - name: Resolve and fetch review target
         shell: powershell
-        run: git fetch --no-tags origin main
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER_INPUT: ${{ github.event.pull_request.number || inputs.pr_number }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+        run: |
+          $pullRequestNumber = $env:PR_NUMBER_INPUT
+          if ($pullRequestNumber -notmatch '^\d+$') {
+            throw 'A numeric pull request number is required for review workflow.'
+          }
+
+          $baseSha = $env:EVENT_BASE_SHA
+          $headSha = $env:EVENT_HEAD_SHA
+          if ($env:EVENT_NAME -eq 'workflow_dispatch') {
+            $pullRequest = (& gh api "repos/$($env:REPOSITORY)/pulls/$pullRequestNumber" | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or $null -eq $pullRequest) {
+              throw "Could not resolve pull request #$pullRequestNumber from GitHub."
+            }
+            if ($pullRequest.state -ne 'open') {
+              throw "Pull request #$pullRequestNumber is not open."
+            }
+            if ($pullRequest.base.repo.full_name -ne $env:REPOSITORY -or $pullRequest.head.repo.full_name -ne $env:REPOSITORY) {
+              throw 'Review workflow accepts only pull requests wholly inside the configured repository.'
+            }
+            $baseSha = [string]$pullRequest.base.sha
+            $headSha = [string]$pullRequest.head.sha
+          }
+
+          foreach ($sha in @($baseSha, $headSha)) {
+            if ($sha -notmatch '^[0-9a-fA-F]{40}$') {
+              throw "Review target SHA is invalid: $sha"
+            }
+            git fetch --no-tags origin $sha
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not fetch review target SHA: $sha"
+            }
+          }
+
+          git update-ref refs/remotes/origin/review-base $baseSha
+          git update-ref refs/remotes/origin/review-head $headSha
+          @(
+            "PR_NUMBER=$pullRequestNumber"
+            "REVIEW_BASE_SHA=$baseSha"
+            "REVIEW_HEAD_SHA=$headSha"
+          ) | Add-Content -LiteralPath $env:GITHUB_ENV
+
       - name: Verify Claude review skill
         shell: powershell
         run: |
           $skillPath = Join-Path $env:GITHUB_WORKSPACE '.claude/skills/review-loop/SKILL.md'
           if (-not (Test-Path -LiteralPath $skillPath -PathType Leaf)) {
-            throw "Claude review skill not found: $skillPath"
+            throw "Claude review skill not found in the trusted review base: $skillPath"
           }
+
       - name: Verify GitHub review identity
         shell: powershell
         run: |
@@ -53,19 +102,24 @@ jobs:
           if ($actualLogin -ne $expectedLogin) {
             throw "Review runner identity mismatch: expected $expectedLogin, got $actualLogin"
           }
+
       - name: Run Claude review loop with Codex fallback
         shell: powershell
         env:
           CLAUDE_BIN: claude
           CODEX_BIN: codex
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           $fallback = Join-Path $env:GITHUB_WORKSPACE 'scripts/review-backend-fallback.ps1'
           if (-not (Test-Path -LiteralPath $fallback -PathType Leaf)) {
-            throw "Review backend fallback not found: $fallback"
+            throw "Review backend fallback not found in the trusted review base: $fallback"
           }
           $pullRequestNumber = $env:PR_NUMBER
           if ($pullRequestNumber -notmatch '^\d+$') {
             throw 'A numeric pull request number is required for review workflow.'
           }
-          & $fallback -PullRequestNumber ([int]$pullRequestNumber) -Repository '${{ github.repository }}' -Workspace $env:GITHUB_WORKSPACE
+          & $fallback `
+            -PullRequestNumber ([int]$pullRequestNumber) `
+            -Repository '${{ github.repository }}' `
+            -Workspace $env:GITHUB_WORKSPACE `
+            -BaseSha $env:REVIEW_BASE_SHA `
+            -HeadSha $env:REVIEW_HEAD_SHA
