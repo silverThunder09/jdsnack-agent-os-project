@@ -131,6 +131,27 @@ class JdFetchImageOcrTest {
     }
 
     @Test
+    void jobKoreaPrivateAndLoopbackImageHostsAreNeverDownloaded() throws Exception {
+        for (String imageUrl : List.of(
+                "http://127.0.0.1/private.png",
+                "http://10.0.0.5/private.png",
+                "http://localhost/private.png"
+        )) {
+            HttpClient httpClient = mock(HttpClient.class);
+            JdImageOcr ocr = availableOcr();
+            String html = "<main id=\"jobkorea-job-description\"><img src=\"" + imageUrl + "\"></main>";
+            when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(htmlResponse(html, URI.create(JOBKOREA_URL)));
+
+            assertThrows(ApiException.class, () ->
+                    new JdFetchService(httpClient, new JdHtmlExtractor(), ocr)
+                            .fetch(new JdFetchRequest(JOBKOREA_URL)));
+            verify(httpClient, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+            verify(ocr, never()).extractText(any(), any());
+        }
+    }
+
+    @Test
     void jobKoreaImageRedirectToUntrustedHostIsRejectedBeforeOcr() throws Exception {
         HttpClient httpClient = mock(HttpClient.class);
         JdImageOcr ocr = availableOcr();
@@ -232,6 +253,8 @@ class JdFetchImageOcrTest {
     void invalidContentTypeAndOversizedImagesFallBackToOriginalError() throws Exception {
         assertRejectedImage("text/html", new byte[]{1, 2, 3});
         assertRejectedImage("image/png", new byte[8 * 1024 * 1024 + 1]);
+        assertRejectedJobKoreaImage("text/html", new byte[]{1, 2, 3});
+        assertRejectedJobKoreaImage("image/png", new byte[8 * 1024 * 1024 + 1]);
     }
 
     @Test
@@ -340,6 +363,28 @@ class JdFetchImageOcrTest {
 
         assertThrows(ApiException.class, () ->
                 new JdFetchService(httpClient, new JdHtmlExtractor(), ocr).fetch(new JdFetchRequest(JOB_URL)));
+        verify(ocr, never()).extractText(any(), any());
+    }
+
+    private void assertRejectedJobKoreaImage(String mimeType, byte[] bytes) throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdImageOcr ocr = availableOcr();
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenAnswer(invocation -> {
+                    HttpRequest request = invocation.getArgument(0);
+                    if (request.uri().getPath().endsWith(".png")) {
+                        return imageResponse(mimeType, bytes, request.uri());
+                    }
+                    return htmlResponse(
+                            fixture("jd/fixtures/jobkorea-image-only.html"),
+                            URI.create(JOBKOREA_URL)
+                    );
+                });
+
+        assertThrows(ApiException.class, () ->
+                new JdFetchService(httpClient, new JdHtmlExtractor(), ocr)
+                        .fetch(new JdFetchRequest(JOBKOREA_URL)));
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
         verify(ocr, never()).extractText(any(), any());
     }
 
