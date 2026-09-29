@@ -198,7 +198,6 @@ for approval_contract in \
     "'review'" \
     'Required checks are not passing' \
     'The review report must have a PASS result with score 4 or higher.' \
-    'The repository owner enabled Squash auto-merge after the current head commit.' \
     "'skipping'" \
     ' --auto'; do
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
@@ -218,6 +217,7 @@ for signoff_contract in \
     'request.mergeMethod' \
     'ExpectedHeadSha' \
     'enabledAt -lt $headCommittedAt' \
+    'The repository owner enabled Squash auto-merge after the current head commit.' \
     'disable and re-enable Squash auto-merge'; do
     grep -Fq -- "$signoff_contract" "$OWNER_SIGNOFF_SCRIPT" \
         || fail "저장소 소유자 확인에 다음 계약이 없습니다: $signoff_contract"
