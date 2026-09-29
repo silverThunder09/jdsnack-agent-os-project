@@ -6,7 +6,7 @@ Claude 리뷰 서비스가 인증·구독·쿼터·자격 증명 장애로 실�
 
 ## 전환 및 승인 순서
 
-1. codex-branch-review.yml이 trusted base에서 Claude review-loop를 한 번 실행합니다. Claude는 trusted base에서 만든 PR diff와 검토 기준만 restricted/plan 모드로 읽습니다. 저장소 소유자가 auto-merge를 켜면 `auto_merge_enabled` 이벤트도 같은 trusted workflow를 깨웁니다.
+1. `PR CI Router`가 성공한 뒤 `codex-branch-review.yml`이 trusted base에서 Claude review-loop를 실행합니다. CI가 실패하면 리뷰는 시작하지 않고 PR Feedback Detector가 먼저 Codex 수정 작업을 디스패치합니다. Claude는 trusted base에서 만든 PR diff와 검토 기준만 restricted/plan 모드로 읽습니다. 저장소 소유자가 auto-merge를 켜면 `auto_merge_enabled` 이벤트도 같은 trusted workflow를 깨웁니다.
 2. Claude가 정상 종료하면 그 판정을 사용합니다. 코드상 리뷰 반려와 서비스 unavailable은 구분하며, 리뷰 반려를 Codex fallback으로 바꾸지 않습니다.
 3. Claude가 인증·구독·쿼터·자격 증명·실행 파일 unavailable 오류로 실패하면 scripts/review-backend-fallback.ps1이 Codex를 호출합니다.
 4. Codex 입력은 PR diff와 검토 기준뿐입니다. Codex는 저장소 checkout 바깥의 빈 임시 작업공간에서 실행하며, 상위 경로의 AGENTS.md 존재 여부를 먼저 확인합니다. shell, app, plugin, remote plugin, multi-agent, memories, hooks, goals, browser/computer, code mode, skill 검색·설치를 끄고 web 검색을 비활성화합니다. 사용자 설정을 무시하고 저장소 경로와 GitHub 토큰·PR 환경 변수도 Codex 프로세스에 전달하지 않습니다. 리뷰 모델은 루트 backends.json의 workers.codex.review-fallback.model을 사용합니다.

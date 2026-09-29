@@ -1,1 +1,2 @@
 *.sh text eol=lf
+scripts/test-fixtures/pr-feedback-detector/gh text eol=lf

@@ -36,6 +36,8 @@ assert_contains "$ROUTER" "- 'frontend/Dockerfile'"
 assert_contains "$ROUTER" "- '.agent-os/**'"
 assert_contains "$ROUTER" "- '.github/pull_request_template.md'"
 assert_contains "$ROUTER" "- '.github/workflows/**'"
+assert_contains "$ROUTER" "- 'scripts/codex-branch-review-workflow-test.sh'"
+assert_contains "$ROUTER" "- 'scripts/review-backend-fallback.ps1'"
 assert_contains "$ROUTER" 'name: PR CI Gate'
 assert_contains "$ROUTER" 'name: Test and build backend'
 assert_contains "$ROUTER" 'name: Test and build frontend'

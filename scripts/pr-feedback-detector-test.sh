@@ -121,9 +121,13 @@ set -e
 assert_eq 10 "$exit_code" "required check override exit code"
 assert_eq ci_failed "$(printf '%s' "$output" | jq -r .event_type)" "required check override event"
 
-run_detector issue_priority
-assert_eq 10 "$exit_code" "rejection issue priority exit code"
-assert_eq review_rejection_issue "$(printf '%s' "$output" | jq -r .event_type)" "rejection issue priority event"
+run_detector ci_priority
+assert_eq 10 "$exit_code" "CI priority exit code"
+assert_eq ci_failed "$(printf '%s' "$output" | jq -r .event_type)" "CI failure must precede review issue and requested changes"
+
+run_detector issue_no_ci
+assert_eq 10 "$exit_code" "rejection issue exit code without CI failure"
+assert_eq review_rejection_issue "$(printf '%s' "$output" | jq -r .event_type)" "rejection issue event after CI passes"
 
 run_detector malformed
 assert_eq 20 "$exit_code" "malformed GitHub response exit code"

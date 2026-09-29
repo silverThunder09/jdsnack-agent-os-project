@@ -484,6 +484,10 @@ try {
 } catch {
     Stop-NeedsHuman $_.Exception.Message ''
 }
+$preReviewCheckFailure = Get-RequiredCheckFailure
+if (-not [string]::IsNullOrWhiteSpace($preReviewCheckFailure)) {
+    Stop-NeedsHuman "Required CI and PR gates must pass before review starts: $preReviewCheckFailure" ''
+}
 $reviewDiff = Get-Content -LiteralPath $reviewInputs.DiffPath -Raw
 $reviewCriteria = Get-Content -LiteralPath $reviewInputs.CriteriaPath -Raw
 
@@ -518,7 +522,7 @@ $claudeExitCode = Invoke-Tool $claudeBin @(
 ) $claudeLog 120
 $claudeOutput = Read-ToolOutput $claudeLog
 
-$availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
+$availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:failed\s+to\s+authenticate|oauth\s+session\s+expired|not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
 if ($claudeExitCode -eq 0) {
     Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
     $claudeResult = Get-StructuredReviewResult -Text $claudeOutput -ReviewerBackend 'claude' -FallbackReason 'none'
@@ -537,7 +541,7 @@ if (-not [regex]::IsMatch($claudeOutput, $availabilityPattern)) {
 $fallbackReason = switch -Regex ($claudeOutput) {
     '(?i)subscription' { 'claude-subscription'; break }
     '(?i)quota|rate\s+limit' { 'claude-quota'; break }
-    '(?i)authentication|not\s+authenticated|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired)' { 'claude-auth'; break }
+    '(?i)failed\s+to\s+authenticate|oauth\s+session\s+expired|authentication|not\s+authenticated|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired)' { 'claude-auth'; break }
     default { 'claude-unavailable' }
 }
 Add-StepSummary "Claude review backend unavailable ($fallbackReason); delegating PR #$PullRequestNumber to Codex read-only reviewer."

@@ -55,6 +55,8 @@ jobs:
               - 'frontend/README.md'
             workflow:
               - '.github/workflows/**'
+              - 'scripts/codex-branch-review-workflow-test.sh'
+              - 'scripts/review-backend-fallback.ps1'
 
   pr_contract:
     name: Validate PR contract

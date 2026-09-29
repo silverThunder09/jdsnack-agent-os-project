@@ -253,18 +253,6 @@ EOF
 )"
 feedback_summary="$(printf '%s' "$issue_body" | tr '\n' ' ' | cut -c 1-500)"
 
-if [ -n "$issue_number" ]; then
-    event_key="issue:${issue_number}:${issue_updated_at}"
-    emit_actionable \
-        "review_rejection_issue" \
-        "$event_key" \
-        "${feedback_summary:-리뷰 반려 Issue가 열려 있습니다.}" \
-        "Read Issue #${issue_number} for branch ${BRANCH}, fix the requested changes on the same branch, run the relevant tests, commit, and push. Preserve business coverage and do not weaken assertions." \
-        "[]" \
-        "$pr_ref" \
-        "$issue_ref"
-fi
-
 required_checks='[]'
 if [ -n "$pr_number" ]; then
     base_branch="$($JQ_BIN -r '.baseRefName // empty' <<EOF
@@ -307,18 +295,6 @@ $pr_payload
 EOF
 )"
 
-if [ "$pr_review_decision" = "CHANGES_REQUESTED" ]; then
-    event_key="pr:${pr_number}:${head_oid}:changes-requested"
-    emit_actionable \
-        "review_changes_requested" \
-        "$event_key" \
-        "PR #${pr_number} has requested changes." \
-        "Read the latest PR review, fix the requested changes on the same branch, run the relevant tests, commit, and push. Preserve business coverage and do not weaken assertions." \
-        "$failed_checks" \
-        "$pr_ref" \
-        "$issue_ref"
-fi
-
 if [ "$($JQ_BIN 'length' <<EOF
 $failed_checks
 EOF
@@ -329,6 +305,30 @@ EOF
         "$event_key" \
         "PR #${pr_number} has failed required checks." \
         "Read the failed CI logs, reproduce the failure locally, fix it on the same branch, run the relevant tests, commit, and push." \
+        "$failed_checks" \
+        "$pr_ref" \
+        "$issue_ref"
+fi
+
+if [ -n "$issue_number" ]; then
+    event_key="issue:${issue_number}:${issue_updated_at}"
+    emit_actionable \
+        "review_rejection_issue" \
+        "$event_key" \
+        "${feedback_summary:-리뷰 반려 Issue가 열려 있습니다.}" \
+        "Read Issue #${issue_number} for branch ${BRANCH}, fix the requested changes on the same branch, run the relevant tests, commit, and push. Preserve business coverage and do not weaken assertions." \
+        "[]" \
+        "$pr_ref" \
+        "$issue_ref"
+fi
+
+if [ "$pr_review_decision" = "CHANGES_REQUESTED" ]; then
+    event_key="pr:${pr_number}:${head_oid}:changes-requested"
+    emit_actionable \
+        "review_changes_requested" \
+        "$event_key" \
+        "PR #${pr_number} has requested changes." \
+        "Read the latest PR review, fix the requested changes on the same branch, run the relevant tests, commit, and push. Preserve business coverage and do not weaken assertions." \
         "$failed_checks" \
         "$pr_ref" \
         "$issue_ref"
