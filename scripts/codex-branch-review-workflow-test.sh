@@ -135,7 +135,7 @@ for fallback_contract in \
     "'--permission-mode', 'plan'" \
     "'--permission-prompts', 'none'" \
     'HighRisk' \
-    'Deterministic path classification' \
+    '[bool]$ReviewInputs.HighRisk' \
     'needs-human' \
     'High-risk' \
     'Get-OwnerAutoMergeSignoff' \
