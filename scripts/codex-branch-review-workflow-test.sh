@@ -141,7 +141,7 @@ for fallback_contract in \
     'Get-OwnerAutoMergeSignoff' \
     'current-head Squash auto-merge confirmation' \
     'Score concrete findings independently from risk; a High-risk label alone does not lower the score.' \
-    'Do not use NEEDS_HUMAN solely because a change is High-risk.' \
+    'Do not use NEEDS_HUMAN solely because a change is High-risk' \
     'Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.' \
     'BaseSha' \
     'HeadSha' \
