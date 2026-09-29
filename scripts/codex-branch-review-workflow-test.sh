@@ -31,8 +31,21 @@ assert_contains "      pr_number:"
 assert_contains "        required: true"
 assert_contains "        type: string"
 assert_contains "permissions:"
-assert_contains "  contents: write"
-assert_contains "  pull-requests: write"
+assert_contains "concurrency:"
+assert_contains "  group: jdsnack-review-pr-"
+assert_contains "      contents: read"
+assert_contains "      pull-requests: write"
+assert_contains "  approve:"
+assert_contains "    needs: [review]"
+assert_contains "    if: needs.review.result == 'success'"
+assert_contains "      contents: write"
+assert_contains "      pull-requests: write"
+assert_contains "      pr_number: ${{ steps.resolve.outputs.pr_number }}"
+assert_contains "      base_sha: ${{ steps.resolve.outputs.base_sha }}"
+assert_contains "      head_sha: ${{ steps.resolve.outputs.head_sha }}"
+assert_contains "uses: actions/upload-artifact@v4"
+assert_contains "uses: actions/download-artifact@v4"
+assert_contains "scripts/complete-review-approval.ps1"
 assert_contains "github.event_name == 'pull_request_target'"
 assert_contains "github.event.pull_request.head.repo.full_name == github.repository"
 assert_contains "github.event.pull_request.base.repo.full_name == github.repository"
@@ -87,8 +100,28 @@ for fallback_contract in \
     "'review-fallback'" \
     "'--config', 'model_reasoning_effort=\"medium\"'" \
     "'--sandbox', 'read-only'" \
+    "'--ignore-user-config'" \
+    "'--config', 'web_search=\"disabled\"'" \
+    "'--disable', 'shell_tool'" \
+    "'--disable', 'apps'" \
+    "'--disable', 'remote_plugin'" \
+    "'--disable', 'multi_agent'" \
+    "'--disable', 'memories'" \
+    "'--disable', 'hooks'" \
+    "'--disable', 'goals'" \
+    "'--disable', 'browser_use'" \
+    "'--disable', 'browser_use_external'" \
+    "'--disable', 'browser_use_full_cdp_access'" \
+    "'--disable', 'computer_use'" \
+    "'--disable', 'plugins'" \
+    "'--disable', 'skill_search'" \
+    "'--disable', 'skill_mcp_dependency_install'" \
+    "'--disable', 'code_mode_host'" \
+    "'--disable', 'auth_elicitation'" \
+    "'--skip-git-repo-check'" \
     '$null | & $ToolPath @ToolArguments' \
     'ConvertFrom-Json' \
+    'Set-Location -LiteralPath $WorkingDirectory' \
     'Wait-Job -Job $job -Timeout $TimeoutSeconds' \
     'timed out after' \
     'decision: PASS | COMMENT | REQUEST_CHANGES | NEEDS_HUMAN' \
@@ -110,14 +143,16 @@ for fallback_contract in \
     '$ReviewBaseSha' \
     '$ReviewHeadSha' \
     '$diffRange' \
-    '.codex-review-input-' \
-    'Do not call tools, shell, git, gh, web' \
+    'codex-review-evidence-' \
+    'jdsnack-codex-review-' \
+    '$workspaceFullPath' \
+    '$inheritedInstructions' \
+    'ClearEnvironmentVariables' \
+    'The PR diff and review criteria below are the only review evidence' \
+    'Do not ask for or use any tools, shell, git, gh, web, or repository access' \
     'Get-Content -LiteralPath $reviewInputs.DiffPath -Raw' \
-    "'--ignore-rules'" \
     "'--output-last-message'" \
-    'Remove-Item -LiteralPath $reviewInputPath' \
-    'Limit-ReportText' \
-    'Codex output truncated for GitHub review size limits' \
+    'Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory' \
     'Get-StructuredField' \
     'Get-StructuredReviewResult' \
     'Write-ReviewReport' \
@@ -126,11 +161,47 @@ for fallback_contract in \
     'ScoreLabel' \
     'RiskLabel' \
     'detailed runner output is intentionally omitted from the GitHub comment' \
-    'ghPath pr merge' \
-    ' --auto'; do
+    "'Validate PR contract'" \
+    "'PR CI Gate'" \
+    'ReviewSubmissionAttempted' \
+    'Complete-ReviewDecision'; do
     grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
 done
+if grep -Fq -- '--ignore-rules' "$FALLBACK_SCRIPT"; then
+    fail 'Codex fallback must not bypass repository rules.'
+fi
+if grep -Fq -- "(Join-Path \$ReviewWorkspace 'AGENTS.md')" "$FALLBACK_SCRIPT" || grep -Fq -- '## $contextPath' "$FALLBACK_SCRIPT"; then
+    fail 'Codex review evidence must not include inherited repository instructions or local file paths.'
+fi
+if grep -Fq -- '--approve' "$FALLBACK_SCRIPT" || grep -Fq -- 'ghPath pr merge' "$FALLBACK_SCRIPT"; then
+    fail 'The review job must defer approval and merge to the dependent approval job.'
+fi
+if [[ "$(grep -Fc -- "Submit-Review '--request-changes'" "$FALLBACK_SCRIPT")" -ne 1 ]]; then
+    fail 'REQUEST_CHANGES must have exactly one GitHub review submission site.'
+fi
+if grep -Fq -- "-replace '\s+' ' '" "$FALLBACK_SCRIPT" || grep -Fq -- 'MaximumCharacters = 2000' "$FALLBACK_SCRIPT"; then
+    fail 'Structured findings must retain all lines and content.'
+fi
+APPROVAL_SCRIPT="$ROOT_DIR/scripts/complete-review-approval.ps1"
+[[ -f "$APPROVAL_SCRIPT" ]] || fail "분리된 승인 게이트 스크립트가 없습니다: $APPROVAL_SCRIPT"
+for approval_contract in \
+    'Assert-ReviewedPullRequestIsCurrent' \
+    "'Validate PR contract'" \
+    "'PR CI Gate'" \
+    "'review'" \
+    'Required checks are not passing' \
+    'Deterministic path classification marked this PR High-risk' \
+    'commit_id = $HeadSha' \
+    "event = 'APPROVE'" \
+    '--method POST' \
+    ' --auto'; do
+    grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
+        || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
+done
+if grep -Fq -- '--admin' "$APPROVAL_SCRIPT"; then
+    fail '분리된 승인 게이트는 관리자 우회 머지를 포함하면 안 됩니다.'
+fi
 assert_not_contains '--dangerously-skip-permissions'
 for unsafe_report_contract in \
     '- decision: $($decisionMatch.Value)' \
@@ -150,20 +221,24 @@ fi
 diff -u <(sed 's/\r$//' "$CLAUDE_SKILL") <(sed 's/\r$//' "$AGENTS_SKILL") >/dev/null || fail ".claude와 .agents의 review-loop 스킬이 서로 다릅니다."
 for skill_contract in \
     'bash scripts/pr-contract-test.sh <N>' \
-    'gh pr review <N> --approve --body-file <review-report-file>' \
-    'gh pr review <N> --request-changes --body-file <review-report-file>' \
-    'gh pr review <N> --comment --body-file <review-report-file>' \
-    'gh pr merge <N> --squash --delete-branch --auto --repo <owner>/<repo>' \
-    'gh pr view <N> --json state,mergedAt,mergeCommit,autoMergeRequest,mergeStateStatus' \
+    'PASS는 review report를 artifact로 넘깁니다.' \
+    'REQUEST_CHANGES는 GitHub review로 한 번 제출합니다.' \
+    'COMMENT 또는 NEEDS_HUMAN은 정식 comment review를 남기고 자동 승인을 중단합니다.' \
+    'approval job은 report와 최신 PR이 리뷰한 base/head SHA와 일치하는지' \
+    'Validate PR contract, PR CI Gate, review check' \
+    '확인한 head SHA에만 승인한 뒤 squash auto-merge를 큐에 넣습니다.' \
+    'gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.' \
+    'needs-human으로 멈춥니다.' \
     'autoMergeRequest' \
-    '현재 실행 중인 자기 자신의 체크' \
-    'state == MERGED' \
-    'NEEDS_HUMAN' \
+    '현재 실행 중인 review check는 완료 전에 IN_PROGRESS일 수 있으므로' \
     '최대 3회' \
     'attempt == 3'; do
     grep -Fq -- "$skill_contract" "$CLAUDE_SKILL" \
         || fail "Claude review-loop 스킬에 다음 리뷰·머지 계약이 없습니다: $skill_contract"
 done
+if grep -Fq -- 'gh pr review <N> --approve' "$CLAUDE_SKILL" || grep -Fq -- 'gh pr merge <N>' "$CLAUDE_SKILL"; then
+    fail 'The review skill must defer automatic approval to its gated dependent job.'
+fi
 assert_not_contains "shell: bash"
 assert_not_contains "  push:"
 assert_not_contains "github.event_name == 'push'"

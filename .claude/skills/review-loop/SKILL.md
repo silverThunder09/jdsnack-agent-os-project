@@ -48,28 +48,22 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
    - 마지막 점수·미해결 findings를 사용자에게 에스컬레이션.
    - `pr-automation-loop.md` 기준 실패 Issue 생성 여부 판단.
 
-## 3. 통과 후: 정식 PR Review와 머지 (Claude 담당)
-리뷰 통과는 로컬 판정만 끝났다는 뜻이 아닙니다. **GitHub PR Review를 제출하고, 머지 가능한 일반 PR이면 실제로 머지된 상태까지 확인해야 합니다.** PR 본문만 수정하거나 일반 댓글만 남기고, `Ready to merge` 상태를 성공으로 보고 멈추면 안 됩니다.
+## 3. 리뷰 결과 제출과 승인 job
+리뷰 job은 구조화된 판정을 만들고, 승인 여부를 정해진 게이트에 맡깁니다. review job 자체에서는 PASS를 승인하거나 머지를 요청하지 않습니다.
 
-1. 현재 PR 번호와 저장소를 확인합니다.
-   - `gh pr view --json number,state,headRefName,mergeStateStatus`
-   - PR이 이미 `MERGED`이면 중복 실행으로 간주하고 종료합니다.
-2. 구조화된 결과를 **정식 GitHub PR Review**로 제출합니다. workflow가 확인한 runner의 GitHub CLI 계정을 사용합니다.
-   - `PASS`: `gh pr review <N> --approve --body-file <review-report-file>`
-   - `REQUEST_CHANGES`: `gh pr review <N> --request-changes --body-file <review-report-file>`
-   - `COMMENT` 또는 `NEEDS_HUMAN`: `gh pr review <N> --comment --body-file <review-report-file>`
-   - 본문에는 `review-loop`, `attempt`, 점수, 결정, findings를 포함합니다.
-3. `score < 4`, 결정론 게이트 실패, 충돌, 또는 현재 리뷰 job 이외의 필수 체크 미통과이면 정식 `REQUEST_CHANGES` 또는 `COMMENT` Review만 남기고 머지하지 않습니다.
-   - 이 스킬은 보호 규칙의 필수 체크인 `Codex Branch Review / review` job 안에서 실행될 수 있습니다. 현재 실행 중인 자기 자신의 체크는 명령이 끝나기 전까지 `IN_PROGRESS`인 것이 정상이며, 이를 외부 blocker로 판정하거나 완료될 때까지 무한 대기하지 않습니다.
-4. High-risk 변경은 `scripts/pr-contract-test.sh <N>`와 `scripts/pr-review-gate.sh <N>`, `merge-rules.md` 조건을 적용하고, 사람 승인이 필요한 경우 `NEEDS_HUMAN`을 본문에 적은 `COMMENT` Review로 멈춥니다.
-5. High-risk가 아니고 모든 필수 체크가 통과한 일반 Codex PR이면 다음으로 squash merge합니다.
-   - 현재 review job이 required check인 경우에도 실제 머지가 job 종료 뒤 진행되도록 auto-merge를 큐에 넣습니다.
-   - `gh pr merge <N> --squash --delete-branch --auto --repo <owner>/<repo>`
-6. 명령 성공 메시지만 믿지 말고 최종 상태를 확인합니다.
-   - `gh pr view <N> --json state,mergedAt,mergeCommit,autoMergeRequest,mergeStateStatus`
-   - `state == MERGED`이고 `mergedAt`이 있을 때만 머지 완료로 보고합니다.
-   - 명령 직후 `state == OPEN`이어도 `autoMergeRequest`가 존재하고 현재 review job만 대기 중이면 auto-merge가 큐에 등록된 정상 중간 상태입니다. 이 경우 성공적으로 종료하여 현재 체크를 통과시킵니다.
-   - 실패하거나 `OPEN`인데 auto-merge가 큐에 없으면 재시도 폭주 없이 실패 원인과 `NEEDS_HUMAN` 상태를 정식 `COMMENT` Review로 남깁니다.
+1. 현재 PR 번호와 저장소를 확인하고, 이미 MERGED 상태이면 종료합니다.
+2. 결과에 따라 review action을 한 번만 제출합니다.
+   - PASS는 review report를 artifact로 넘깁니다. 실제 승인은 별도 approval job이 PR 계약, review gate, 모든 필수 check와 현재 base/head SHA를 재확인한 뒤 수행합니다.
+   - REQUEST_CHANGES는 GitHub review로 한 번 제출합니다. 제출을 시도한 뒤 추가 comment review를 만들지 않습니다.
+   - COMMENT 또는 NEEDS_HUMAN은 정식 comment review를 남기고 자동 승인을 중단합니다.
+   - 본문에는 review-loop, attempt, 점수, 결정, findings를 포함합니다.
+3. score가 4 미만이거나 결정론 게이트가 실패하면 review job을 통과시키지 않습니다. 현재 실행 중인 review check는 완료 전에 IN_PROGRESS일 수 있으므로, 그 check가 완료되길 기다리는 무한 대기를 하지 않습니다.
+4. High-risk 변경은 scripts/pr-contract-test.sh, scripts/pr-review-gate.sh, merge-rules.md 조건을 적용하고 사람 확인이 필요하도록 중단합니다. 자동 approval job을 실행하지 않습니다.
+5. approval job은 report와 최신 PR이 리뷰한 base/head SHA와 일치하는지, Validate PR contract, PR CI Gate, review check 및 모든 branch-required check가 통과했는지 확인합니다. 확인한 head SHA에만 승인한 뒤 squash auto-merge를 큐에 넣습니다.
+6. auto-merge 명령 성공만으로 머지 완료로 보고하지 않습니다.
+   - gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.
+   - state가 OPEN이면 autoMergeRequest가 존재하는 경우에만 큐에 등록된 상태로 기록합니다.
+   - 실패하거나 OPEN인데 autoMergeRequest가 없으면 needs-human으로 멈춥니다.
 
 ## 경계 규칙 (반드시 준수)
 - **Claude는 소스 코드를 수정/커밋하지 않는다.** 수정의 주체는 항상 Codex.

@@ -11,8 +11,12 @@ on:
         type: string
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: jdsnack-review-pr-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   review:
@@ -27,9 +31,13 @@ jobs:
       )
     runs-on: [self-hosted, jdsnack]
     timeout-minutes: 30
-    concurrency:
-      group: jdsnack-review-loop
-      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      pr_number: ${{ steps.resolve.outputs.pr_number }}
+      base_sha: ${{ steps.resolve.outputs.base_sha }}
+      head_sha: ${{ steps.resolve.outputs.head_sha }}
     steps:
       - name: Check out trusted review base
         uses: actions/checkout@v4
@@ -38,6 +46,7 @@ jobs:
           fetch-depth: 0
 
       - name: Resolve and fetch review target
+        id: resolve
         shell: powershell
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -85,6 +94,16 @@ jobs:
             "REVIEW_BASE_SHA=$baseSha"
             "REVIEW_HEAD_SHA=$headSha"
           ) | Add-Content -LiteralPath $env:GITHUB_ENV
+          $outputLines = @(
+            "pr_number=$pullRequestNumber"
+            "base_sha=$baseSha"
+            "head_sha=$headSha"
+          )
+          [System.IO.File]::AppendAllText(
+            $env:GITHUB_OUTPUT,
+            ($outputLines -join [Environment]::NewLine) + [Environment]::NewLine,
+            [System.Text.UTF8Encoding]::new($false)
+          )
 
       - name: Verify Claude review skill
         shell: powershell
@@ -123,3 +142,61 @@ jobs:
             -Workspace $env:GITHUB_WORKSPACE `
             -BaseSha $env:REVIEW_BASE_SHA `
             -HeadSha $env:REVIEW_HEAD_SHA
+
+      - name: Upload successful review report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-${{ github.run_id }}
+          path: ${{ runner.temp }}/jdsnack-review-backend-fallback/review-${{ steps.resolve.outputs.pr_number }}.md
+          if-no-files-found: error
+
+  approve:
+    needs: [review]
+    if: needs.review.result == 'success'
+    runs-on: [self-hosted, jdsnack]
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out trusted approval base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Download successful review report
+        uses: actions/download-artifact@v4
+        with:
+          name: review-${{ github.run_id }}
+          path: ${{ runner.temp }}/review-artifact
+
+      - name: Verify GitHub review identity
+        shell: powershell
+        run: |
+          $expectedLogin = '${{ github.repository_owner }}'
+          $actualLogin = (& gh api user --jq '.login').Trim()
+          if ($actualLogin -ne $expectedLogin) {
+            throw "Review runner identity mismatch: expected $expectedLogin, got $actualLogin"
+          }
+
+      - name: Recheck PR contract and review gates before approval
+        shell: powershell
+        env:
+          PR_NUMBER: ${{ needs.review.outputs.pr_number }}
+          REVIEW_BASE_SHA: ${{ needs.review.outputs.base_sha }}
+          REVIEW_HEAD_SHA: ${{ needs.review.outputs.head_sha }}
+        run: |
+          $approval = Join-Path $env:GITHUB_WORKSPACE 'scripts/complete-review-approval.ps1'
+          if (-not (Test-Path -LiteralPath $approval -PathType Leaf)) {
+            throw "Review approval gate not found in trusted base: $approval"
+          }
+          $report = Join-Path $env:RUNNER_TEMP "review-artifact/review-$($env:PR_NUMBER).md"
+          & $approval `
+            -PullRequestNumber ([int]$env:PR_NUMBER) `
+            -Repository '${{ github.repository }}' `
+            -BaseSha $env:REVIEW_BASE_SHA `
+            -HeadSha $env:REVIEW_HEAD_SHA `
+            -Workspace $env:GITHUB_WORKSPACE `
+            -ReportPath $report
