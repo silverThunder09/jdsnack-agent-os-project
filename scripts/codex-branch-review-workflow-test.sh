@@ -40,9 +40,9 @@ assert_contains "    needs: [review]"
 assert_contains "    if: needs.review.result == 'success'"
 assert_contains "      contents: write"
 assert_contains "      pull-requests: write"
-assert_contains "      pr_number: ${{ steps.resolve.outputs.pr_number }}"
-assert_contains "      base_sha: ${{ steps.resolve.outputs.base_sha }}"
-assert_contains "      head_sha: ${{ steps.resolve.outputs.head_sha }}"
+assert_contains '      pr_number: ${{ steps.resolve.outputs.pr_number }}'
+assert_contains '      base_sha: ${{ steps.resolve.outputs.base_sha }}'
+assert_contains '      head_sha: ${{ steps.resolve.outputs.head_sha }}'
 assert_contains "uses: actions/upload-artifact@v4"
 assert_contains "uses: actions/download-artifact@v4"
 assert_contains "scripts/complete-review-approval.ps1"
