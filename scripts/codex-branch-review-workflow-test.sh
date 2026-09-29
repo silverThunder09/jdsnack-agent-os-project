@@ -96,6 +96,8 @@ for fallback_contract in \
     "'exec'" \
     "'--ephemeral'" \
     'Get-ConfiguredCodexReviewModel' \
+    'failed\s+to\s+authenticate' \
+    'oauth\s+session\s+expired' \
     "'backends.json'" \
     "'review-fallback'" \
     "'--config', 'model_reasoning_effort=\"medium\"'" \
