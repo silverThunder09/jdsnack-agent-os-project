@@ -106,15 +106,20 @@ if (-not (Test-Path -LiteralPath $ReportPath -PathType Leaf)) {
 if ([string]::IsNullOrWhiteSpace($Workspace) -or -not (Test-Path -LiteralPath $Workspace -PathType Container)) {
     Stop-NeedsHuman 'The trusted approval workspace is unavailable.'
 }
+$ownerSignoffPath = Join-Path $Workspace 'scripts/review-owner-signoff.ps1'
+if (-not (Test-Path -LiteralPath $ownerSignoffPath -PathType Leaf)) {
+    Stop-NeedsHuman 'The trusted owner signoff verifier is unavailable.'
+}
+. $ownerSignoffPath
 
 $report = Get-Content -LiteralPath $ReportPath -Raw
 $decisionMatch = [regex]::Match($report, '(?im)^-\s*decision:\s*(PASS)\s*$')
 $scoreMatch = [regex]::Match($report, '(?im)^-\s*score:\s*([4-5])\s*/\s*5\s*$')
-$riskMatch = [regex]::Match($report, '(?im)^-\s*risk:\s*(Light|Standard)\s*$')
+$riskMatch = [regex]::Match($report, '(?im)^-\s*risk:\s*(Light|Standard|High-risk)\s*$')
 $baseMatch = [regex]::Match($report, '(?im)^-\s*reviewed base SHA:\s*([0-9a-f]{40})\s*$')
 $headMatch = [regex]::Match($report, '(?im)^-\s*reviewed head SHA:\s*([0-9a-f]{40})\s*$')
 if (-not $decisionMatch.Success -or -not $scoreMatch.Success -or -not $riskMatch.Success) {
-    Stop-NeedsHuman 'The review report is not an approvable PASS result with score 4 or higher and non-high risk.'
+    Stop-NeedsHuman 'The review report must have a PASS result with score 4 or higher.'
 }
 if (
     -not $baseMatch.Success -or
@@ -143,15 +148,23 @@ if ([int]$LASTEXITCODE -ne 0) {
 }
 $highRiskPathPattern = '^(?:\.github/|\.agent-os/operations/|scripts/|(?:.*/)?AGENTS\.md$|(?:.*/)?backends\.json$|(?:.*/)?Dockerfile(?:\.[^/]*)?$|(?:.*/)?(?:docker-compose|compose)[^/]*\.ya?ml$|(?:.*/)?docker/)'
 $highRiskPaths = @($changedPaths | Where-Object { $_ -match $highRiskPathPattern })
-if ($highRiskPaths.Count -gt 0) {
-    Stop-NeedsHuman "Deterministic path classification marked this PR High-risk: $($highRiskPaths -join ', ')"
+$requiresOwnerSignoff = ($riskMatch.Groups[1].Value -eq 'High-risk') -or ($highRiskPaths.Count -gt 0)
+if ($requiresOwnerSignoff) {
+    $signoff = Get-OwnerAutoMergeSignoff `
+        -GhPath $script:ghPath `
+        -Repository $Repository `
+        -PullRequestNumber $PullRequestNumber `
+        -ExpectedHeadSha $HeadSha
+    if (-not $signoff.IsValid) {
+        Stop-NeedsHuman "High-risk change lacks current-head Squash auto-merge confirmation: $($signoff.Reason)"
+    }
 }
 
 $requiredChecks = Get-Checks -Required
 if ($requiredChecks.Count -eq 0) {
     Stop-NeedsHuman 'No required PR checks were returned.'
 }
-$blockingChecks = @($requiredChecks | Where-Object { $_.bucket -ne 'pass' })
+$blockingChecks = @($requiredChecks | Where-Object { $_.bucket -notin @('pass', 'skipping') })
 if ($blockingChecks.Count -gt 0) {
     $blockingSummary = ($blockingChecks | ForEach-Object { '{0}={1}' -f $_.name, $_.bucket }) -join ', '
     Stop-NeedsHuman "Required checks are not passing: $blockingSummary"
@@ -169,41 +182,8 @@ if ($reviewChecks.Count -ne 1 -or $reviewChecks[0].bucket -ne 'pass') {
     Stop-NeedsHuman 'The review job gate is missing, ambiguous, or not passing.'
 }
 
-# Recheck the target immediately before creating an approval for this exact commit.
+# Recheck the target immediately before queueing Squash auto-merge for this exact commit.
 Assert-ReviewedPullRequestIsCurrent
-$approvalPayloadPath = Join-Path ([System.IO.Path]::GetDirectoryName($ReportPath)) 'approval-payload.json'
-$approvalPayload = @{
-    event = 'APPROVE'
-    commit_id = $HeadSha
-    body = $report
-} | ConvertTo-Json -Depth 4
-[System.IO.File]::WriteAllText(
-    $approvalPayloadPath,
-    $approvalPayload,
-    [System.Text.UTF8Encoding]::new($false)
-)
-
-try {
-    $approvalResult = & $script:ghPath api "repos/$Repository/pulls/$PullRequestNumber/reviews" --method POST --input $approvalPayloadPath 2>&1 | Out-String
-    if ([int]$LASTEXITCODE -ne 0) {
-        Stop-NeedsHuman "GitHub approval submission failed: $approvalResult"
-    }
-    try {
-        $approval = $approvalResult | ConvertFrom-Json
-    } catch {
-        Stop-NeedsHuman 'GitHub approval response was not valid JSON.'
-    }
-    if ($approval.state -ne 'APPROVED' -or $approval.commit_id -ne $HeadSha) {
-        Stop-NeedsHuman 'GitHub did not confirm approval for the reviewed head commit.'
-    }
-} finally {
-    Remove-Item -LiteralPath $approvalPayloadPath -Force -ErrorAction SilentlyContinue
-}
-
-& $script:ghPath pr merge $PullRequestNumber --repo $Repository --squash --delete-branch --auto
-if ([int]$LASTEXITCODE -ne 0) {
-    Stop-NeedsHuman 'Approval succeeded, but auto-merge could not be queued.'
-}
 $mergeStateJson = & $script:ghPath pr view $PullRequestNumber --repo $Repository --json state,autoMergeRequest,mergeStateStatus
 if ([int]$LASTEXITCODE -ne 0) {
     Stop-NeedsHuman 'Could not verify auto-merge state after approval.'
@@ -214,10 +194,25 @@ try {
     Stop-NeedsHuman 'Auto-merge verification returned invalid JSON.'
 }
 if ($mergeState.state -ne 'MERGED' -and $null -eq $mergeState.autoMergeRequest) {
-    Stop-NeedsHuman 'Auto-merge command returned but no auto-merge request was recorded.'
+    & $script:ghPath pr merge $PullRequestNumber --repo $Repository --squash --delete-branch --auto
+    if ([int]$LASTEXITCODE -ne 0) {
+        Stop-NeedsHuman 'Review gates passed, but Squash auto-merge could not be queued.'
+    }
+    $mergeStateJson = & $script:ghPath pr view $PullRequestNumber --repo $Repository --json state,autoMergeRequest,mergeStateStatus
+    if ([int]$LASTEXITCODE -ne 0) {
+        Stop-NeedsHuman 'Could not verify Squash auto-merge state after queueing.'
+    }
+    try {
+        $mergeState = $mergeStateJson | ConvertFrom-Json
+    } catch {
+        Stop-NeedsHuman 'Squash auto-merge verification returned invalid JSON.'
+    }
+}
+if ($mergeState.state -ne 'MERGED' -and $mergeState.autoMergeRequest.mergeMethod -ne 'SQUASH') {
+    Stop-NeedsHuman 'The existing auto-merge request is not configured for Squash.'
 }
 
-$message = "Review gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; approval was submitted for $HeadSha and auto-merge was queued."
+$message = "Review gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; Squash auto-merge is queued for $HeadSha."
 Write-Output $message
 if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
     Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $message

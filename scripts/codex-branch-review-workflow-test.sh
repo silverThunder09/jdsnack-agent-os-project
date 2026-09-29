@@ -25,7 +25,7 @@ assert_not_contains() {
 }
 
 assert_contains "  pull_request_target:"
-assert_contains "    types: [opened, synchronize, reopened]"
+assert_contains "    types: [opened, synchronize, reopened, auto_merge_enabled]"
 assert_contains "  workflow_dispatch:"
 assert_contains "      pr_number:"
 assert_contains "        required: true"
@@ -35,7 +35,7 @@ assert_contains "concurrency:"
 assert_contains "  group: jdsnack-review-pr-"
 assert_contains "      contents: read"
 assert_contains "      pull-requests: write"
-assert_contains "  approve:"
+assert_contains "  queue_squash:"
 assert_contains "    needs: [review]"
 assert_contains "    if: needs.review.result == 'success'"
 assert_contains "      contents: write"
@@ -138,6 +138,11 @@ for fallback_contract in \
     'Deterministic path classification' \
     'needs-human' \
     'High-risk' \
+    'Get-OwnerAutoMergeSignoff' \
+    'current-head Squash auto-merge confirmation' \
+    'Score concrete findings independently from risk; a High-risk label alone does not lower the score.' \
+    'Do not use NEEDS_HUMAN solely because a change is High-risk.' \
+    'Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.' \
     'BaseSha' \
     'HeadSha' \
     '$ReviewBaseSha' \
@@ -187,14 +192,14 @@ APPROVAL_SCRIPT="$ROOT_DIR/scripts/complete-review-approval.ps1"
 [[ -f "$APPROVAL_SCRIPT" ]] || fail "분리된 승인 게이트 스크립트가 없습니다: $APPROVAL_SCRIPT"
 for approval_contract in \
     'Assert-ReviewedPullRequestIsCurrent' \
+    'Get-OwnerAutoMergeSignoff' \
     "'Validate PR contract'" \
     "'PR CI Gate'" \
     "'review'" \
     'Required checks are not passing' \
-    'Deterministic path classification marked this PR High-risk' \
-    'commit_id = $HeadSha' \
-    "event = 'APPROVE'" \
-    '--method POST' \
+    'The review report must have a PASS result with score 4 or higher.' \
+    'The repository owner enabled Squash auto-merge after the current head commit.' \
+    "'skipping'" \
     ' --auto'; do
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
@@ -202,6 +207,21 @@ done
 if grep -Fq -- '--admin' "$APPROVAL_SCRIPT"; then
     fail '분리된 승인 게이트는 관리자 우회 머지를 포함하면 안 됩니다.'
 fi
+if grep -Fq -- 'pulls/$PullRequestNumber/reviews' "$APPROVAL_SCRIPT" || grep -Fq -- "event = 'APPROVE'" "$APPROVAL_SCRIPT"; then
+    fail '저장소 소유자가 자기 PR에 별도 GitHub APPROVE 리뷰를 제출하도록 요구하지 않습니다.'
+fi
+OWNER_SIGNOFF_SCRIPT="$ROOT_DIR/scripts/review-owner-signoff.ps1"
+[[ -f "$OWNER_SIGNOFF_SCRIPT" ]] || fail "저장소 소유자 확인 스크립트가 없습니다: $OWNER_SIGNOFF_SCRIPT"
+for signoff_contract in \
+    "--json state,headRefOid,autoMergeRequest" \
+    'request.enabledBy.login' \
+    'request.mergeMethod' \
+    'ExpectedHeadSha' \
+    'enabledAt -lt $headCommittedAt' \
+    'disable and re-enable Squash auto-merge'; do
+    grep -Fq -- "$signoff_contract" "$OWNER_SIGNOFF_SCRIPT" \
+        || fail "저장소 소유자 확인에 다음 계약이 없습니다: $signoff_contract"
+done
 assert_not_contains '--dangerously-skip-permissions'
 for unsafe_report_contract in \
     '- decision: $($decisionMatch.Value)' \
@@ -221,12 +241,14 @@ fi
 diff -u <(sed 's/\r$//' "$CLAUDE_SKILL") <(sed 's/\r$//' "$AGENTS_SKILL") >/dev/null || fail ".claude와 .agents의 review-loop 스킬이 서로 다릅니다."
 for skill_contract in \
     'bash scripts/pr-contract-test.sh <N>' \
-    'PASS는 review report를 artifact로 넘깁니다.' \
+    'PASS와 score 4 이상이면 review report를 artifact로 넘깁니다.' \
     'REQUEST_CHANGES는 GitHub review로 한 번 제출합니다.' \
-    'COMMENT 또는 NEEDS_HUMAN은 정식 comment review를 남기고 자동 승인을 중단합니다.' \
+    'COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 승인을 중단합니다.' \
+    'High-risk도 같은 리뷰 점수를 요구하며 소유자가 최신 head 이후 Squash auto-merge를 켜야 사람 확인을 통과합니다.' \
+    'COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 승인을 중단합니다.' \
     'approval job은 report와 최신 PR이 리뷰한 base/head SHA와 일치하는지' \
     'Validate PR contract, PR CI Gate, review check' \
-    '확인한 head SHA에만 승인한 뒤 squash auto-merge를 큐에 넣습니다.' \
+    '별도 GitHub APPROVE 리뷰 없이 확인한 head의 squash auto-merge를 큐에 넣습니다.' \
     'gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.' \
     'needs-human으로 멈춥니다.' \
     'autoMergeRequest' \

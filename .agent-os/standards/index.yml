@@ -78,6 +78,7 @@ documents:
     - scripts/notify-needs-human-test.sh
     - scripts/backends-contract-test.sh
     - scripts/review-backend-fallback.ps1
+    - scripts/review-owner-signoff.ps1
     - scripts/pr-contract-test.sh
     - scripts/pr-contract-test-test.sh
     - scripts/create-codex-worktree.sh

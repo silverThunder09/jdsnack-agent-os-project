@@ -45,6 +45,11 @@ New-Item -ItemType Directory -Path $fallbackRoot -Force | Out-Null
 $claudeLog = Join-Path $fallbackRoot "claude-$PullRequestNumber.log"
 $codexLog = Join-Path $fallbackRoot "codex-$PullRequestNumber.log"
 $reviewReport = Join-Path $fallbackRoot "review-$PullRequestNumber.md"
+$ownerSignoffPath = Join-Path $Workspace 'scripts/review-owner-signoff.ps1'
+if (-not (Test-Path -LiteralPath $ownerSignoffPath -PathType Leaf)) {
+    throw "Owner signoff verifier not found in the trusted review base: $ownerSignoffPath"
+}
+. $ownerSignoffPath
 
 function Resolve-ToolPath {
     param([string]$Name)
@@ -213,7 +218,7 @@ function Get-RequiredCheckFailure {
     $currentJob = $env:GITHUB_JOB
     $blocking = @($checks | Where-Object {
         $self = ($_.name -eq $currentJob) -or (($currentJob -eq 'review') -and ($_.name -eq 'Codex Branch Review / review'))
-        (-not $self) -and $_.bucket -ne 'pass'
+        (-not $self) -and $_.bucket -notin @('pass', 'skipping')
     })
     if ($blocking.Count -gt 0) { return "Required PR checks are not passing: $(($blocking | ForEach-Object { '{0}={1}' -f $_.name, $_.bucket }) -join ', ')" }
 
@@ -428,17 +433,37 @@ function Complete-ReviewDecision {
         Stop-NeedsHuman "$($Result.ReviewerBackend) requested changes; the implementation backend must address the findings." $ReportPath -ReviewSubmissionAttempted
     }
 
-    if ($decision -ne 'PASS' -or $score -lt 4) {
-        Stop-NeedsHuman "$($Result.ReviewerBackend) decision=$decision score=$score/5." $ReportPath
+    if ($decision -eq 'COMMENT') {
+        Stop-NeedsHuman "$($Result.ReviewerBackend) returned COMMENT; the review gate is not satisfied." $ReportPath
+    }
+    if ($score -lt 4) {
+        Stop-NeedsHuman "$($Result.ReviewerBackend) score=$score/5 is below the required 4/5." $ReportPath
     }
 
-    if ($risk -eq 'High-risk') {
-        Stop-NeedsHuman 'High-risk PR requires human review after the automated review.' $ReportPath
+    $modelHighRisk = $risk -eq 'High-risk'
+    $deterministicHighRisk = [bool]$ReviewInputs.HighRisk
+    $requiresOwnerSignoff = $modelHighRisk -or $deterministicHighRisk
+    if ($decision -eq 'NEEDS_HUMAN') {
+        Stop-NeedsHuman "$($Result.ReviewerBackend) returned NEEDS_HUMAN; unresolved review results cannot pass through owner confirmation." $ReportPath
+    }
+    if ($decision -ne 'PASS') {
+        Stop-NeedsHuman "$($Result.ReviewerBackend) returned unsupported decision=$decision." $ReportPath
     }
 
-    if ($ReviewInputs.HighRisk) {
-        Add-Content -LiteralPath $ReportPath -Value "`r`nDeterministic risk classification: High-risk"
-        Stop-NeedsHuman 'Deterministic path classification marked this PR High-risk.' $ReportPath
+    if ($requiresOwnerSignoff) {
+        $ghPath = Resolve-ToolPath 'gh'
+        if ([string]::IsNullOrWhiteSpace($ghPath)) {
+            Stop-NeedsHuman 'GitHub CLI is unavailable while verifying the owner confirmation.' $ReportPath
+        }
+        $signoff = Get-OwnerAutoMergeSignoff `
+            -GhPath $ghPath `
+            -Repository $Repository `
+            -PullRequestNumber $PullRequestNumber `
+            -ExpectedHeadSha $HeadSha
+        if (-not $signoff.IsValid) {
+            Stop-NeedsHuman "High-risk change requires the repository owner's current-head Squash auto-merge confirmation: $($signoff.Reason)" $ReportPath
+        }
+        Add-Content -LiteralPath $ReportPath -Value "`r`nHuman confirmation: $($signoff.Reason)"
     }
 
     $requiredCheckFailure = Get-RequiredCheckFailure
@@ -447,7 +472,7 @@ function Complete-ReviewDecision {
         Stop-NeedsHuman $requiredCheckFailure $ReportPath
     }
 
-    Add-StepSummary "$($Result.ReviewerBackend) review passed at $score/5; contract and CI gates passed. Approval is deferred to the dependent approval job."
+    Add-StepSummary "$($Result.ReviewerBackend) review passed at $score/5; contract and CI gates passed. High-risk changes require the repository owner's current-head Squash auto-merge confirmation."
 }
 
 try {
@@ -474,7 +499,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
-Use PASS only when the change is safe and complete at score 4 or higher. Use NEEDS_HUMAN for ambiguous output, missing required evidence, high-risk automatic merge, or a service/permission boundary.
+Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
 --- BEGIN PR DIFF ---
 $reviewDiff
 --- END PR DIFF ---
@@ -561,7 +586,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
-Use PASS only when the change is safe and complete at score 4 or higher. Use NEEDS_HUMAN for ambiguous output, missing required evidence, high-risk automatic merge, or a service/permission boundary.
+Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
 --- BEGIN PR DIFF ---
 $reviewDiff
 --- END PR DIFF ---

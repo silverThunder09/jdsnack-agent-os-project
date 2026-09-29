@@ -2,7 +2,7 @@ name: Codex Branch Review
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, auto_merge_enabled]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -151,7 +151,7 @@ jobs:
           path: ${{ runner.temp }}/jdsnack-review-backend-fallback/review-${{ steps.resolve.outputs.pr_number }}.md
           if-no-files-found: error
 
-  approve:
+  queue_squash:
     needs: [review]
     if: needs.review.result == 'success'
     runs-on: [self-hosted, jdsnack]
@@ -181,7 +181,7 @@ jobs:
             throw "Review runner identity mismatch: expected $expectedLogin, got $actualLogin"
           }
 
-      - name: Recheck PR contract and review gates before approval
+      - name: Recheck PR contract and review gates before Squash auto-merge
         shell: powershell
         env:
           PR_NUMBER: ${{ needs.review.outputs.pr_number }}

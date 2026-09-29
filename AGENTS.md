@@ -10,9 +10,9 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 
 - 클로드: 문서 계획(spec), 게이트 검증, 독립 리뷰(`code-reviewer` 서브에이전트에 diff만 넘겨 채점), PR 작성/관리, merge 판단/실행. `backend`/`frontend` 소스는 직접 수정하지 않습니다. Claude 리뷰 서비스 장애 시에는 Codex fallback을 호출하고, fallback이 `needs-human`이면 자동 머지를 중단합니다.
 - 코덱스: 활성 spec 기준 기능 **구현 + 기능 테스트 작성**을 담당합니다. 기본 리뷰·판정은 담당하지 않으며, Claude review backend unavailable 시에만 명시된 Codex review fallback 예외를 적용합니다.
-- Claude review fallback: Codex에는 PR diff와 검토 기준만 주고 격리된 빈 작업공간에서 도구를 비활성화합니다. 별도 승인 job은 PR 계약·리뷰 게이트·필수 check·리뷰 SHA를 다시 확인한 뒤 실행하며, High-risk는 사람 확인으로 멈춥니다. 세부 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
+- Claude review fallback: Codex에는 PR diff와 검토 기준만 주고 격리된 빈 작업공간에서 도구를 비활성화합니다. 별도 승인 job은 PR 계약·리뷰 게이트·필수 check·리뷰 SHA를 다시 확인합니다. High-risk는 저장소 소유자가 최신 head 이후 Squash auto-merge를 직접 켜 사람 확인을 남겨야 합니다. 별도 GitHub 승인 리뷰는 요구하지 않습니다. 세부 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
 - 폴백: 코덱스가 토큰이 없어 막힐 때만, 사용자가 "네가 구현해"라고 지시하면 클로드가 직접 구현·테스트합니다. 전환·복귀·가드레일은 `.agent-os/operations/worker-backends.md`의 폴백 규칙을 따릅니다.
-- **무인 배치**: Codex 구현 PR은 이벤트 기반 리뷰-머지 루프가 리뷰·CI를 확인합니다. 마지막 Feature가 머지되면 `spec-queue.json`의 eligible 후보를 자동으로 Spec으로 승격하고 T1을 다시 Codex에 디스패치합니다. 사람이 필요한 제품 판단·High-risk·충돌은 `needs-human`으로 멈춥니다.
+- **무인 배치**: Codex 구현 PR은 이벤트 기반 리뷰-머지 루프가 리뷰·CI를 확인합니다. 마지막 Feature가 머지되면 `spec-queue.json`의 eligible 후보를 자동으로 Spec으로 승격하고 T1을 다시 Codex에 디스패치합니다. High-risk는 저장소 소유자가 최신 head의 Squash auto-merge를 명시한 뒤 필수 게이트를 통과해야 진행합니다. 제품 판단·충돌은 `needs-human`으로 멈춥니다.
 
 ### Codex 모델 정책
 
