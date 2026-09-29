@@ -41,8 +41,11 @@ flowchart LR
   SpecPR --> AutoLoop
   Queue --> Codex["Codex T1..Tn worker"]
   Codex --> Branch["codex/* push"]
-  Branch --> Review["CI + review/merge loop"]
-  Review --> MainPush
+  Branch --> PrContract["PR CI router\nValidate PR contract + PR CI Gate"]
+  PrContract --> Review["review job\nClaude / isolated Codex fallback\nPASS ≥ 4, non-High-risk"]
+  Review -->|PASS and gates pass| Approval["dependent approval job\nrecheck PR SHA + required checks"]
+  Approval -->|approve reviewed head + auto-merge| MainPush
+  Review -->|High-risk or failed gate| Human
   AutoLoop --> Human["needs-human alert"]
 ```
 

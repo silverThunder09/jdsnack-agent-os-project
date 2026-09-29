@@ -9,9 +9,11 @@
 - 머지 판단, 머지 실행, 머지 후 운영 기록은 클로드가 담당합니다.
 - 코덱스는 머지를 직접 수행하지 않습니다.
 - 코덱스는 머지 전 리뷰 결과에 따른 코드 수정, 테스트, 사용자가 지시한 자동 배포 작업만 수행합니다.
-- **무인 배치**: `codex/*` 구현 PR은 무인 리뷰-머지 루프(`jdsnack-review-merge-loop`)가 `code-reviewer` 5점 채점에서 **4점 이상이면 자동 머지**한다(4점 미만이면 구조화된 변경요청을 코덱스로). 자율 루프가 `spec-queue.json`에서 선택한 `automation/spec-*` promotion PR은 Docs Harness·traceability·diff 범위 검증을 통과하면 자동 머지한다. **단, `High-risk` 변경(보안/외부 API/배포/DB/인증/CI)은 점수와 무관하게 자동 머지하지 않고 `needs-human`으로 사람에게 에스컬레이션한다.** 구현 워커가 폴백으로 Claude인 PR(본문에 `backend: claude-fallback` 표기)도 구현·리뷰 벤더가 같으므로 점수와 무관하게 자동 머지하지 않고 사용자 머지로 강등한다([worker-backends.md](worker-backends.md)의 폴백 규칙).
+- **무인 배치**: `codex/*` 구현 PR은 무인 리뷰-머지 루프(`jdsnack-review-merge-loop`)가 `code-reviewer` 5점 채점에서 **4점 이상이면 자동 머지**한다(4점 미만이면 구조화된 변경요청을 코덱스로). 자율 루프가 `spec-queue.json`에서 선택한 `automation/spec-*` promotion PR은 Docs Harness·traceability·diff 범위 검증을 통과하면 자동 머지한다. **단, `High-risk` 변경(보안/외부 API/배포/DB/인증/CI)은 4점 이상 리뷰와 저장소 소유자의 최신 head Squash auto-merge 확인을 모두 요구한다.** 이 확인이 사람 승인 역할을 하며 별도 GitHub 승인 리뷰를 요구하지 않는다. 구현 워커가 폴백으로 Claude인 PR(본문에 `backend: claude-fallback` 표기)도 구현·리뷰 벤더가 같으므로 점수와 무관하게 자동 머지하지 않고 사용자 머지로 강등한다([worker-backends.md](worker-backends.md)의 폴백 규칙).
 
 ## 기본 전략
+
+Claude review backend가 unavailable하여 Codex read-only reviewer로 전환된 경우에도 동일한 5점 루브릭과 결정론 게이트를 적용합니다. `High-risk` 변경은 4점 이상이어도 소유자의 최신 head Squash auto-merge 확인 전까지 `needs-human`으로 멈춥니다. 확인 시각은 head 커밋 이후여야 하며, 새 head에는 다시 확인이 필요합니다. 구현 backend와 reviewer backend가 같은 PR은 fallback 점수만으로 자동 머지하지 않고 `needs-human`으로 멈춥니다.
 
 - 기본 브랜치는 `main`입니다.
 - MVP 초기에는 작은 PR 단위로 `main`에 머지합니다.

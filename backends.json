@@ -11,6 +11,11 @@
         "provider": "openai",
         "model": "gpt-5.6-luna-medium",
         "reason": "테스트 케이스 작성과 실패 원인 분석에 필요한 충분한 추론 여유를 제공합니다."
+      },
+      "review-fallback": {
+        "provider": "openai",
+        "model": "gpt-5.6-luna",
+        "reason": "Claude review backend 장애 시 동일 루브릭의 읽기 전용 PR 리뷰를 대행합니다."
       }
     },
     "claude": {

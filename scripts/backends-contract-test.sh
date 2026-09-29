@@ -8,9 +8,10 @@ jq -e '
   .version == 1
   and (.workers | type == "object")
   and ([
-    .workers.codex.implementation,
-    .workers.codex["test-authoring-and-analysis"],
-    .workers.claude["documentation-planning"],
+   .workers.codex.implementation,
+   .workers.codex["test-authoring-and-analysis"],
+    .workers.codex["review-fallback"],
+   .workers.claude["documentation-planning"],
     .workers.claude.review
   ] | all(.[]; (.provider | type == "string") and (.provider | length > 0) and (.model | type == "string") and (.model | length > 0) and (.reason | type == "string") and (.reason | length > 0)))
 ' "$BACKENDS_FILE" >/dev/null

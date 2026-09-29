@@ -96,10 +96,16 @@ done <<< "$commits"
 required_sections=(
   "## 배경 · 문제"
   "## 변경 요약"
+  "## 구현한 기능"
+  "## 수행한 테스트"
   "## 범위 판단"
+  "## 보안 영향"
   "## 연결 문서"
   "## 검증"
+  "## 영향 범위"
   "## 리뷰 포인트"
+  "## 자체 리뷰 결과"
+  "## 실패 시 Issue"
 )
 
 for section in "${required_sections[@]}"; do

@@ -33,11 +33,11 @@ bash scripts/pr-contract-test.sh <PR_NUMBER>
 - `COMMENT`: 머지는 가능하지만 후속 개선 필요
 - `REQUEST_CHANGES`: 머지 금지, 실패 Issue 생성 후 수정 필요
 
-`NEEDS_HUMAN`은 자동 루프의 내부 중단 사유입니다. GitHub에는 `COMMENT` Review로 제출하고 자동 머지하지 않습니다.
+`NEEDS_HUMAN`은 자동 루프의 내부 중단 사유이며 소유자 확인이 있어도 통과하지 않습니다. High-risk 변경도 안전하고 완결된 리뷰에서 `PASS`와 4점 이상을 받아야 합니다. 이 경우 저장소 소유자가 현재 head 커밋 이후 Squash auto-merge를 켜면 사람 확인 게이트를 통과합니다. 점수 미달·모호한 결과·서비스 장애는 그 확인으로 해제되지 않습니다.
 
 `REQUEST_CHANGES`가 하나라도 있으면 PR은 머지할 수 없습니다.
 
-Claude workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정으로 Review를 제출합니다. 그 계정이 PR 작성자와 같으면 GitHub가 자기 PR의 approve/request changes를 거부하므로, workflow는 같은 판정을 `COMMENT`로 남기고 이를 승인으로 간주하지 않습니다. High-risk PR은 이 경우에도 `NEEDS_HUMAN`으로 중단합니다.
+리뷰 workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정을 사용합니다. 이 개인 저장소는 필수 승인 리뷰 수가 0이므로 자기 PR에 GitHub `APPROVE` 리뷰를 제출하지 않습니다. `REQUEST_CHANGES`는 한 번 제출하며, High-risk의 `PASS` 결과는 소유자가 최신 head 이후 Squash auto-merge를 켜야 사람 확인 게이트를 통과합니다. `NEEDS_HUMAN`은 항상 중단합니다.
 
 ## 변경 범위별 확인 기준
 
