@@ -245,8 +245,7 @@ for skill_contract in \
     'REQUEST_CHANGES는 GitHub review로 한 번 제출합니다.' \
     'COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 승인을 중단합니다.' \
     'High-risk도 같은 리뷰 점수를 요구하며 소유자가 최신 head 이후 Squash auto-merge를 켜야 사람 확인을 통과합니다.' \
-    'COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 승인을 중단합니다.' \
-    'approval job은 report와 최신 PR이 리뷰한 base/head SHA와 일치하는지' \
+    'approval job은 report와 최신 PR이 리뷰한 base/head SHA가 일치하는지' \
     'Validate PR contract, PR CI Gate, review check' \
     '별도 GitHub APPROVE 리뷰 없이 확인한 head의 squash auto-merge를 큐에 넣습니다.' \
     'gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.' \
