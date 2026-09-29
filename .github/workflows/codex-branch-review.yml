@@ -2,7 +2,10 @@ name: Codex Branch Review
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, auto_merge_enabled]
+    types: [auto_merge_enabled]
+  workflow_run:
+    workflows: [PR CI Router]
+    types: [completed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -15,7 +18,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: jdsnack-review-pr-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+  group: jdsnack-review-pr-${{ github.event.pull_request.number || inputs.pr_number || github.event.workflow_run.head_branch || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -28,6 +31,13 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository &&
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
           github.event.pull_request.author_association)
+      ) ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.name == 'PR CI Router' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        startsWith(github.event.workflow_run.head_branch, 'codex/')
       )
     runs-on: [self-hosted, jdsnack]
     timeout-minutes: 30
@@ -51,18 +61,45 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           REPOSITORY: ${{ github.repository }}
-          PR_NUMBER_INPUT: ${{ github.event.pull_request.number || inputs.pr_number }}
+          PR_NUMBER_INPUT: ${{ github.event.pull_request.number || inputs.pr_number || '' }}
           EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || '' }}
+          EVENT_HEAD_REF: ${{ github.event.workflow_run.head_branch || '' }}
         run: |
           $pullRequestNumber = $env:PR_NUMBER_INPUT
-          if ($pullRequestNumber -notmatch '^\d+$') {
-            throw 'A numeric pull request number is required for review workflow.'
-          }
-
           $baseSha = $env:EVENT_BASE_SHA
           $headSha = $env:EVENT_HEAD_SHA
-          if ($env:EVENT_NAME -eq 'workflow_dispatch') {
+          if ($env:EVENT_NAME -eq 'workflow_run') {
+            if ($env:EVENT_HEAD_REF -notmatch '^codex/') {
+              throw "A codex/* branch is required for review workflow: $($env:EVENT_HEAD_REF)"
+            }
+            if ($headSha -notmatch '^[0-9a-fA-F]{40}$') {
+              throw "Workflow run head SHA is invalid: $headSha"
+            }
+            $associatedPullRequests = (& gh api -H 'Accept: application/vnd.github+json' "repos/$($env:REPOSITORY)/commits/$headSha/pulls" | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or $null -eq $associatedPullRequests) {
+              throw "Could not resolve an open pull request for successful PR CI head $headSha."
+            }
+            $matchingPullRequests = @($associatedPullRequests | Where-Object {
+              $_.state -eq 'open' -and
+              $_.head.ref -eq $env:EVENT_HEAD_REF -and
+              $_.head.ref -like 'codex/*' -and
+              $_.head.sha -eq $headSha -and
+              $_.base.repo.full_name -eq $env:REPOSITORY -and
+              $_.head.repo.full_name -eq $env:REPOSITORY -and
+              $_.author_association -in @('OWNER', 'MEMBER', 'COLLABORATOR')
+            })
+            if ($matchingPullRequests.Count -ne 1) {
+              throw "Expected exactly one eligible open Codex pull request for CI head $headSha, found $($matchingPullRequests.Count)."
+            }
+            $pullRequest = $matchingPullRequests[0]
+            $pullRequestNumber = [string]$pullRequest.number
+            $baseSha = [string]$pullRequest.base.sha
+            $headSha = [string]$pullRequest.head.sha
+          } elseif ($env:EVENT_NAME -eq 'workflow_dispatch') {
+            if ($pullRequestNumber -notmatch '^\d+$') {
+              throw 'A numeric pull request is required for workflow dispatch.'
+            }
             $pullRequest = (& gh api "repos/$($env:REPOSITORY)/pulls/$pullRequestNumber" | ConvertFrom-Json)
             if ($LASTEXITCODE -ne 0 -or $null -eq $pullRequest) {
               throw "Could not resolve pull request #$pullRequestNumber from GitHub."
@@ -75,6 +112,9 @@ jobs:
             }
             $baseSha = [string]$pullRequest.base.sha
             $headSha = [string]$pullRequest.head.sha
+          }
+          if ($pullRequestNumber -notmatch '^\d+$') {
+            throw 'A numeric pull request number is required for review workflow.'
           }
 
           foreach ($sha in @($baseSha, $headSha)) {

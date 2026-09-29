@@ -25,7 +25,14 @@ assert_not_contains() {
 }
 
 assert_contains "  pull_request_target:"
-assert_contains "    types: [opened, synchronize, reopened, auto_merge_enabled]"
+assert_contains "    types: [auto_merge_enabled]"
+assert_contains "  workflow_run:"
+assert_contains "    workflows: [PR CI Router]"
+assert_contains "    types: [completed]"
+assert_contains "github.event.workflow_run.name == 'PR CI Router'"
+assert_contains "github.event.workflow_run.conclusion == 'success'"
+assert_contains "github.event.workflow_run.head_repository.full_name == github.repository"
+assert_contains "startsWith(github.event.workflow_run.head_branch, 'codex/')"
 assert_contains "  workflow_dispatch:"
 assert_contains "      pr_number:"
 assert_contains "        required: true"
@@ -77,7 +84,13 @@ assert_contains 'throw "Review runner identity mismatch: expected $expectedLogin
 assert_contains 'Run Claude review loop with Codex fallback'
 assert_contains 'CLAUDE_BIN: claude'
 assert_contains 'CODEX_BIN: codex'
-assert_contains 'PR_NUMBER_INPUT: ${{ github.event.pull_request.number || inputs.pr_number }}'
+assert_contains 'PR_NUMBER_INPUT: ${{ github.event.pull_request.number || inputs.pr_number ||'
+assert_contains 'EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha ||'
+assert_contains 'EVENT_HEAD_REF: ${{ github.event.workflow_run.head_branch ||'
+assert_contains 'commits/$headSha/pulls'
+assert_contains '$_.head.sha -eq $headSha'
+assert_contains '$_.author_association -in @('
+assert_contains "'OWNER', 'MEMBER', 'COLLABORATOR'"
 assert_contains 'scripts/review-backend-fallback.ps1'
 assert_contains '-PullRequestNumber'
 assert_contains '-BaseSha'
@@ -175,6 +188,10 @@ for fallback_contract in \
     grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
 done
+pre_review_gate_line="$(grep -nF -- '$preReviewCheckFailure = Get-RequiredCheckFailure' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+reviewer_start_line="$(grep -nF -- '$claudeBin = ' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+[[ -n "$pre_review_gate_line" && -n "$reviewer_start_line" && "$pre_review_gate_line" -lt "$reviewer_start_line" ]] \
+    || fail 'Codex/Claude review must not start before required CI and PR gates pass.'
 if grep -Fq -- '--ignore-rules' "$FALLBACK_SCRIPT"; then
     fail 'Codex fallback must not bypass repository rules.'
 fi

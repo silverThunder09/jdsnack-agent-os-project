@@ -32,7 +32,7 @@ fi
 - PR required check의 `FAILURE`, `CANCELLED`, `TIMED_OUT`, `ACTION_REQUIRED`, `STARTUP_FAILURE`
 - PR 추가·삭제 변경량 합계가 기본 1,000줄을 초과한 경우
 
-반려 Issue를 가장 먼저 처리합니다. 같은 사건을 반복 감지하지 않도록 `event_key`에 Issue 갱신 시각 또는 PR head SHA를 포함합니다. 상태 저장·중복 제거는 호출하는 스케줄러가 담당합니다.
+처리 우선순위는 required CI 실패, 반려 Issue, 리뷰 `CHANGES_REQUESTED`, 변경량 초과 순입니다. CI와 다른 피드백이 함께 있으면 CI 실패를 먼저 Codex에 전달하며, CI가 통과한 뒤 다음 이벤트에서 나머지 피드백을 처리합니다. 같은 사건을 반복 감지하지 않도록 `event_key`에 Issue 갱신 시각 또는 PR head SHA를 포함합니다. 상태 저장·중복 제거는 호출하는 스케줄러가 담당합니다.
 
 CI 실패는 base 브랜치 보호 규칙의 required status check와 일치하는 항목만 감지합니다. 보호 규칙을 읽을 수 없으면 조용히 통과시키지 않고 `needs_human`을 반환합니다. 일시적으로 API를 읽을 수 없는 환경은 `PR_FEEDBACK_REQUIRED_CHECKS=check-a,check-b`로 명시할 수 있습니다. `ERROR` 상태도 실패로 처리합니다.
 
@@ -51,6 +51,7 @@ CI 실패는 base 브랜치 보호 규칙의 required status check와 일치하�
 
 - 감지기는 polling loop를 내장하지 않습니다. `.github/workflows/pr-feedback-detector.yml`이 PR·리뷰·반려 Issue·선택된 CI Router 완료 이벤트마다 한 번 호출합니다.
 - 이벤트 workflow는 GitHub-hosted runner가 아니라 로컬 `jdsnack` self-hosted runner에서 dispatcher `--apply`를 실행합니다. runner에는 로컬 Codex 인증과 같은 저장소 브랜치에 push할 권한이 필요합니다. Codex는 커밋까지만 수행하고 runner가 push를 재시도한 뒤 원격 브랜치 SHA를 비교합니다.
+- Windows self-hosted workflow는 PowerShell에서 `jq.exe`를 찾고 그 경로를 `GITHUB_PATH`에 추가한 뒤 Git Bash를 시작합니다. runner의 Chocolatey 경로가 Git Bash의 기본 `PATH`에 빠져 감지와 자동수리가 중단되지 않도록 합니다.
 - 임의 사용자가 로컬 runner에서 코드를 실행하지 못하도록 이슈·댓글·리뷰 이벤트는 `OWNER`, `MEMBER`, `COLLABORATOR` 작성자만 통과합니다.
 - 현재 열린 이슈를 일괄 확인하려면 `scripts/open-issue-work-dispatcher.sh`를 한 번 실행하거나 `PR Feedback Detector` workflow를 `workflow_dispatch`로 실행합니다. `needs-human`·중복·미지원 이슈는 후보에서 제외합니다. 특정 이슈 이벤트는 `--branch codex/<branch>`로 해당 브랜치 하나만 처리합니다.
 - `--apply`는 후보마다 최신 원격 브랜치에서 격리 worktree를 만들고 Codex 구현·테스트·커밋을 수행한 뒤 `publish-codex-branch.sh`로 push와 원격 SHA를 검증하고 worktree를 제거합니다. push·검증·origin/main freshness 실패는 `needs_human`으로 종료합니다. PR 생성·머지는 수행하지 않습니다.

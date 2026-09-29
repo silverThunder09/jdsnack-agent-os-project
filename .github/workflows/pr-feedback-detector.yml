@@ -68,6 +68,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Expose jq to Git Bash
+        shell: powershell
+        run: |
+          $jqPath = (Get-Command jq.exe -CommandType Application -ErrorAction SilentlyContinue).Source
+          if ([string]::IsNullOrWhiteSpace($jqPath)) {
+            $jqPath = Join-Path $env:ProgramData 'chocolatey\bin\jq.exe'
+          }
+          if (-not (Test-Path -LiteralPath $jqPath -PathType Leaf)) {
+            throw "jq.exe is unavailable on the self-hosted runner: $jqPath"
+          }
+          $jqDirectory = Split-Path -Path $jqPath -Parent
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $jqDirectory
+          Write-Output 'Added jq executable directory to subsequent step PATH.'
+
       - name: Dispatch event to Codex
         env:
           GH_TOKEN: ${{ github.token }}

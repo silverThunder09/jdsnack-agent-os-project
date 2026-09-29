@@ -484,6 +484,10 @@ try {
 } catch {
     Stop-NeedsHuman $_.Exception.Message ''
 }
+$preReviewCheckFailure = Get-RequiredCheckFailure
+if (-not [string]::IsNullOrWhiteSpace($preReviewCheckFailure)) {
+    Stop-NeedsHuman "Required CI and PR gates must pass before review starts: $preReviewCheckFailure" ''
+}
 $reviewDiff = Get-Content -LiteralPath $reviewInputs.DiffPath -Raw
 $reviewCriteria = Get-Content -LiteralPath $reviewInputs.CriteriaPath -Raw
 

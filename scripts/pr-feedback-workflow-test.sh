@@ -36,6 +36,14 @@ if grep -Fq -- 'shell: bash' "$WORKFLOW"; then
 fi
 grep -Fq -- "shell: 'C:\\PROGRA~1\\Git\\bin\\bash.exe --noprofile --norc -eo pipefail {0}'" "$WORKFLOW" \
     || fail 'detector job must use the absolute Git Bash executable on Windows'
+grep -Fq -- '- name: Expose jq to Git Bash' "$WORKFLOW" \
+    || fail 'detector job must expose the installed jq executable to Git Bash before dispatch'
+grep -Fq -- 'Get-Command jq.exe -CommandType Application' "$WORKFLOW" \
+    || fail 'detector job must resolve an installed jq application, not a PowerShell alias or function'
+grep -Fq -- "Join-Path \$env:ProgramData 'chocolatey\\bin\\jq.exe'" "$WORKFLOW" \
+    || fail 'detector job must resolve jq from the self-hosted runner Chocolatey install when PATH is stale'
+grep -Fq -- 'Add-Content -LiteralPath $env:GITHUB_PATH -Value $jqDirectory' "$WORKFLOW" \
+    || fail 'detector job must add the jq directory to later Git Bash steps'
 grep -Fq -- 'if ! command -v jq >/dev/null 2>&1; then' "$WORKFLOW" \
     || fail 'detector job must guard jq before the workflow wrapper parses event JSON'
 grep -Fq -- '"reason":"jq_unavailable"' "$WORKFLOW" \
