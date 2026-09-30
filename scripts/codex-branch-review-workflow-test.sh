@@ -188,6 +188,17 @@ for fallback_contract in \
     grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
 done
+for check_json_parse in \
+    'ConvertFrom-Json -InputObject $checksEnvelopeJson' \
+    '$checks = @($checksEnvelope.checks)' \
+    'ConvertFrom-Json -InputObject $allChecksEnvelopeJson' \
+    '$allChecks = @($allChecksEnvelope.checks)'; do
+    grep -Fq -- "$check_json_parse" "$FALLBACK_SCRIPT" \
+        || fail "Codex review fallback must parse check JSON as an explicit input object: $check_json_parse"
+done
+if grep -Fq -- '$checksJson | ConvertFrom-Json' "$FALLBACK_SCRIPT" || grep -Fq -- '$allChecksJson | ConvertFrom-Json' "$FALLBACK_SCRIPT"; then
+    fail 'PR check JSON arrays must not be piped into ConvertFrom-Json on Windows PowerShell.'
+fi
 pre_review_gate_line="$(grep -nF -- '$preReviewCheckFailure = Get-RequiredCheckFailure' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 reviewer_start_line="$(grep -nF -- '$claudeBin = ' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 [[ -n "$pre_review_gate_line" && -n "$reviewer_start_line" && "$pre_review_gate_line" -lt "$reviewer_start_line" ]] \
@@ -218,7 +229,10 @@ for approval_contract in \
     'Required checks are not passing' \
     'The review report must have a PASS result with score 4 or higher.' \
     "'skipping'" \
-    ' --auto'; do
+    ' --auto' \
+    'ConvertFrom-Json -InputObject $checksEnvelopeJson' \
+    '$checks = @($checksEnvelope.checks)' \
+    'return ,$checks'; do
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
