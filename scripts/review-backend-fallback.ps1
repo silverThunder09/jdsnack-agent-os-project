@@ -213,7 +213,11 @@ function Get-RequiredCheckFailure {
     if ([string]::IsNullOrWhiteSpace($ghPath)) { return 'GitHub CLI is unavailable while checking required PR checks.' }
     $checksJson = & $ghPath pr checks $PullRequestNumber --repo $Repository --required --json name,state,bucket 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0) { return "Could not read required PR checks: $checksJson" }
-    try { $checks = @($checksJson | ConvertFrom-Json) } catch { return "Required PR checks returned invalid JSON: $($_.Exception.Message)" }
+    $checksEnvelopeJson = '{"checks":' + $checksJson + '}'
+    try {
+        $checksEnvelope = ConvertFrom-Json -InputObject $checksEnvelopeJson
+        $checks = @($checksEnvelope.checks)
+    } catch { return "Required PR checks returned invalid JSON: $($_.Exception.Message)" }
     if ($checks.Count -eq 0) { return 'No required PR checks were returned; refusing to treat an incomplete gate as passed.' }
     $currentJob = $env:GITHUB_JOB
     $blocking = @($checks | Where-Object {
@@ -224,7 +228,11 @@ function Get-RequiredCheckFailure {
 
     $allChecksJson = & $ghPath pr checks $PullRequestNumber --repo $Repository --json name,state,bucket 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0) { return "Could not read PR gate checks: $allChecksJson" }
-    try { $allChecks = @($allChecksJson | ConvertFrom-Json) } catch { return "PR gate checks returned invalid JSON: $($_.Exception.Message)" }
+    $allChecksEnvelopeJson = '{"checks":' + $allChecksJson + '}'
+    try {
+        $allChecksEnvelope = ConvertFrom-Json -InputObject $allChecksEnvelopeJson
+        $allChecks = @($allChecksEnvelope.checks)
+    } catch { return "PR gate checks returned invalid JSON: $($_.Exception.Message)" }
     foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
         $gateChecks = @($allChecks | Where-Object { $_.name -eq $gateName })
         if ($gateChecks.Count -ne 1) {

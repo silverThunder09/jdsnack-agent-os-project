@@ -82,7 +82,10 @@ function Get-Checks {
         Stop-NeedsHuman "Could not read PR checks: $checksJson"
     }
     try {
-        return @($checksJson | ConvertFrom-Json)
+        $checksEnvelopeJson = '{"checks":' + $checksJson + '}'
+        $checksEnvelope = ConvertFrom-Json -InputObject $checksEnvelopeJson
+        $checks = @($checksEnvelope.checks)
+        return ,$checks
     } catch {
         Stop-NeedsHuman "PR checks returned invalid JSON: $($_.Exception.Message)"
     }
