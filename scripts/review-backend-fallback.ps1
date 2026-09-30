@@ -519,40 +519,47 @@ $reviewDiff
 $reviewCriteria
 --- END REVIEW CRITERIA ---
 "@
-$claudeExitCode = Invoke-Tool $claudeBin @(
-    '--model', 'sonnet',
-    '--effort', 'medium',
-    '--restricted',
-    '--tools', '',
-    '--permission-mode', 'plan',
-    '--permission-prompts', 'none',
-    '-p', $claudePrompt
-) $claudeLog 120
+$claudeExitCode = 1
+try {
+    $claudeExitCode = Invoke-Tool $claudeBin @(
+        '--model', 'sonnet',
+        '--effort', 'medium',
+        '--restricted',
+        '--tools', '',
+        '--permission-mode', 'plan',
+        '--permission-prompts', 'none',
+        '-p', $claudePrompt
+    ) $claudeLog 120
+} catch {
+    [System.IO.File]::WriteAllText($claudeLog, "Claude invocation failed: $($_.Exception.Message)")
+}
 $claudeOutput = Read-ToolOutput $claudeLog
 
 $availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:failed\s+to\s+authenticate|oauth\s+session\s+expired|not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
-if ($claudeExitCode -eq 0) {
+$claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)
+$claudeResult = Get-StructuredReviewResult -Text $claudeOutput -ReviewerBackend 'claude' -FallbackReason 'none'
+$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success
+$claudeReviewUnavailable = $claudeExitCode -ne 0 -or -not $claudeHasStructuredResult
+
+# A failed invocation or missing structured review means Claude could not complete the review.
+# Delegate that case to Codex; valid Claude decisions remain authoritative.
+if (-not $claudeReviewUnavailable) {
     Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
-    $claudeResult = Get-StructuredReviewResult -Text $claudeOutput -ReviewerBackend 'claude' -FallbackReason 'none'
     Write-ReviewReport -Result $claudeResult -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
     Complete-ReviewDecision -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -ProcessExitCode $claudeExitCode
     exit 0
-}
-
-if (-not [regex]::IsMatch($claudeOutput, $availabilityPattern)) {
-    Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
-    Add-StepSummary 'Claude review failed with a review or workflow error; Codex fallback was not selected.'
-    Write-Error $claudeOutput
-    exit $claudeExitCode
 }
 
 $fallbackReason = switch -Regex ($claudeOutput) {
     '(?i)subscription' { 'claude-subscription'; break }
     '(?i)quota|rate\s+limit' { 'claude-quota'; break }
     '(?i)failed\s+to\s+authenticate|oauth\s+session\s+expired|authentication|not\s+authenticated|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired)' { 'claude-auth'; break }
-    default { 'claude-unavailable' }
+    default {
+        if ($claudeExitCode -ne 0 -or $claudeAvailabilitySignal) { 'claude-unavailable' }
+        else { 'claude-invalid-output' }
+    }
 }
-Add-StepSummary "Claude review backend unavailable ($fallbackReason); delegating PR #$PullRequestNumber to Codex read-only reviewer."
+Add-StepSummary "Claude could not provide a valid structured review ($fallbackReason); delegating PR #$PullRequestNumber to Codex read-only reviewer."
 
 try {
     $codexReviewModel = Get-ConfiguredCodexReviewModel -ReviewWorkspace $Workspace

@@ -184,10 +184,22 @@ for fallback_contract in \
     "'Validate PR contract'" \
     "'PR CI Gate'" \
     'ReviewSubmissionAttempted' \
-    'Complete-ReviewDecision'; do
+    'Complete-ReviewDecision' \
+    'Claude invocation failed:'; do
     grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
 done
+availability_check_line="$(grep -nF -- '$claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+unavailable_route_line="$(grep -nF -- '$claudeReviewUnavailable = $claudeExitCode -ne 0 -or -not $claudeHasStructuredResult' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+claude_success_route_line="$(grep -nF -- 'if (-not $claudeReviewUnavailable) {' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+codex_fallback_route_line="$(grep -nF -- 'Claude could not provide a valid structured review' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+[[ -n "$availability_check_line" && -n "$structured_result_line" && -n "$unavailable_route_line" && -n "$claude_success_route_line" && -n "$codex_fallback_route_line" \
+    && "$availability_check_line" -lt "$structured_result_line" \
+    && "$structured_result_line" -lt "$unavailable_route_line" \
+    && "$unavailable_route_line" -lt "$claude_success_route_line" \
+    && "$claude_success_route_line" -lt "$codex_fallback_route_line" ]] \
+    || fail 'A Claude invocation failure or malformed structured result must route review to Codex.'
 for check_json_parse in \
     'ConvertFrom-Json -InputObject $checksEnvelopeJson' \
     '$checks = @($checksEnvelope.checks)' \
