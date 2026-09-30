@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { AnalysisHistoryDetail } from '../../types/diagnosis'
-import { analysisHistoryExportFileName, buildAnalysisHistoryMarkdown } from './analysisUtils'
+import { analysisHistoryExportFileName, buildAnalysisHistoryMarkdown, inferJdSourceMetadata } from './analysisUtils'
 
 function history(overrides: Partial<NonNullable<AnalysisHistoryDetail['result']>> = {}): AnalysisHistoryDetail {
   return {
     id: 'history-42',
     status: 'SUCCEEDED',
     createdAt: '2026-07-19T12:00:00Z',
-    input: { resumeText: 'resume', jdInputType: 'TEXT', jdText: 'jd', sourceUrl: null, sourceSite: null },
+    input: { resumeText: 'resume', jdInputType: 'TEXT', jdText: 'jd', sourceUrl: null, sourceSite: null, fetchMode: null },
     result: { diagnosis: null, match: null, ...overrides },
     failure: null,
     feedback: null,
@@ -51,5 +51,29 @@ describe('분석 이력 Markdown 내보내기', () => {
     expect(buildAnalysisHistoryMarkdown({ ...history(), status: 'RUNNING' })).toBe('')
     expect(buildAnalysisHistoryMarkdown({ ...history(), status: 'FAILED' })).toBe('')
     expect(buildAnalysisHistoryMarkdown(history())).toBe('')
+  })
+})
+
+describe('JD 출처 메타데이터', () => {
+  it('잡코리아 URL을 JOBKOREA_URL과 jobkorea로 식별한다', () => {
+    expect(inferJdSourceMetadata('https://www.jobkorea.co.kr/Recruit/GI_Read/777777')).toEqual({
+      inputType: 'JOBKOREA_URL',
+      sourceSite: 'jobkorea',
+    })
+  })
+
+  it('사람인 URL을 기존 SARAMIN_URL 계약으로 유지한다', () => {
+    expect(inferJdSourceMetadata('https://www.saramin.co.kr/zf_user/jobs/view?rec_idx=123')).toEqual({
+      inputType: 'SARAMIN_URL',
+      sourceSite: 'saramin',
+    })
+  })
+
+  it('지원하지 않는 링크나 직접 입력은 URL 출처로 가장하지 않는다', () => {
+    expect(inferJdSourceMetadata('https://example.com/jobs/backend')).toEqual({
+      inputType: 'TEXT',
+      sourceSite: null,
+    })
+    expect(inferJdSourceMetadata('')).toEqual({ inputType: 'TEXT', sourceSite: null })
   })
 })

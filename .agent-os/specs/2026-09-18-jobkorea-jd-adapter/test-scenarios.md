@@ -12,9 +12,13 @@ JobKorea 실호출 없이 커밋된 fixture와 mock `HttpClient`로 검증한다
 - TC-08: mock 응답 500과 네트워크 `IOException`이 `JD_FETCH_FAILED`(502)인지 확인한다.
 - TC-09: 본문이 1,000,000자를 초과하는 mock 응답이 `JD_FETCH_FAILED`(502)인지 확인한다.
 - TC-10: redirect 결과 최종 host가 비-allowlist인 mock 응답에서 본문을 추출하지 않고 실패 계약으로 응답하는지 확인한다.
-- TC-11: JobKorea URL 입력 분석 이력 생성이 `jdInputType=JOBKOREA_URL`, `sourceSite=jobkorea`, 서버 수집 `sourceUrl`로 저장되고 클라이언트가 보낸 다른 `sourceSite`가 무시되는지 확인한다.
+- TC-11: JobKorea URL 입력 분석 이력 생성이 `jdInputType=JOBKOREA_URL`, `sourceSite=jobkorea`, 서버 수집 `sourceUrl`·`fetchMode`로 저장되고 클라이언트가 보낸 다른 `sourceSite`가 무시되는지 확인한다.
 - TC-12: 기존 `SARAMIN_URL` 이력의 생성·조회 계약이 깨지지 않는지 확인한다.
 - TC-13: frontend가 JobKorea/사람인/링크 없음 입력에서 각각 `JOBKOREA_URL`·`SARAMIN_URL`·`TEXT`와 대응 `sourceSite`를 전송하는지 확인한다.
 - TC-14: frontend가 `JD_FETCH_UNSUPPORTED_SOURCE`·`JD_FETCH_EMPTY_CONTENT`·`JD_FETCH_FAILED`·`INVALID_JD_URL` 안내를 구분해 표시하고 지원 사이트 문구에 JobKorea가 포함되는지 확인한다.
+- TC-15: `jobkorea-image-only.html` fixture와 mock `img.jobkorea.co.kr` 이미지 응답에서 OCR이 성공해 `sourceSite=jobkorea`, `fetchMode=image-ocr`, 원본 `sourceUrl`과 OCR 본문을 반환하는지 확인한다. 정적 본문 성공 시 OCR이 호출되지 않는지 함께 확인한다.
+- TC-16: JobKorea OCR 후보의 비신뢰/사설 이미지 호스트, 비이미지 MIME, 8 MiB 초과 body, 비신뢰 redirect가 이미지 다운로드와 OCR 호출 전에 차단되는지 확인하고 기존 사람인 OCR 보안 회귀를 확인한다.
+- TC-17: JobKorea image-ocr fetch 응답으로 분석 이력을 생성하면 `JOBKOREA_URL`, `jobkorea`, `image-ocr`, 서버 `sourceUrl`이 저장·조회되는지 확인한다.
+- TC-18: frontend가 `fetchMode=image-ocr` 성공을 OCR 인식 안내로 표시하고, OCR 실패를 기존 error code별 수동 입력 안내로 표시하는지 확인한다.
 
 게이트는 `cd backend && ./gradlew test`, `cd frontend && npm run lint`, `npm test`, `npm run build`, `python scripts/check-ai-readiness.py`, PR CI다. Docker 미설치 환경에서는 Compose/health 검증을 실행하지 않고 사유를 기록한다.

@@ -4,11 +4,13 @@ import com.jdsnack.common.ApiException;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import javax.net.ssl.SSLSession;
@@ -20,6 +22,7 @@ import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,6 +52,27 @@ class JdFetchServiceTest {
 
         assertEquals("saramin", response.sourceSite());
         assertEquals("static-html", response.fetchMode());
+    }
+
+    @Test
+    void supportedJobKoreaUrlReturnsFetchedResponse() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
+        String jobKoreaUrl = "https://www.jobkorea.co.kr/Recruit/GI_Read/123456";
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(
+                        200,
+                        fixture("jd/fixtures/jobkorea-backend-engineer.html"),
+                        URI.create(jobKoreaUrl)
+                ));
+
+        JdFetchResponse fetched = service.fetch(new JdFetchRequest(jobKoreaUrl));
+
+        assertEquals("jobkorea", fetched.sourceSite());
+        assertEquals("static-html", fetched.fetchMode());
+        assertEquals(jobKoreaUrl, fetched.sourceUrl());
+        assertTrue(fetched.jdText().contains("Spring Boot 기반 백엔드 API"));
     }
 
     @Test
@@ -224,13 +248,15 @@ class JdFetchServiceTest {
     }
 
     @Test
-    void unsupportedDomainReturnsUnsupportedSource() {
-        JdFetchService service = new JdFetchService(mock(HttpClient.class), new JdHtmlExtractor());
+    void unsupportedDomainReturnsUnsupportedSource() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
 
         ApiException exception = assertThrows(ApiException.class,
                 () -> service.fetch(new JdFetchRequest("https://jobs.ashbyhq.com/company/backend")));
 
         assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", exception.errorCode().name());
+        verify(httpClient, never()).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
@@ -288,7 +314,28 @@ class JdFetchServiceTest {
         assertEquals("JD_FETCH_FAILED", exception.errorCode().name());
     }
 
+    @Test
+    void redirectOutsideAllowlistReturnsBadGateway() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(
+                        200,
+                        fixture("jd/fixtures/jobkorea-backend-engineer.html"),
+                        URI.create("https://example.com/jobs/redirected")
+                ));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> service.fetch(new JdFetchRequest("https://jobkorea.co.kr/Recruit/GI_Read/123456")));
+
+        assertEquals("JD_FETCH_FAILED", exception.errorCode().name());
+    }
+
     private HttpResponse<String> response(int statusCode, String body) {
+        return response(statusCode, body, URI.create("https://www.saramin.co.kr"));
+    }
+
+    private HttpResponse<String> response(int statusCode, String body, URI responseUri) {
         return new HttpResponse<>() {
             @Override
             public int statusCode() {
@@ -297,7 +344,7 @@ class JdFetchServiceTest {
 
             @Override
             public HttpRequest request() {
-                return HttpRequest.newBuilder().uri(URI.create("https://www.saramin.co.kr")).build();
+                return HttpRequest.newBuilder().uri(responseUri).build();
             }
 
             @Override
@@ -322,7 +369,7 @@ class JdFetchServiceTest {
 
             @Override
             public URI uri() {
-                return URI.create("https://www.saramin.co.kr");
+                return responseUri;
             }
 
             @Override
@@ -330,5 +377,14 @@ class JdFetchServiceTest {
                 return HttpClient.Version.HTTP_1_1;
             }
         };
+    }
+
+    private String fixture(String path) throws IOException {
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(path)) {
+            if (inputStream == null) {
+                throw new IOException("Fixture not found: " + path);
+            }
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }

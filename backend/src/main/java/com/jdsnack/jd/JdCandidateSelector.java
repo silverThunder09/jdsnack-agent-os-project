@@ -22,6 +22,11 @@ final class JdCandidateSelector {
                 document.select(selector).remove();
             }
         }
+        if ("jobkorea".equals(sourceSite)) {
+            for (String selector : JdHtmlExtractor.JOBKOREA_NOISE_SELECTORS) {
+                document.select(selector).remove();
+            }
+        }
         document.select("[class], [id]").removeIf(this::isNoiseContainer);
     }
 
@@ -32,12 +37,28 @@ final class JdCandidateSelector {
                 return saraminCandidate;
             }
         }
+        if ("jobkorea".equals(sourceSite)) {
+            Element jobKoreaCandidate = findSiteSpecificCandidate(document, JdHtmlExtractor.JOBKOREA_CANDIDATE_SELECTORS);
+            if (jobKoreaCandidate != null) {
+                return jobKoreaCandidate;
+            }
+        }
         return selectBestCandidate(document, JdHtmlExtractor.CANDIDATE_SELECTORS);
     }
 
-    void removeNestedNoise(Element candidate) {
+    void removeNestedNoise(Element candidate, String sourceSite) {
         for (String selector : JdHtmlExtractor.NOISE_SELECTORS) {
             candidate.select(selector).remove();
+        }
+        if ("saramin".equals(sourceSite)) {
+            for (String selector : JdHtmlExtractor.SARAMIN_NOISE_SELECTORS) {
+                candidate.select(selector).remove();
+            }
+        }
+        if ("jobkorea".equals(sourceSite)) {
+            for (String selector : JdHtmlExtractor.JOBKOREA_NOISE_SELECTORS) {
+                candidate.select(selector).remove();
+            }
         }
         candidate.select("[class], [id]").removeIf(this::isNoiseContainer);
     }
