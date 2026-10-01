@@ -47,7 +47,7 @@ answer_path="$tmp_dir/answer.md"
 
 git diff --cached --no-ext-diff --no-textconv --unified=80 > "$staged_path"
 git diff --no-ext-diff --no-textconv --unified=80 > "$working_path"
-git status --porcelain=v1 --untracked-files=all > "$status_path"
+git status --porcelain=v1 --untracked-files=no > "$status_path"
 
 push_refs=()
 push_shas=()
@@ -76,7 +76,7 @@ if [ -s "$staged_path" ] || [ -s "$working_path" ]; then
   exit 1
 fi
 if [ -s "$status_path" ]; then
-  echo "ERROR: push 대상 커밋과 checkout 상태가 다릅니다. staged·working-tree·untracked 변경을 먼저 커밋하거나 정리하십시오." >&2
+  echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. staged·working-tree 변경을 먼저 커밋하거나 정리하십시오." >&2
   cat "$status_path" >&2
   exit 1
 fi
@@ -230,10 +230,25 @@ has_structured_body() {
   ' "$answer_path"
 }
 
-if [ "$decision" != "PASS" ] || [ "${score:-0}" -lt 4 ] || [ -z "$risk" ] || [ "$risk" != "$expected_risk" ] || [ "$risk_score" != "$expected_risk_score" ] || [ "$review_labels" != "$expected_labels" ]; then
+if [ "$decision" != "PASS" ] || [ "${score:-0}" -lt 4 ]; then
   echo "ERROR: Codex pre-push 리뷰 기준 미달입니다. push를 차단합니다." >&2
   printf 'decision=%s score=%s risk=%s risk_score=%s review_labels=%s\n' "${decision:-unavailable}" "${score:-unavailable}" "${risk:-unavailable}" "${risk_score:-unavailable}" "${review_labels:-unavailable}" >&2
   sed -n '/^findings:/,$p' "$answer_path" | tail -n 20 >&2 || true
+  exit 1
+fi
+if [ -z "$risk" ] || [ "$risk" != "$expected_risk" ]; then
+  echo "ERROR: Codex risk 결과가 결정론 위험도 구간과 일치하지 않습니다. push를 차단합니다." >&2
+  printf 'reported_risk=%s expected_risk=%s\n' "${risk:-unavailable}" "$expected_risk" >&2
+  exit 1
+fi
+if [ -z "$risk_score" ] || [ "$risk_score" != "$expected_risk_score" ]; then
+  echo "ERROR: Codex risk_score 결과가 결정론 점수와 일치하지 않습니다. push를 차단합니다." >&2
+  printf 'reported_risk_score=%s expected_risk_score=%s\n' "${risk_score:-unavailable}" "$expected_risk_score" >&2
+  exit 1
+fi
+if [ -z "$review_labels" ] || [ "$review_labels" != "$expected_labels" ]; then
+  echo "ERROR: Codex review_labels 결과가 결정론 라우팅과 일치하지 않습니다. push를 차단합니다." >&2
+  printf 'reported_review_labels=%s expected_review_labels=%s\n' "${review_labels:-unavailable}" "$expected_labels" >&2
   exit 1
 fi
 if ! has_structured_body findings review_summary || ! has_structured_body review_summary __end_of_review__; then

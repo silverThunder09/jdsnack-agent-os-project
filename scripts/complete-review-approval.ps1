@@ -109,6 +109,8 @@ function Get-Checks {
 }
 
 function Get-HumanApprovalSummary {
+    param([string]$ExpectedHeadSha)
+
     $reviewJson = & $script:ghPath pr view $PullRequestNumber --repo $Repository --json author,reviews 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0) {
         Stop-NeedsHuman "Could not read human approvals: $reviewJson"
@@ -124,6 +126,9 @@ function Get-HumanApprovalSummary {
     foreach ($review in @($reviewData.reviews)) {
         $login = [string]$review.author.login
         if ([string]::IsNullOrWhiteSpace($login) -or $login -eq $pullRequestAuthor -or $login -match '\[bot\]$') {
+            continue
+        }
+        if ([string]$review.commit.oid -ne $ExpectedHeadSha) {
             continue
         }
         $submittedAt = [datetime]::MinValue
@@ -224,6 +229,7 @@ try {
 if (
     [int]$riskScoreMatch.Groups[1].Value -ne [int]$riskAssessment.riskScore -or
     $riskBandMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand -or
+    $riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand -or
     ([string]$dryRunMatch.Groups[1].Value -eq 'True') -ne [bool]$riskAssessment.dryRun
 ) {
     Stop-NeedsHuman 'The review report risk data does not match the deterministic assessment.'
@@ -264,7 +270,7 @@ if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
     Stop-NeedsHuman 'Implementation and reviewer backend are both Codex fallback; automatic merge is disabled for self-review prevention.'
 }
 
-$approvalSummary = Get-HumanApprovalSummary
+$approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
 if ($approvalSummary.Count -lt [int]$riskAssessment.minimumApprovals) {
     Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) requires at least $($riskAssessment.minimumApprovals) human approval(s); found $($approvalSummary.Count)."
 }

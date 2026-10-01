@@ -114,6 +114,9 @@ grep -Fq -- '--sandbox read-only' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || f
 grep -Fq -- '--disable shell_tool' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 shell tool을 비활성화하지 않습니다.'
 grep -Fq -- 'risk_score:' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 결정론 위험도 점수를 검증하지 않습니다.'
 grep -Fq -- 'has_structured_body' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 구조화된 findings/summary를 검증하지 않습니다.'
+grep -Fq -- 'expected_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 host 계산 점수를 보존하지 않습니다.'
+grep -Fq -- 'reported_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 점수 불일치를 차단하지 않습니다.'
+grep -Fq -- 'reported_review_labels' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 라벨 불일치를 차단하지 않습니다.'
 grep -Fq -- '여러 ref가 한 번에 push되어' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 다중 ref push를 차단하지 않습니다.'
 grep -Fq -- 'staged/working-tree diff가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
 grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex 환경 변수를 정리하지 않습니다.'
@@ -284,6 +287,9 @@ for approval_contract in \
     'The review report must include deterministic risk score, risk band, and dry-run state.' \
     'review-risk.ps1' \
     'Get-HumanApprovalSummary' \
+    'ExpectedHeadSha' \
+    'commit.oid' \
+    'riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand' \
     'minimumApprovals' \
     'autoMergePolicy' \
     'dry-run is enabled, so no merge command was executed.' \
