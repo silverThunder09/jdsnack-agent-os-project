@@ -143,19 +143,80 @@ function Get-HumanApprovalSummary {
         [switch]$RequireCurrentHead
     )
 
-    $reviewJson = & $script:ghPath pr view $PullRequestNumber --repo $Repository --json author,reviews 2>&1 | Out-String
-    if ([int]$LASTEXITCODE -ne 0) {
-        Stop-NeedsHuman "Could not read human approvals: $reviewJson"
+    $repositoryParts = $Repository -split '/'
+    if ($repositoryParts.Count -ne 2) {
+        Stop-NeedsHuman "Repository identity is invalid while reading human approvals: $Repository"
     }
-    try {
-        $reviewData = ConvertFrom-Json -InputObject $reviewJson
-    } catch {
-        Stop-NeedsHuman "Human review data returned invalid JSON: $($_.Exception.Message)"
+    $graphqlQuery = @'
+query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      author { login }
+      reviews(first: 100, after: $cursor) {
+        nodes {
+          author { login }
+          authorAssociation
+          commit { oid }
+          databaseId
+          id
+          state
+          submittedAt
+        }
+        pageInfo { hasNextPage endCursor }
+      }
     }
+  }
+}
+'@
+    $cursor = $null
+    $reviews = @()
+    $pullRequestAuthor = ''
+    do {
+        $graphqlArguments = @(
+            'api',
+            'graphql',
+            '-f', "query=$graphqlQuery",
+            '-F', "owner=$($repositoryParts[0])",
+            '-F', "name=$($repositoryParts[1])",
+            '-F', "number=$PullRequestNumber"
+        )
+        if ($null -eq $cursor) {
+            $graphqlArguments += @('-F', 'cursor=null')
+        } else {
+            $graphqlArguments += @('-F', "cursor=$cursor")
+        }
+        $reviewPageJson = & $script:ghPath @graphqlArguments 2>&1 | Out-String
+        if ([int]$LASTEXITCODE -ne 0) {
+            Stop-NeedsHuman "Could not read human approvals: $reviewPageJson"
+        }
+        try {
+            $reviewPage = ConvertFrom-Json -InputObject $reviewPageJson
+        } catch {
+            Stop-NeedsHuman "Human review data returned invalid JSON: $($_.Exception.Message)"
+        }
+        if ($null -ne $reviewPage.errors -and @($reviewPage.errors).Count -gt 0) {
+            Stop-NeedsHuman "Human review data returned GraphQL errors: $(($reviewPage.errors | ForEach-Object { $_.message }) -join '; ')"
+        }
+        $pullRequest = $reviewPage.data.repository.pullRequest
+        if ($null -eq $pullRequest -or $null -eq $pullRequest.reviews -or $null -eq $pullRequest.reviews.pageInfo) {
+            Stop-NeedsHuman 'Human review data did not include a complete reviews page.'
+        }
+        if ([string]::IsNullOrWhiteSpace($pullRequestAuthor)) {
+            $pullRequestAuthor = [string]$pullRequest.author.login
+        }
+        $reviews += @($pullRequest.reviews.nodes)
+        $pageInfo = $pullRequest.reviews.pageInfo
+        if ([bool]$pageInfo.hasNextPage) {
+            $nextCursor = [string]$pageInfo.endCursor
+            if ([string]::IsNullOrWhiteSpace($nextCursor) -or $nextCursor -eq $cursor) {
+                Stop-NeedsHuman 'Human review pagination did not provide a deterministic next cursor.'
+            }
+            $cursor = $nextCursor
+        }
+    } while ([bool]$pageInfo.hasNextPage)
 
-    $pullRequestAuthor = [string]$reviewData.author.login
     $latestByLogin = @{}
-    foreach ($review in @($reviewData.reviews)) {
+    foreach ($review in @($reviews)) {
         $login = [string]$review.author.login
         if ([string]::IsNullOrWhiteSpace($login) -or $login -eq $pullRequestAuthor -or $login -match '\[bot\]$') {
             continue
@@ -346,12 +407,7 @@ if ([bool]$riskAssessment.dryRun) {
 }
 
 if ([string]$riskAssessment.autoMergePolicy -eq 'blocked') {
-    $message = "Risk gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; $($riskAssessment.riskBand) has the required human approval(s), and automatic merge remains blocked by policy."
-    Write-Output $message
-    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
-        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $message
-    }
-    exit 0
+    Stop-NeedsHuman "Automatic merge is blocked by policy for risk band $($riskAssessment.riskBand); the approval gate will not report success for this merge policy."
 }
 if ([bool]$riskAssessment.requiresOwnerSignoff) {
     $signoff = Get-OwnerAutoMergeSignoff `
