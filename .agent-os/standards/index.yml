@@ -74,6 +74,7 @@ documents:
     - scripts/README.md
     - scripts/install-git-hooks.sh
     - scripts/pre-push-ai-review.sh
+    - scripts/pre-push-ai-review-test.sh
     - scripts/review-policy.json
     - scripts/review-risk.ps1
     - scripts/review-risk-test.ps1

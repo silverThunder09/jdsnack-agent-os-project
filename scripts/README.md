@@ -10,6 +10,7 @@
 - `run-ai-readiness-evals.py`: Codex CLI를 읽기 전용으로 실행해 context-on/off 계획 결과와 지표를 기록합니다.
 - `install-git-hooks.sh`: clone 직후 `core.hooksPath=.githooks`를 검증하고 pre-commit/pre-push를 연결합니다.
 - `pre-push-ai-review.sh`: staged/working-tree/branch diff를 읽기 전용 Codex 리뷰어에 전달하고 기준 미달 push를 차단합니다.
+- `pre-push-ai-review-test.sh`: read-only 격리 옵션, 결정론 위험도·라벨 대조, 구조화 결과 차단을 fixture로 검증합니다.
 - `review-risk.ps1`: PR 위험도 점수, 보호 정책, Security/Performance/Test Coverage/Architecture 라우팅을 결정론적으로 계산합니다.
 - `smoke-test.sh`: 실행 중인 서비스의 기본 API smoke test를 수행합니다.
 - `pr-review-gate.sh`: PR 리뷰 게이트 결과를 확인합니다.

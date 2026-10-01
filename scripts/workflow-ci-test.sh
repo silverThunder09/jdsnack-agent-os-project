@@ -147,7 +147,11 @@ test -f "$ROOT_DIR/.githooks/pre-push" \
 test -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
   || { echo 'scripts/pre-push-ai-review.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pre-push-ai-review.sh"
+test -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
+  || { echo 'scripts/pre-push-ai-review-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
+./scripts/pre-push-ai-review-test.sh
 bash "$ROOT_DIR/scripts/backends-contract-test.sh"
 ./scripts/pr-ci-router-test.sh
 ./scripts/pr-feedback-workflow-test.sh

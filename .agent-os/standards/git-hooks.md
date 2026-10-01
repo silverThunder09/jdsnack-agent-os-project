@@ -90,9 +90,12 @@ echo "$changed" | grep -q 'requirements.md' && {
 검사 규칙:
 
 - Codex review-fallback 모델(`backends.json`)이 구조화된 `PASS`와 4점 이상을 반환해야 합니다.
+- 리뷰 결과의 `risk`, `risk_score`, 전문 라벨이 `scripts/review-risk.ps1`의 branch diff 계산과 일치해야 하며 `findings`와 `review_summary` 본문도 비어 있지 않아야 합니다.
 - 리뷰 실행 실패, 필드 누락, `COMMENT`, `REQUEST_CHANGES`, `NEEDS_HUMAN`, 4점 미만이면 push를 차단합니다.
 - Codex에는 diff만 전달하고 shell·network·credential·repository access를 허용하지 않습니다.
 - 빌드·lint·test·E2E는 CI가 담당하며 hook에서 모델 배정으로 대체하지 않습니다.
+
+`scripts/pre-push-ai-review-test.sh`는 fake Codex를 격리해 PASS 경로와 위험도 불일치 차단 경로를 모두 확인합니다.
 
 예시 명령:
 
