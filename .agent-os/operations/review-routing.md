@@ -9,7 +9,7 @@
 | Security | 30 | `.github/**`, `.githooks/**`, 리뷰 fallback/운영 경계, 인증·보안·secret·credential·token·permission·환경변수 경로가 하나라도 변경됨 |
 | API/DB/환경변수 | 20 | API·Controller·Repository·migration·schema, `application*.yml`, Compose·Dockerfile·`backends.json`, frontend service 경로가 하나라도 변경됨 |
 | PR 크기·범위 | 0 / 8 / 15 | 100줄·5파일·1 논리 scope 이하는 0점, 300줄·10파일·2 논리 scope 이하는 8점, 그 외는 15점 |
-| 테스트 공백 | 15 | backend·frontend·scripts·workflow·hook 소스가 변경됐는데 test 경로가 함께 변경되지 않음 |
+| 테스트 공백 | 15 | backend·frontend·scripts·workflow·hook 소스가 변경됐는데 test 경로가 함께 변경되지 않음. `test`, `tests`, `*.test.*`, `*.spec.*`, `scripts/*-test.sh`, `scripts/*-test.ps1`를 테스트 경로로 인정 |
 | 마이그레이션 | 20 | `db/migration`, `migrations`, `schema`, `flyway` 또는 `.sql` 경로가 변경됨 |
 
 논리 scope는 `backend/src/main/controller`·`backend/src/main/resources`, `frontend/src/<영역>`, `.agent-os/<영역>`, `.github/<영역>`, `scripts`, `docs/<영역>`처럼 같은 최상위 디렉터리 안의 별도 변경 영역을 구분합니다. 총점은 0~100점이며 구간은 다음과 같습니다.

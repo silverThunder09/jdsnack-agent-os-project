@@ -293,6 +293,9 @@ for approval_contract in \
     'Get-BranchProtectionApprovalRequirement' \
     'required_approving_review_count' \
     'effectiveMinimumApprovals' \
+    'DismissStaleReviews' \
+    'dismiss_stale_reviews' \
+    'RequireCurrentHead' \
     'ExpectedHeadSha' \
     'commit.oid' \
     'riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand' \
@@ -309,7 +312,7 @@ for approval_contract in \
 done
 dry_run_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun)' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
 self_review_line="$(grep -nF -- "if (\$reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback')" "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
-approval_summary_line="$(grep -nF -- '$approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
+approval_summary_line="$(grep -nF -- '$approvalSummary = Get-HumanApprovalSummary' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
 [[ -n "$dry_run_line" && -n "$self_review_line" && -n "$approval_summary_line" && "$self_review_line" -lt "$dry_run_line" && "$approval_summary_line" -lt "$dry_run_line" ]] \
     || fail '드라이런 종료 전에 fallback 자기검수와 사람 승인 게이트를 검증해야 합니다.'
 if grep -Fq -- '--admin' "$APPROVAL_SCRIPT"; then

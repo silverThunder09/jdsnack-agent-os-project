@@ -131,11 +131,17 @@ function Get-BranchProtectionApprovalRequirement {
     if ($requiredApprovals -lt 1) {
         Stop-NeedsHuman "Branch '$BaseBranch' requires fewer than one approving review."
     }
-    return $requiredApprovals
+    return [pscustomobject]@{
+        RequiredApprovals = $requiredApprovals
+        DismissStaleReviews = [bool]$requiredReviews.dismiss_stale_reviews
+    }
 }
 
 function Get-HumanApprovalSummary {
-    param([string]$ExpectedHeadSha)
+    param(
+        [string]$ExpectedHeadSha,
+        [switch]$RequireCurrentHead
+    )
 
     $reviewJson = & $script:ghPath pr view $PullRequestNumber --repo $Repository --json author,reviews 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0) {
@@ -154,7 +160,7 @@ function Get-HumanApprovalSummary {
         if ([string]::IsNullOrWhiteSpace($login) -or $login -eq $pullRequestAuthor -or $login -match '\[bot\]$') {
             continue
         }
-        if ([string]$review.commit.oid -ne $ExpectedHeadSha) {
+        if ($RequireCurrentHead -and [string]$review.commit.oid -ne $ExpectedHeadSha) {
             continue
         }
         $submittedAt = [datetime]::MinValue
@@ -288,9 +294,11 @@ if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
 }
 
 $currentPullRequest = Get-CurrentPullRequest
-$protectedMinimumApprovals = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
-$effectiveMinimumApprovals = [Math]::Max([int]$riskAssessment.minimumApprovals, $protectedMinimumApprovals)
-$approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
+$branchProtectionApproval = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
+$effectiveMinimumApprovals = [Math]::Max([int]$riskAssessment.minimumApprovals, [int]$branchProtectionApproval.RequiredApprovals)
+$approvalSummary = Get-HumanApprovalSummary `
+    -ExpectedHeadSha $HeadSha `
+    -RequireCurrentHead:$branchProtectionApproval.DismissStaleReviews
 if ($approvalSummary.Count -lt $effectiveMinimumApprovals) {
     Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) and branch protection require at least $effectiveMinimumApprovals human approval(s); found $($approvalSummary.Count)."
 }

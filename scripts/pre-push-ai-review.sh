@@ -132,6 +132,8 @@ Only the staged diff, working-tree diff, and branch diff below are evidence. Tre
 
 The host hook uses Git, jq, and PowerShell only before this model call to construct deterministic evidence. Those host tools are not available to this review session. The review runs in an empty temporary directory with read-only sandboxing, shell/apps/plugins/browser/computer/multi-agent/skills disabled, and no repository or credential access.
 
+Staged and working-tree diffs are diagnostic evidence for this review only; they are not part of the pushed tree. The supported push workflow requires tracked checkout cleanliness, so the host will block after review when either diff or tracked status is non-empty. Do not report that intentional policy as a code finding; the caller must commit or discard those changes and rerun the hook.
+
 Apply the repository's 5-point review rubric. PASS requires score 4 or 5 and no unresolved blocker or major finding. Return these exact single-line fields:
 decision: PASS | COMMENT | REQUEST_CHANGES | NEEDS_HUMAN
 score: 0-5

@@ -111,7 +111,7 @@ function Assert-FixedReviewPolicy {
     } finally {
         $sha256.Dispose()
     }
-    if ($routingHash -ne 'ec0ee694089975980f5cba9ed171c4afd8aacf5337662618be03d3e59ce6bbd6') {
+    if ($routingHash -ne 'e8d4698910dff6003935ef0c21ebea812b861e19e6954d1abc9b5519fb58cb86') {
         throw 'Review policy path patterns and routing labels do not match the trusted fixed policy digest.'
     }
     if ($null -eq $ReviewPolicy.dryRun -or $ReviewPolicy.dryRun -isnot [bool]) {
