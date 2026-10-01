@@ -311,6 +311,10 @@ for approval_contract in \
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
+RISK_SCRIPT="$ROOT_DIR/scripts/review-risk.ps1"
+grep -Fq -- 'expectedScoringPathPatterns' "$RISK_SCRIPT" || fail '위험도 계산기가 source/test scoring path patterns를 고정하지 않습니다.'
+grep -Fq -- 'scripts/.*-test' "$ROOT_DIR/scripts/review-policy.json" || fail 'PowerShell test path가 위험도 정책에 포함되지 않았습니다.'
+grep -Fq -- 'ChangesRequested' "$APPROVAL_SCRIPT" || fail '승인 게이트가 unresolved change request를 차단하지 않습니다.'
 dry_run_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun)' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
 self_review_line="$(grep -nF -- "if (\$reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback')" "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
 approval_summary_line="$(grep -nF -- '$approvalSummary = Get-HumanApprovalSummary' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"

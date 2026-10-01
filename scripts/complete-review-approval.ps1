@@ -176,9 +176,11 @@ function Get-HumanApprovalSummary {
     }
 
     $approvedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq 'APPROVED' } | Sort-Object)
+    $changesRequestedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq 'CHANGES_REQUESTED' } | Sort-Object)
     return [pscustomobject]@{
         Count = $approvedLogins.Count
         Logins = $approvedLogins
+        ChangesRequested = $changesRequestedLogins
     }
 }
 
@@ -300,6 +302,9 @@ $requireCurrentHeadApproval = [bool]$branchProtectionApproval.DismissStaleReview
 $approvalSummary = Get-HumanApprovalSummary `
     -ExpectedHeadSha $HeadSha `
     -RequireCurrentHead:$requireCurrentHeadApproval
+if (@($approvalSummary.ChangesRequested).Count -gt 0) {
+    Stop-NeedsHuman "Unresolved human change request(s) remain: $(@($approvalSummary.ChangesRequested) -join ', ')."
+}
 if ($approvalSummary.Count -lt $effectiveMinimumApprovals) {
     Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) and branch protection require at least $effectiveMinimumApprovals human approval(s); found $($approvalSummary.Count)."
 }

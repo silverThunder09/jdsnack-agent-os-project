@@ -99,6 +99,24 @@ function Assert-FixedReviewPolicy {
             throw "Review policy routing is missing a path rule for $label."
         }
     }
+    $expectedScoringPathPatterns = [ordered]@{
+        source = @(
+            '^(backend|frontend|scripts|\.github/workflows|\.githooks)/'
+        )
+        test = @(
+            '(^|/)(test|tests)/'
+            '(^|/).*([._-]test|[._-]spec)(\.[^/]*)?$'
+            '^scripts/.*-test\.sh$'
+            '^scripts/.*-test\.ps1$'
+        )
+    }
+    foreach ($scoringPatternGroup in $expectedScoringPathPatterns.GetEnumerator()) {
+        $actualPatterns = @($ReviewPolicy.riskScore.pathPatterns.($scoringPatternGroup.Key))
+        if ($actualPatterns.Count -ne @($scoringPatternGroup.Value).Count -or
+            (($actualPatterns -join "`n") -ne (@($scoringPatternGroup.Value) -join "`n"))) {
+            throw "Review policy scoring path patterns are not fixed: $($scoringPatternGroup.Key)."
+        }
+    }
     $routingPayload = [ordered]@{
         pathPatterns = $ReviewPolicy.riskScore.pathPatterns
         reviewRouting = $ReviewPolicy.reviewRouting
