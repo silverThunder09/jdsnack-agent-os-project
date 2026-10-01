@@ -117,6 +117,10 @@ grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm jq codex' "$ROOT_
 grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'require_tool codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex CLI 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'
+install_prereq_line="$(grep -nF -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
+install_chmod_line="$(grep -nF -- 'chmod +x "$repo_root/$hooks_path/$hook"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
+[[ -n "$install_prereq_line" && -n "$install_chmod_line" && "$install_prereq_line" -lt "$install_chmod_line" ]] \
+    || fail 'Git hook 설치가 사전조건 검증 전에 tracked hook을 변경합니다.'
 grep -Fq -- 'Specialized review routing labels and path rules' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 전문 라우팅 지침이 없습니다.'
 grep -Fq -- '--sandbox read-only' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 read-only sandbox를 강제하지 않습니다.'
 grep -Fq -- '--disable shell_tool' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 shell tool을 비활성화하지 않습니다.'
@@ -134,6 +138,7 @@ grep -Fq -- 'reported_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || f
 grep -Fq -- 'reported_review_labels' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 라벨 불일치를 차단하지 않습니다.'
 grep -Fq -- '여러 ref가 한 번에 push되어' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 다중 ref push를 차단하지 않습니다.'
 grep -Fq -- '현재 checkout의 HEAD와' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push head와 local HEAD를 고정하지 않습니다.'
+grep -Fq -- '삭제 ref만 있는 push는' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 삭제 ref 전용 push를 fail-closed 처리하지 않습니다.'
 grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
 grep -Fq -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex reviewer 전에 dirty checkout을 차단하지 않습니다.'
 grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
@@ -247,6 +252,8 @@ for fallback_contract in \
     'Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory' \
     'Get-StructuredField' \
     'Get-StructuredReviewResult' \
+    'Test-StructuredFindings' \
+    'FindingsContractValid' \
     'HasStructuredBody' \
     'hasFindings' \
     'hasReviewSummary' \

@@ -80,6 +80,7 @@ assert_clean_checkout() {
 
 push_refs=()
 push_shas=()
+deletion_ref_seen=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "${local_ref:-}" ] && continue
   case "$local_ref" in
@@ -90,7 +91,10 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       ;;
   esac
   case "$local_sha" in
-    0000000000000000000000000000000000000000) continue ;;
+    0000000000000000000000000000000000000000)
+      deletion_ref_seen=1
+      continue
+      ;;
   esac
   push_refs+=("$local_ref")
   push_shas+=("$local_sha")
@@ -98,6 +102,10 @@ done
 
 if [ "${#push_shas[@]}" -eq 0 ]; then
   assert_clean_checkout
+  if [ "$deletion_ref_seen" -eq 1 ]; then
+    echo "ERROR: 삭제 ref만 있는 push는 pre-push 리뷰 대상 커밋이 없어 허용하지 않습니다." >&2
+    exit 1
+  fi
   printf 'No branch update is being pushed; pre-push AI review is not required.\n'
   exit 0
 fi

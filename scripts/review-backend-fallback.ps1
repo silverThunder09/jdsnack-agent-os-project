@@ -443,6 +443,43 @@ function New-CodexReviewInputs {
     }
 }
 
+function Test-StructuredFindings {
+    param(
+        [string]$Findings,
+        [string]$Decision
+    )
+
+    $findingLines = @($Findings -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($findingLines.Count -eq 0) {
+        return $false
+    }
+
+    $hasNone = $false
+    $hasFinding = $false
+    foreach ($line in $findingLines) {
+        $trimmed = ([string]$line).Trim()
+        if ($trimmed -match '^-[ \t]+none$') {
+            if ($hasNone -or $hasFinding) {
+                return $false
+            }
+            $hasNone = $true
+            continue
+        }
+        if ($trimmed -notmatch '^-[ \t]+P[0-3](?:[ \t]|$)') {
+            return $false
+        }
+        if ($Decision -eq 'PASS' -and $trimmed -match '^-[ \t]+P[01](?:[ \t]|$)') {
+            return $false
+        }
+        if ($hasNone) {
+            return $false
+        }
+        $hasFinding = $true
+    }
+
+    return $hasNone -or $hasFinding
+}
+
 function Get-StructuredReviewResult {
     param(
         [string]$Text,
@@ -466,6 +503,8 @@ function Get-StructuredReviewResult {
     if (-not $hasReviewSummary) {
         $reviewSummary = 'Structured review fields were missing or malformed; detailed runner output is intentionally omitted from the GitHub comment.'
     }
+    $decisionLabel = if ($decisionMatch.Success) { $decisionMatch.Groups[1].Value } else { 'unavailable' }
+    $findingsContractValid = $hasFindings -and (Test-StructuredFindings -Findings $findings -Decision $decisionLabel)
 
     return [pscustomobject]@{
         Text = $Text
@@ -480,6 +519,7 @@ function Get-StructuredReviewResult {
         HasFindings = $hasFindings
         HasReviewSummary = $hasReviewSummary
         HasStructuredBody = $hasFindings -and $hasReviewSummary
+        FindingsContractValid = $findingsContractValid
         Findings = $findings
         ReviewSummary = $reviewSummary
     }
@@ -628,7 +668,8 @@ function Complete-ReviewDecision {
         -not $Result.DecisionMatch.Success -or
         -not $Result.ScoreMatch.Success -or
         -not $Result.RiskMatch.Success -or
-        -not $Result.HasStructuredBody
+        -not $Result.HasStructuredBody -or
+        -not $Result.FindingsContractValid
     ) {
         Stop-NeedsHuman "$($Result.ReviewerBackend) was unavailable or returned an invalid structured result." $ReportPath
     }
@@ -725,7 +766,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
-Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". The review_summary body must be non-empty and contain the concise review conclusion. Do not repeat any scalar field or structured header.
+Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary body must be non-empty and contain the concise review conclusion. Do not repeat any scalar field or structured header.
 
 The deterministic review assessment appended to the criteria is authoritative for risk score, risk band, merge policy, and the Security, Performance, Test Coverage, and Architecture routing labels. Review each supplied label's matched paths and report findings under the relevant label. Do not invent a different risk score or band.
 Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
@@ -823,7 +864,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
-Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". The review_summary body must be non-empty and contain the concise review conclusion. Do not repeat any scalar field or structured header.
+Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary body must be non-empty and contain the concise review conclusion. Do not repeat any scalar field or structured header.
 
 Requested reviewer model: $codexRequestedModel
 Runtime reviewer model: $codexReviewModel
