@@ -151,6 +151,12 @@ test -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
   || { echo 'scripts/pre-push-ai-review-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
+test -f "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" \
+  || { echo 'scripts/review-backend-fallback-contract-test.ps1 is missing' >&2; exit 1; }
+pwsh -NoProfile -File "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" -Workspace "$ROOT_DIR"
+test -f "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+  || { echo 'scripts/complete-review-approval-contract-test.ps1 is missing' >&2; exit 1; }
+pwsh -NoProfile -File "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" -Workspace "$ROOT_DIR"
 ./scripts/pre-push-ai-review-test.sh
 bash "$ROOT_DIR/scripts/backends-contract-test.sh"
 ./scripts/pr-ci-router-test.sh

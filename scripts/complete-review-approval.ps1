@@ -182,10 +182,21 @@ function Get-BranchProtectionApprovalRequirement {
     }
 }
 
+function Get-CurrentHeadApprovers {
+    param(
+        [hashtable]$LatestByLogin,
+        [string]$ExpectedHeadSha
+    )
+
+    return @($LatestByLogin.Keys | Where-Object {
+        $latest = $LatestByLogin[$_]
+        $latest.State -eq 'APPROVED' -and $latest.CommitOid -eq $ExpectedHeadSha
+    } | Sort-Object)
+}
+
 function Get-HumanApprovalSummary {
     param(
-        [string]$ExpectedHeadSha,
-        [switch]$RequireCurrentHead
+        [string]$ExpectedHeadSha
     )
 
     $repositoryParts = $Repository -split '/'
@@ -306,10 +317,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
         }
     }
 
-    $approvedLogins = @($latestByLogin.Keys | Where-Object {
-        $latest = $latestByLogin[$_]
-        $latest.State -eq 'APPROVED' -and (-not $RequireCurrentHead -or $latest.CommitOid -eq $ExpectedHeadSha)
-    } | Sort-Object)
+    $approvedLogins = @(Get-CurrentHeadApprovers -LatestByLogin $latestByLogin -ExpectedHeadSha $ExpectedHeadSha)
     $changesRequestedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq 'CHANGES_REQUESTED' } | Sort-Object)
     return [pscustomobject]@{
         Count = $approvedLogins.Count
@@ -443,10 +451,7 @@ if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
 $currentPullRequest = Get-CurrentPullRequest
 $branchProtectionApproval = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
 $effectiveMinimumApprovals = [Math]::Max([int]$riskAssessment.minimumApprovals, [int]$branchProtectionApproval.RequiredApprovals)
-$requireCurrentHeadApproval = [bool]$branchProtectionApproval.DismissStaleReviews -or [string]$riskAssessment.riskBand -eq 'High-risk'
-$approvalSummary = Get-HumanApprovalSummary `
-    -ExpectedHeadSha $HeadSha `
-    -RequireCurrentHead:$requireCurrentHeadApproval
+$approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
 # This assertion intentionally precedes the dry-run success path.
 Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary
 if ($approvalSummary.Count -lt $effectiveMinimumApprovals) {

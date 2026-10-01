@@ -424,16 +424,30 @@ has_auditable_review_summary() {
     in_summary { print }
   ' "$answer_path" > "$summary_path"
 
+  local summary_line_count
+  summary_line_count="$("$awk_bin" '
+    /^[[:space:]]*review_summary:[[:space:]]*$/ { in_summary=1; next }
+    in_summary && /[^[:space:]]/ { count++ }
+    END { print count + 0 }
+  ' "$answer_path")"
+  if [ "$summary_line_count" -ne 7 ]; then
+    return 1
+  fi
+
   local rubric_name
+  local match_count
   for rubric_name in correctness contract tests security maintainability; do
-    if ! "$grep_bin" -Eiq "^[[:space:]]*-[[:space:]]+$rubric_name:[[:space:]]+(PASS|OK|SATISFIED)[[:space:]]+.{10,}$" "$summary_path"; then
+    match_count="$("$grep_bin" -Eic "^[[:space:]]*-[[:space:]]+$rubric_name:[[:space:]]+(PASS|OK|SATISFIED)[[:space:]]+.{10,}$" "$summary_path" || true)"
+    if [ "$match_count" -ne 1 ]; then
       return 1
     fi
   done
-  if ! "$grep_bin" -Eiq "^[[:space:]]*-[[:space:]]+score rationale:[[:space:]]+${expected_score}/5[[:space:]]+.{10,}$" "$summary_path"; then
+  match_count="$("$grep_bin" -Eic "^[[:space:]]*-[[:space:]]+score rationale:[[:space:]]+${expected_score}/5[[:space:]]+.{10,}$" "$summary_path" || true)"
+  if [ "$match_count" -ne 1 ]; then
     return 1
   fi
-  if ! "$grep_bin" -Eiq '^[[:space:]]*-[[:space:]]+conclusion:[[:space:]].{20,}$' "$summary_path"; then
+  match_count="$("$grep_bin" -Eic '^[[:space:]]*-[[:space:]]+conclusion:[[:space:]].{20,}$' "$summary_path" || true)"
+  if [ "$match_count" -ne 1 ]; then
     return 1
   fi
   if "$grep_bin" -Eiq '^[[:space:]]*-[[:space:]]+P[23]([[:space:]]|$)' "$answer_path" \

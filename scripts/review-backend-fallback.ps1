@@ -490,17 +490,23 @@ function Test-StructuredReviewSummary {
     if ($summaryLines.Count -eq 0) {
         return $false
     }
+    if ($summaryLines.Count -ne 7) {
+        return $false
+    }
     foreach ($rubricName in @('correctness', 'contract', 'tests', 'security', 'maintainability')) {
         $rubricPattern = "^\s*-\s*$($rubricName):\s+(PASS|OK|SATISFIED)\s+.{10,}$"
-        if (-not ($summaryLines | Where-Object { ([string]$_) -match $rubricPattern })) {
+        $rubricMatches = @($summaryLines | Where-Object { ([string]$_) -match $rubricPattern })
+        if ($rubricMatches.Count -ne 1) {
             return $false
         }
     }
     $scorePattern = "^\s*-\s*score rationale:\s+$($Score)/5\s+.{10,}$"
-    if (-not ($summaryLines | Where-Object { ([string]$_) -match $scorePattern })) {
+    $scoreMatches = @($summaryLines | Where-Object { ([string]$_) -match $scorePattern })
+    if ($scoreMatches.Count -ne 1) {
         return $false
     }
-    if (-not ($summaryLines | Where-Object { ([string]$_) -match '^\s*-\s*conclusion:\s+.{20,}$' })) {
+    $conclusionMatches = @($summaryLines | Where-Object { ([string]$_) -match '^\s*-\s*conclusion:\s+.{20,}$' })
+    if ($conclusionMatches.Count -ne 1) {
         return $false
     }
     return $true

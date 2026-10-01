@@ -168,6 +168,10 @@ fi
     printf '%s\n' '- conclusion: the reviewed change is safe and complete for this push.'
   fi
 } >> "$output_path"
+if [ -f "$fixture_dir/codex.duplicate-summary" ]; then
+  printf '%s\n' '- correctness: PASS — duplicate rubric evidence must be rejected.' >> "$output_path"
+  printf '%s\n' '- conclusion: duplicate conclusion evidence must be rejected.' >> "$output_path"
+fi
 FAKE_CODEX
 sed -i "s|__FAKE_ROOT__|$fake_root|g" "$fake_root/codex"
 chmod +x "$fake_root/codex"
@@ -235,6 +239,20 @@ rm -f "$fake_root/codex.weak-summary"
 if [ "$weak_summary_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$weak_summary_output"; then
   printf '%s\n' "$weak_summary_output" >&2
   fail '실질적인 rubric 근거가 없는 review_summary를 pre-push가 차단하지 않았습니다.'
+fi
+
+set +e
+touch "$fake_root/codex.duplicate-summary"
+duplicate_summary_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+duplicate_summary_status=$?
+set -e
+rm -f "$fake_root/codex.duplicate-summary"
+if [ "$duplicate_summary_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$duplicate_summary_output"; then
+  printf '%s\n' "$duplicate_summary_output" >&2
+  fail '중복 rubric·conclusion review_summary를 pre-push가 차단하지 않았습니다.'
 fi
 
 set +e

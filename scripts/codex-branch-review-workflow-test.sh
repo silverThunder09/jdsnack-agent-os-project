@@ -152,6 +152,8 @@ grep -Fq -- 'review_path="$reviewer_bin_dir"' "$ROOT_DIR/scripts/pre-push-ai-rev
 grep -Fq -- 'review_env_args=(' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
 grep -Fq -- '"CODEX_HOME=$codex_home_arg"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 빈 임시 CODEX_HOME을 고정하지 않습니다.'
 grep -Fq -- '"TMPDIR=$tmp_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 임시 디렉터리 기반 환경을 고정하지 않습니다.'
+grep -Fq -- 'summary_line_count' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 review_summary 전체 줄 수를 고정하지 않습니다.'
+grep -Fq -- 'match_count' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 rubric·결론 중복을 차단하지 않습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
 grep -Fq -- 'require_host_tool cat' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 status 보고용 cat 경로를 고정하지 않습니다.'
 grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
@@ -339,6 +341,9 @@ fi
 if grep -Fq -- "-replace '\s+' ' '" "$FALLBACK_SCRIPT" || grep -Fq -- 'MaximumCharacters = 2000' "$FALLBACK_SCRIPT"; then
     fail 'Structured findings must retain all lines and content.'
 fi
+grep -Fq -- '$summaryLines.Count -ne 7' "$FALLBACK_SCRIPT" || fail 'review_summary는 정확히 7개의 구조화 줄만 허용해야 합니다.'
+grep -Fq -- '$rubricMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary rubric 중복을 차단하지 않습니다.'
+grep -Fq -- '$conclusionMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary conclusion 중복을 차단하지 않습니다.'
 APPROVAL_SCRIPT="$ROOT_DIR/scripts/complete-review-approval.ps1"
 [[ -f "$APPROVAL_SCRIPT" ]] || fail "분리된 승인 게이트 스크립트가 없습니다: $APPROVAL_SCRIPT"
 for approval_contract in \
@@ -355,6 +360,7 @@ for approval_contract in \
     'The review report must have a PASS result with score 4 or higher.' \
     'The review report must include deterministic risk score, risk band, and dry-run state.' \
     'review-risk.ps1' \
+    'Get-CurrentHeadApprovers' \
     'Get-HumanApprovalSummary' \
     'Assert-NoUnresolvedChangeRequests' \
     'api' \
@@ -365,15 +371,14 @@ for approval_contract in \
     'endCursor' \
     'Human review pagination did not provide a deterministic next cursor.' \
     'CommitOid = [string]$review.commit.oid' \
-    '$latest.State -eq '\''APPROVED'\'' -and (-not $RequireCurrentHead -or $latest.CommitOid -eq $ExpectedHeadSha)' \
+    'Get-CurrentHeadApprovers -LatestByLogin $latestByLogin -ExpectedHeadSha $ExpectedHeadSha' \
+    '$latest.State -eq '\''APPROVED'\'' -and $latest.CommitOid -eq $ExpectedHeadSha' \
     '$changesRequestedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq '\''CHANGES_REQUESTED'\'' }' \
     'Get-BranchProtectionApprovalRequirement' \
     'required_approving_review_count' \
     'effectiveMinimumApprovals' \
     'DismissStaleReviews' \
     'dismiss_stale_reviews' \
-    'RequireCurrentHead' \
-    'requireCurrentHeadApproval' \
     'ExpectedHeadSha' \
     'commit.oid' \
     "'DISMISSED'" \
