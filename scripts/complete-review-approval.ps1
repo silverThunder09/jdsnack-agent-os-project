@@ -296,9 +296,10 @@ if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
 $currentPullRequest = Get-CurrentPullRequest
 $branchProtectionApproval = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
 $effectiveMinimumApprovals = [Math]::Max([int]$riskAssessment.minimumApprovals, [int]$branchProtectionApproval.RequiredApprovals)
+$requireCurrentHeadApproval = [bool]$branchProtectionApproval.DismissStaleReviews -or [string]$riskAssessment.riskBand -eq 'High-risk'
 $approvalSummary = Get-HumanApprovalSummary `
     -ExpectedHeadSha $HeadSha `
-    -RequireCurrentHead:$branchProtectionApproval.DismissStaleReviews
+    -RequireCurrentHead:$requireCurrentHeadApproval
 if ($approvalSummary.Count -lt $effectiveMinimumApprovals) {
     Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) and branch protection require at least $effectiveMinimumApprovals human approval(s); found $($approvalSummary.Count)."
 }

@@ -34,4 +34,4 @@
 
 초기 `scripts/review-policy.json`의 `dryRun`은 `true`입니다. 이 상태에서는 리뷰 실행, PASS 코멘트, 위험도·전문 라벨 게시만 수행하고 `gh pr merge`는 실행하지 않습니다. 승인 job은 dry-run 종료 전에 Codex fallback 자기검수 금지와 위험도별 사람 승인 수를 먼저 검증합니다.
 
-`dryRun`을 해제한 뒤에도 승인 게이트가 점수 구간을 다시 확인합니다. `Light`는 승인 1명, `Standard`는 사람 리뷰 후 자동 병합 차단, `High-risk`는 승인 2명과 최신 head 이후 소유자 명시 확인을 요구합니다. 승인 job은 GitHub 보호 규칙의 실제 `required_approving_review_count`도 읽어 정책 최소값과 큰 수를 적용하며, 보호 규칙과 required check가 확인되지 않으면 `needs-human`으로 중단합니다.
+`dryRun`을 해제한 뒤에도 승인 게이트가 점수 구간을 다시 확인합니다. `Light`는 승인 1명, `Standard`는 사람 리뷰 후 자동 병합 차단, `High-risk`는 최신 head의 승인 2명과 최신 head 이후 소유자 명시 확인을 요구합니다. 승인 job은 GitHub 보호 규칙의 실제 `required_approving_review_count`도 읽어 정책 최소값과 큰 수를 적용합니다. Light·Standard는 보호 규칙의 stale review 설정을 따르고, High-risk는 항상 현재 head SHA의 승인만 인정합니다. 보호 규칙과 required check가 확인되지 않으면 `needs-human`으로 중단합니다.

@@ -296,6 +296,7 @@ for approval_contract in \
     'DismissStaleReviews' \
     'dismiss_stale_reviews' \
     'RequireCurrentHead' \
+    'requireCurrentHeadApproval' \
     'ExpectedHeadSha' \
     'commit.oid' \
     'riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand' \
