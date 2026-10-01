@@ -105,6 +105,10 @@ esac
 IFS= read -r fake_risk < "$codex_dir/expected-risk"
 IFS= read -r fake_risk_score < "$codex_dir/expected-risk-score"
 IFS= read -r fake_labels < "$codex_dir/expected-labels"
+fake_score="${JDSNACK_FAKE_SCORE:-5}"
+if [ -f "$0.invalid-score" ]; then
+  fake_score=6
+fi
 if [ -f "$0.bad-risk" ]; then
   fake_risk='Light'
 fi
@@ -117,7 +121,7 @@ esac
 
 {
   printf 'decision: %s\n' "${JDSNACK_FAKE_DECISION:-PASS}"
-  printf 'score: %s\n' "${JDSNACK_FAKE_SCORE:-5}"
+  printf 'score: %s\n' "$fake_score"
   printf 'risk: %s\n' "$fake_risk"
   printf 'risk_score: %s\n' "$fake_risk_score"
   printf 'review_labels: %s\n' "$fake_labels"
@@ -218,12 +222,14 @@ if [ "$weak_summary_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$weak_summa
 fi
 
 set +e
+touch "$fake_root/codex.invalid-score"
 invalid_score_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
-  | (cd "$test_worktree" && PATH="$fake_root:$PATH" JDSNACK_FAKE_SCORE=6 \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
       bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
 invalid_score_status=$?
 set -e
+rm -f "$fake_root/codex.invalid-score"
 if [ "$invalid_score_status" -eq 0 ] || ! grep -Fq 'score 필드가 정확히 하나' <<< "$invalid_score_output"; then
   printf '%s\n' "$invalid_score_output" >&2
   fail '범위를 벗어난 score를 pre-push가 차단하지 않았습니다.'
