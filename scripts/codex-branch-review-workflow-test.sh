@@ -381,7 +381,6 @@ for approval_contract in \
     'dismiss_stale_reviews' \
     'ExpectedHeadSha' \
     'commit.oid' \
-    "'DISMISSED'" \
     'reviewState' \
     "'OWNER', 'MEMBER', 'COLLABORATOR'" \
     'authorAssociation' \
@@ -402,6 +401,8 @@ for approval_contract in \
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
+grep -Fq -- "State = 'DISMISSED'" "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+    || fail '승인 계약 테스트가 dismissed review state를 검증하지 않습니다.'
 if grep -Fq -- "if (\$reviewState -ieq 'DISMISSED')" "$APPROVAL_SCRIPT"; then
     fail 'Dismissed human reviews must remain in latest-state selection so they revoke earlier approvals.'
 fi
