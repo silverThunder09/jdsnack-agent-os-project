@@ -380,6 +380,7 @@ if [ -z "$review_labels" ] || [ "$review_labels" != "$expected_labels" ]; then
 fi
 if ! has_single_field_header findings || ! has_single_field_header review_summary || ! has_structured_body findings review_summary || ! has_structured_body review_summary __end_of_review__; then
   echo "ERROR: Codex pre-push 리뷰의 findings/review_summary 필드가 정확히 하나이고 본문이 있어야 합니다. push를 차단합니다." >&2
+  "$sed_bin" -n '/^[[:space:]]*findings:[[:space:]]*$/,$p' "$answer_path" | "$tail_bin" -n 30 >&2 || true
   exit 1
 fi
 if ! has_valid_findings; then
