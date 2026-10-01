@@ -163,6 +163,10 @@ function Get-HumanApprovalSummary {
         if ($RequireCurrentHead -and [string]$review.commit.oid -ne $ExpectedHeadSha) {
             continue
         }
+        $reviewState = [string]$review.state
+        if ($reviewState -ieq 'DISMISSED') {
+            continue
+        }
         $reviewId = [string]$review.id
         if ([string]::IsNullOrWhiteSpace($reviewId)) {
             $reviewId = [string]$review.databaseId
@@ -182,13 +186,13 @@ function Get-HumanApprovalSummary {
             $timeComparison = $submittedAt.CompareTo($existing.SubmittedAt)
             $idComparison = [string]::CompareOrdinal($reviewId, [string]$existing.ReviewId)
             $isNewer = $timeComparison -gt 0 -or ($timeComparison -eq 0 -and $idComparison -gt 0)
-            if ($timeComparison -eq 0 -and $idComparison -eq 0 -and [string]$review.state -ne [string]$existing.State) {
+            if ($timeComparison -eq 0 -and $idComparison -eq 0 -and $reviewState -ne [string]$existing.State) {
                 Stop-NeedsHuman "Human review data contains conflicting states for review id '$reviewId'."
             }
         }
         if ($isNewer) {
             $latestByLogin[$login] = [pscustomobject]@{
-                State = [string]$review.state
+                State = $reviewState
                 SubmittedAt = $submittedAt
                 ReviewId = $reviewId
             }

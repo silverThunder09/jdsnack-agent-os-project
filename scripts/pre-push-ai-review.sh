@@ -28,9 +28,10 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git cat grep tail sed head awk cmp rm; do
+for tool in env git grep tail sed head awk cmp rm; do
   require_host_tool "$tool"
 done
+require_host_tool cat
 
 tmp_dir="$(mktemp -d)"
 cleanup() {
@@ -193,7 +194,7 @@ append_review_environment() {
     review_env_args+=("$name=$value")
   fi
 }
-for name in CODEX_HOME APPDATA LOCALAPPDATA ComSpec PATHEXT SystemRoot SYSTEMROOT WINDIR TEMP TMP TMPDIR LANG TERM PWD OLDPWD SHLVL _; do
+for name in APPDATA LOCALAPPDATA ComSpec PATHEXT SystemRoot SYSTEMROOT WINDIR TEMP TMP TMPDIR LANG TERM PWD OLDPWD SHLVL _; do
   append_review_environment "$name"
 done
 for name in $(compgen -v); do

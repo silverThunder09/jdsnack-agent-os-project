@@ -127,7 +127,8 @@ grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push"
 grep -Fq -- 'review_path="$codex_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 Codex 실행 디렉터리로 제한되지 않습니다.'
 grep -Fq -- 'review_env_args=("PATH=$review_path")' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 명시적 allowlist 환경을 구성하지 않습니다.'
 grep -Fq -- 'append_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
-grep -Fq -- 'for tool in env git cat grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
+grep -Fq -- 'require_host_tool cat' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 status 보고용 cat 경로를 고정하지 않습니다.'
 grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
 grep -Fq -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec --help' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 실제 Codex runtime을 사전 검증하지 않습니다.'
 clean_checkout_line="$(grep -nF -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
@@ -140,6 +141,9 @@ fi
 grep -Fq -- "sandbox_workspace_write.network_access=false" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer sandbox가 network access를 명시적으로 차단하지 않습니다.'
 if grep -Fq -- 'for helper in cat grep cygpath' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer PATH가 host 도구 디렉터리로 확장됩니다.'
+fi
+if grep -Fq -- 'for name in CODEX_HOME' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
+    fail 'pre-push reviewer가 사용자 CODEX_HOME 경로를 전달합니다.'
 fi
 if grep -Fq -- 'PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|TEMP' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer가 사용자 home/config 환경을 보존합니다.'
@@ -323,6 +327,8 @@ for approval_contract in \
     'requireCurrentHeadApproval' \
     'ExpectedHeadSha' \
     'commit.oid' \
+    "'DISMISSED'" \
+    'reviewState' \
     'review.id' \
     'review.databaseId' \
     'CompareOrdinal' \

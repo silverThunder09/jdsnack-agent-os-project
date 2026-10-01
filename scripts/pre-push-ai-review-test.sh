@@ -98,6 +98,9 @@ fi
 if [ -n "${JDSNACK_TEST_CUSTOM-}" ]; then
   exit 7
 fi
+if [ -n "${CODEX_HOME-}" ]; then
+  exit 10
+fi
 IFS= read -r fake_risk < "$codex_dir/expected-risk"
 IFS= read -r fake_risk_score < "$codex_dir/expected-risk-score"
 IFS= read -r fake_labels < "$codex_dir/expected-labels"
