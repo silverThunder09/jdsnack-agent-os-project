@@ -32,7 +32,11 @@ expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
 
 fake_root="$(mktemp -d)"
+tracked_backup=""
 cleanup() {
+  if [ -n "$tracked_backup" ] && [ -f "$tracked_backup" ]; then
+    cp "$tracked_backup" "$ROOT_DIR/scripts/README.md"
+  fi
   rm -rf "$fake_root"
 }
 trap cleanup EXIT
@@ -127,6 +131,7 @@ tracked_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre
 tracked_status=$?
 set -e
 cp "$tracked_backup" "$ROOT_DIR/scripts/README.md"
+tracked_backup=""
 if [ "$tracked_status" -eq 0 ] || ! grep -Fq 'staged/working-tree diff가 다릅니다' <<< "$tracked_output"; then
   printf '%s\n' "$tracked_output" >&2
   fail 'tracked dirty checkout을 pre-push가 차단하지 않았습니다.'

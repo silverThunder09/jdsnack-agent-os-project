@@ -100,6 +100,8 @@ try {
     Assert-Equal ($assessment.reviewLabels -contains 'Security') $true 'Security routing label'
     Assert-Equal ($assessment.reviewLabels -contains 'Test Coverage') $true 'Test Coverage routing label'
     Assert-Equal ($assessment.reviewLabels -contains 'Architecture') $true 'Architecture routing label'
+    Assert-Equal ($assessment.topLevelScopes -contains 'backend/src/main/controller') $true 'controller logical scope'
+    Assert-Equal ($assessment.topLevelScopes -contains 'backend/src/main/resources') $true 'resources logical scope'
     Assert-Equal $assessment.dryRun $true 'default dry-run policy'
 
     $lightAssessment = New-SingleFileAssessment -Name 'light' -RelativePath 'docs/note.md' -Content 'small change'

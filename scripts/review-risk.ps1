@@ -119,6 +119,41 @@ function Assert-FixedReviewPolicy {
     }
 }
 
+function Get-LogicalReviewScope {
+    param([string]$Path)
+
+    $parts = @($Path -split '/')
+    if ($parts.Count -le 1) {
+        return '<root>'
+    }
+    switch ([string]$parts[0]) {
+        '.agent-os' {
+            return ".agent-os/$($parts[1])"
+        }
+        '.github' {
+            return ".github/$($parts[1])"
+        }
+        'backend' {
+            if ($parts.Count -ge 4) {
+                return ($parts[0..3] -join '/')
+            }
+            return 'backend'
+        }
+        'frontend' {
+            if ($parts.Count -ge 3) {
+                return ($parts[0..2] -join '/')
+            }
+            return 'frontend'
+        }
+        'scripts' {
+            return 'scripts'
+        }
+        default {
+            return "$($parts[0])/$($parts[1])"
+        }
+    }
+}
+
 function Get-ReviewRiskAssessment {
     param(
         [string]$ReviewWorkspace,
@@ -181,14 +216,7 @@ function Get-ReviewRiskAssessment {
         }
     }
     $changedLines = $addedLines + $deletedLines
-    $topLevelScopes = @($changedPaths | ForEach-Object {
-        $pathParts = ([string]$_) -split '/'
-        if ($pathParts.Count -gt 1) {
-            $pathParts[0]
-        } else {
-            '<root>'
-        }
-    } | Sort-Object -Unique)
+    $topLevelScopes = @($changedPaths | ForEach-Object { Get-LogicalReviewScope -Path ([string]$_) } | Sort-Object -Unique)
 
     $patterns = $policy.riskScore.pathPatterns
     $securityPaths = @($changedPaths | Where-Object { Matches-AnyPattern $_ $patterns.security })

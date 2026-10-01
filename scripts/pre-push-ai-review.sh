@@ -34,8 +34,14 @@ if [ "$base_ref" != "origin/main" ]; then
   exit 1
 fi
 if ! base_sha="$(git rev-parse --verify "$base_ref^{commit}" 2>/dev/null)"; then
-  echo "ERROR: 리뷰 기준 브랜치를 확인할 수 없습니다: $base_ref" >&2
-  exit 1
+  if ! git fetch --no-tags origin main:refs/remotes/origin/main >/dev/null 2>&1; then
+    echo "ERROR: origin/main을 fetch할 수 없어 리뷰 기준 브랜치를 확인할 수 없습니다." >&2
+    exit 1
+  fi
+  if ! base_sha="$(git rev-parse --verify "$base_ref^{commit}" 2>/dev/null)"; then
+    echo "ERROR: 리뷰 기준 브랜치를 확인할 수 없습니다: $base_ref" >&2
+    exit 1
+  fi
 fi
 
 staged_path="$tmp_dir/staged.diff"
@@ -70,16 +76,6 @@ if [ "${#push_shas[@]}" -ne 1 ]; then
   exit 1
 fi
 reviewed_ref="${push_shas[0]}"
-
-if [ -s "$staged_path" ] || [ -s "$working_path" ]; then
-  echo "ERROR: push 대상 커밋과 staged/working-tree diff가 다릅니다. 변경을 먼저 커밋한 뒤 push하십시오." >&2
-  exit 1
-fi
-if [ -s "$status_path" ]; then
-  echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. staged·working-tree 변경을 먼저 커밋하거나 정리하십시오." >&2
-  cat "$status_path" >&2
-  exit 1
-fi
 
 if ! git merge-base --is-ancestor "$base_sha" "$reviewed_ref"; then
   echo "ERROR: push 대상 커밋이 origin/main의 후손이 아니어서 리뷰 범위를 고정할 수 없습니다." >&2
@@ -253,6 +249,27 @@ if [ -z "$review_labels" ] || [ "$review_labels" != "$expected_labels" ]; then
 fi
 if ! has_structured_body findings review_summary || ! has_structured_body review_summary __end_of_review__; then
   echo "ERROR: Codex pre-push 리뷰의 findings/review_summary 본문이 비어 있습니다. push를 차단합니다." >&2
+  exit 1
+fi
+
+current_staged_path="$tmp_dir/current-staged.diff"
+current_working_path="$tmp_dir/current-working.diff"
+current_status_path="$tmp_dir/current-status.txt"
+git diff --cached --no-ext-diff --no-textconv --unified=80 > "$current_staged_path"
+git diff --no-ext-diff --no-textconv --unified=80 > "$current_working_path"
+git status --porcelain=v1 --untracked-files=no > "$current_status_path"
+if ! cmp -s "$staged_path" "$current_staged_path" || ! cmp -s "$working_path" "$current_working_path" || ! cmp -s "$status_path" "$current_status_path"; then
+  echo "ERROR: Codex 리뷰 중 checkout이 바뀌어 staged/working-tree 증적이 push 대상과 달라졌습니다." >&2
+  exit 1
+fi
+if [ -s "$status_path" ]; then
+  echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. staged·working-tree 변경을 먼저 커밋하거나 정리하십시오." >&2
+  cat "$status_path" >&2
+  exit 1
+fi
+current_head="$(git rev-parse HEAD)"
+if [ "$current_head" != "$reviewed_ref" ]; then
+  echo "ERROR: Codex 리뷰 중 HEAD가 바뀌어 push 증적을 고정할 수 없습니다." >&2
   exit 1
 fi
 
