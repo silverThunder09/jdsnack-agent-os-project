@@ -106,6 +106,9 @@ fi
 if [ -n "${APPDATA-}" ] || [ -n "${LOCALAPPDATA-}" ]; then
   exit 11
 fi
+if [ -z "${SystemRoot-}" ] || [ -z "${WINDIR-}" ]; then
+  exit 13
+fi
 case "${PWD-}" in
   *test-worktree*) exit 12 ;;
 esac

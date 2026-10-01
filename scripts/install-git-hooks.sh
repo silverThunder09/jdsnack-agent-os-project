@@ -12,6 +12,18 @@ for hook in pre-commit pre-push; do
   fi
 done
 
+for required_file in \
+  "scripts/check-ai-readiness.py" \
+  "scripts/pre-push-ai-review.sh" \
+  "scripts/review-policy.json" \
+  "scripts/review-risk.ps1" \
+  "backends.json"; do
+  if [ ! -f "$repo_root/$required_file" ]; then
+    echo "ERROR: Git hook dependency is missing: $required_file" >&2
+    exit 1
+  fi
+done
+
 require_tool() {
   tool="$1"
   if ! command -v "$tool" >/dev/null 2>&1; then

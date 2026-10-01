@@ -109,6 +109,7 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" ]] || fail "pre-push AI 리뷰 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" ]] || fail "pre-push AI 리뷰 계약 테스트가 없습니다."
 [[ -f "$ROOT_DIR/.agent-os/operations/review-routing.md" ]] || fail "리뷰 라우팅 문서가 없습니다."
+[[ -f "$ROOT_DIR/.agent-os/operations/branch-protection-provisioning.md" ]] || fail "branch protection provisioning 문서가 없습니다."
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 전문 라우팅 정책을 읽지 않습니다.'
 grep -Fq -- 'push_remote="${1-}"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 hook destination remote를 읽지 않습니다.'
 grep -Fq -- 'push_remote" != "origin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin 이외 destination remote를 차단하지 않습니다.'
@@ -117,6 +118,9 @@ grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm cp jq codex' "$RO
 grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'require_tool codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex CLI 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'
+grep -Fq -- 'required_file' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 downstream 파일 의존성을 확인하지 않습니다.'
+grep -Fq -- 'scripts/check-ai-readiness.py' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 readiness 스크립트 의존성을 확인하지 않습니다.'
+grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 review policy 의존성을 확인하지 않습니다.'
 grep -Fq -- 'if ! codex exec' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex exec 호환성을 확인하지 않습니다.'
 install_prereq_line="$(grep -nF -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
 install_chmod_line="$(grep -nF -- 'chmod +x "$repo_root/$hooks_path/$hook"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
@@ -152,6 +156,9 @@ grep -Fq -- 'review_path="$reviewer_bin_dir"' "$ROOT_DIR/scripts/pre-push-ai-rev
 grep -Fq -- 'review_env_args=(' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
 grep -Fq -- '"CODEX_HOME=$codex_home_arg"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 빈 임시 CODEX_HOME을 고정하지 않습니다.'
 grep -Fq -- '"TMPDIR=$tmp_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 임시 디렉터리 기반 환경을 고정하지 않습니다.'
+grep -Fq -- 'windows_root=' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 Windows 런타임 루트를 확인하지 않습니다.'
+grep -Fq -- 'SystemRoot=$windows_root' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 SystemRoot를 격리 환경에 전달하지 않습니다.'
+grep -Fq -- 'WINDIR=$windows_root' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 WINDIR를 격리 환경에 전달하지 않습니다.'
 grep -Fq -- 'summary_line_count' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 review_summary 전체 줄 수를 고정하지 않습니다.'
 grep -Fq -- 'match_count' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 rubric·결론 중복을 차단하지 않습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
@@ -175,6 +182,8 @@ fi
 if grep -Fq -- 'for name in CODEX_HOME' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer가 사용자 CODEX_HOME 경로를 전달합니다.'
 fi
+grep -Fq -- 'required_pull_request_reviews' "$ROOT_DIR/.agent-os/operations/branch-protection-provisioning.md" || fail 'branch protection 문서가 required_pull_request_reviews를 설명하지 않습니다.'
+grep -Fq -- 'branches/$BASE_BRANCH/protection' "$ROOT_DIR/.agent-os/operations/branch-protection-provisioning.md" || fail 'branch protection 문서가 live protection endpoint를 검증하지 않습니다.'
 if grep -Fq -- 'PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|TEMP' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer가 사용자 home/config 환경을 보존합니다.'
 fi

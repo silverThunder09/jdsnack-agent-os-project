@@ -276,9 +276,12 @@ review_env_args=(
   'LANG=C'
   'TERM=dumb'
 )
-if [ -n "${SystemRoot-}" ]; then
-  review_env_args+=("SystemRoot=$SystemRoot")
+windows_root="${SystemRoot:-${WINDIR-}}"
+if [ -z "$windows_root" ]; then
+  echo "ERROR: Windows Codex reviewer runtime에 필요한 SystemRoot/WINDIR가 없습니다." >&2
+  exit 1
 fi
+review_env_args+=("SystemRoot=$windows_root" "WINDIR=$windows_root")
 
 run_reviewer() {
   (
