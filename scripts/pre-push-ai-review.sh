@@ -12,9 +12,10 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm cat jq codex; do
+for tool in env git grep tail sed head awk cmp rm jq codex; do
   require_host_tool "$tool"
 done
+require_host_tool cat
 
 REQUESTED_MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
 MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].runtimeModel // .workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
