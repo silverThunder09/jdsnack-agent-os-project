@@ -104,6 +104,25 @@ try {
     Assert-Equal ($assessment.topLevelScopes -contains 'backend/src/main/resources') $true 'resources logical scope'
     Assert-Equal $assessment.dryRun $true 'default dry-run policy'
 
+    $policyPath = Join-Path $PSScriptRoot 'review-policy.json'
+    foreach ($patternGroup in @('security', 'apiDbEnvironment', 'migration')) {
+        $tamperedPolicyPath = Join-Path $tempRoot "tampered-$patternGroup-policy.json"
+        $tamperedPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
+        $tamperedPolicy.riskScore.pathPatterns.$patternGroup = @('^tampered$')
+        $tamperedPolicy | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tamperedPolicyPath -Encoding utf8
+        $tamperedExitCode = 0
+        try {
+            $tamperedOutput = & $scriptPath -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedPolicyPath 2>&1 | Out-String
+            $tamperedExitCode = [int]$LASTEXITCODE
+        } catch {
+            $tamperedExitCode = 1
+            $tamperedOutput = $_ | Out-String
+        }
+        if ($tamperedExitCode -eq 0 -or $tamperedOutput -notmatch 'path patterns are not fixed|trusted fixed policy digest') {
+            throw "tampered $patternGroup scoring path pattern was accepted: $tamperedOutput"
+        }
+    }
+
     $lightAssessment = New-SingleFileAssessment -Name 'light' -RelativePath 'docs/note.md' -Content 'small change'
     Assert-Equal $lightAssessment.riskScore 0 'light fixture score'
     Assert-Equal $lightAssessment.riskBand 'Light' 'light fixture band'

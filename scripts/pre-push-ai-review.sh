@@ -205,6 +205,14 @@ if [ -z "$codex_dir" ] || [ "$codex_dir" = "$codex_bin" ]; then
   exit 1
 fi
 review_path="$codex_dir"
+if ! (
+  clear_review_environment
+  export PATH="$review_path"
+  "$codex_bin" exec --help >/dev/null 2>&1
+); then
+  echo "ERROR: 제한된 reviewer PATH에서 Codex CLI runtime을 시작할 수 없습니다." >&2
+  exit 1
+fi
 clear_review_environment
 export PATH="$review_path"
 
@@ -214,6 +222,7 @@ if ! "$codex_bin" exec \
   --model "$MODEL" \
   --config 'model_reasoning_effort="medium"' \
   --config 'web_search="disabled"' \
+  --config 'sandbox_workspace_write.network_access=false' \
   --disable shell_tool \
   --disable apps \
   --disable remote_plugin \

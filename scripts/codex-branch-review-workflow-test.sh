@@ -130,6 +130,8 @@ grep -Fq -- 'restore_host_environment()' "$ROOT_DIR/scripts/pre-push-ai-review.s
 grep -Fq -- 'export PATH="$host_path"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 host PATH를 복구하지 않습니다.'
 grep -Fq -- 'for tool in git cat grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
 grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
+grep -Fq -- '"$codex_bin" exec --help' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 실제 Codex runtime을 사전 검증하지 않습니다.'
+grep -Fq -- "sandbox_workspace_write.network_access=false" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer sandbox가 network access를 명시적으로 차단하지 않습니다.'
 if grep -Fq -- 'for helper in cat grep cygpath' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer PATH가 host 도구 디렉터리로 확장됩니다.'
 fi

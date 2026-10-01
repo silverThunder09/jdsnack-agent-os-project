@@ -100,6 +100,24 @@ function Assert-FixedReviewPolicy {
         }
     }
     $expectedScoringPathPatterns = [ordered]@{
+        security = @(
+            '^\.github/'
+            '^\.githooks/'
+            '(^|/)(scripts/review|\.agent-os/operations/review)'
+            '(^|/)(AGENTS\.md|CLAUDE\.md|backends\.json)$'
+            '(^|/)(auth|security|secret|credential|token|permission)([-_/.]|$)'
+            '(^|/)\.env([^/]*)$'
+        )
+        apiDbEnvironment = @(
+            '(^|/)(api|controller|repository|migration|migrations|schema)(/|\.|$)'
+            '(^|/)(application[^/]*\.(yml|yaml|properties)|compose[^/]*\.ya?ml|Dockerfile[^/]*|backends\.json)$'
+            '^frontend/src/services/'
+        )
+        migration = @(
+            '(^|/)(db/migration|migrations)(/|$)'
+            '\.sql$'
+            '(^|/)(schema|flyway)(/|\.|$)'
+        )
         source = @(
             '^(backend|frontend|scripts|\.github/workflows|\.githooks)/'
         )

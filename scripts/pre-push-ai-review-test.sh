@@ -52,8 +52,19 @@ cat > "$fake_root/codex" <<'FAKE_CODEX'
 set -eu
 
 output_path=""
+help_requested=0
+network_config_seen=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --help)
+      help_requested=1
+      ;;
+    --config)
+      shift
+      if [ "${1:-}" = 'sandbox_workspace_write.network_access=false' ]; then
+        network_config_seen=1
+      fi
+      ;;
     --output-last-message)
       shift
       output_path="${1:-}"
@@ -62,7 +73,9 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+[ "$help_requested" -eq 1 ] && exit 0
 [ -n "$output_path" ] || exit 2
+ [ "$network_config_seen" -eq 1 ] || exit 9
 codex_dir="${0%/*}"
 case ":${PATH-}:" in
   *":$codex_dir:"*) ;;
