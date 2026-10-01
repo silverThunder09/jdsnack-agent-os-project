@@ -31,9 +31,15 @@ Worker의 역할·권한·작업 경계와 모델 배정을 분리합니다.
 
 - Claude review-loop를 한 번 실행하고 종료 코드와 구조화된 리뷰 필드를 확인합니다. Claude 실행이 실패하거나 필수 필드가 누락되면 구체적인 오류 문구와 종료 코드에 관계없이 `active_reviewer: codex-fallback`으로 전환합니다.
 - Claude가 유효한 리뷰 결과를 냈을 때는 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달을 Codex fallback으로 바꾸지 않습니다.
-- Codex는 read-only sandbox에서 diff와 해당 acceptance/test 기준만 읽고 `decision`, `score`, `risk`, `findings`를 반환합니다.
+- Codex는 read-only sandbox에서 diff와 해당 acceptance/test 기준만 읽고 `decision`, `score`, `risk`, `findings`를 반환합니다. 위험도 score와 Security·Performance·Test Coverage·Architecture 라벨은 trusted base의 결정론 계산기가 정하고 Codex가 임의로 바꾸지 않습니다.
 - Codex가 실행되지 않거나 출력 형식이 깨지거나 score가 4점 미만이면 `needs-human`입니다.
 - `High-risk` PR은 Codex fallback만으로 자동 머지하지 않고 사람 판단으로 멈춥니다.
+
+## 리뷰 산식·드라이런
+
+- 고정 산식과 경로 규칙은 [review-routing.md](review-routing.md)와 `scripts/review-policy.json`에 둡니다. fallback 프롬프트와 로컬 `pre-push` hook은 같은 규칙을 사용합니다.
+- Claude 구독이 비활성화되어 실행되지 않는 경우에도 Claude 결과를 기다리거나 반려를 숨기지 않고 `claude-subscription` 사유로 Codex read-only reviewer에 위임합니다.
+- 초기 `dryRun=true`에서는 리뷰 실행·PR 코멘트·전문 라벨만 허용하고 병합 명령을 금지합니다. 산식 구간별 승인 정책은 드라이런을 해제한 뒤에만 적용됩니다.
 
 ## 폴백 전환 조건 (outage 판정)
 

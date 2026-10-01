@@ -138,6 +138,17 @@ test -f "$ROOT_DIR/scripts/pr-review-gate-test.sh" \
   || { echo 'scripts/pr-review-gate-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pr-review-gate-test.sh"
 bash "$ROOT_DIR/scripts/pr-review-gate-test.sh"
+test -f "$ROOT_DIR/scripts/review-policy.json" \
+  || { echo 'scripts/review-policy.json is missing' >&2; exit 1; }
+test -f "$ROOT_DIR/scripts/review-risk.ps1" \
+  || { echo 'scripts/review-risk.ps1 is missing' >&2; exit 1; }
+test -f "$ROOT_DIR/.githooks/pre-push" \
+  || { echo '.githooks/pre-push is missing' >&2; exit 1; }
+test -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || { echo 'scripts/pre-push-ai-review.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pre-push-ai-review.sh"
+pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
+bash "$ROOT_DIR/scripts/backends-contract-test.sh"
 ./scripts/pr-ci-router-test.sh
 ./scripts/pr-feedback-workflow-test.sh
 ./scripts/codex-branch-review-workflow-test.sh

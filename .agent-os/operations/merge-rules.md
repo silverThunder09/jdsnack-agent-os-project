@@ -9,11 +9,21 @@
 - 머지 판단, 머지 실행, 머지 후 운영 기록은 클로드가 담당합니다.
 - 코덱스는 머지를 직접 수행하지 않습니다.
 - 코덱스는 머지 전 리뷰 결과에 따른 코드 수정, 테스트, 사용자가 지시한 자동 배포 작업만 수행합니다.
-- **무인 배치**: `codex/*` 구현 PR은 무인 리뷰-머지 루프(`jdsnack-review-merge-loop`)가 `code-reviewer` 5점 채점에서 **4점 이상이면 자동 머지**한다(4점 미만이면 구조화된 변경요청을 코덱스로). 자율 루프가 `spec-queue.json`에서 선택한 `automation/spec-*` promotion PR은 Docs Harness·traceability·diff 범위 검증을 통과하면 자동 머지한다. **단, `High-risk` 변경(보안/외부 API/배포/DB/인증/CI)은 4점 이상 리뷰와 저장소 소유자의 최신 head Squash auto-merge 확인을 모두 요구한다.** 이 확인이 사람 승인 역할을 하며 별도 GitHub 승인 리뷰를 요구하지 않는다. 구현 워커가 폴백으로 Claude인 PR(본문에 `backend: claude-fallback` 표기)도 구현·리뷰 벤더가 같으므로 점수와 무관하게 자동 머지하지 않고 사용자 머지로 강등한다([worker-backends.md](worker-backends.md)의 폴백 규칙).
+- **무인 배치**: `codex/*` 구현 PR은 무인 리뷰-머지 루프(`jdsnack-review-merge-loop`)가 `code-reviewer` 5점 채점에서 **4점 이상이면 위험도 승인 정책을 다시 확인**한다(4점 미만이면 구조화된 변경요청을 코덱스로). 자율 루프가 `spec-queue.json`에서 선택한 `automation/spec-*` promotion PR은 Docs Harness·traceability·diff 범위 검증을 통과하면 자동 머지한다. **`High-risk` 변경(보안/외부 API/배포/DB/인증/CI)은 사람 승인 2명과 저장소 소유자의 최신 head Squash auto-merge 확인을 요구한다.** 구현 backend와 reviewer backend가 같은 Codex fallback PR은 점수와 무관하게 자동 머지하지 않고 사용자 확인으로 강등한다([worker-backends.md](worker-backends.md)의 폴백 규칙).
 
 ## 기본 전략
 
 Claude review backend가 unavailable하여 Codex read-only reviewer로 전환된 경우에도 동일한 5점 루브릭과 결정론 게이트를 적용합니다. `High-risk` 변경은 4점 이상이어도 소유자의 최신 head Squash auto-merge 확인 전까지 `needs-human`으로 멈춥니다. 확인 시각은 head 커밋 이후여야 하며, 새 head에는 다시 확인이 필요합니다. 구현 backend와 reviewer backend가 같은 PR은 fallback 점수만으로 자동 머지하지 않고 `needs-human`으로 멈춥니다.
+
+위험도 점수와 승인 정책은 `scripts/review-policy.json` 및 [review-routing.md](review-routing.md)를 정본으로 사용합니다.
+
+| 위험도 | 승인 조건 | 자동 병합 |
+|---|---|---|
+| `0~30 Light` | 사람 승인 1명 | 승인 후 허용 |
+| `31~60 Standard` | 사람 리뷰 1명 이상 | 차단 |
+| `61~100 High-risk` | 사람 승인 2명 이상과 최신 head 이후 저장소 소유자 명시 확인 | 확인 후 허용 |
+
+초기 `dryRun=true`에서는 세 구간 모두 리뷰·PR 코멘트·라벨만 수행하고 병합 명령을 실행하지 않습니다. 구현 backend와 reviewer backend가 같은 PR인 Codex fallback은 위 구간을 충족해도 자기 검수 방지 규칙에 따라 `needs-human`으로 멈춥니다.
 
 - 기본 브랜치는 `main`입니다.
 - MVP 초기에는 작은 PR 단위로 `main`에 머지합니다.

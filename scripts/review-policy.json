@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "dryRun": true,
+  "riskScore": {
+    "weights": {
+      "security": 30,
+      "apiDbEnvironment": 20,
+      "sizeScope": 15,
+      "testGap": 15,
+      "migration": 20
+    },
+    "pathPatterns": {
+      "security": [
+        "^\\.github/",
+        "^\\.githooks/",
+        "(^|/)(scripts/review|\\.agent-os/operations/review)",
+        "(^|/)(AGENTS\\.md|CLAUDE\\.md|backends\\.json)$",
+        "(^|/)(auth|security|secret|credential|token|permission)([-_/.]|$)",
+        "(^|/)\\.env([^/]*)$"
+      ],
+      "apiDbEnvironment": [
+        "(^|/)(api|controller|repository|migration|migrations|schema)(/|\\.|$)",
+        "(^|/)(application[^/]*\\.(yml|yaml|properties)|compose[^/]*\\.ya?ml|Dockerfile[^/]*|backends\\.json)$",
+        "^frontend/src/services/"
+      ],
+      "migration": [
+        "(^|/)(db/migration|migrations)(/|$)",
+        "\\.sql$",
+        "(^|/)(schema|flyway)(/|\\.|$)"
+      ],
+      "source": [
+        "^(backend|frontend|scripts|\\.github/workflows|\\.githooks)/"
+      ],
+      "test": [
+        "(^|/)(test|tests)/",
+        "(^|/).*([._-]test|[._-]spec)(\\.[^/]*)?$",
+        "^scripts/.*-test\\.sh$"
+      ]
+    },
+    "size": {
+      "small": {
+        "maxChangedLines": 100,
+        "maxFiles": 5,
+        "maxScopes": 1,
+        "points": 0
+      },
+      "medium": {
+        "maxChangedLines": 300,
+        "maxFiles": 10,
+        "maxScopes": 2,
+        "points": 8
+      },
+      "largePoints": 15
+    }
+  },
+  "reviewRouting": {
+    "Security": [
+      "^\\.github/",
+      "^\\.githooks/",
+      "(^|/)(scripts/review|\\.agent-os/operations/review)",
+      "(^|/)(auth|security|secret|credential|token|permission|workflow)([-_/.]|$)",
+      "(^|/)(AGENTS\\.md|CLAUDE\\.md|backends\\.json)$"
+    ],
+    "Performance": [
+      "(^|/)(performance|benchmark|load|cache|async|worker|query|repository|sql)([-_/.]|$)",
+      "^frontend/src/(components|hooks|pages|services)/"
+    ],
+    "Test Coverage": [
+      "^(backend|frontend|scripts|\\.github/workflows|\\.githooks)/",
+      "(^|/)(test|tests)/"
+    ],
+    "Architecture": [
+      "^\\.agent-os/",
+      "^docs/architecture/",
+      "^backend/",
+      "^frontend/src/",
+      "^\\.github/",
+      "^scripts/",
+      "^\\.githooks/",
+      "(^|/)(AGENTS\\.md|CLAUDE\\.md|backends\\.json)$"
+    ]
+  },
+  "bands": [
+    {
+      "name": "Light",
+      "maxScore": 30,
+      "minimumApprovals": 1,
+      "autoMerge": "allowed-after-approval",
+      "requiresOwnerSignoff": false
+    },
+    {
+      "name": "Standard",
+      "maxScore": 60,
+      "minimumApprovals": 1,
+      "autoMerge": "blocked",
+      "requiresOwnerSignoff": false
+    },
+    {
+      "name": "High-risk",
+      "maxScore": 100,
+      "minimumApprovals": 2,
+      "autoMerge": "allowed-after-additional-review-and-owner-signoff",
+      "requiresOwnerSignoff": true
+    }
+  ]
+}

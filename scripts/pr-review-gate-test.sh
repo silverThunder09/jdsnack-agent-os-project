@@ -14,6 +14,9 @@ gh() {
     *"--json title,body --template"*)
       printf '%s\n' "$GH_FIXTURE_BODY"
       ;;
+    *"--json baseRefOid,headRefOid"*)
+      printf '%s\n' "{\"baseRefOid\":\"$GH_FIXTURE_BASE_SHA\",\"headRefOid\":\"$GH_FIXTURE_HEAD_SHA\"}"
+      ;;
     *"--json title --template"*)
       printf '%s\n' "$GH_FIXTURE_TITLE"
       ;;
@@ -42,6 +45,8 @@ set_common_fixture() {
   GH_FIXTURE_TITLE="chore(harness): 리뷰 게이트 실행 테스트"
   GH_FIXTURE_COMMITS="chore(harness): 리뷰 게이트 실행 테스트"
   GH_FIXTURE_FILES="docs/harness.md"
+  GH_FIXTURE_BASE_SHA="$(git rev-parse origin/main)"
+  GH_FIXTURE_HEAD_SHA="$(git rev-parse HEAD)"
   GH_FIXTURE_BODY="$(cat <<'BODY'
 ## 배경 · 문제
 
@@ -114,7 +119,7 @@ run_case() {
       ;;
   esac
 
-  export GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY
+  export GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY GH_FIXTURE_BASE_SHA GH_FIXTURE_HEAD_SHA
   set +e
   output="$(bash "$GATE_SCRIPT" 999 2>&1)"
   actual_status=$?

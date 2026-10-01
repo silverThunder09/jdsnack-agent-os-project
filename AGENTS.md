@@ -6,11 +6,13 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 
 ## 코덱스와 분업 운영
 
-클로드는 **기획·검증·리뷰·통합**을 맡고, **기능 구현·테스트는 코덱스**가 맡습니다. Claude review backend가 실행에 실패하거나 유효한 구조화 리뷰를 반환하지 못하면 [`review-backend-fallback.md`](./.agent-os/operations/review-backend-fallback.md)의 절차에 따라 Codex 읽기 전용 리뷰어에게 위임합니다.
+클로드는 **기획·검증·리뷰·통합**을 맡고, **기능 구현·테스트는 코덱스**가 맡습니다. Claude 구독이 비활성화되었거나 인증·쿼터·실행 장애로 실행되지 않거나 유효한 구조화 리뷰를 반환하지 못하면 [`review-backend-fallback.md`](./.agent-os/operations/review-backend-fallback.md)의 절차에 따라 Codex 읽기 전용 리뷰어에게 위임합니다.
 
 - 클로드: 문서 계획(spec), 게이트 검증, 독립 리뷰(`code-reviewer` 서브에이전트에 diff만 넘겨 채점), PR 작성/관리, merge 판단/실행. `backend`/`frontend` 소스는 직접 수정하지 않습니다. Claude가 실행에 실패하거나 구조화 리뷰를 만들지 못하면 Codex fallback을 호출하고, fallback이 `needs-human`이면 자동 머지를 중단합니다.
 - 코덱스: 활성 spec 기준 기능 **구현 + 기능 테스트 작성**을 담당합니다. 기본 리뷰·판정은 담당하지 않으며, Claude가 실행에 실패하거나 구조화 리뷰를 반환하지 못한 경우에만 명시된 Codex review fallback 예외를 적용합니다.
-- Claude review fallback: Codex에는 PR diff와 검토 기준만 주고 격리된 빈 작업공간에서 도구를 비활성화합니다. 별도 승인 job은 PR 계약·리뷰 게이트·필수 check·리뷰 SHA를 다시 확인합니다. High-risk는 저장소 소유자가 최신 head 이후 Squash auto-merge를 직접 켜 사람 확인을 남겨야 합니다. 별도 GitHub 승인 리뷰는 요구하지 않습니다. 세부 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
+- Claude review fallback: Codex에는 PR diff와 검토 기준만 주고 격리된 빈 작업공간에서 도구를 비활성화합니다. 별도 승인 job은 PR 계약·리뷰 게이트·필수 check·리뷰 SHA를 다시 확인합니다. 드라이런 해제 뒤 Light는 사람 승인 1명, Standard는 사람 리뷰 후 자동 병합 차단, High-risk는 사람 승인 2명과 저장소 소유자의 최신 head 이후 Squash auto-merge 확인을 요구합니다. 세부 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
+- clone 직후 `sh scripts/install-git-hooks.sh`로 `core.hooksPath=.githooks`와 pre-commit/pre-push 설치를 검증합니다. pre-push는 staged/working-tree/branch diff를 Codex 읽기 전용 리뷰어에게 전달하고 PASS 4점 미만이면 push를 차단합니다.
+- 리뷰는 [review-routing.md](./.agent-os/operations/review-routing.md)의 고정 위험도 산식과 Security·Performance·Test Coverage·Architecture 라벨을 사용합니다. 초기 `scripts/review-policy.json`은 드라이런으로 리뷰·코멘트·라벨만 허용하고 병합 명령을 차단합니다.
 - 폴백: 코덱스가 토큰이 없어 막힐 때만, 사용자가 "네가 구현해"라고 지시하면 클로드가 직접 구현·테스트합니다. 전환·복귀·가드레일은 `.agent-os/operations/worker-backends.md`의 폴백 규칙을 따릅니다.
 - **무인 배치**: Codex 구현 PR은 이벤트 기반 리뷰-머지 루프가 리뷰·CI를 확인합니다. 마지막 Feature가 머지되면 `spec-queue.json`의 eligible 후보를 자동으로 Spec으로 승격하고 T1을 다시 Codex에 디스패치합니다. High-risk는 저장소 소유자가 최신 head의 Squash auto-merge를 명시한 뒤 필수 게이트를 통과해야 진행합니다. 제품 판단·충돌은 `needs-human`으로 멈춥니다.
 

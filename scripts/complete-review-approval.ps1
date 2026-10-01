@@ -44,6 +44,23 @@ function Stop-NeedsHuman {
     exit 20
 }
 
+function Get-ReviewPolicy {
+    param([string]$PolicyPath)
+
+    if (-not (Test-Path -LiteralPath $PolicyPath -PathType Leaf)) {
+        Stop-NeedsHuman "Review policy file is missing: $PolicyPath"
+    }
+    try {
+        $policy = Get-Content -LiteralPath $PolicyPath -Raw | ConvertFrom-Json
+    } catch {
+        Stop-NeedsHuman "Review policy is invalid JSON: $($_.Exception.Message)"
+    }
+    if ([int]$policy.version -ne 1) {
+        Stop-NeedsHuman "Unsupported review policy version: $($policy.version)"
+    }
+    return $policy
+}
+
 function Get-CurrentPullRequest {
     $pullRequestJson = & $script:ghPath api "repos/$Repository/pulls/$PullRequestNumber" 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0) {
@@ -91,6 +108,43 @@ function Get-Checks {
     }
 }
 
+function Get-HumanApprovalSummary {
+    $reviewJson = & $script:ghPath pr view $PullRequestNumber --repo $Repository --json author,reviews 2>&1 | Out-String
+    if ([int]$LASTEXITCODE -ne 0) {
+        Stop-NeedsHuman "Could not read human approvals: $reviewJson"
+    }
+    try {
+        $reviewData = ConvertFrom-Json -InputObject $reviewJson
+    } catch {
+        Stop-NeedsHuman "Human review data returned invalid JSON: $($_.Exception.Message)"
+    }
+
+    $pullRequestAuthor = [string]$reviewData.author.login
+    $latestByLogin = @{}
+    foreach ($review in @($reviewData.reviews)) {
+        $login = [string]$review.author.login
+        if ([string]::IsNullOrWhiteSpace($login) -or $login -eq $pullRequestAuthor -or $login -match '\[bot\]$') {
+            continue
+        }
+        $submittedAt = [datetime]::MinValue
+        if (-not [string]::IsNullOrWhiteSpace([string]$review.submittedAt)) {
+            try { $submittedAt = [datetime]::Parse([string]$review.submittedAt) } catch { }
+        }
+        if (-not $latestByLogin.ContainsKey($login) -or $submittedAt -gt $latestByLogin[$login].SubmittedAt) {
+            $latestByLogin[$login] = [pscustomobject]@{
+                State = [string]$review.state
+                SubmittedAt = $submittedAt
+            }
+        }
+    }
+
+    $approvedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq 'APPROVED' } | Sort-Object)
+    return [pscustomobject]@{
+        Count = $approvedLogins.Count
+        Logins = $approvedLogins
+    }
+}
+
 if ($PullRequestNumber -le 0 -or $Repository -notmatch '^[^/]+/[^/]+$') {
     Stop-NeedsHuman 'Pull request identity is invalid.'
 }
@@ -114,15 +168,24 @@ if (-not (Test-Path -LiteralPath $ownerSignoffPath -PathType Leaf)) {
     Stop-NeedsHuman 'The trusted owner signoff verifier is unavailable.'
 }
 . $ownerSignoffPath
+$policyPath = Join-Path $Workspace 'scripts/review-policy.json'
+$reviewPolicy = Get-ReviewPolicy $policyPath
 
 $report = Get-Content -LiteralPath $ReportPath -Raw
+$reviewerBackendMatch = [regex]::Match($report, '(?im)^-\s*reviewer backend:\s*([^\r\n]+)$')
 $decisionMatch = [regex]::Match($report, '(?im)^-\s*decision:\s*(PASS)\s*$')
 $scoreMatch = [regex]::Match($report, '(?im)^-\s*score:\s*([4-5])\s*/\s*5\s*$')
 $riskMatch = [regex]::Match($report, '(?im)^-\s*risk:\s*(Light|Standard|High-risk)\s*$')
+$riskScoreMatch = [regex]::Match($report, '(?im)^-\s*risk score:\s*(\d+)\s*/\s*100\s*$')
+$riskBandMatch = [regex]::Match($report, '(?im)^-\s*risk band:\s*(Light|Standard|High-risk)\s*$')
+$dryRunMatch = [regex]::Match($report, '(?im)^-\s*dry-run:\s*(True|False)\s*$')
 $baseMatch = [regex]::Match($report, '(?im)^-\s*reviewed base SHA:\s*([0-9a-f]{40})\s*$')
 $headMatch = [regex]::Match($report, '(?im)^-\s*reviewed head SHA:\s*([0-9a-f]{40})\s*$')
-if (-not $decisionMatch.Success -or -not $scoreMatch.Success -or -not $riskMatch.Success) {
+if (-not $reviewerBackendMatch.Success -or -not $decisionMatch.Success -or -not $scoreMatch.Success -or -not $riskMatch.Success) {
     Stop-NeedsHuman 'The review report must have a PASS result with score 4 or higher.'
+}
+if (-not $riskScoreMatch.Success -or -not $riskBandMatch.Success -or -not $dryRunMatch.Success) {
+    Stop-NeedsHuman 'The review report must include deterministic risk score, risk band, and dry-run state.'
 }
 if (
     -not $baseMatch.Success -or
@@ -145,22 +208,25 @@ foreach ($sha in @($BaseSha, $HeadSha)) {
         Stop-NeedsHuman "Could not fetch reviewed commit $sha for risk verification."
     }
 }
-$changedPaths = & $gitPath -C $Workspace diff --no-ext-diff --no-textconv --no-renames --name-only "$BaseSha...$HeadSha"
-if ([int]$LASTEXITCODE -ne 0) {
-    Stop-NeedsHuman 'Could not classify the reviewed PR paths.'
+$riskScriptPath = Join-Path $Workspace 'scripts/review-risk.ps1'
+if (-not (Test-Path -LiteralPath $riskScriptPath -PathType Leaf)) {
+    Stop-NeedsHuman "Deterministic review risk calculator is missing: $riskScriptPath"
 }
-$highRiskPathPattern = '^(?:\.github/|\.agent-os/operations/|scripts/|(?:.*/)?AGENTS\.md$|(?:.*/)?backends\.json$|(?:.*/)?Dockerfile(?:\.[^/]*)?$|(?:.*/)?(?:docker-compose|compose)[^/]*\.ya?ml$|(?:.*/)?docker/)'
-$highRiskPaths = @($changedPaths | Where-Object { $_ -match $highRiskPathPattern })
-$requiresOwnerSignoff = ($riskMatch.Groups[1].Value -eq 'High-risk') -or ($highRiskPaths.Count -gt 0)
-if ($requiresOwnerSignoff) {
-    $signoff = Get-OwnerAutoMergeSignoff `
-        -GhPath $script:ghPath `
-        -Repository $Repository `
-        -PullRequestNumber $PullRequestNumber `
-        -ExpectedHeadSha $HeadSha
-    if (-not $signoff.IsValid) {
-        Stop-NeedsHuman "High-risk change lacks current-head Squash auto-merge confirmation: $($signoff.Reason)"
-    }
+$riskJson = (& $riskScriptPath -Workspace $Workspace -BaseSha $BaseSha -HeadSha $HeadSha | Out-String)
+if ([int]$LASTEXITCODE -ne 0) {
+    Stop-NeedsHuman 'Deterministic review risk calculation failed.'
+}
+try {
+    $riskAssessment = ConvertFrom-Json -InputObject $riskJson
+} catch {
+    Stop-NeedsHuman "Deterministic review risk calculation returned invalid JSON: $($_.Exception.Message)"
+}
+if (
+    [int]$riskScoreMatch.Groups[1].Value -ne [int]$riskAssessment.riskScore -or
+    $riskBandMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand -or
+    ([string]$dryRunMatch.Groups[1].Value -eq 'True') -ne [bool]$riskAssessment.dryRun
+) {
+    Stop-NeedsHuman 'The review report risk data does not match the deterministic assessment.'
 }
 
 $requiredChecks = Get-Checks -Required
@@ -183,6 +249,37 @@ foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
 $reviewChecks = @($allChecks | Where-Object { $_.name -eq 'review' -or $_.name -match '(^| / )review$' })
 if ($reviewChecks.Count -ne 1 -or $reviewChecks[0].bucket -ne 'pass') {
     Stop-NeedsHuman 'The review job gate is missing, ambiguous, or not passing.'
+}
+
+if ([bool]$riskAssessment.dryRun) {
+    $message = "Review gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; dry-run is enabled, so no merge command was executed."
+    Write-Output $message
+    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
+        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $message
+    }
+    exit 0
+}
+
+if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
+    Stop-NeedsHuman 'Implementation and reviewer backend are both Codex fallback; automatic merge is disabled for self-review prevention.'
+}
+
+$approvalSummary = Get-HumanApprovalSummary
+if ($approvalSummary.Count -lt [int]$riskAssessment.minimumApprovals) {
+    Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) requires at least $($riskAssessment.minimumApprovals) human approval(s); found $($approvalSummary.Count)."
+}
+if ([string]$riskAssessment.autoMergePolicy -eq 'blocked') {
+    Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) requires human review and blocks automatic merge."
+}
+if ([bool]$riskAssessment.requiresOwnerSignoff) {
+    $signoff = Get-OwnerAutoMergeSignoff `
+        -GhPath $script:ghPath `
+        -Repository $Repository `
+        -PullRequestNumber $PullRequestNumber `
+        -ExpectedHeadSha $HeadSha
+    if (-not $signoff.IsValid) {
+        Stop-NeedsHuman "High-risk change lacks current-head Squash auto-merge confirmation: $($signoff.Reason)"
+    }
 }
 
 # Recheck the target immediately before queueing Squash auto-merge for this exact commit.

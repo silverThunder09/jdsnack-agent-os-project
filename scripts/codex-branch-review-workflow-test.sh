@@ -102,6 +102,23 @@ assert_not_contains 'GH_TOKEN: ${{ github.token }}'
 assert_not_contains 'claude --model sonnet --effort medium -p'
 FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$FALLBACK_SCRIPT" ]] || fail "리뷰 backend fallback 스크립트가 없습니다: $FALLBACK_SCRIPT"
+[[ -f "$ROOT_DIR/scripts/review-policy.json" ]] || fail "리뷰 정책 파일이 없습니다: scripts/review-policy.json"
+[[ -f "$ROOT_DIR/scripts/review-risk.ps1" ]] || fail "결정론적 위험도 계산기가 없습니다: scripts/review-risk.ps1"
+[[ -f "$ROOT_DIR/.githooks/pre-push" ]] || fail "pre-push hook이 없습니다: .githooks/pre-push"
+[[ -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" ]] || fail "pre-push AI 리뷰 스크립트가 없습니다."
+[[ -f "$ROOT_DIR/.agent-os/operations/review-routing.md" ]] || fail "리뷰 라우팅 문서가 없습니다."
+grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 전문 라우팅 정책을 읽지 않습니다.'
+grep -Fq -- 'Specialized review routing labels and path rules' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 전문 라우팅 지침이 없습니다.'
+jq -e '
+    .version == 1
+    and .dryRun == true
+    and .riskScore.weights.security == 30
+    and .riskScore.weights.apiDbEnvironment == 20
+    and .riskScore.weights.sizeScope == 15
+    and .riskScore.weights.testGap == 15
+    and .riskScore.weights.migration == 20
+    and (.reviewRouting as $routing | (["Security", "Performance", "Test Coverage", "Architecture"] | all(.[]; ($routing[.] | type) == "array")))
+' "$ROOT_DIR/scripts/review-policy.json" >/dev/null || fail 'review-policy.json의 위험도/라우팅 정책이 올바르지 않습니다.'
 for fallback_contract in \
     "--model', 'sonnet" \
     "--effort', 'medium" \
@@ -176,6 +193,17 @@ for fallback_contract in \
     'Get-StructuredField' \
     'Get-StructuredReviewResult' \
     'Write-ReviewReport' \
+    'RiskAssessment' \
+    'risk score:' \
+    'risk band:' \
+    'review labels:' \
+    'Publish-ReviewLabels' \
+    'Publish-PassComment' \
+    'ghPath pr comment' \
+    'ghPath label create' \
+    'review-routing.md' \
+    'dry-run' \
+    'risk does not match deterministic risk band' \
     'Complete-ReviewDecision' \
     'DecisionLabel' \
     'ScoreLabel' \
@@ -240,6 +268,12 @@ for approval_contract in \
     "'review'" \
     'Required checks are not passing' \
     'The review report must have a PASS result with score 4 or higher.' \
+    'The review report must include deterministic risk score, risk band, and dry-run state.' \
+    'review-risk.ps1' \
+    'Get-HumanApprovalSummary' \
+    'minimumApprovals' \
+    'autoMergePolicy' \
+    'dry-run is enabled, so no merge command was executed.' \
     "'skipping'" \
     ' --auto' \
     'ConvertFrom-Json -InputObject $checksEnvelopeJson' \
@@ -250,6 +284,9 @@ for approval_contract in \
 done
 if grep -Fq -- '--admin' "$APPROVAL_SCRIPT"; then
     fail '분리된 승인 게이트는 관리자 우회 머지를 포함하면 안 됩니다.'
+fi
+if ! grep -Fq -- 'pr merge' "$APPROVAL_SCRIPT"; then
+    fail '드라이런 이후 정책을 해제했을 때만 사용하는 병합 경로가 없습니다.'
 fi
 if grep -Fq -- 'pulls/$PullRequestNumber/reviews' "$APPROVAL_SCRIPT" || grep -Fq -- "event = 'APPROVE'" "$APPROVAL_SCRIPT"; then
     fail '저장소 소유자가 자기 PR에 별도 GitHub APPROVE 리뷰를 제출하도록 요구하지 않습니다.'

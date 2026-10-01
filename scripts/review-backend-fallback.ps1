@@ -296,16 +296,31 @@ function New-CodexReviewInputs {
         throw "Git could not classify $diffRange for deterministic risk checks (exit $gitExitCode)."
     }
 
-    $highRiskPathPattern = '^(?:\.github/|\.agent-os/operations/|scripts/|(?:.*/)?AGENTS\.md$|(?:.*/)?backends\.json$|(?:.*/)?Dockerfile(?:\.[^/]*)?$|(?:.*/)?(?:docker-compose|compose)[^/]*\.ya?ml$|(?:.*/)?docker/)'
-    $highRiskPaths = @($changedPaths | Where-Object { $_ -match $highRiskPathPattern })
-    $highRisk = $highRiskPaths.Count -gt 0
+    $riskScriptPath = Join-Path $ReviewWorkspace 'scripts/review-risk.ps1'
+    if (-not (Test-Path -LiteralPath $riskScriptPath -PathType Leaf)) {
+        throw "Deterministic review risk calculator not found: $riskScriptPath"
+    }
+    $riskJson = (& $riskScriptPath `
+        -Workspace $ReviewWorkspace `
+        -BaseSha $ReviewBaseSha `
+        -HeadSha $ReviewHeadSha | Out-String)
+    $riskExitCode = [int]$LASTEXITCODE
+    if ($riskExitCode -ne 0) {
+        throw "Deterministic review risk calculator failed (exit $riskExitCode)."
+    }
+    try {
+        $riskAssessment = ConvertFrom-Json -InputObject $riskJson
+    } catch {
+        throw "Deterministic review risk calculator returned invalid JSON: $($_.Exception.Message)"
+    }
     Set-Content -LiteralPath $diffPath -Value $diffText -Encoding utf8
 
     $contextPaths = @(
         (Join-Path $ReviewWorkspace '.agent-os/operations/pr-rules.md'),
         (Join-Path $ReviewWorkspace '.agent-os/operations/pr-review-gate.md'),
         (Join-Path $ReviewWorkspace '.agent-os/operations/merge-rules.md'),
-        (Join-Path $ReviewWorkspace '.agent-os/operations/review-backend-fallback.md')
+        (Join-Path $ReviewWorkspace '.agent-os/operations/review-backend-fallback.md'),
+        (Join-Path $ReviewWorkspace '.agent-os/operations/review-routing.md')
     )
     $indexPath = Join-Path $ReviewWorkspace '.agent-os/standards/index.yml'
     if (Test-Path -LiteralPath $indexPath -PathType Leaf) {
@@ -341,13 +356,28 @@ function New-CodexReviewInputs {
     if ($criteriaSections.Count -eq 0) {
         throw 'No review criteria files were available for the Codex fallback.'
     }
+    $routingLines = @(
+        '## Deterministic review assessment'
+        "- risk score: $($riskAssessment.riskScore)/100"
+        "- risk band: $($riskAssessment.riskBand)"
+        "- minimum approvals: $($riskAssessment.minimumApprovals)"
+        "- auto-merge policy: $($riskAssessment.autoMergePolicy)"
+        "- dry-run: $($riskAssessment.dryRun)"
+        "- review labels: $(@($riskAssessment.reviewLabels) -join ', ')"
+        "- changed paths: $(@($riskAssessment.changedPaths) -join ', ')"
+    )
+    foreach ($labelProperty in $riskAssessment.routingMatches.PSObject.Properties) {
+        $routingLines += "- $($labelProperty.Name) paths: $(@($labelProperty.Value) -join ', ')"
+    }
+    $criteriaSections += ($routingLines -join [Environment]::NewLine)
     Set-Content -LiteralPath $criteriaPath -Value ($criteriaSections -join [Environment]::NewLine) -Encoding utf8
 
     return [pscustomobject]@{
         DiffPath = $diffPath
         CriteriaPath = $criteriaPath
         EvidenceDirectory = $evidenceDirectory
-        HighRisk = $highRisk
+        HighRisk = [string]$riskAssessment.riskBand -eq 'High-risk'
+        RiskAssessment = $riskAssessment
     }
 }
 
@@ -389,6 +419,7 @@ function Get-StructuredReviewResult {
 function Write-ReviewReport {
     param(
         [pscustomobject]$Result,
+        [pscustomobject]$ReviewInputs,
         [string]$ReportPath,
         [string]$BaseSha,
         [string]$HeadSha
@@ -402,6 +433,12 @@ function Write-ReviewReport {
 - decision: $($Result.DecisionLabel)
 - score: $($Result.ScoreLabel)
 - risk: $($Result.RiskLabel)
+- risk score: $($ReviewInputs.RiskAssessment.riskScore)/100
+- risk band: $($ReviewInputs.RiskAssessment.riskBand)
+- minimum approvals: $($ReviewInputs.RiskAssessment.minimumApprovals)
+- auto-merge policy: $($ReviewInputs.RiskAssessment.autoMergePolicy)
+- dry-run: $($ReviewInputs.RiskAssessment.dryRun)
+- review labels: $(@($ReviewInputs.RiskAssessment.reviewLabels) -join ', ')
 - reviewed base SHA: $BaseSha
 - reviewed head SHA: $HeadSha
 - evidence: read-only PR diff and repository review criteria (local runner paths omitted)
@@ -417,11 +454,94 @@ $($Result.ReviewSummary)
     Set-Content -LiteralPath $ReportPath -Value $reportBody -Encoding utf8
 }
 
+function Get-ReviewLabelColor {
+    param([string]$Label)
+
+    switch -Regex ($Label) {
+        '^Security$' { return 'b60205' }
+        '^Performance$' { return 'fbca04' }
+        '^Test Coverage$' { return '0e8a16' }
+        '^Architecture$' { return '5319e7' }
+        '^Risk: Light$' { return 'c2e0c6' }
+        '^Risk: Standard$' { return 'f9d0c4' }
+        '^Risk: High-risk$' { return 'd93f0b' }
+        '^Review: Dry-run$' { return 'bfdadc' }
+        default { return 'ededed' }
+    }
+}
+
+function Publish-ReviewLabels {
+    param([pscustomobject]$ReviewInputs)
+
+    $ghPath = Resolve-ToolPath 'gh'
+    if ([string]::IsNullOrWhiteSpace($ghPath)) {
+        throw 'GitHub CLI is unavailable while publishing review labels.'
+    }
+
+    $labels = @($ReviewInputs.RiskAssessment.reviewLabels)
+    $labels += "Risk: $($ReviewInputs.RiskAssessment.riskBand)"
+    if ([bool]$ReviewInputs.RiskAssessment.dryRun) {
+        $labels += 'Review: Dry-run'
+    }
+    foreach ($label in @($labels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)) {
+        $color = Get-ReviewLabelColor $label
+        & $ghPath label create $label --repo $Repository --color $color --description 'JDSnack automated review routing' --force 2>&1 | Out-Null
+        & $ghPath pr edit $PullRequestNumber --repo $Repository --add-label $label 2>&1 | Out-Null
+        if ([int]$LASTEXITCODE -ne 0) {
+            throw "Could not add review label '$label' to PR #$PullRequestNumber."
+        }
+    }
+}
+
+function Publish-PassComment {
+    param(
+        [pscustomobject]$Result,
+        [pscustomobject]$ReviewInputs,
+        [string]$BaseSha,
+        [string]$HeadSha
+    )
+
+    $ghPath = Resolve-ToolPath 'gh'
+    if ([string]::IsNullOrWhiteSpace($ghPath)) {
+        throw 'GitHub CLI is unavailable while publishing the PASS comment.'
+    }
+
+    $commentPath = Join-Path $fallbackRoot "pass-comment-$PullRequestNumber.md"
+    $componentScores = @($ReviewInputs.RiskAssessment.componentScores.PSObject.Properties | ForEach-Object {
+        "$($_.Name)=$($_.Value)"
+    }) -join ', '
+    $commentBody = @"
+<!-- jdsnack-review-result head:$HeadSha -->
+## JDSnack 리뷰 PASS
+
+- reviewer backend: $($Result.ReviewerBackend)
+- fallback reason: $($Result.FallbackReason)
+- review score: $($Result.ScoreLabel)
+- risk score: $($ReviewInputs.RiskAssessment.riskScore)/100 ($($ReviewInputs.RiskAssessment.riskBand))
+- risk components: $componentScores
+- reviewed head SHA: $HeadSha
+- review labels: $(@($ReviewInputs.RiskAssessment.reviewLabels) -join ', ')
+- merge policy: $($ReviewInputs.RiskAssessment.autoMergePolicy)
+- dry-run: $($ReviewInputs.RiskAssessment.dryRun)
+
+### 요약
+
+$($Result.ReviewSummary)
+"@
+    Set-Content -LiteralPath $commentPath -Value $commentBody -Encoding utf8
+    & $ghPath pr comment $PullRequestNumber --repo $Repository --body-file $commentPath 2>&1 | Out-Null
+    if ([int]$LASTEXITCODE -ne 0) {
+        throw "Could not publish the PASS comment for PR #$PullRequestNumber."
+    }
+}
+
 function Complete-ReviewDecision {
     param(
         [pscustomobject]$Result,
         [pscustomobject]$ReviewInputs,
         [string]$ReportPath,
+        [string]$BaseSha,
+        [string]$HeadSha,
         [int]$ProcessExitCode
     )
 
@@ -448,9 +568,11 @@ function Complete-ReviewDecision {
         Stop-NeedsHuman "$($Result.ReviewerBackend) score=$score/5 is below the required 4/5." $ReportPath
     }
 
-    $modelHighRisk = $risk -eq 'High-risk'
-    $deterministicHighRisk = [bool]$ReviewInputs.HighRisk
-    $requiresOwnerSignoff = $modelHighRisk -or $deterministicHighRisk
+    $deterministicRisk = [string]$ReviewInputs.RiskAssessment.riskBand
+    if ($risk -ne $deterministicRisk) {
+        Stop-NeedsHuman "$($Result.ReviewerBackend) risk=$risk does not match deterministic risk band=$deterministicRisk." $ReportPath
+    }
+    $requiresOwnerSignoff = [bool]$ReviewInputs.HighRisk -and [bool]$ReviewInputs.RiskAssessment.requiresOwnerSignoff
     if ($decision -eq 'NEEDS_HUMAN') {
         Stop-NeedsHuman "$($Result.ReviewerBackend) returned NEEDS_HUMAN; unresolved review results cannot pass through owner confirmation." $ReportPath
     }
@@ -458,7 +580,7 @@ function Complete-ReviewDecision {
         Stop-NeedsHuman "$($Result.ReviewerBackend) returned unsupported decision=$decision." $ReportPath
     }
 
-    if ($requiresOwnerSignoff) {
+    if ($requiresOwnerSignoff -and -not [bool]$ReviewInputs.RiskAssessment.dryRun) {
         $ghPath = Resolve-ToolPath 'gh'
         if ([string]::IsNullOrWhiteSpace($ghPath)) {
             Stop-NeedsHuman 'GitHub CLI is unavailable while verifying the owner confirmation.' $ReportPath
@@ -480,7 +602,15 @@ function Complete-ReviewDecision {
         Stop-NeedsHuman $requiredCheckFailure $ReportPath
     }
 
-    Add-StepSummary "$($Result.ReviewerBackend) review passed at $score/5; contract and CI gates passed. High-risk changes require the repository owner's current-head Squash auto-merge confirmation."
+    try {
+        Publish-ReviewLabels -ReviewInputs $ReviewInputs
+        Publish-PassComment -Result $Result -ReviewInputs $ReviewInputs -BaseSha $BaseSha -HeadSha $HeadSha
+    } catch {
+        Add-Content -LiteralPath $ReportPath -Value "`r`n## Publication failure`r`n$($_.Exception.Message)"
+        Stop-NeedsHuman "PASS publication failed: $($_.Exception.Message)" $ReportPath
+    }
+
+    Add-StepSummary "$($Result.ReviewerBackend) review passed at $score/5; risk=$($ReviewInputs.RiskAssessment.riskScore)/100 ($($ReviewInputs.RiskAssessment.riskBand)); labels and PASS comment published; dry-run=$($ReviewInputs.RiskAssessment.dryRun)."
 }
 
 try {
@@ -511,6 +641,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
+The deterministic review assessment appended to the criteria is authoritative for risk score, risk band, merge policy, and the Security, Performance, Test Coverage, and Architecture routing labels. Review each supplied label's matched paths and report findings under the relevant label. Do not invent a different risk score or band.
 Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
 --- BEGIN PR DIFF ---
 $reviewDiff
@@ -545,8 +676,8 @@ $claudeReviewUnavailable = $claudeExitCode -ne 0 -or -not $claudeHasStructuredRe
 # Delegate that case to Codex; valid Claude decisions remain authoritative.
 if (-not $claudeReviewUnavailable) {
     Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
-    Write-ReviewReport -Result $claudeResult -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
-    Complete-ReviewDecision -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -ProcessExitCode $claudeExitCode
+    Write-ReviewReport -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
+    Complete-ReviewDecision -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha -ProcessExitCode $claudeExitCode
     exit 0
 }
 
@@ -605,6 +736,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
+The deterministic review assessment in the supplied criteria is authoritative for risk score, risk band, merge policy, and the Security, Performance, Test Coverage, and Architecture routing labels. Review each supplied label's matched paths and report findings under the relevant label. Do not invent a different risk score or band.
 Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
 --- BEGIN PR DIFF ---
 $reviewDiff
@@ -677,6 +809,6 @@ $codexOutput = if (Test-Path -LiteralPath $codexAnswerPath -PathType Leaf) { Rea
 Remove-Item -LiteralPath $codexAnswerPath -Force -ErrorAction SilentlyContinue
 
 $codexResult = Get-StructuredReviewResult -Text $codexOutput -ReviewerBackend 'codex-fallback' -FallbackReason $fallbackReason
-Write-ReviewReport -Result $codexResult -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
-Complete-ReviewDecision -Result $codexResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -ProcessExitCode $codexExitCode
+Write-ReviewReport -Result $codexResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
+Complete-ReviewDecision -Result $codexResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha -ProcessExitCode $codexExitCode
 exit 0

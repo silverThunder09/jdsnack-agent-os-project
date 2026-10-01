@@ -6,7 +6,7 @@ Git 훅은 사람이 놓치기 쉬운 하네스 규칙을 커밋/푸시 전에 �
 
 ## 적용 단계
 
-현재 저장소는 버전관리되는 `.githooks/pre-commit`을 사용합니다. clone마다 한 번 `sh scripts/install-git-hooks.sh`를 실행해 `core.hooksPath`를 연결합니다.
+현재 저장소는 버전관리되는 `.githooks/pre-commit`과 `.githooks/pre-push`를 사용합니다. clone 직후 `sh scripts/install-git-hooks.sh`를 실행하면 두 hook 파일의 존재와 `core.hooksPath=.githooks` 설정을 확인한 뒤 로컬 Git 설정에 연결합니다. 설정 검증이 실패하면 초기화를 성공으로 처리하지 않습니다.
 
 ## `commit-msg` 훅
 
@@ -85,13 +85,14 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 ## `pre-push` 훅
 
-푸시 전 검증을 수행합니다.
+푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. `scripts/pre-push-ai-review.sh`는 staged diff, working-tree diff, 현재 branch와 `origin/main`의 branch diff를 함께 전달하고 `scripts/review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙도 프롬프트에 포함합니다. 모델은 `backends.json`의 `workers.codex.review-fallback.model`을 사용합니다.
 
 검사 규칙:
 
-- 백엔드 테스트 실행
-- 프론트엔드 타입 체크/빌드 실행
-- 문서 링크 깨짐 여부는 추후 자동화
+- Codex review-fallback 모델(`backends.json`)이 구조화된 `PASS`와 4점 이상을 반환해야 합니다.
+- 리뷰 실행 실패, 필드 누락, `COMMENT`, `REQUEST_CHANGES`, `NEEDS_HUMAN`, 4점 미만이면 push를 차단합니다.
+- Codex에는 diff만 전달하고 shell·network·credential·repository access를 허용하지 않습니다.
+- 빌드·lint·test·E2E는 CI가 담당하며 hook에서 모델 배정으로 대체하지 않습니다.
 
 예시 명령:
 
@@ -105,5 +106,5 @@ npm run build
 ## 운영 규칙
 
 - 훅은 개발자 실수를 줄이는 장치입니다.
-- 훅 실패를 우회하려면 PR 설명에 이유를 남깁니다.
+- hook 설치 실패 또는 AI 리뷰 기준 미달은 push 실패로 남깁니다.
 - 같은 예외가 2회 이상 발생하면 훅 규칙 자체를 조정합니다.
