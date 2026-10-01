@@ -114,8 +114,8 @@ if [ -f "$0.bad-risk" ]; then
 fi
 case "$output_path" in
   *\\*)
-    command -v cygpath >/dev/null 2>&1 || exit 8
-    output_path="$(cygpath -u "$output_path")"
+    [ -x "$codex_dir/cygpath" ] || exit 8
+    output_path="$("$codex_dir/cygpath" -u "$output_path")"
     ;;
 esac
 
