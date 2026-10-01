@@ -118,7 +118,7 @@ grep -Fq -- 'expected_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || f
 grep -Fq -- 'reported_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 점수 불일치를 차단하지 않습니다.'
 grep -Fq -- 'reported_review_labels' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 라벨 불일치를 차단하지 않습니다.'
 grep -Fq -- '여러 ref가 한 번에 push되어' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 다중 ref push를 차단하지 않습니다.'
-grep -Fq -- 'staged/working-tree diff가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
+grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
 grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex 환경 변수를 정리하지 않습니다.'
 jq -e '
     .version == 1

@@ -132,7 +132,7 @@ tracked_status=$?
 set -e
 cp "$tracked_backup" "$ROOT_DIR/scripts/README.md"
 tracked_backup=""
-if [ "$tracked_status" -eq 0 ] || ! grep -Fq 'staged/working-tree diff가 다릅니다' <<< "$tracked_output"; then
+if [ "$tracked_status" -eq 0 ] || ! grep -Fq 'tracked checkout 상태가 다릅니다' <<< "$tracked_output"; then
   printf '%s\n' "$tracked_output" >&2
   fail 'tracked dirty checkout을 pre-push가 차단하지 않았습니다.'
 fi
