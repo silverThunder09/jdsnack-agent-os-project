@@ -35,6 +35,7 @@ $staleSha = ('b' * 40) -join ''
 $latestByLogin = @{
     staleReviewer = [pscustomobject]@{ State = 'APPROVED'; CommitOid = $staleSha }
     currentReviewer = [pscustomobject]@{ State = 'APPROVED'; CommitOid = $headSha }
+    dismissedReviewer = [pscustomobject]@{ State = 'DISMISSED'; CommitOid = $headSha }
     currentRequester = [pscustomobject]@{ State = 'CHANGES_REQUESTED'; CommitOid = $headSha }
 }
 $approvers = @(Get-CurrentHeadApprovers -LatestByLogin $latestByLogin -ExpectedHeadSha $headSha)

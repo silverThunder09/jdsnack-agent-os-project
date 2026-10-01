@@ -402,6 +402,9 @@ for approval_contract in \
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
+if grep -Fq -- "if (\$reviewState -ieq 'DISMISSED')" "$APPROVAL_SCRIPT"; then
+    fail 'Dismissed human reviews must remain in latest-state selection so they revoke earlier approvals.'
+fi
 unresolved_changes_line="$(grep -nF -- 'Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary' "$APPROVAL_SCRIPT" | cut -d: -f1)"
 dry_run_success_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun) {' "$APPROVAL_SCRIPT" | cut -d: -f1)"
 [[ -n "$unresolved_changes_line" && -n "$dry_run_success_line" && "$unresolved_changes_line" -lt "$dry_run_success_line" ]] \

@@ -281,9 +281,6 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
             continue
         }
         $reviewState = [string]$review.state
-        if ($reviewState -ieq 'DISMISSED') {
-            continue
-        }
         $reviewId = [string]$review.id
         if ([string]::IsNullOrWhiteSpace($reviewId)) {
             $reviewId = [string]$review.databaseId
