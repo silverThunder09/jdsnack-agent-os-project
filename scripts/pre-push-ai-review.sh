@@ -43,21 +43,31 @@ answer_path="$tmp_dir/answer.md"
 git diff --cached --no-ext-diff --no-textconv --unified=80 > "$staged_path"
 git diff --no-ext-diff --no-textconv --unified=80 > "$working_path"
 
-reviewed_ref="HEAD"
-found_ref=0
+push_refs=()
+push_shas=()
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "${local_ref:-}" ] && continue
   case "$local_sha" in
     0000000000000000000000000000000000000000) continue ;;
   esac
-  reviewed_ref="$local_sha"
-  found_ref=1
-  break
+  push_refs+=("$local_ref")
+  push_shas+=("$local_sha")
 done
 
-if [ "$found_ref" -eq 0 ]; then
+if [ "${#push_shas[@]}" -eq 0 ]; then
   printf 'No branch update is being pushed; pre-push AI review is not required.\n'
   exit 0
+fi
+if [ "${#push_shas[@]}" -ne 1 ]; then
+  echo "ERROR: 여러 ref가 한 번에 push되어 pre-push 리뷰 대상을 단일 커밋에 고정할 수 없습니다. ref별로 다시 push하십시오." >&2
+  printf 'refs=%s\n' "${push_refs[*]}" >&2
+  exit 1
+fi
+reviewed_ref="${push_shas[0]}"
+
+if [ -s "$staged_path" ] || [ -s "$working_path" ]; then
+  echo "ERROR: push 대상 커밋과 staged/working-tree diff가 다릅니다. 변경을 먼저 커밋한 뒤 push하십시오." >&2
+  exit 1
 fi
 
 if ! git diff --no-ext-diff --no-textconv --unified=80 "$base_sha...$reviewed_ref" > "$branch_path"; then
@@ -86,6 +96,11 @@ fi
 expected_risk_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
+expected_dry_run="$(jq -r '.dryRun' <<< "$risk_json")"
+if [ "$expected_dry_run" != "true" ]; then
+  echo "ERROR: 초기 pre-push 정책은 dry-run=true여야 합니다. 정책 변경은 별도 운영 승인으로 진행하십시오." >&2
+  exit 1
+fi
 if [ -z "$expected_risk_score" ] || [ -z "$expected_risk" ] || [ -z "$expected_labels" ]; then
   echo "ERROR: 결정론적 pre-push 위험도 결과가 불완전합니다. push를 차단합니다." >&2
   exit 1
@@ -127,6 +142,20 @@ if command -v cygpath >/dev/null 2>&1; then
   codex_tmp_dir="$(cygpath -w "$tmp_dir")"
   codex_answer_path="$(cygpath -w "$answer_path")"
 fi
+
+clear_review_environment() {
+  local name
+  for name in $(compgen -v); do
+    case "$name" in
+      PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|TEMP|TMP|TMPDIR|SystemRoot|SYSTEMROOT|LANG|LC_*|TERM|PWD|OLDPWD|SHLVL|_)
+        ;;
+      GITHUB_*|GH_*|AWS_*|AZURE_*|GOOGLE_*|OPENAI_*|ANTHROPIC_*|GEMINI_*|DATABASE_*|REDIS_*|SSH_*|GIT_*|*_TOKEN|*_KEY|*_SECRET|*_PASSWORD|*_CREDENTIAL*|*_AUTH*|*_URL)
+        unset "$name" 2>/dev/null || true
+        ;;
+    esac
+  done
+}
+clear_review_environment
 
 if ! codex exec \
   --ephemeral \

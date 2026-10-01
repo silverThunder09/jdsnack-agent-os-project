@@ -494,6 +494,9 @@ function Publish-ReviewLabels {
     foreach ($label in @($labels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)) {
         $color = Get-ReviewLabelColor $label
         & $ghPath label create $label --repo $Repository --color $color --description 'JDSnack automated review routing' --force 2>&1 | Out-Null
+        if ([int]$LASTEXITCODE -ne 0) {
+            throw "Could not create or update review label '$label'."
+        }
         & $ghPath pr edit $PullRequestNumber --repo $Repository --add-label $label 2>&1 | Out-Null
         if ([int]$LASTEXITCODE -ne 0) {
             throw "Could not add review label '$label' to PR #$PullRequestNumber."
@@ -524,9 +527,11 @@ function Publish-PassComment {
 
 - reviewer backend: $($Result.ReviewerBackend)
 - fallback reason: $($Result.FallbackReason)
+- decision: $($Result.DecisionLabel)
 - review score: $($Result.ScoreLabel)
 - risk score: $($ReviewInputs.RiskAssessment.riskScore)/100 ($($ReviewInputs.RiskAssessment.riskBand))
 - risk components: $componentScores
+- reviewed base SHA: $BaseSha
 - reviewed head SHA: $HeadSha
 - review labels: $(@($ReviewInputs.RiskAssessment.reviewLabels) -join ', ')
 - merge policy: $($ReviewInputs.RiskAssessment.autoMergePolicy)
@@ -535,6 +540,10 @@ function Publish-PassComment {
 ### 요약
 
 $($Result.ReviewSummary)
+
+### Findings
+
+$($Result.Findings)
 "@
     Set-Content -LiteralPath $commentPath -Value $commentBody -Encoding utf8
     & $ghPath pr comment $PullRequestNumber --repo $Repository --body-file $commentPath 2>&1 | Out-Null

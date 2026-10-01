@@ -10,7 +10,7 @@ Claude는 **기획·검증·리뷰·통합**을 맡고, **기능 구현·테스�
 - ✅ 문서 계획·작성 → `doc-planner` 서브에이전트 또는 메인 plan 모드. 모델 배정은 [backends.json](backends.json)을 따른다. `.agent-os/` 하네스 규칙(`doc-lifecycle.md`·`definition-of-done.md` 등)에 맞춘다.
 - ✅ 게이트 검증 → 빌드/lint/test/e2e(아래 명령)로 Codex 산출물을 확인한다.
 - ✅ 독립 리뷰·채점 → `code-reviewer` 서브에이전트에 **diff와 합격기준만** 넘겨 5점 채점(`/review-loop`). 레포 전체를 주입하지 않는다.
-- ✅ PR 생성·관리 → 이벤트 기반 자동 루프. **일반 `codex/*` 구현 PR과 자동 생성된 Spec promotion PR은 게이트 통과 시 자동 머지**하고, High-risk·충돌·사람 판단이 필요한 큐 후보는 `needs-human`으로 중단합니다.
+- ✅ PR 생성·관리 → 이벤트 기반 자동 루프. **일반 `codex/*` 구현 PR과 자동 생성된 Spec promotion PR은 게이트 통과 시 위험도 정책에 따라 처리**하고, High-risk는 사람 승인 2명과 최신 head 소유자 확인을 거친 뒤에만 허용합니다. 충돌·미해결·사람 판단이 필요한 큐 후보는 `needs-human`으로 중단합니다.
 - ❌ **기능 구현 + 기능 테스트 작성, 리뷰 기반 코드 수정·커밋·푸시 → Codex 담당.**
 - ❌ CI/CD 배포(GHCR publish, `compose.prod.yaml`, 배포 워크플로/런북, 자동 배포·검증) → Codex 담당(사용자 지시 시).
 

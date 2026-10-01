@@ -41,6 +41,69 @@ function Matches-AnyPattern {
     return $false
 }
 
+function Assert-FixedReviewPolicy {
+    param([pscustomobject]$ReviewPolicy)
+
+    $expectedWeights = [ordered]@{
+        security = 30
+        apiDbEnvironment = 20
+        sizeScope = 15
+        testGap = 15
+        migration = 20
+    }
+    foreach ($weightName in $expectedWeights.Keys) {
+        if ($null -eq $ReviewPolicy.riskScore.weights.$weightName -or [int]$ReviewPolicy.riskScore.weights.$weightName -ne $expectedWeights[$weightName]) {
+            throw "Review policy weight is not fixed for $weightName."
+        }
+    }
+    if (
+        [int]$ReviewPolicy.riskScore.size.small.maxChangedLines -ne 100 -or
+        [int]$ReviewPolicy.riskScore.size.small.maxFiles -ne 5 -or
+        [int]$ReviewPolicy.riskScore.size.small.maxScopes -ne 1 -or
+        [int]$ReviewPolicy.riskScore.size.small.points -ne 0 -or
+        [int]$ReviewPolicy.riskScore.size.medium.maxChangedLines -ne 300 -or
+        [int]$ReviewPolicy.riskScore.size.medium.maxFiles -ne 10 -or
+        [int]$ReviewPolicy.riskScore.size.medium.maxScopes -ne 2 -or
+        [int]$ReviewPolicy.riskScore.size.medium.points -ne 8 -or
+        [int]$ReviewPolicy.riskScore.size.largePoints -ne 15
+    ) {
+        throw 'Review policy size thresholds are not fixed.'
+    }
+
+    $expectedBands = @(
+        [pscustomobject]@{ name = 'Light'; maxScore = 30; minimumApprovals = 1; autoMerge = 'allowed-after-approval'; requiresOwnerSignoff = $false }
+        [pscustomobject]@{ name = 'Standard'; maxScore = 60; minimumApprovals = 1; autoMerge = 'blocked'; requiresOwnerSignoff = $false }
+        [pscustomobject]@{ name = 'High-risk'; maxScore = 100; minimumApprovals = 2; autoMerge = 'allowed-after-additional-review-and-owner-signoff'; requiresOwnerSignoff = $true }
+    )
+    $actualBands = @($ReviewPolicy.bands)
+    if ($actualBands.Count -ne $expectedBands.Count) {
+        throw 'Review policy must define exactly three fixed risk bands.'
+    }
+    for ($index = 0; $index -lt $expectedBands.Count; $index++) {
+        $expected = $expectedBands[$index]
+        $actual = $actualBands[$index]
+        if (
+            [string]$actual.name -ne $expected.name -or
+            [int]$actual.maxScore -ne $expected.maxScore -or
+            [int]$actual.minimumApprovals -ne $expected.minimumApprovals -or
+            [string]$actual.autoMerge -ne $expected.autoMerge -or
+            [bool]$actual.requiresOwnerSignoff -ne $expected.requiresOwnerSignoff
+        ) {
+            throw "Review policy risk band is not fixed: $($expected.name)."
+        }
+    }
+
+    foreach ($label in @('Security', 'Performance', 'Test Coverage', 'Architecture')) {
+        $property = $ReviewPolicy.reviewRouting.PSObject.Properties[$label]
+        if ($null -eq $property -or @($property.Value).Count -eq 0) {
+            throw "Review policy routing is missing a path rule for $label."
+        }
+    }
+    if ($null -eq $ReviewPolicy.dryRun -or $ReviewPolicy.dryRun -isnot [bool]) {
+        throw 'Review policy dryRun must be an explicit boolean.'
+    }
+}
+
 function Get-ReviewRiskAssessment {
     param(
         [string]$ReviewWorkspace,
@@ -66,6 +129,7 @@ function Get-ReviewRiskAssessment {
     if ([int]$policy.version -ne 1) {
         throw "Unsupported review policy version: $($policy.version)"
     }
+    Assert-FixedReviewPolicy -ReviewPolicy $policy
 
     $gitPath = Resolve-ToolPath 'git'
     if ([string]::IsNullOrWhiteSpace($gitPath)) {

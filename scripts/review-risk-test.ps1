@@ -25,6 +25,47 @@ function Assert-Equal {
     }
 }
 
+function New-SingleFileAssessment {
+    param(
+        [string]$Name,
+        [string]$RelativePath,
+        [string]$Content
+    )
+
+    $fixtureRoot = Join-Path $tempRoot $Name
+    New-Item -ItemType Directory -Path $fixtureRoot -Force | Out-Null
+    $invokeFixtureGit = {
+        param([string[]]$Arguments)
+        $output = & git -C $fixtureRoot @Arguments
+        if ([int]$LASTEXITCODE -ne 0) {
+            throw "git $($Arguments -join ' ') failed for $Name with exit $LASTEXITCODE"
+        }
+        return $output
+    }
+    & $invokeFixtureGit @('init', '--quiet') | Out-Null
+    & $invokeFixtureGit @('config', 'user.name', 'JDSnack Risk Test') | Out-Null
+    & $invokeFixtureGit @('config', 'user.email', 'risk-test@example.invalid') | Out-Null
+    Set-Content -LiteralPath (Join-Path $fixtureRoot 'README.md') -Value 'base' -Encoding utf8
+    & $invokeFixtureGit @('add', 'README.md') | Out-Null
+    & $invokeFixtureGit @('commit', '--quiet', '-m', 'test: seed band fixture') | Out-Null
+    $fixtureBaseSha = ([string](& $invokeFixtureGit @('rev-parse', 'HEAD'))).Trim()
+
+    $normalizedPath = $RelativePath.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+    $targetPath = Join-Path $fixtureRoot $normalizedPath
+    New-Item -ItemType Directory -Path (Split-Path -Parent $targetPath) -Force | Out-Null
+    Set-Content -LiteralPath $targetPath -Value $Content -Encoding utf8
+    & $invokeFixtureGit @('add', '.') | Out-Null
+    & $invokeFixtureGit @('commit', '--quiet', '-m', 'test: exercise risk band') | Out-Null
+    $fixtureHeadSha = ([string](& $invokeFixtureGit @('rev-parse', 'HEAD'))).Trim()
+
+    $policyPath = Join-Path $PSScriptRoot 'review-policy.json'
+    $json = & $scriptPath -Workspace $fixtureRoot -BaseSha $fixtureBaseSha -HeadSha $fixtureHeadSha -PolicyPath $policyPath | Out-String
+    if ([int]$LASTEXITCODE -ne 0) {
+        throw "review-risk.ps1 failed for ${Name}: $json"
+    }
+    return ConvertFrom-Json -InputObject $json
+}
+
 try {
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
     Invoke-Git @('init', '--quiet') | Out-Null
@@ -60,6 +101,18 @@ try {
     Assert-Equal ($assessment.reviewLabels -contains 'Test Coverage') $true 'Test Coverage routing label'
     Assert-Equal ($assessment.reviewLabels -contains 'Architecture') $true 'Architecture routing label'
     Assert-Equal $assessment.dryRun $true 'default dry-run policy'
+
+    $lightAssessment = New-SingleFileAssessment -Name 'light' -RelativePath 'docs/note.md' -Content 'small change'
+    Assert-Equal $lightAssessment.riskScore 0 'light fixture score'
+    Assert-Equal $lightAssessment.riskBand 'Light' 'light fixture band'
+    Assert-Equal $lightAssessment.minimumApprovals 1 'light approval count'
+    Assert-Equal $lightAssessment.autoMergePolicy 'allowed-after-approval' 'light merge policy'
+
+    $standardAssessment = New-SingleFileAssessment -Name 'standard' -RelativePath 'backend/src/main/controller/FixtureController.java' -Content 'class FixtureController {}'
+    Assert-Equal $standardAssessment.riskScore 35 'standard fixture score'
+    Assert-Equal $standardAssessment.riskBand 'Standard' 'standard fixture band'
+    Assert-Equal $standardAssessment.minimumApprovals 1 'standard approval count'
+    Assert-Equal $standardAssessment.autoMergePolicy 'blocked' 'standard merge policy'
     Write-Output 'Review risk scoring tests passed'
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {
