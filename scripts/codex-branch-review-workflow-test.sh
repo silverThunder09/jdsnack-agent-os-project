@@ -114,6 +114,8 @@ grep -Fq -- '--sandbox read-only' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || f
 grep -Fq -- '--disable shell_tool' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 shell tool을 비활성화하지 않습니다.'
 grep -Fq -- 'risk_score:' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 결정론 위험도 점수를 검증하지 않습니다.'
 grep -Fq -- 'has_structured_body' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 구조화된 findings/summary를 검증하지 않습니다.'
+grep -Fq -- 'has_blocking_finding' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 blocker/major findings를 검증하지 않습니다.'
+grep -Fq -- 'blocker/major 또는 P0/P1' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 P0/P1 차단 결과를 알리지 않습니다.'
 grep -Fq -- 'expected_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 host 계산 점수를 보존하지 않습니다.'
 grep -Fq -- 'reported_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 점수 불일치를 차단하지 않습니다.'
 grep -Fq -- 'reported_review_labels' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 라벨 불일치를 차단하지 않습니다.'
@@ -301,6 +303,11 @@ for approval_contract in \
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
+dry_run_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun)' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
+self_review_line="$(grep -nF -- "if (\$reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback')" "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
+approval_summary_line="$(grep -nF -- '$approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
+[[ -n "$dry_run_line" && -n "$self_review_line" && -n "$approval_summary_line" && "$self_review_line" -lt "$dry_run_line" && "$approval_summary_line" -lt "$dry_run_line" ]] \
+    || fail '드라이런 종료 전에 fallback 자기검수와 사람 승인 게이트를 검증해야 합니다.'
 if grep -Fq -- '--admin' "$APPROVAL_SCRIPT"; then
     fail '분리된 승인 게이트는 관리자 우회 머지를 포함하면 안 됩니다.'
 fi

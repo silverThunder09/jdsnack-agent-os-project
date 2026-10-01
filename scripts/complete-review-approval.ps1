@@ -257,15 +257,6 @@ if ($reviewChecks.Count -ne 1 -or $reviewChecks[0].bucket -ne 'pass') {
     Stop-NeedsHuman 'The review job gate is missing, ambiguous, or not passing.'
 }
 
-if ([bool]$riskAssessment.dryRun) {
-    $message = "Review gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; dry-run is enabled, so no merge command was executed."
-    Write-Output $message
-    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
-        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $message
-    }
-    exit 0
-}
-
 if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
     Stop-NeedsHuman 'Implementation and reviewer backend are both Codex fallback; automatic merge is disabled for self-review prevention.'
 }
@@ -274,6 +265,16 @@ $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
 if ($approvalSummary.Count -lt [int]$riskAssessment.minimumApprovals) {
     Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) requires at least $($riskAssessment.minimumApprovals) human approval(s); found $($approvalSummary.Count)."
 }
+
+if ([bool]$riskAssessment.dryRun) {
+    $message = "Review gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; $($riskAssessment.riskBand) has the required human approval(s), dry-run is enabled, and no merge command was executed."
+    Write-Output $message
+    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
+        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $message
+    }
+    exit 0
+}
+
 if ([string]$riskAssessment.autoMergePolicy -eq 'blocked') {
     $message = "Risk gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; $($riskAssessment.riskBand) has the required human approval(s), and automatic merge remains blocked by policy."
     Write-Output $message

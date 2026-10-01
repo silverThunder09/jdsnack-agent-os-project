@@ -132,6 +132,7 @@ risk: Light | Standard | High-risk
 risk_score: $expected_risk_score
 review_labels: $expected_labels
 findings:
+- Use "- none" when there are no unresolved findings. Otherwise start every finding with exactly one severity prefix: "- P0", "- P1", "- P2", or "- P3". PASS is valid only when findings contains "- none" or P2/P3 findings and has no blocker or major finding.
 review_summary:
 
 PROMPT
@@ -226,6 +227,10 @@ has_structured_body() {
   ' "$answer_path"
 }
 
+has_blocking_finding() {
+  grep -Ei '^[[:space:]]*[-*][[:space:]]*(P0|P1|blocker|major)' "$answer_path" >/dev/null 2>&1
+}
+
 if [ "$decision" != "PASS" ] || [ "${score:-0}" -lt 4 ]; then
   echo "ERROR: Codex pre-push 리뷰 기준 미달입니다. push를 차단합니다." >&2
   printf 'decision=%s score=%s risk=%s risk_score=%s review_labels=%s\n' "${decision:-unavailable}" "${score:-unavailable}" "${risk:-unavailable}" "${risk_score:-unavailable}" "${review_labels:-unavailable}" >&2
@@ -249,6 +254,11 @@ if [ -z "$review_labels" ] || [ "$review_labels" != "$expected_labels" ]; then
 fi
 if ! has_structured_body findings review_summary || ! has_structured_body review_summary __end_of_review__; then
   echo "ERROR: Codex pre-push 리뷰의 findings/review_summary 본문이 비어 있습니다. push를 차단합니다." >&2
+  exit 1
+fi
+if has_blocking_finding; then
+  echo "ERROR: Codex pre-push 리뷰의 findings에 blocker/major 또는 P0/P1 항목이 있어 push를 차단합니다." >&2
+  sed -n '/^findings:/,/^review_summary:/p' "$answer_path" >&2 || true
   exit 1
 fi
 

@@ -91,12 +91,12 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 - Codex review-fallback 모델(`backends.json`)이 구조화된 `PASS`와 4점 이상을 반환해야 합니다.
 - 리뷰 결과의 `risk`, `risk_score`, 전문 라벨이 `scripts/review-risk.ps1`의 branch diff 계산과 일치해야 하며 `findings`와 `review_summary` 본문도 비어 있지 않아야 합니다.
-- 리뷰 실행 실패, 필드 누락, `COMMENT`, `REQUEST_CHANGES`, `NEEDS_HUMAN`, 4점 미만이면 push를 차단합니다.
+- 리뷰 실행 실패, 필드 누락, `COMMENT`, `REQUEST_CHANGES`, `NEEDS_HUMAN`, 4점 미만, 또는 findings에 `P0`, `P1`, `blocker`, `major`가 있으면 push를 차단합니다. PASS 응답은 `findings: - none` 또는 P2/P3 항목만 허용합니다.
 - 한 번에 하나의 ref만 허용하고 `origin/main`의 후손인 단일 push head만 리뷰합니다. staged·working-tree의 tracked diff도 함께 증적에 넣고, 리뷰 중 증적이 바뀌거나 tracked dirty 상태가 남아 있으면 최종 push를 차단합니다. untracked 파일은 push 증적에 포함되지 않으므로 대상에서 제외합니다.
 - Codex에는 diff만 전달하고 shell·network·credential·repository access를 허용하지 않습니다.
 - 빌드·lint·test·E2E는 CI가 담당하며 hook에서 모델 배정으로 대체하지 않습니다.
 
-`scripts/pre-push-ai-review-test.sh`는 fake Codex를 격리해 PASS 경로와 위험도 불일치 차단 경로를 모두 확인합니다.
+`scripts/pre-push-ai-review-test.sh`는 임시 Git worktree와 fake Codex를 사용해 PASS 경로, 위험도 불일치, blocker/P1 차단, 다중 ref, tracked dirty checkout을 확인합니다. 테스트는 현재 checkout의 추적 파일을 수정하지 않습니다.
 
 예시 명령:
 
