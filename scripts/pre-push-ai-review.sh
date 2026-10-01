@@ -177,6 +177,16 @@ findings:
 - Use "- none" when there are no unresolved findings. Otherwise start every finding with exactly one severity prefix: "- P0", "- P1", "- P2", or "- P3". PASS is valid only when findings contains "- none" or P2/P3 findings and has no blocker or major finding.
 review_summary:
 
+The review_summary must contain exactly one concise evidence line for each rubric item and a conclusion:
+- correctness: PASS — concrete evidence
+- contract: PASS — concrete evidence
+- tests: PASS — concrete evidence
+- security: PASS — concrete evidence
+- maintainability: PASS — concrete evidence
+- score rationale: <reported score>/5 — why the five rubric items support that score
+- conclusion: concise review conclusion
+Use the actual reported score in score rationale. If findings contains P2/P3 items, mention P2 or P3 in score rationale or conclusion. Do not use placeholders such as TBD or N/A.
+
 PROMPT
 printf '\nRequested reviewer model: %s\nRuntime reviewer model: %s\n' "$REQUESTED_MODEL" "$MODEL" >> "$prompt_path"
 printf '\nReview base: %s\nReview head: %s\n' "$base_sha" "$reviewed_ref" >> "$prompt_path"
@@ -370,6 +380,33 @@ has_valid_findings() {
   ' "$answer_path"
 }
 
+has_auditable_review_summary() {
+  local expected_score="$1"
+  local summary_path="$tmp_dir/review-summary.txt"
+  "$awk_bin" '
+    /^[[:space:]]*review_summary:[[:space:]]*$/ { in_summary=1; next }
+    in_summary { print }
+  ' "$answer_path" > "$summary_path"
+
+  local rubric_name
+  for rubric_name in correctness contract tests security maintainability; do
+    if ! "$grep_bin" -Eiq "^[[:space:]]*-[[:space:]]+$rubric_name:[[:space:]]+(PASS|OK|SATISFIED)[[:space:]]+.{10,}$" "$summary_path"; then
+      return 1
+    fi
+  done
+  if ! "$grep_bin" -Eiq "^[[:space:]]*-[[:space:]]+score rationale:[[:space:]]+${expected_score}/5[[:space:]]+.{10,}$" "$summary_path"; then
+    return 1
+  fi
+  if ! "$grep_bin" -Eiq '^[[:space:]]*-[[:space:]]+conclusion:[[:space:]].{20,}$' "$summary_path"; then
+    return 1
+  fi
+  if "$grep_bin" -Eiq '^[[:space:]]*-[[:space:]]+P[23]([[:space:]]|$)' "$answer_path" \
+      && ! "$grep_bin" -Eiq 'P[23]' "$summary_path"; then
+    return 1
+  fi
+  return 0
+}
+
 if [ "$decision" != "PASS" ] || [ "${score:-0}" -lt 4 ]; then
   echo "ERROR: Codex pre-push 리뷰 기준 미달입니다. push를 차단합니다." >&2
   printf 'decision=%s score=%s risk=%s risk_score=%s review_labels=%s\n' "${decision:-unavailable}" "${score:-unavailable}" "${risk:-unavailable}" "${risk_score:-unavailable}" "${review_labels:-unavailable}" >&2
@@ -398,6 +435,11 @@ if ! has_single_field_header findings || ! has_single_field_header review_summar
 fi
 if ! has_valid_findings; then
   echo "ERROR: Codex pre-push 리뷰의 findings는 '- none' 또는 '- P0/P1/P2/P3' 심각도 접두사가 붙은 항목만 허용합니다. push를 차단합니다." >&2
+  exit 1
+fi
+if ! has_auditable_review_summary "$score"; then
+  echo "ERROR: Codex pre-push 리뷰의 review_summary가 5개 rubric과 보고 score를 구체적으로 입증하지 않습니다. push를 차단합니다." >&2
+  "$sed_bin" -n '/^[[:space:]]*review_summary:[[:space:]]*$/,$p' "$answer_path" | "$tail_bin" -n 20 >&2 || true
   exit 1
 fi
 if has_blocking_finding; then

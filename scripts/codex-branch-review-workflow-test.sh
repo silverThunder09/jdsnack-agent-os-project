@@ -126,6 +126,8 @@ grep -Fq -- 'extract_single_field()' "$ROOT_DIR/scripts/pre-push-ai-review.sh" |
 grep -Fq -- 'has_single_field_header()' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 구조화 field header 중복을 검증하지 않습니다.'
 grep -Fq -- 'has_blocking_finding' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 blocker/major findings를 검증하지 않습니다.'
 grep -Fq -- 'has_valid_findings' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 finding 심각도 형식을 검증하지 않습니다.'
+grep -Fq -- 'has_auditable_review_summary' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 rubric 근거와 score rationale을 검증하지 않습니다.'
+grep -Fq -- 'score rationale:' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 score rationale 계약이 없습니다.'
 grep -Fq -- 'blocker/major 또는 P0/P1' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 P0/P1 차단 결과를 알리지 않습니다.'
 grep -Fq -- 'expected_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 host 계산 점수를 보존하지 않습니다.'
 grep -Fq -- 'reported_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 점수 불일치를 차단하지 않습니다.'
@@ -379,8 +381,12 @@ dry_run_success_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun) {' "$APPR
     || fail 'Unresolved change requests must be rejected before the dry-run success path.'
 RISK_SCRIPT="$ROOT_DIR/scripts/review-risk.ps1"
 grep -Fq -- 'expectedScoringPathPatterns' "$RISK_SCRIPT" || fail '위험도 계산기가 source/test scoring path patterns를 고정하지 않습니다.'
+grep -Fq -- 'dryRun is fixed to true' "$RISK_SCRIPT" || fail '위험도 계산기가 dryRun=true 정책을 고정하지 않습니다.'
 grep -Fq -- 'scripts/.*-test' "$ROOT_DIR/scripts/review-policy.json" || fail 'PowerShell test path가 위험도 정책에 포함되지 않았습니다.'
 grep -Fq -- 'ChangesRequested' "$APPROVAL_SCRIPT" || fail '승인 게이트가 unresolved change request를 차단하지 않습니다.'
+PR_GATE_SCRIPT="$ROOT_DIR/scripts/pr-review-gate.sh"
+grep -Fq -- 'current_refs_path' "$PR_GATE_SCRIPT" || fail 'PR review gate가 위험도 계산 후 최신 PR SHA를 보관하지 않습니다.'
+grep -Fq -- '위험도 계산 중 변경되어' "$PR_GATE_SCRIPT" || fail 'PR review gate가 위험도 계산 중 PR SHA 변경을 차단하지 않습니다.'
 dry_run_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun)' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
 self_review_line="$(grep -nF -- "if (\$reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback')" "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
 approval_summary_line="$(grep -nF -- '$approvalSummary = Get-HumanApprovalSummary' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"

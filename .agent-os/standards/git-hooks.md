@@ -91,6 +91,7 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 - Codex review-fallback 모델(`backends.json`)이 구조화된 `PASS`와 4점 이상을 반환해야 합니다.
 - 리뷰 결과의 `risk`, `risk_score`, 전문 라벨이 `scripts/review-risk.ps1`의 branch diff 계산과 일치해야 하며 `findings`와 `review_summary` 본문도 비어 있지 않아야 합니다.
+- `PASS`의 `review_summary`는 correctness·contract·tests·security·maintainability 5개 rubric의 구체적 근거, 보고 score와 일치하는 `score rationale`, 결론을 포함해야 하며, P2/P3 finding은 summary에서도 언급해야 합니다.
 - 리뷰 실행 실패, 필드 누락·중복, `COMMENT`, `REQUEST_CHANGES`, `NEEDS_HUMAN`, 4점 미만, findings 형식 오류, 또는 findings에 `P0`, `P1`, `blocker`, `major`가 있으면 push를 차단합니다. PASS 응답은 `findings: - none` 또는 심각도 접두사가 붙은 P2/P3 항목만 허용합니다.
 - 한 번에 하나의 ref만 허용하고 `origin/main`의 후손인 단일 push head만 리뷰합니다. 삭제 ref만 있는 push처럼 리뷰 대상 head가 없는 경로도 tracked checkout이 clean한지 먼저 확인하며, push head가 현재 checkout의 `HEAD`와 정확히 같아야 합니다. staged·working-tree의 tracked 변경이 있으면 Codex reviewer를 시작하기 전에 차단하고, reviewer 종료 후에도 staged·working-tree/status/HEAD 증적을 다시 비교해 리뷰 중 checkout 변경을 차단합니다. untracked 파일은 push 증적에 포함되지 않으므로 대상에서 제외합니다.
 - Codex에는 diff만 전달하고 shell·network·credential·repository access를 허용하지 않습니다.

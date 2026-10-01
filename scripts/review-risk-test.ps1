@@ -104,6 +104,21 @@ try {
     Assert-Equal ($assessment.topLevelScopes -contains 'backend/src/main/resources') $true 'resources logical scope'
     Assert-Equal $assessment.dryRun $true 'default dry-run policy'
 
+    $tamperedDryRunPath = Join-Path $tempRoot 'tampered-dry-run-policy.json'
+    $tamperedDryRunPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
+    $tamperedDryRunPolicy.dryRun = $false
+    $tamperedDryRunPolicy | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tamperedDryRunPath -Encoding utf8
+    $tamperedDryRunExitCode = 0
+    try {
+        $tamperedDryRunOutput = & $scriptPath -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedDryRunPath 2>&1 | Out-String
+        $tamperedDryRunExitCode = [int]$LASTEXITCODE
+    } catch {
+        $tamperedDryRunExitCode = 1
+    }
+    if ($tamperedDryRunExitCode -eq 0) {
+        throw 'review-risk.ps1 accepted a policy with dryRun=false.'
+    }
+
     $policyPath = Join-Path $PSScriptRoot 'review-policy.json'
     foreach ($patternGroup in @('security', 'apiDbEnvironment', 'migration')) {
         $tamperedPolicyPath = Join-Path $tempRoot "tampered-$patternGroup-policy.json"

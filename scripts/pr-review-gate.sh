@@ -163,6 +163,19 @@ if command -v cygpath >/dev/null 2>&1; then
   workspace_arg="$(cygpath -w "$ROOT_DIR")"
 fi
 risk_json="$($pwsh_bin -NoProfile -File "$workspace_arg/scripts/review-risk.ps1" -Workspace "$workspace_arg" -BaseSha "$base_sha" -HeadSha "$head_sha")"
+current_refs_path="$tmp_dir/current-refs.json"
+if ! gh pr view "$PR_NUMBER" --json baseRefOid,headRefOid > "$current_refs_path"; then
+  echo "ERROR: 위험도 계산 후 PR base/head SHA를 다시 확인하지 못했습니다." >&2
+  exit 1
+fi
+current_base_sha="$(jq -r '.baseRefOid // empty' "$current_refs_path")"
+current_head_sha="$(jq -r '.headRefOid // empty' "$current_refs_path")"
+if [ "$current_base_sha" != "$base_sha" ] || [ "$current_head_sha" != "$head_sha" ]; then
+  echo "ERROR: PR base/head SHA가 위험도 계산 중 변경되어 평가를 중단합니다." >&2
+  printf 'initial_base=%s current_base=%s initial_head=%s current_head=%s\n' \
+    "$base_sha" "$current_base_sha" "$head_sha" "$current_head_sha" >&2
+  exit 1
+fi
 risk_score="$(jq -r '.riskScore' <<< "$risk_json")"
 risk_level="$(jq -r '.riskBand' <<< "$risk_json")"
 risk_policy="$(jq -r '.autoMergePolicy' <<< "$risk_json")"

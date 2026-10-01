@@ -140,7 +140,18 @@ if [ -f "$0.failure" ]; then
 fi
 {
   printf 'review_summary:\n'
-  printf 'Synthetic pre-push contract result.\n'
+  if [ -f "$0.weak-summary" ]; then
+    printf 'insufficient summary\n'
+  else
+    fake_score="${JDSNACK_FAKE_SCORE:-5}"
+    printf '%s\n' '- correctness: PASS — the reviewed diff has a coherent implementation.'
+    printf '%s\n' '- contract: PASS — the requested workflow contracts are covered.'
+    printf '%s\n' '- tests: PASS — executable contract tests cover the changed paths.'
+    printf '%s\n' '- security: PASS — restricted execution and fail-closed checks are preserved.'
+    printf '%s\n' '- maintainability: PASS — the change keeps validation responsibilities explicit.'
+    printf '%s\n' "- score rationale: ${fake_score}/5 — all five rubric items have concrete passing evidence."
+    printf '%s\n' '- conclusion: the reviewed change is safe and complete for this push.'
+  fi
 } >> "$output_path"
 FAKE_CODEX
 chmod +x "$fake_root/codex"
@@ -190,6 +201,20 @@ if [ "$remote_status" -eq 0 ] || ! grep -Fq 'remote는 origin으로 고정' <<< 
 fi
 if [ -e "$fake_root/codex.invoked" ]; then
   fail 'origin 이외 remote push가 Codex reviewer 실행 전에 차단되지 않았습니다.'
+fi
+
+touch "$fake_root/codex.weak-summary"
+set +e
+weak_summary_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+weak_summary_status=$?
+set -e
+rm -f "$fake_root/codex.weak-summary"
+if [ "$weak_summary_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$weak_summary_output"; then
+  printf '%s\n' "$weak_summary_output" >&2
+  fail '실질적인 rubric 근거가 없는 review_summary를 pre-push가 차단하지 않았습니다.'
 fi
 
 touch "$fake_root/codex.duplicate"

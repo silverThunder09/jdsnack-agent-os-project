@@ -152,6 +152,9 @@ function Assert-FixedReviewPolicy {
     if ($null -eq $ReviewPolicy.dryRun -or $ReviewPolicy.dryRun -isnot [bool]) {
         throw 'Review policy dryRun must be an explicit boolean.'
     }
+    if ($ReviewPolicy.dryRun -ne $true) {
+        throw 'Review policy dryRun is fixed to true for this workflow.'
+    }
 }
 
 function Get-LogicalReviewScope {
