@@ -82,8 +82,8 @@ codex_dir="${0%/*}"
 [ "$help_requested" -eq 1 ] && exit 0
 [ -n "$output_path" ] || exit 2
 [ "$network_config_seen" -eq 1 ] || exit 9
-case ":${PATH-}:" in
-  *":$codex_dir:"*) ;;
+case "${PATH-}" in
+  */reviewer-bin) ;;
   *) exit 3 ;;
 esac
 if command -v git >/dev/null 2>&1; then

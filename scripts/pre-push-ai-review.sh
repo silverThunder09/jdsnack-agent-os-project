@@ -18,7 +18,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm jq codex; do
+for tool in env git grep tail sed head awk cmp rm cp jq codex; do
   require_host_tool "$tool"
 done
 require_host_tool cat
@@ -237,7 +237,14 @@ if [ -z "$codex_dir" ] || [ "$codex_dir" = "$codex_bin" ]; then
   echo "ERROR: Codex CLI 경로를 제한된 reviewer PATH로 고정할 수 없습니다." >&2
   exit 1
 fi
-review_path="$codex_dir"
+reviewer_bin_dir="$tmp_dir/reviewer-bin"
+mkdir -p "$reviewer_bin_dir"
+reviewer_entry="$reviewer_bin_dir/codex"
+if ! "$cp_bin" "$codex_bin" "$reviewer_entry"; then
+  echo "ERROR: Codex reviewer 전용 실행 디렉터리를 만들 수 없습니다." >&2
+  exit 1
+fi
+review_path="$reviewer_bin_dir"
 review_env_args=("PATH=$review_path" "CODEX_HOME=$codex_home_arg")
 append_review_environment() {
   local name="$1"

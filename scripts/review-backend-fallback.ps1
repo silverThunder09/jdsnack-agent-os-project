@@ -118,8 +118,8 @@ function Assert-FixedReviewPolicy {
             throw "Fixed review policy weight changed: $($weight.Key)"
         }
     }
-    if ($null -eq $policy.dryRun -or $policy.dryRun.GetType().Name -ne 'Boolean') {
-        throw 'Fixed review policy dryRun must be an explicit boolean.'
+    if ($policy.dryRun -isnot [bool] -or $policy.dryRun -ne $true) {
+        throw 'Fixed review policy dryRun is fixed to true for this workflow.'
     }
     foreach ($label in @('Security', 'Performance', 'Test Coverage', 'Architecture')) {
         if ($null -eq $policy.reviewRouting.$label -or @($policy.reviewRouting.$label).Count -eq 0) {
