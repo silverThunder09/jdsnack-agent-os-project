@@ -160,6 +160,9 @@ function Get-HumanApprovalSummary {
         if ([string]::IsNullOrWhiteSpace($login) -or $login -eq $pullRequestAuthor -or $login -match '\[bot\]$') {
             continue
         }
+        if ([string]$review.authorAssociation -notin @('OWNER', 'MEMBER', 'COLLABORATOR')) {
+            continue
+        }
         if ($RequireCurrentHead -and [string]$review.commit.oid -ne $ExpectedHeadSha) {
             continue
         }

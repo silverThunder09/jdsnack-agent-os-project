@@ -114,6 +114,8 @@ grep -Fq -- '--sandbox read-only' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || f
 grep -Fq -- '--disable shell_tool' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 shell tool을 비활성화하지 않습니다.'
 grep -Fq -- 'risk_score:' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 결정론 위험도 점수를 검증하지 않습니다.'
 grep -Fq -- 'has_structured_body' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 구조화된 findings/summary를 검증하지 않습니다.'
+grep -Fq -- 'extract_single_field()' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 scalar 구조화 필드를 단일 값으로 검증하지 않습니다.'
+grep -Fq -- 'has_single_field_header()' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 구조화 field header 중복을 검증하지 않습니다.'
 grep -Fq -- 'has_blocking_finding' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 blocker/major findings를 검증하지 않습니다.'
 grep -Fq -- 'blocker/major 또는 P0/P1' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 P0/P1 차단 결과를 알리지 않습니다.'
 grep -Fq -- 'expected_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 host 계산 점수를 보존하지 않습니다.'
@@ -329,6 +331,8 @@ for approval_contract in \
     'commit.oid' \
     "'DISMISSED'" \
     'reviewState' \
+    "'OWNER', 'MEMBER', 'COLLABORATOR'" \
+    'authorAssociation' \
     'review.id' \
     'review.databaseId' \
     'CompareOrdinal' \

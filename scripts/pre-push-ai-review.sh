@@ -249,11 +249,37 @@ if [ ! -s "$answer_path" ]; then
   exit 1
 fi
 
-decision="$("$sed_bin" -nE 's/^[[:space:]]*decision:[[:space:]]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[[:space:]]*$/\1/p' "$answer_path" | "$head_bin" -n 1)"
-score="$("$sed_bin" -nE 's/^[[:space:]]*score:[[:space:]]*([0-5])([[:space:]]*\/5)?[[:space:]]*$/\1/p' "$answer_path" | "$head_bin" -n 1)"
-risk="$("$sed_bin" -nE 's/^[[:space:]]*risk:[[:space:]]*(Light|Standard|High-risk)[[:space:]]*$/\1/p' "$answer_path" | "$head_bin" -n 1)"
-risk_score="$("$sed_bin" -nE 's/^[[:space:]]*risk_score:[[:space:]]*([0-9]+)([[:space:]]*\/100)?[[:space:]]*$/\1/p' "$answer_path" | "$head_bin" -n 1)"
-review_labels="$("$sed_bin" -nE 's/^[[:space:]]*review_labels:[[:space:]]*(.*)$/\1/p' "$answer_path" | "$head_bin" -n 1 | "$sed_bin" 's/[[:space:]]*$//')"
+extract_single_field() {
+  local expression="$1"
+  local -a values=()
+  mapfile -t values < <("$sed_bin" -nE "$expression" "$answer_path")
+  if [ "${#values[@]}" -ne 1 ]; then
+    return 1
+  fi
+  printf '%s' "${values[0]}"
+}
+
+if ! decision="$(extract_single_field 's/^[[:space:]]*decision:[[:space:]]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[[:space:]]*$/\1/p')"; then
+  echo "ERROR: Codex pre-push 리뷰의 decision 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
+  exit 1
+fi
+if ! score="$(extract_single_field 's/^[[:space:]]*score:[[:space:]]*([0-5])([[:space:]]*\/5)?[[:space:]]*$/\1/p')"; then
+  echo "ERROR: Codex pre-push 리뷰의 score 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
+  exit 1
+fi
+if ! risk="$(extract_single_field 's/^[[:space:]]*risk:[[:space:]]*(Light|Standard|High-risk)[[:space:]]*$/\1/p')"; then
+  echo "ERROR: Codex pre-push 리뷰의 risk 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
+  exit 1
+fi
+if ! risk_score="$(extract_single_field 's/^[[:space:]]*risk_score:[[:space:]]*([0-9]+)([[:space:]]*\/100)?[[:space:]]*$/\1/p')"; then
+  echo "ERROR: Codex pre-push 리뷰의 risk_score 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
+  exit 1
+fi
+if ! review_labels="$(extract_single_field 's/^[[:space:]]*review_labels:[[:space:]]*(.*)$/\1/p')"; then
+  echo "ERROR: Codex pre-push 리뷰의 review_labels 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
+  exit 1
+fi
+review_labels="$("$sed_bin" 's/[[:space:]]*$//' <<< "$review_labels")"
 
 has_structured_body() {
   local field="$1"
@@ -264,6 +290,17 @@ has_structured_body() {
     in_field && $0 ~ /[^[:space:]]/ { found=1 }
     END { exit(found ? 0 : 1) }
   ' "$answer_path"
+}
+
+has_single_field_header() {
+  local field="$1"
+  local count=0
+  local header_pattern
+  printf -v header_pattern '^[[:space:]]*%s:[[:space:]]*$' "$field"
+  while IFS= read -r _; do
+    count=$((count + 1))
+  done < <("$grep_bin" -E "$header_pattern" "$answer_path" || true)
+  [ "$count" -eq 1 ]
 }
 
 has_blocking_finding() {
@@ -291,8 +328,8 @@ if [ -z "$review_labels" ] || [ "$review_labels" != "$expected_labels" ]; then
   printf 'reported_review_labels=%s expected_review_labels=%s\n' "${review_labels:-unavailable}" "$expected_labels" >&2
   exit 1
 fi
-if ! has_structured_body findings review_summary || ! has_structured_body review_summary __end_of_review__; then
-  echo "ERROR: Codex pre-push 리뷰의 findings/review_summary 본문이 비어 있습니다. push를 차단합니다." >&2
+if ! has_single_field_header findings || ! has_single_field_header review_summary || ! has_structured_body findings review_summary || ! has_structured_body review_summary __end_of_review__; then
+  echo "ERROR: Codex pre-push 리뷰의 findings/review_summary 필드가 정확히 하나이고 본문이 있어야 합니다. push를 차단합니다." >&2
   exit 1
 fi
 if has_blocking_finding; then
