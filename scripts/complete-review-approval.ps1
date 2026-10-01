@@ -224,9 +224,6 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
         if ([string]$review.authorAssociation -notin @('OWNER', 'MEMBER', 'COLLABORATOR')) {
             continue
         }
-        if ($RequireCurrentHead -and [string]$review.commit.oid -ne $ExpectedHeadSha) {
-            continue
-        }
         $reviewState = [string]$review.state
         if ($reviewState -ieq 'DISMISSED') {
             continue
@@ -259,11 +256,15 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
                 State = $reviewState
                 SubmittedAt = $submittedAt
                 ReviewId = $reviewId
+                CommitOid = [string]$review.commit.oid
             }
         }
     }
 
-    $approvedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq 'APPROVED' } | Sort-Object)
+    $approvedLogins = @($latestByLogin.Keys | Where-Object {
+        $latest = $latestByLogin[$_]
+        $latest.State -eq 'APPROVED' -and (-not $RequireCurrentHead -or $latest.CommitOid -eq $ExpectedHeadSha)
+    } | Sort-Object)
     $changesRequestedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq 'CHANGES_REQUESTED' } | Sort-Object)
     return [pscustomobject]@{
         Count = $approvedLogins.Count

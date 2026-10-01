@@ -261,7 +261,7 @@ for fallback_contract in \
     'dry-run' \
     'risk does not match deterministic risk band' \
     'Complete-ReviewDecision' \
-    '-ProcessExitCode 0' \
+    '-ProcessExitCode $claudeExitCode' \
     'DecisionLabel' \
     'ScoreLabel' \
     'RiskLabel' \
@@ -276,7 +276,7 @@ for fallback_contract in \
 done
 availability_check_line="$(grep -nF -- '$claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-unavailable_route_line="$(grep -nF -- '$claudeReviewUnavailable = -not $claudeHasStructuredResult' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+unavailable_route_line="$(grep -nF -- '$claudeReviewUnavailable = ($claudeExitCode -ne 0) -or (-not $claudeHasStructuredResult)' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 claude_success_route_line="$(grep -nF -- 'if (-not $claudeReviewUnavailable) {' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 codex_fallback_route_line="$(grep -nF -- 'Claude could not provide a valid structured review' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 [[ -n "$availability_check_line" && -n "$structured_result_line" && -n "$unavailable_route_line" && -n "$claude_success_route_line" && -n "$codex_fallback_route_line" \
@@ -335,6 +335,9 @@ for approval_contract in \
     'hasNextPage' \
     'endCursor' \
     'Human review pagination did not provide a deterministic next cursor.' \
+    'CommitOid = [string]$review.commit.oid' \
+    '$latest.State -eq '\''APPROVED'\'' -and (-not $RequireCurrentHead -or $latest.CommitOid -eq $ExpectedHeadSha)' \
+    '$changesRequestedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq '\''CHANGES_REQUESTED'\'' }' \
     'Get-BranchProtectionApprovalRequirement' \
     'required_approving_review_count' \
     'effectiveMinimumApprovals' \

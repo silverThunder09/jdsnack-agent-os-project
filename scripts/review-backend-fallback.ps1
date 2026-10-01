@@ -754,14 +754,13 @@ $availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(
 $claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)
 $claudeResult = Get-StructuredReviewResult -Text $claudeOutput -ReviewerBackend 'claude' -FallbackReason 'none'
 $claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody
-$claudeReviewUnavailable = -not $claudeHasStructuredResult
+$claudeReviewUnavailable = ($claudeExitCode -ne 0) -or (-not $claudeHasStructuredResult)
 
-# Missing required structured fields means Claude could not complete the review.
-# A complete structured decision remains authoritative even when the runner exits nonzero.
+# A nonzero Claude process exit means the runner failed even when it emitted complete-looking fields.
 if (-not $claudeReviewUnavailable) {
     Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
     Write-ReviewReport -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
-    Complete-ReviewDecision -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha -ProcessExitCode 0
+    Complete-ReviewDecision -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha -ProcessExitCode $claudeExitCode
     exit 0
 }
 
