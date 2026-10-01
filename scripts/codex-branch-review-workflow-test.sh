@@ -110,6 +110,9 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" ]] || fail "pre-push AI 리뷰 계약 테스트가 없습니다."
 [[ -f "$ROOT_DIR/.agent-os/operations/review-routing.md" ]] || fail "리뷰 라우팅 문서가 없습니다."
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 전문 라우팅 정책을 읽지 않습니다.'
+grep -Fq -- 'push_remote="${1-}"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 hook destination remote를 읽지 않습니다.'
+grep -Fq -- 'push_remote" != "origin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin 이외 destination remote를 차단하지 않습니다.'
+grep -Fq -- 'refs/heads/*' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 branch ref 이외의 push를 차단하지 않습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 jq와 Codex CLI를 실행 전에 확인하지 않습니다.'
 grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'require_tool codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex CLI 사전조건을 확인하지 않습니다.'

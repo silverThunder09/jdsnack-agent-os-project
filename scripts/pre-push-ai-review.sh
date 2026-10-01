@@ -2,6 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+push_remote="${1-}"
+if [ "$push_remote" != "origin" ]; then
+  echo "ERROR: pre-push 리뷰 대상 remote는 origin으로 고정됩니다: ${push_remote:-unavailable}" >&2
+  exit 1
+fi
+
 require_host_tool() {
   local name="$1"
   local path
@@ -76,6 +82,13 @@ push_refs=()
 push_shas=()
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "${local_ref:-}" ] && continue
+  case "$local_ref" in
+    refs/heads/*) ;;
+    *)
+      echo "ERROR: branch push만 허용됩니다. 지원하지 않는 local ref입니다: $local_ref" >&2
+      exit 1
+      ;;
+  esac
   case "$local_sha" in
     0000000000000000000000000000000000000000) continue ;;
   esac
