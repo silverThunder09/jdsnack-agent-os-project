@@ -294,7 +294,7 @@ for approval_contract in \
     'riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand' \
     'minimumApprovals' \
     'autoMergePolicy' \
-    'dry-run is enabled, so no merge command was executed.' \
+    'dry-run is enabled, and no merge command was executed.' \
     "'skipping'" \
     ' --auto' \
     'ConvertFrom-Json -InputObject $checksEnvelopeJson' \

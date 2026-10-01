@@ -94,6 +94,41 @@ function Get-ConfiguredCodexReviewModel {
     }
 }
 
+function Assert-FixedReviewPolicy {
+    param([string]$ReviewWorkspace)
+
+    $policyPath = Join-Path $ReviewWorkspace 'scripts/review-policy.json'
+    if (-not (Test-Path -LiteralPath $policyPath -PathType Leaf)) {
+        throw "Fixed review policy not found: $policyPath"
+    }
+    try {
+        $policy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
+    } catch {
+        throw "Fixed review policy is invalid JSON: $($_.Exception.Message)"
+    }
+    $expectedWeights = [ordered]@{
+        security = 30
+        apiDbEnvironment = 20
+        sizeScope = 15
+        testGap = 15
+        migration = 20
+    }
+    foreach ($weight in $expectedWeights.GetEnumerator()) {
+        if ([int]$policy.riskScore.weights.($weight.Key) -ne $weight.Value) {
+            throw "Fixed review policy weight changed: $($weight.Key)"
+        }
+    }
+    if ($null -eq $policy.dryRun -or $policy.dryRun.GetType().Name -ne 'Boolean') {
+        throw 'Fixed review policy dryRun must be an explicit boolean.'
+    }
+    foreach ($label in @('Security', 'Performance', 'Test Coverage', 'Architecture')) {
+        if ($null -eq $policy.reviewRouting.$label -or @($policy.reviewRouting.$label).Count -eq 0) {
+            throw "Fixed review policy routing is missing: $label"
+        }
+    }
+    return $policy
+}
+
 function Read-ToolOutput {
     param([string]$Path)
 
@@ -303,6 +338,8 @@ function New-CodexReviewInputs {
     if ($gitExitCode -ne 0) {
         throw "Git could not classify $diffRange for deterministic risk checks (exit $gitExitCode)."
     }
+
+    $null = Assert-FixedReviewPolicy -ReviewWorkspace $ReviewWorkspace
 
     $riskScriptPath = Join-Path $ReviewWorkspace 'scripts/review-risk.ps1'
     if (-not (Test-Path -LiteralPath $riskScriptPath -PathType Leaf)) {
