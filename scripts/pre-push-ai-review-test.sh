@@ -32,8 +32,10 @@ expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
 
 fake_root="$(mktemp -d)"
+dirty_fixture="$ROOT_DIR/.codex-pre-push-dirty-$RANDOM"
 cleanup() {
   rm -rf "$fake_root"
+  rm -f "$dirty_fixture"
 }
 trap cleanup EXIT
 
@@ -96,6 +98,38 @@ set -e
 if [ "$bad_status" -eq 0 ] || ! grep -Fq 'push를 차단합니다' <<< "$bad_output"; then
   printf '%s\n' "$bad_output" >&2
   fail '불일치한 위험도 결과를 pre-push가 차단하지 않았습니다.'
+fi
+
+set +e
+multi_output="$(printf 'refs/heads/codex/one %s refs/remotes/origin/one %s\nrefs/heads/codex/two %s refs/remotes/origin/two %s\n' "$head_sha" "$head_sha" "$head_sha" "$head_sha" \
+  | PATH="$fake_root:$PATH" \
+    JDSNACK_REVIEW_BASE_REF="$base_ref" \
+    JDSNACK_FAKE_RISK="$expected_risk" \
+    JDSNACK_FAKE_RISK_SCORE="$expected_score" \
+    JDSNACK_FAKE_LABELS="$expected_labels" \
+    bash "$ROOT_DIR/scripts/pre-push-ai-review.sh" 2>&1)"
+multi_status=$?
+set -e
+if [ "$multi_status" -eq 0 ] || ! grep -Fq '여러 ref가 한 번에 push되어' <<< "$multi_output"; then
+  printf '%s\n' "$multi_output" >&2
+  fail '다중 ref push를 pre-push가 차단하지 않았습니다.'
+fi
+
+touch "$dirty_fixture"
+set +e
+dirty_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | PATH="$fake_root:$PATH" \
+    JDSNACK_REVIEW_BASE_REF="$base_ref" \
+    JDSNACK_FAKE_RISK="$expected_risk" \
+    JDSNACK_FAKE_RISK_SCORE="$expected_score" \
+    JDSNACK_FAKE_LABELS="$expected_labels" \
+    bash "$ROOT_DIR/scripts/pre-push-ai-review.sh" 2>&1)"
+dirty_status=$?
+set -e
+rm -f "$dirty_fixture"
+if [ "$dirty_status" -eq 0 ] || ! grep -Fq 'checkout 상태가 다릅니다' <<< "$dirty_output"; then
+  printf '%s\n' "$dirty_output" >&2
+  fail 'dirty checkout을 pre-push가 차단하지 않았습니다.'
 fi
 
 echo 'Pre-push AI review contract tests passed'

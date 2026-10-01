@@ -269,7 +269,12 @@ if ($approvalSummary.Count -lt [int]$riskAssessment.minimumApprovals) {
     Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) requires at least $($riskAssessment.minimumApprovals) human approval(s); found $($approvalSummary.Count)."
 }
 if ([string]$riskAssessment.autoMergePolicy -eq 'blocked') {
-    Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) requires human review and blocks automatic merge."
+    $message = "Risk gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; $($riskAssessment.riskBand) has the required human approval(s), and automatic merge remains blocked by policy."
+    Write-Output $message
+    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
+        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $message
+    }
+    exit 0
 }
 if ([bool]$riskAssessment.requiresOwnerSignoff) {
     $signoff = Get-OwnerAutoMergeSignoff `

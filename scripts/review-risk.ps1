@@ -99,6 +99,21 @@ function Assert-FixedReviewPolicy {
             throw "Review policy routing is missing a path rule for $label."
         }
     }
+    $routingPayload = [ordered]@{
+        pathPatterns = $ReviewPolicy.riskScore.pathPatterns
+        reviewRouting = $ReviewPolicy.reviewRouting
+    }
+    $canonicalRouting = $routingPayload | ConvertTo-Json -Depth 20 -Compress
+    $routingBytes = [System.Text.Encoding]::UTF8.GetBytes($canonicalRouting)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $routingHash = (($sha256.ComputeHash($routingBytes) | ForEach-Object { $_.ToString('x2') }) -join '')
+    } finally {
+        $sha256.Dispose()
+    }
+    if ($routingHash -ne 'ec0ee694089975980f5cba9ed171c4afd8aacf5337662618be03d3e59ce6bbd6') {
+        throw 'Review policy path patterns and routing labels do not match the trusted fixed policy digest.'
+    }
     if ($null -eq $ReviewPolicy.dryRun -or $ReviewPolicy.dryRun -isnot [bool]) {
         throw 'Review policy dryRun must be an explicit boolean.'
     }
