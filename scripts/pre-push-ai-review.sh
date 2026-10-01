@@ -18,11 +18,6 @@ if [ -z "$codex_bin" ]; then
   echo "ERROR: pre-push AI 리뷰를 위해 Codex CLI가 필요합니다." >&2
   exit 1
 fi
-host_path="$PATH"
-host_home="${HOME-}"
-host_userprofile="${USERPROFILE-}"
-host_homedrive="${HOMEDRIVE-}"
-host_homepath="${HOMEPATH-}"
 require_host_tool() {
   local name="$1"
   local path
@@ -33,7 +28,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in git cat grep tail sed head awk cmp rm; do
+for tool in env git cat grep tail sed head awk cmp rm; do
   require_host_tool "$tool"
 done
 
@@ -180,43 +175,35 @@ if command -v cygpath >/dev/null 2>&1; then
   codex_answer_path="$(cygpath -w "$answer_path")"
 fi
 
-clear_review_environment() {
-  local name
-  for name in $(compgen -v); do
-    case "$name" in
-      TEMP|TMP|TMPDIR|SystemRoot|SYSTEMROOT|LANG|LC_*|TERM|PWD|OLDPWD|SHLVL|_)
-        ;;
-      PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|GITHUB_*|GH_*|AWS_*|AZURE_*|GOOGLE_*|OPENAI_*|ANTHROPIC_*|GEMINI_*|DATABASE_*|REDIS_*|SSH_*|GIT_*|*_TOKEN|*_KEY|*_SECRET|*_PASSWORD|*_CREDENTIAL*|*_AUTH*|*_URL)
-        unset "$name" 2>/dev/null || true
-        ;;
-    esac
-  done
-}
-restore_host_environment() {
-  export PATH="$host_path"
-  [ -n "$host_home" ] && export HOME="$host_home" || unset HOME
-  [ -n "$host_userprofile" ] && export USERPROFILE="$host_userprofile" || unset USERPROFILE
-  [ -n "$host_homedrive" ] && export HOMEDRIVE="$host_homedrive" || unset HOMEDRIVE
-  [ -n "$host_homepath" ] && export HOMEPATH="$host_homepath" || unset HOMEPATH
-}
 codex_dir="${codex_bin%/*}"
 if [ -z "$codex_dir" ] || [ "$codex_dir" = "$codex_bin" ]; then
   echo "ERROR: Codex CLI 경로를 제한된 reviewer PATH로 고정할 수 없습니다." >&2
   exit 1
 fi
 review_path="$codex_dir"
-if ! (
-  clear_review_environment
-  export PATH="$review_path"
-  "$codex_bin" exec --help >/dev/null 2>&1
-); then
+review_env_args=("PATH=$review_path")
+append_review_environment() {
+  local name="$1"
+  local value="${!name-}"
+  if [ -n "$value" ]; then
+    review_env_args+=("$name=$value")
+  fi
+}
+for name in CODEX_HOME APPDATA LOCALAPPDATA ComSpec PATHEXT SystemRoot SYSTEMROOT WINDIR TEMP TMP TMPDIR LANG TERM PWD OLDPWD SHLVL _; do
+  append_review_environment "$name"
+done
+for name in $(compgen -v); do
+  case "$name" in
+    LC_*) append_review_environment "$name" ;;
+  esac
+done
+
+if ! "$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec --help >/dev/null 2>&1; then
   echo "ERROR: 제한된 reviewer PATH에서 Codex CLI runtime을 시작할 수 없습니다." >&2
   exit 1
 fi
-clear_review_environment
-export PATH="$review_path"
 
-if ! "$codex_bin" exec \
+if ! "$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \
   --ephemeral \
   --ignore-user-config \
   --model "$MODEL" \
@@ -247,12 +234,10 @@ if ! "$codex_bin" exec \
   --sandbox read-only \
   --output-last-message "$codex_answer_path" \
   - < "$prompt_path" > "$tmp_dir/codex.log" 2>&1; then
-  restore_host_environment
   echo "ERROR: Codex pre-push 리뷰를 완료하지 못했습니다. push를 차단합니다." >&2
   "$tail_bin" -n 20 "$tmp_dir/codex.log" >&2 || true
   exit 1
 fi
-restore_host_environment
 
 if [ ! -s "$answer_path" ]; then
   echo "ERROR: Codex pre-push 리뷰 결과가 비어 있습니다. push를 차단합니다." >&2

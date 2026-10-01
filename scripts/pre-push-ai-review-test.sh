@@ -35,8 +35,12 @@ expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
 expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
 test_cygpath_bin="$(command -v cygpath || true)"
-export JDSNACK_TEST_CYGPATH="$test_cygpath_bin"
 export JDSNACK_TEST_SECRET_TOKEN='must-be-cleared-before-review'
+export JDSNACK_TEST_CUSTOM='must-be-cleared-by-allowlist'
+
+printf '%s\n' "$expected_risk" > "$fake_root/expected-risk"
+printf '%s\n' "$expected_score" > "$fake_root/expected-risk-score"
+printf '%s\n' "$expected_labels" > "$fake_root/expected-labels"
 
 cleanup() {
   if [ -d "$test_worktree" ]; then
@@ -75,7 +79,7 @@ done
 
 [ "$help_requested" -eq 1 ] && exit 0
 [ -n "$output_path" ] || exit 2
- [ "$network_config_seen" -eq 1 ] || exit 9
+[ "$network_config_seen" -eq 1 ] || exit 9
 codex_dir="${0%/*}"
 case ":${PATH-}:" in
   *":$codex_dir:"*) ;;
@@ -90,19 +94,28 @@ fi
 if [ -n "${JDSNACK_TEST_SECRET_TOKEN-}" ]; then
   exit 6
 fi
+if [ -n "${JDSNACK_TEST_CUSTOM-}" ]; then
+  exit 7
+fi
+IFS= read -r fake_risk < "$codex_dir/expected-risk"
+IFS= read -r fake_risk_score < "$codex_dir/expected-risk-score"
+IFS= read -r fake_labels < "$codex_dir/expected-labels"
+if [ -f "$0.bad-risk" ]; then
+  fake_risk='Light'
+fi
 case "$output_path" in
   *\\*)
-    [ -n "${JDSNACK_TEST_CYGPATH-}" ] || exit 7
-    output_path="$("$JDSNACK_TEST_CYGPATH" -u "$output_path")"
+    command -v cygpath >/dev/null 2>&1 || exit 8
+    output_path="$(cygpath -u "$output_path")"
     ;;
 esac
 
 {
   printf 'decision: %s\n' "${JDSNACK_FAKE_DECISION:-PASS}"
   printf 'score: %s\n' "${JDSNACK_FAKE_SCORE:-5}"
-  printf 'risk: %s\n' "$JDSNACK_FAKE_RISK"
-  printf 'risk_score: %s\n' "$JDSNACK_FAKE_RISK_SCORE"
-  printf 'review_labels: %s\n' "$JDSNACK_FAKE_LABELS"
+  printf 'risk: %s\n' "$fake_risk"
+  printf 'risk_score: %s\n' "$fake_risk_score"
+  printf 'review_labels: %s\n' "$fake_labels"
   printf 'findings:\n'
 } > "$output_path"
 if [ -f "$0.blocking" ]; then
@@ -120,6 +133,10 @@ fi
 } >> "$output_path"
 FAKE_CODEX
 chmod +x "$fake_root/codex"
+if [ -n "$test_cygpath_bin" ]; then
+  printf '#!/bin/sh\nexec "%s" "$@"\n' "$test_cygpath_bin" > "$fake_root/cygpath"
+  chmod +x "$fake_root/cygpath"
+fi
 
 run_review() {
   (
@@ -127,9 +144,6 @@ run_review() {
     printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
       | PATH="$fake_root:$PATH" \
         JDSNACK_REVIEW_BASE_REF="$base_ref" \
-        JDSNACK_FAKE_RISK="$expected_risk" \
-        JDSNACK_FAKE_RISK_SCORE="$expected_score" \
-        JDSNACK_FAKE_LABELS="$expected_labels" \
         bash "$test_worktree/.githooks/pre-push" origin https://example.invalid
   )
 }
@@ -141,9 +155,6 @@ touch "$fake_root/codex.failure"
 reviewer_failure_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      JDSNACK_FAKE_RISK="$expected_risk" \
-      JDSNACK_FAKE_RISK_SCORE="$expected_score" \
-      JDSNACK_FAKE_LABELS="$expected_labels" \
       bash "$test_worktree/scripts/pre-push-ai-review.sh") 2>&1)"
 reviewer_failure_status=$?
 set -e
@@ -157,9 +168,6 @@ set +e
 head_mismatch_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$base_sha" "$base_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      JDSNACK_FAKE_RISK="$expected_risk" \
-      JDSNACK_FAKE_RISK_SCORE="$expected_score" \
-      JDSNACK_FAKE_LABELS="$expected_labels" \
       bash "$test_worktree/scripts/pre-push-ai-review.sh") 2>&1)"
 head_mismatch_status=$?
 set -e
@@ -168,16 +176,15 @@ if [ "$head_mismatch_status" -eq 0 ] || ! grep -Fq '현재 checkout의 HEAD와' 
   fail 'push head와 local HEAD 불일치를 pre-push가 차단하지 않았습니다.'
 fi
 
+touch "$fake_root/codex.bad-risk"
 set +e
 bad_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      JDSNACK_FAKE_RISK='Light' \
-      JDSNACK_FAKE_RISK_SCORE="$expected_score" \
-      JDSNACK_FAKE_LABELS="$expected_labels" \
       bash "$test_worktree/scripts/pre-push-ai-review.sh") 2>&1)"
 bad_status=$?
 set -e
+rm -f "$fake_root/codex.bad-risk"
 if [ "$bad_status" -eq 0 ] || ! grep -Fq 'push를 차단합니다' <<< "$bad_output"; then
   printf '%s\n' "$bad_output" >&2
   fail '불일치한 위험도 결과를 pre-push가 차단하지 않았습니다.'
@@ -188,9 +195,6 @@ touch "$fake_root/codex.blocking"
 blocking_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      JDSNACK_FAKE_RISK="$expected_risk" \
-      JDSNACK_FAKE_RISK_SCORE="$expected_score" \
-      JDSNACK_FAKE_LABELS="$expected_labels" \
       bash "$test_worktree/scripts/pre-push-ai-review.sh") 2>&1)"
 blocking_status=$?
 set -e
@@ -204,9 +208,6 @@ set +e
 multi_output="$(printf 'refs/heads/codex/one %s refs/remotes/origin/one %s\nrefs/heads/codex/two %s refs/remotes/origin/two %s\n' "$head_sha" "$head_sha" "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      JDSNACK_FAKE_RISK="$expected_risk" \
-      JDSNACK_FAKE_RISK_SCORE="$expected_score" \
-      JDSNACK_FAKE_LABELS="$expected_labels" \
       bash "$test_worktree/scripts/pre-push-ai-review.sh") 2>&1)"
 multi_status=$?
 set -e
@@ -222,9 +223,6 @@ tracked_output="$(
   printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
     | PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      JDSNACK_FAKE_RISK="$expected_risk" \
-      JDSNACK_FAKE_RISK_SCORE="$expected_score" \
-      JDSNACK_FAKE_LABELS="$expected_labels" \
       bash "$test_worktree/scripts/pre-push-ai-review.sh" 2>&1
 )"
 tracked_status=$?

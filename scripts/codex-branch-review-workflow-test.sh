@@ -122,15 +122,16 @@ grep -Fq -- 'reported_review_labels' "$ROOT_DIR/scripts/pre-push-ai-review.sh" |
 grep -Fq -- '여러 ref가 한 번에 push되어' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 다중 ref push를 차단하지 않습니다.'
 grep -Fq -- '현재 checkout의 HEAD와' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push head와 local HEAD를 고정하지 않습니다.'
 grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
-grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex 환경 변수를 정리하지 않습니다.'
 grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
 grep -Fq -- 'review_path="$codex_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 Codex 실행 디렉터리로 제한되지 않습니다.'
-grep -Fq -- 'export PATH="$review_path"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 제한된 PATH를 적용하지 않습니다.'
-grep -Fq -- 'restore_host_environment()' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 종료 후 host 환경을 복구하지 않습니다.'
-grep -Fq -- 'export PATH="$host_path"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 host PATH를 복구하지 않습니다.'
-grep -Fq -- 'for tool in git cat grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
+grep -Fq -- 'review_env_args=("PATH=$review_path")' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 명시적 allowlist 환경을 구성하지 않습니다.'
+grep -Fq -- 'append_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
+grep -Fq -- 'for tool in env git cat grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
 grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
-grep -Fq -- '"$codex_bin" exec --help' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 실제 Codex runtime을 사전 검증하지 않습니다.'
+grep -Fq -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec --help' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 실제 Codex runtime을 사전 검증하지 않습니다.'
+if grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
+    fail 'pre-push reviewer가 denylist 환경 정리에 의존합니다.'
+fi
 grep -Fq -- "sandbox_workspace_write.network_access=false" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer sandbox가 network access를 명시적으로 차단하지 않습니다.'
 if grep -Fq -- 'for helper in cat grep cygpath' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer PATH가 host 도구 디렉터리로 확장됩니다.'

@@ -94,7 +94,7 @@ echo "$changed" | grep -q 'requirements.md' && {
 - 리뷰 실행 실패, 필드 누락, `COMMENT`, `REQUEST_CHANGES`, `NEEDS_HUMAN`, 4점 미만, 또는 findings에 `P0`, `P1`, `blocker`, `major`가 있으면 push를 차단합니다. PASS 응답은 `findings: - none` 또는 P2/P3 항목만 허용합니다.
 - 한 번에 하나의 ref만 허용하고 `origin/main`의 후손인 단일 push head만 리뷰합니다. push head가 현재 checkout의 `HEAD`와 정확히 같아야 하며, staged·working-tree의 tracked diff는 누락될 작업을 알려 주는 진단 증적으로만 전달합니다. 이 변경은 push tree에 포함되지 않으므로 tracked dirty 상태가 남아 있으면 리뷰 후에도 최종 push를 차단합니다. untracked 파일은 push 증적에 포함되지 않으므로 대상에서 제외합니다.
 - Codex에는 diff만 전달하고 shell·network·credential·repository access를 허용하지 않습니다.
-- reviewer 프로세스에는 Codex 실행 디렉터리만 `PATH`로 제공하고 실제 Codex CLI의 `exec --help` 기동을 먼저 확인합니다. 사용자 home·CI·cloud·secret 환경변수는 제거하고, sandbox 명령의 network access도 `sandbox_workspace_write.network_access=false`로 고정합니다. hook이 리뷰 후 결과를 판정하는 데 필요한 host 도구는 제한된 PATH에 추가하지 않고 절대 경로로 호출하며, Codex 종료 뒤 host 환경을 복구합니다.
+- reviewer 프로세스에는 Codex 실행 디렉터리만 `PATH`로 제공하고 실제 Codex CLI의 `exec --help` 기동을 먼저 확인합니다. `CODEX_HOME`과 실행에 필요한 Windows/runtime 변수만 명시적 allowlist로 전달하고, 그 밖의 사용자 home·CI·cloud·secret 환경변수는 전달하지 않습니다. sandbox 명령의 network access도 `sandbox_workspace_write.network_access=false`로 고정합니다. hook이 리뷰 후 결과를 판정하는 데 필요한 host 도구는 제한된 PATH에 추가하지 않고 절대 경로로 호출합니다.
 - 빌드·lint·test·E2E는 CI가 담당하며 hook에서 모델 배정으로 대체하지 않습니다.
 
 `scripts/pre-push-ai-review-test.sh`는 임시 Git worktree와 fake Codex를 사용해 PASS 경로, 제한된 reviewer 환경, Codex 실패 cleanup, 위험도 불일치, blocker/P1 차단, 다중 ref, tracked dirty checkout을 확인합니다. 테스트는 현재 checkout의 추적 파일을 수정하지 않습니다.
