@@ -149,16 +149,18 @@ grep -Fq -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts
 grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
 grep -Fq -- 'reviewer_bin_dir="$tmp_dir/reviewer-bin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer 전용 실행 디렉터리가 없습니다.'
 grep -Fq -- 'review_path="$reviewer_bin_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 전용 실행 디렉터리로 제한되지 않습니다.'
-grep -Fq -- 'review_env_args=("PATH=$review_path" "CODEX_HOME=$codex_home_arg")' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 빈 임시 CODEX_HOME을 고정하지 않습니다.'
-grep -Fq -- 'append_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
+grep -Fq -- 'review_env_args=(' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
+grep -Fq -- '"CODEX_HOME=$codex_home_arg"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 빈 임시 CODEX_HOME을 고정하지 않습니다.'
+grep -Fq -- '"TMPDIR=$tmp_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 임시 디렉터리 기반 환경을 고정하지 않습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
 grep -Fq -- 'require_host_tool cat' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 status 보고용 cat 경로를 고정하지 않습니다.'
 grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
-grep -Fq -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 실제 Codex runtime을 사전 검증하지 않습니다.'
+grep -Fq -- '"$env_bin" -i "${review_env_args[@]}" "$reviewer_entry" "$@"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 전용 Codex runtime을 실행하지 않습니다.'
+grep -Fq -- 'run_reviewer exec' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 전용 reviewer 실행 경계를 사용하지 않습니다.'
 grep -Fq -- "--config 'sandbox_workspace_write.network_access=false'" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer network access 차단 설정을 전달하지 않습니다.'
 grep -Fq -- '--strict-config' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer config를 엄격 모드로 검증하지 않습니다.'
 clean_checkout_line="$(grep -nF -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
-review_runtime_line="$(grep -nF -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
+review_runtime_line="$(grep -nF -- 'run_reviewer exec' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
 [[ -n "$clean_checkout_line" && -n "$review_runtime_line" && "$clean_checkout_line" -lt "$review_runtime_line" ]] \
     || fail 'pre-push reviewer가 dirty checkout을 사전 차단하기 전에 실행됩니다.'
 if grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
