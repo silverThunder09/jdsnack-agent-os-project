@@ -165,6 +165,28 @@ if [ -z "$expected_risk_score" ] || [ -z "$expected_risk" ] || [ -z "$expected_l
   echo "ERROR: 결정론적 pre-push 위험도 결과가 불완전합니다. push를 차단합니다." >&2
   exit 1
 fi
+risk_band_for_score() {
+  local value="$1"
+  if ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -gt 100 ]; then
+    return 1
+  fi
+  if [ "$value" -le 30 ]; then
+    printf 'Light'
+  elif [ "$value" -le 60 ]; then
+    printf 'Standard'
+  else
+    printf 'High-risk'
+  fi
+}
+if ! expected_risk_from_score="$(risk_band_for_score "$expected_risk_score")"; then
+  echo "ERROR: 결정론적 위험 점수가 0~100 범위를 벗어났습니다. push를 차단합니다." >&2
+  exit 1
+fi
+if [ "$expected_risk_from_score" != "$expected_risk" ]; then
+  echo "ERROR: 결정론적 위험 점수와 위험도 구간이 서로 매핑되지 않습니다. push를 차단합니다." >&2
+  printf 'risk_score=%s expected_band=%s mapped_band=%s\n' "$expected_risk_score" "$expected_risk" "$expected_risk_from_score" >&2
+  exit 1
+fi
 
 cat > "$prompt_path" <<PROMPT
 Act as a read-only local pre-push reviewer for a JDSnack branch.

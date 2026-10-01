@@ -117,10 +117,14 @@ grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm cp jq codex' "$RO
 grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'require_tool codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex CLI 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'
+grep -Fq -- 'if ! codex exec' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex exec 호환성을 확인하지 않습니다.'
 install_prereq_line="$(grep -nF -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
 install_chmod_line="$(grep -nF -- 'chmod +x "$repo_root/$hooks_path/$hook"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
 [[ -n "$install_prereq_line" && -n "$install_chmod_line" && "$install_prereq_line" -lt "$install_chmod_line" ]] \
     || fail 'Git hook 설치가 사전조건 검증 전에 tracked hook을 변경합니다.'
+install_exec_line="$(grep -nF -- 'if ! codex exec' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
+[[ -n "$install_exec_line" && "$install_exec_line" -lt "$install_chmod_line" ]] \
+    || fail 'Git hook 설치가 Codex exec 호환성 확인 전에 tracked hook을 변경합니다.'
 grep -Fq -- 'Specialized review routing labels and path rules' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 전문 라우팅 지침이 없습니다.'
 grep -Fq -- '--sandbox read-only' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 read-only sandbox를 강제하지 않습니다.'
 grep -Fq -- '--disable shell_tool' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 shell tool을 비활성화하지 않습니다.'
@@ -134,6 +138,7 @@ grep -Fq -- 'has_auditable_review_summary' "$ROOT_DIR/scripts/pre-push-ai-review
 grep -Fq -- 'score rationale:' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 score rationale 계약이 없습니다.'
 grep -Fq -- 'blocker/major 또는 P0/P1' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 P0/P1 차단 결과를 알리지 않습니다.'
 grep -Fq -- 'expected_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 host 계산 점수를 보존하지 않습니다.'
+grep -Fq -- 'risk_band_for_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 위험 점수와 위험도 구간 매핑을 검증하지 않습니다.'
 grep -Fq -- 'reported_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 점수 불일치를 차단하지 않습니다.'
 grep -Fq -- 'reported_review_labels' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 라벨 불일치를 차단하지 않습니다.'
 grep -Fq -- '여러 ref가 한 번에 push되어' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 다중 ref push를 차단하지 않습니다.'
@@ -254,7 +259,9 @@ for fallback_contract in \
     'Get-StructuredField' \
     'Get-StructuredReviewResult' \
     'Test-StructuredFindings' \
+    'Test-StructuredReviewSummary' \
     'FindingsContractValid' \
+    'ReviewSummaryContractValid' \
     'HasStructuredBody' \
     'hasFindings' \
     'hasReviewSummary' \
