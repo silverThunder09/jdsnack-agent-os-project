@@ -130,6 +130,9 @@ fi
 if [ -f "$0.duplicate" ]; then
   printf '%s\n' 'decision: REQUEST_CHANGES' >> "$output_path"
 fi
+if [ -f "$0.malformed-findings" ]; then
+  printf '%s\n' '- informational finding without a severity prefix' >> "$output_path"
+fi
 if [ -f "$0.failure" ]; then
   printf '%s\n' 'synthetic reviewer failure' >&2
   exit 8
@@ -169,6 +172,20 @@ rm -f "$fake_root/codex.duplicate"
 if [ "$duplicate_status" -eq 0 ] || ! grep -Fq 'decision 필드가 정확히 하나' <<< "$duplicate_output"; then
   printf '%s\n' "$duplicate_output" >&2
   fail '중복된 구조화 decision 필드를 pre-push가 차단하지 않았습니다.'
+fi
+
+touch "$fake_root/codex.malformed-findings"
+set +e
+malformed_findings_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh") 2>&1)"
+malformed_findings_status=$?
+set -e
+rm -f "$fake_root/codex.malformed-findings"
+if [ "$malformed_findings_status" -eq 0 ] || ! grep -Fq 'findings는' <<< "$malformed_findings_output"; then
+  printf '%s\n' "$malformed_findings_output" >&2
+  fail '비정형 findings 항목을 pre-push가 차단하지 않았습니다.'
 fi
 
 set +e

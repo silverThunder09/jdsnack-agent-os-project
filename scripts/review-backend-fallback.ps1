@@ -158,6 +158,23 @@ function Get-StructuredField {
     return $value
 }
 
+function Get-ExactlyOneStructuredMatch {
+    param(
+        [string]$Text,
+        [string]$Name,
+        [string]$ValuePattern
+    )
+
+    $escapedName = [regex]::Escape($Name)
+    $headerMatches = [regex]::Matches($Text, "(?im)^\s*$escapedName\s*:")
+    $valueMatches = [regex]::Matches($Text, "(?im)^\s*$escapedName\s*:\s*$ValuePattern\s*$")
+    if ($headerMatches.Count -ne 1 -or $valueMatches.Count -ne 1) {
+        return [regex]::Match('', '(?!)')
+    }
+
+    return $valueMatches[0]
+}
+
 function Invoke-Tool {
     param(
         [string]$Name,
@@ -433,14 +450,16 @@ function Get-StructuredReviewResult {
         [string]$FallbackReason
     )
 
-    $decisionMatch = [regex]::Match($Text, '(?im)^\s*decision\s*:\s*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)\s*$')
-    $scoreMatch = [regex]::Match($Text, '(?im)^\s*score\s*:\s*([0-5])(?:\s*/\s*5)?\s*$')
-    $riskMatch = [regex]::Match($Text, '(?im)^\s*risk\s*:\s*(Light|Standard|High-risk)\s*$')
+    $decisionMatch = Get-ExactlyOneStructuredMatch -Text $Text -Name 'decision' -ValuePattern '(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)'
+    $scoreMatch = Get-ExactlyOneStructuredMatch -Text $Text -Name 'score' -ValuePattern '([0-5])(?:\s*/\s*5)?'
+    $riskMatch = Get-ExactlyOneStructuredMatch -Text $Text -Name 'risk' -ValuePattern '(Light|Standard|High-risk)'
 
-    $findings = Get-StructuredField -Text $Text -Name 'findings'
-    $reviewSummary = Get-StructuredField -Text $Text -Name 'review_summary'
-    $hasFindings = -not [string]::IsNullOrWhiteSpace($findings)
-    $hasReviewSummary = -not [string]::IsNullOrWhiteSpace($reviewSummary)
+    $findingsHeaderCount = [regex]::Matches($Text, '(?im)^\s*findings\s*:').Count
+    $reviewSummaryHeaderCount = [regex]::Matches($Text, '(?im)^\s*review_summary\s*:').Count
+    $findings = if ($findingsHeaderCount -eq 1) { Get-StructuredField -Text $Text -Name 'findings' } else { '' }
+    $reviewSummary = if ($reviewSummaryHeaderCount -eq 1) { Get-StructuredField -Text $Text -Name 'review_summary' } else { '' }
+    $hasFindings = $findingsHeaderCount -eq 1 -and -not [string]::IsNullOrWhiteSpace($findings)
+    $hasReviewSummary = $reviewSummaryHeaderCount -eq 1 -and -not [string]::IsNullOrWhiteSpace($reviewSummary)
     if (-not $hasFindings) {
         $findings = 'Structured review findings were not returned.'
     }

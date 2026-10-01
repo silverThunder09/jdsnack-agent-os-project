@@ -105,10 +105,15 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/review-policy.json" ]] || fail "리뷰 정책 파일이 없습니다: scripts/review-policy.json"
 [[ -f "$ROOT_DIR/scripts/review-risk.ps1" ]] || fail "결정론적 위험도 계산기가 없습니다: scripts/review-risk.ps1"
 [[ -f "$ROOT_DIR/.githooks/pre-push" ]] || fail "pre-push hook이 없습니다: .githooks/pre-push"
+[[ -f "$ROOT_DIR/scripts/install-git-hooks.sh" ]] || fail "Git hook 설치 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" ]] || fail "pre-push AI 리뷰 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" ]] || fail "pre-push AI 리뷰 계약 테스트가 없습니다."
 [[ -f "$ROOT_DIR/.agent-os/operations/review-routing.md" ]] || fail "리뷰 라우팅 문서가 없습니다."
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 전문 라우팅 정책을 읽지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm cat jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 jq와 Codex CLI를 실행 전에 확인하지 않습니다.'
+grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
+grep -Fq -- 'require_tool codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex CLI 사전조건을 확인하지 않습니다.'
+grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'Specialized review routing labels and path rules' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 전문 라우팅 지침이 없습니다.'
 grep -Fq -- '--sandbox read-only' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 read-only sandbox를 강제하지 않습니다.'
 grep -Fq -- '--disable shell_tool' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 shell tool을 비활성화하지 않습니다.'
@@ -117,6 +122,7 @@ grep -Fq -- 'has_structured_body' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || f
 grep -Fq -- 'extract_single_field()' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 scalar 구조화 필드를 단일 값으로 검증하지 않습니다.'
 grep -Fq -- 'has_single_field_header()' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 구조화 field header 중복을 검증하지 않습니다.'
 grep -Fq -- 'has_blocking_finding' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 blocker/major findings를 검증하지 않습니다.'
+grep -Fq -- 'has_valid_findings' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 finding 심각도 형식을 검증하지 않습니다.'
 grep -Fq -- 'blocker/major 또는 P0/P1' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 P0/P1 차단 결과를 알리지 않습니다.'
 grep -Fq -- 'expected_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 host 계산 점수를 보존하지 않습니다.'
 grep -Fq -- 'reported_risk_score' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 보고 점수 불일치를 차단하지 않습니다.'
@@ -167,6 +173,7 @@ for fallback_contract in \
     "'exec'" \
     "'--ephemeral'" \
     'Get-ConfiguredCodexReviewModel' \
+    'Get-ExactlyOneStructuredMatch' \
     'failed\s+to\s+authenticate' \
     'oauth\s+session\s+expired' \
     "'backends.json'" \

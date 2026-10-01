@@ -15,6 +15,25 @@ for hook in pre-commit pre-push; do
   fi
 done
 
+require_tool() {
+  tool="$1"
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "ERROR: Git hooks require $tool before core.hooksPath can be enabled." >&2
+    exit 1
+  fi
+}
+
+require_tool jq
+require_tool codex
+if command -v pwsh >/dev/null 2>&1; then
+  powershell_tool="pwsh"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  powershell_tool="powershell.exe"
+else
+  echo "ERROR: Git hooks require PowerShell (pwsh or powershell.exe) before core.hooksPath can be enabled." >&2
+  exit 1
+fi
+
 git config --local core.hooksPath "$hooks_path"
 configured_path="$(git config --local --get core.hooksPath)"
 if [ "$configured_path" != "$hooks_path" ]; then
@@ -22,4 +41,5 @@ if [ "$configured_path" != "$hooks_path" ]; then
   exit 1
 fi
 
+echo "Git hook prerequisites verified: jq, $powershell_tool, codex"
 echo "Git hooks enabled: $configured_path (pre-commit, pre-push)"

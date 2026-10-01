@@ -2,22 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REQUESTED_MODEL="$(jq -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
-MODEL="$(jq -r '.workers.codex["review-fallback"].runtimeModel // .workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
-
-if [ -z "$REQUESTED_MODEL" ] || [ -z "$MODEL" ]; then
-  echo "ERROR: backends.json에 Codex review-fallback 모델이 없습니다." >&2
-  exit 1
-fi
-if [ ! -f "$ROOT_DIR/scripts/review-policy.json" ]; then
-  echo "ERROR: 전문 리뷰 라우팅 정책이 없습니다: scripts/review-policy.json" >&2
-  exit 1
-fi
-codex_bin="$(command -v codex || true)"
-if [ -z "$codex_bin" ]; then
-  echo "ERROR: pre-push AI 리뷰를 위해 Codex CLI가 필요합니다." >&2
-  exit 1
-fi
 require_host_tool() {
   local name="$1"
   local path
@@ -28,10 +12,21 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm; do
+for tool in env git grep tail sed head awk cmp rm cat jq codex; do
   require_host_tool "$tool"
 done
-require_host_tool cat
+
+REQUESTED_MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
+MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].runtimeModel // .workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
+
+if [ -z "$REQUESTED_MODEL" ] || [ -z "$MODEL" ]; then
+  echo "ERROR: backends.json에 Codex review-fallback 모델이 없습니다." >&2
+  exit 1
+fi
+if [ ! -f "$ROOT_DIR/scripts/review-policy.json" ]; then
+  echo "ERROR: 전문 리뷰 라우팅 정책이 없습니다: scripts/review-policy.json" >&2
+  exit 1
+fi
 
 tmp_dir="$(mktemp -d)"
 cleanup() {
@@ -131,10 +126,10 @@ if ! risk_json="$($pwsh_bin -NoProfile -File "$workspace_arg/scripts/review-risk
   echo "ERROR: 결정론적 pre-push 위험도 검증에 실패했습니다. push를 차단합니다." >&2
   exit 1
 fi
-expected_risk_score="$(jq -r '.riskScore' <<< "$risk_json")"
-expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
-expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
-expected_dry_run="$(jq -r '.dryRun' <<< "$risk_json")"
+expected_risk_score="$("$jq_bin" -r '.riskScore' <<< "$risk_json")"
+expected_risk="$("$jq_bin" -r '.riskBand' <<< "$risk_json")"
+expected_labels="$("$jq_bin" -r '.reviewLabels | join(", ")' <<< "$risk_json")"
+expected_dry_run="$("$jq_bin" -r '.dryRun' <<< "$risk_json")"
 if [ "$expected_dry_run" != "true" ]; then
   echo "ERROR: 초기 pre-push 정책은 dry-run=true여야 합니다. 정책 변경은 별도 운영 승인으로 진행하십시오." >&2
   exit 1
@@ -307,6 +302,28 @@ has_blocking_finding() {
   "$grep_bin" -Ei '^[[:space:]]*[-*][[:space:]]*(P0|P1|blocker|major)' "$answer_path" >/dev/null 2>&1
 }
 
+has_valid_findings() {
+  "$awk_bin" '
+    /^[[:space:]]*findings:[[:space:]]*$/ { in_findings=1; next }
+    in_findings && /^[[:space:]]*review_summary:[[:space:]]*$/ { in_findings=0; next }
+    in_findings {
+      if ($0 ~ /^[[:space:]]*$/) next
+      if ($0 ~ /^[[:space:]]*-[[:space:]]+none[[:space:]]*$/) {
+        none_count++
+        next
+      }
+      if ($0 !~ /^[[:space:]]*-[[:space:]]+P[0-3]([[:space:]]|$)/) {
+        invalid=1
+        next
+      }
+      finding_count++
+    }
+    END {
+      if (invalid || none_count > 1 || (none_count > 0 && finding_count > 0) || (none_count == 0 && finding_count == 0)) exit 1
+    }
+  ' "$answer_path"
+}
+
 if [ "$decision" != "PASS" ] || [ "${score:-0}" -lt 4 ]; then
   echo "ERROR: Codex pre-push 리뷰 기준 미달입니다. push를 차단합니다." >&2
   printf 'decision=%s score=%s risk=%s risk_score=%s review_labels=%s\n' "${decision:-unavailable}" "${score:-unavailable}" "${risk:-unavailable}" "${risk_score:-unavailable}" "${review_labels:-unavailable}" >&2
@@ -330,6 +347,10 @@ if [ -z "$review_labels" ] || [ "$review_labels" != "$expected_labels" ]; then
 fi
 if ! has_single_field_header findings || ! has_single_field_header review_summary || ! has_structured_body findings review_summary || ! has_structured_body review_summary __end_of_review__; then
   echo "ERROR: Codex pre-push 리뷰의 findings/review_summary 필드가 정확히 하나이고 본문이 있어야 합니다. push를 차단합니다." >&2
+  exit 1
+fi
+if ! has_valid_findings; then
+  echo "ERROR: Codex pre-push 리뷰의 findings는 '- none' 또는 '- P0/P1/P2/P3' 심각도 접두사가 붙은 항목만 허용합니다. push를 차단합니다." >&2
   exit 1
 fi
 if has_blocking_finding; then
