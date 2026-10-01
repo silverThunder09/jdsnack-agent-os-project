@@ -133,7 +133,7 @@ grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-pus
 grep -Fq -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex reviewer 전에 dirty checkout을 차단하지 않습니다.'
 grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
 grep -Fq -- 'review_path="$codex_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 Codex 실행 디렉터리로 제한되지 않습니다.'
-grep -Fq -- 'review_env_args=("PATH=$review_path")' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 명시적 allowlist 환경을 구성하지 않습니다.'
+grep -Fq -- 'review_env_args=("PATH=$review_path" "CODEX_HOME=$codex_home_arg")' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 빈 임시 CODEX_HOME을 고정하지 않습니다.'
 grep -Fq -- 'append_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
 grep -Fq -- 'require_host_tool cat' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 status 보고용 cat 경로를 고정하지 않습니다.'

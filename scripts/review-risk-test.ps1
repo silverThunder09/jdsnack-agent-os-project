@@ -134,6 +134,11 @@ try {
     Assert-Equal $standardAssessment.riskBand 'Standard' 'standard fixture band'
     Assert-Equal $standardAssessment.minimumApprovals 1 'standard approval count'
     Assert-Equal $standardAssessment.autoMergePolicy 'blocked' 'standard merge policy'
+
+    $shellTestAssessment = New-SingleFileAssessment -Name 'shell-test-path' -RelativePath 'scripts/pre-push-ai-review-test.sh' -Content '# fixture test'
+    Assert-Equal $shellTestAssessment.componentScores.testGap 0 'scripts/*-test.sh test evidence'
+    $powerShellTestAssessment = New-SingleFileAssessment -Name 'powershell-test-path' -RelativePath 'scripts/review-risk-test.ps1' -Content '# fixture test'
+    Assert-Equal $powerShellTestAssessment.componentScores.testGap 0 'scripts/*-test.ps1 test evidence'
     Write-Output 'Review risk scoring tests passed'
 } finally {
     if (Test-Path -LiteralPath $tempRoot) {

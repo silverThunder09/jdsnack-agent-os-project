@@ -34,8 +34,7 @@
       "test": [
         "(^|/)(test|tests)/",
         "(^|/).*([._-]test|[._-]spec)(\\.[^/]*)?$",
-        "^scripts/.*-test\\.sh$",
-        "^scripts/.*-test\\.ps1$"
+        "^scripts/.*-test\\.(sh|ps1)$"
       ]
     },
     "size": {

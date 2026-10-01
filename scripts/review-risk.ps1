@@ -124,8 +124,7 @@ function Assert-FixedReviewPolicy {
         test = @(
             '(^|/)(test|tests)/'
             '(^|/).*([._-]test|[._-]spec)(\.[^/]*)?$'
-            '^scripts/.*-test\.sh$'
-            '^scripts/.*-test\.ps1$'
+            '^scripts/.*-test\.(sh|ps1)$'
         )
     }
     foreach ($scoringPatternGroup in $expectedScoringPathPatterns.GetEnumerator()) {
@@ -147,7 +146,7 @@ function Assert-FixedReviewPolicy {
     } finally {
         $sha256.Dispose()
     }
-    if ($routingHash -ne 'e8d4698910dff6003935ef0c21ebea812b861e19e6954d1abc9b5519fb58cb86') {
+    if ($routingHash -ne 'facb6cf57c1ffe7ba78c63e0f7538ce0423309ada0b49b5de947b108be7efc99') {
         throw 'Review policy path patterns and routing labels do not match the trusted fixed policy digest.'
     }
     if ($null -eq $ReviewPolicy.dryRun -or $ReviewPolicy.dryRun -isnot [bool]) {
