@@ -77,6 +77,13 @@ if [ "${#push_shas[@]}" -ne 1 ]; then
 fi
 reviewed_ref="${push_shas[0]}"
 
+local_head_sha="$(git rev-parse HEAD)"
+if [ "$local_head_sha" != "$reviewed_ref" ]; then
+  echo "ERROR: push 대상 커밋이 현재 checkout의 HEAD와 달라 pre-push 리뷰 증적을 고정할 수 없습니다." >&2
+  printf 'head=%s push=%s\n' "$local_head_sha" "$reviewed_ref" >&2
+  exit 1
+fi
+
 if ! git merge-base --is-ancestor "$base_sha" "$reviewed_ref"; then
   echo "ERROR: push 대상 커밋이 origin/main의 후손이 아니어서 리뷰 범위를 고정할 수 없습니다." >&2
   exit 1

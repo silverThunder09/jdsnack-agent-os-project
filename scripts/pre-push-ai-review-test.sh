@@ -100,6 +100,21 @@ run_review() {
 run_review >/dev/null
 
 set +e
+head_mismatch_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$base_sha" "$base_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      JDSNACK_FAKE_RISK="$expected_risk" \
+      JDSNACK_FAKE_RISK_SCORE="$expected_score" \
+      JDSNACK_FAKE_LABELS="$expected_labels" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh") 2>&1)"
+head_mismatch_status=$?
+set -e
+if [ "$head_mismatch_status" -eq 0 ] || ! grep -Fq '현재 checkout의 HEAD와' <<< "$head_mismatch_output"; then
+  printf '%s\n' "$head_mismatch_output" >&2
+  fail 'push head와 local HEAD 불일치를 pre-push가 차단하지 않았습니다.'
+fi
+
+set +e
 bad_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \

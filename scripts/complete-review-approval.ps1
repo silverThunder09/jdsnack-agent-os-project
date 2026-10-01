@@ -108,6 +108,32 @@ function Get-Checks {
     }
 }
 
+function Get-BranchProtectionApprovalRequirement {
+    param([string]$BaseBranch)
+
+    if ([string]::IsNullOrWhiteSpace($BaseBranch)) {
+        Stop-NeedsHuman 'The pull request base branch is unavailable while verifying branch protection.'
+    }
+    $protectionJson = & $script:ghPath api "repos/$Repository/branches/$BaseBranch/protection" 2>&1 | Out-String
+    if ([int]$LASTEXITCODE -ne 0) {
+        Stop-NeedsHuman "Could not read effective branch protection for '$BaseBranch': $protectionJson"
+    }
+    try {
+        $protection = ConvertFrom-Json -InputObject $protectionJson
+    } catch {
+        Stop-NeedsHuman "Branch protection returned invalid JSON: $($_.Exception.Message)"
+    }
+    $requiredReviews = $protection.required_pull_request_reviews
+    if ($null -eq $requiredReviews) {
+        Stop-NeedsHuman "Branch '$BaseBranch' has no required pull request review protection."
+    }
+    $requiredApprovals = [int]$requiredReviews.required_approving_review_count
+    if ($requiredApprovals -lt 1) {
+        Stop-NeedsHuman "Branch '$BaseBranch' requires fewer than one approving review."
+    }
+    return $requiredApprovals
+}
+
 function Get-HumanApprovalSummary {
     param([string]$ExpectedHeadSha)
 
@@ -261,9 +287,12 @@ if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
     Stop-NeedsHuman 'Implementation and reviewer backend are both Codex fallback; automatic merge is disabled for self-review prevention.'
 }
 
+$currentPullRequest = Get-CurrentPullRequest
+$protectedMinimumApprovals = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
+$effectiveMinimumApprovals = [Math]::Max([int]$riskAssessment.minimumApprovals, $protectedMinimumApprovals)
 $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
-if ($approvalSummary.Count -lt [int]$riskAssessment.minimumApprovals) {
-    Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) requires at least $($riskAssessment.minimumApprovals) human approval(s); found $($approvalSummary.Count)."
+if ($approvalSummary.Count -lt $effectiveMinimumApprovals) {
+    Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) and branch protection require at least $effectiveMinimumApprovals human approval(s); found $($approvalSummary.Count)."
 }
 
 if ([bool]$riskAssessment.dryRun) {
