@@ -267,24 +267,27 @@ if ! "$cp_bin" "$codex_bin" "$reviewer_entry"; then
   exit 1
 fi
 review_path="$reviewer_bin_dir"
-review_env_args=("PATH=$review_path" "CODEX_HOME=$codex_home_arg")
-append_review_environment() {
-  local name="$1"
-  local value="${!name-}"
-  if [ -n "$value" ]; then
-    review_env_args+=("$name=$value")
-  fi
-}
-for name in APPDATA LOCALAPPDATA ComSpec PATHEXT SystemRoot SYSTEMROOT WINDIR TEMP TMP TMPDIR LANG TERM PWD OLDPWD SHLVL _; do
-  append_review_environment "$name"
-done
-for name in $(compgen -v); do
-  case "$name" in
-    LC_*) append_review_environment "$name" ;;
-  esac
-done
+review_env_args=(
+  "PATH=$review_path"
+  "CODEX_HOME=$codex_home_arg"
+  "TEMP=$tmp_dir"
+  "TMP=$tmp_dir"
+  "TMPDIR=$tmp_dir"
+  'LANG=C'
+  'TERM=dumb'
+)
+if [ -n "${SystemRoot-}" ]; then
+  review_env_args+=("SystemRoot=$SystemRoot")
+fi
 
-if ! "$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \
+run_reviewer() {
+  (
+    cd "$tmp_dir"
+    "$env_bin" -i "${review_env_args[@]}" "$reviewer_entry" "$@"
+  )
+}
+
+if ! run_reviewer exec \
   --ephemeral \
   --ignore-user-config \
   --strict-config \
@@ -295,7 +298,7 @@ if ! "$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \
   exit 1
 fi
 
-if ! "$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \
+if ! run_reviewer exec \
   --ephemeral \
   --ignore-user-config \
   --strict-config \

@@ -55,6 +55,7 @@ cat > "$fake_root/codex" <<'FAKE_CODEX'
 #!/bin/sh
 set -eu
 
+fixture_dir='__FAKE_ROOT__'
 output_path=""
 help_requested=0
 network_config_seen=0
@@ -77,8 +78,12 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-codex_dir="${0%/*}"
-: > "$codex_dir/invoked"
+printf '%s\n' "$0" > "$fixture_dir/codex.invoked"
+case "$0" in
+  */reviewer-bin/codex|*\\reviewer-bin\\codex)
+    : > "$fixture_dir/copied-entry-invoked"
+    ;;
+esac
 [ "$help_requested" -eq 1 ] && exit 0
 [ -n "$output_path" ] || exit 2
 [ "$network_config_seen" -eq 1 ] || exit 9
@@ -98,24 +103,30 @@ fi
 if [ -n "${JDSNACK_TEST_CUSTOM-}" ]; then
   exit 7
 fi
+if [ -n "${APPDATA-}" ] || [ -n "${LOCALAPPDATA-}" ]; then
+  exit 11
+fi
+case "${PWD-}" in
+  *test-worktree*) exit 12 ;;
+esac
 case "${CODEX_HOME-}" in
   *codex-home*) ;;
   *) exit 10 ;;
 esac
-IFS= read -r fake_risk < "$codex_dir/expected-risk"
-IFS= read -r fake_risk_score < "$codex_dir/expected-risk-score"
-IFS= read -r fake_labels < "$codex_dir/expected-labels"
+IFS= read -r fake_risk < "$fixture_dir/expected-risk"
+IFS= read -r fake_risk_score < "$fixture_dir/expected-risk-score"
+IFS= read -r fake_labels < "$fixture_dir/expected-labels"
 fake_score="${JDSNACK_FAKE_SCORE:-5}"
-if [ -f "$0.invalid-score" ]; then
+if [ -f "$fixture_dir/codex.invalid-score" ]; then
   fake_score=6
 fi
-if [ -f "$0.bad-risk" ]; then
+if [ -f "$fixture_dir/codex.bad-risk" ]; then
   fake_risk='Light'
 fi
 case "$output_path" in
   *\\*)
-    [ -x "$codex_dir/cygpath" ] || exit 8
-    output_path="$("$codex_dir/cygpath" -u "$output_path")"
+    [ -x "$fixture_dir/cygpath" ] || exit 8
+    output_path="$("$fixture_dir/cygpath" -u "$output_path")"
     ;;
 esac
 
@@ -127,24 +138,24 @@ esac
   printf 'review_labels: %s\n' "$fake_labels"
   printf 'findings:\n'
 } > "$output_path"
-if [ -f "$0.blocking" ]; then
+if [ -f "$fixture_dir/codex.blocking" ]; then
   printf '%s\n' '- P1 — synthetic blocker' >> "$output_path"
 else
   printf '%s\n' '- none' >> "$output_path"
 fi
-if [ -f "$0.duplicate" ]; then
+if [ -f "$fixture_dir/codex.duplicate" ]; then
   printf '%s\n' 'decision: REQUEST_CHANGES' >> "$output_path"
 fi
-if [ -f "$0.malformed-findings" ]; then
+if [ -f "$fixture_dir/codex.malformed-findings" ]; then
   printf '%s\n' '- informational finding without a severity prefix' >> "$output_path"
 fi
-if [ -f "$0.failure" ]; then
+if [ -f "$fixture_dir/codex.failure" ]; then
   printf '%s\n' 'synthetic reviewer failure' >&2
   exit 8
 fi
 {
   printf 'review_summary:\n'
-  if [ -f "$0.weak-summary" ]; then
+  if [ -f "$fixture_dir/codex.weak-summary" ]; then
     printf 'insufficient summary\n'
   else
     fake_score="${JDSNACK_FAKE_SCORE:-5}"
@@ -158,6 +169,7 @@ fi
   fi
 } >> "$output_path"
 FAKE_CODEX
+sed -i "s|__FAKE_ROOT__|$fake_root|g" "$fake_root/codex"
 chmod +x "$fake_root/codex"
 if [ -n "$test_cygpath_bin" ]; then
   printf '#!/bin/sh\nexec "%s" "$@"\n' "$test_cygpath_bin" > "$fake_root/cygpath"
@@ -175,6 +187,10 @@ run_review() {
 }
 
 run_review >/dev/null
+
+if [ ! -e "$fake_root/copied-entry-invoked" ]; then
+  fail 'Codex reviewer가 원본 실행 파일이 아닌 전용 reviewer entrypoint를 사용하지 않았습니다.'
+fi
 
 rm -f "$fake_root/codex.invoked"
 set +e
