@@ -138,9 +138,11 @@ grep -Fq -- 'append_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
 grep -Fq -- 'require_host_tool cat' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 status 보고용 cat 경로를 고정하지 않습니다.'
 grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
-grep -Fq -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec --help' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 실제 Codex runtime을 사전 검증하지 않습니다.'
+grep -Fq -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 실제 Codex runtime을 사전 검증하지 않습니다.'
+grep -Fq -- "--config 'sandbox_workspace_write.network_access=false'" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer network access 차단 설정을 전달하지 않습니다.'
+grep -Fq -- '--strict-config' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer config를 엄격 모드로 검증하지 않습니다.'
 clean_checkout_line="$(grep -nF -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
-review_runtime_line="$(grep -nF -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec --help' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
+review_runtime_line="$(grep -nF -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
 [[ -n "$clean_checkout_line" && -n "$review_runtime_line" && "$clean_checkout_line" -lt "$review_runtime_line" ]] \
     || fail 'pre-push reviewer가 dirty checkout을 사전 차단하기 전에 실행됩니다.'
 if grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then

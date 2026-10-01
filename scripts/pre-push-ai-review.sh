@@ -62,6 +62,16 @@ answer_path="$tmp_dir/answer.md"
 "$git_bin" diff --no-ext-diff --no-textconv --unified=80 > "$working_path"
 "$git_bin" status --porcelain=v1 --untracked-files=no > "$status_path"
 
+assert_clean_checkout() {
+  if [ -s "$staged_path" ] || [ -s "$working_path" ] || [ -s "$status_path" ]; then
+    echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. Codex 리뷰 전에 staged·working-tree 변경을 먼저 커밋하거나 정리하십시오." >&2
+    if [ -s "$status_path" ]; then
+      "$cat_bin" "$status_path" >&2
+    fi
+    exit 1
+  fi
+}
+
 push_refs=()
 push_shas=()
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -74,6 +84,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 done
 
 if [ "${#push_shas[@]}" -eq 0 ]; then
+  assert_clean_checkout
   printf 'No branch update is being pushed; pre-push AI review is not required.\n'
   exit 0
 fi
@@ -91,13 +102,7 @@ if [ "$local_head_sha" != "$reviewed_ref" ]; then
   exit 1
 fi
 
-if [ -s "$staged_path" ] || [ -s "$working_path" ] || [ -s "$status_path" ]; then
-  echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. Codex 리뷰 전에 staged·working-tree 변경을 먼저 커밋하거나 정리하십시오." >&2
-  if [ -s "$status_path" ]; then
-    "$cat_bin" "$status_path" >&2
-  fi
-  exit 1
-fi
+assert_clean_checkout
 
 if ! "$git_bin" merge-base --is-ancestor "$base_sha" "$reviewed_ref"; then
   echo "ERROR: push 대상 커밋이 origin/main의 후손이 아니어서 리뷰 범위를 고정할 수 없습니다." >&2
@@ -199,7 +204,13 @@ for name in $(compgen -v); do
   esac
 done
 
-if ! "$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec --help >/dev/null 2>&1; then
+if ! "$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \
+  --ephemeral \
+  --ignore-user-config \
+  --strict-config \
+  --config 'sandbox_workspace_write.network_access=false' \
+  --sandbox read-only \
+  --help >/dev/null 2>&1; then
   echo "ERROR: 제한된 reviewer PATH에서 Codex CLI runtime을 시작할 수 없습니다." >&2
   exit 1
 fi
@@ -207,6 +218,7 @@ fi
 if ! "$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec \
   --ephemeral \
   --ignore-user-config \
+  --strict-config \
   --model "$MODEL" \
   --config 'model_reasoning_effort="medium"' \
   --config 'web_search="disabled"' \

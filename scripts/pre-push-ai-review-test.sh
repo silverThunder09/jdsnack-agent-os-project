@@ -254,6 +254,26 @@ if [ "$multi_status" -eq 0 ] || ! grep -Fq '여러 ref가 한 번에 push되어'
   fail '다중 ref push를 pre-push가 차단하지 않았습니다.'
 fi
 
+printf '\ndelete-only dirty fixture\n' >> "$test_worktree/scripts/README.md"
+rm -f "$fake_root/codex.invoked"
+set +e
+delete_only_output="$(
+  cd "$test_worktree"
+  printf 'refs/heads/codex/pre-push-test 0000000000000000000000000000000000000000 refs/heads/codex/pre-push-test %s\n' "$head_sha" \
+    | PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" 2>&1
+)"
+delete_only_status=$?
+set -e
+if [ "$delete_only_status" -eq 0 ] || ! grep -Fq 'Codex 리뷰 전에 staged·working-tree 변경' <<< "$delete_only_output"; then
+  printf '%s\n' "$delete_only_output" >&2
+  fail '삭제 ref 전용 push에서도 dirty checkout을 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail '삭제 ref 전용 dirty checkout이 Codex reviewer 실행 전에 차단되지 않았습니다.'
+fi
+
 printf '\npre-push tracked fixture\n' >> "$test_worktree/scripts/README.md"
 rm -f "$fake_root/codex.invoked"
 set +e
