@@ -44,6 +44,50 @@ function Stop-NeedsHuman {
     exit 20
 }
 
+function Assert-FixedApprovalPolicy {
+    param([pscustomobject]$ReviewPolicy)
+
+    if ($ReviewPolicy.dryRun -isnot [bool] -or $ReviewPolicy.dryRun -ne $true) {
+        Stop-NeedsHuman 'Review policy dryRun is fixed to true for this workflow.'
+    }
+
+    $expectedWeights = [ordered]@{
+        security = 30
+        apiDbEnvironment = 20
+        sizeScope = 15
+        testGap = 15
+        migration = 20
+    }
+    foreach ($weightName in $expectedWeights.Keys) {
+        if ($null -eq $ReviewPolicy.riskScore.weights.$weightName -or [int]$ReviewPolicy.riskScore.weights.$weightName -ne $expectedWeights[$weightName]) {
+            Stop-NeedsHuman "Review policy weight is not fixed for $weightName."
+        }
+    }
+
+    $expectedBands = @(
+        [pscustomobject]@{ name = 'Light'; maxScore = 30; minimumApprovals = 1; autoMerge = 'allowed-after-approval'; requiresOwnerSignoff = $false }
+        [pscustomobject]@{ name = 'Standard'; maxScore = 60; minimumApprovals = 1; autoMerge = 'blocked'; requiresOwnerSignoff = $false }
+        [pscustomobject]@{ name = 'High-risk'; maxScore = 100; minimumApprovals = 2; autoMerge = 'allowed-after-additional-review-and-owner-signoff'; requiresOwnerSignoff = $true }
+    )
+    $actualBands = @($ReviewPolicy.bands)
+    if ($actualBands.Count -ne $expectedBands.Count) {
+        Stop-NeedsHuman 'Review policy must define exactly three fixed risk bands.'
+    }
+    for ($index = 0; $index -lt $expectedBands.Count; $index++) {
+        $expected = $expectedBands[$index]
+        $actual = $actualBands[$index]
+        if (
+            [string]$actual.name -ne $expected.name -or
+            [int]$actual.maxScore -ne $expected.maxScore -or
+            [int]$actual.minimumApprovals -ne $expected.minimumApprovals -or
+            [string]$actual.autoMerge -ne $expected.autoMerge -or
+            [bool]$actual.requiresOwnerSignoff -ne $expected.requiresOwnerSignoff
+        ) {
+            Stop-NeedsHuman "Review policy risk band is not fixed: $($expected.name)."
+        }
+    }
+}
+
 function Get-ReviewPolicy {
     param([string]$PolicyPath)
 
@@ -58,6 +102,7 @@ function Get-ReviewPolicy {
     if ([int]$policy.version -ne 1) {
         Stop-NeedsHuman "Unsupported review policy version: $($policy.version)"
     }
+    Assert-FixedApprovalPolicy -ReviewPolicy $policy
     return $policy
 }
 
@@ -358,10 +403,12 @@ try {
 } catch {
     Stop-NeedsHuman "Deterministic review risk calculation returned invalid JSON: $($_.Exception.Message)"
 }
+if ($riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand) {
+    Stop-NeedsHuman 'The review report risk field does not match the deterministic risk band.'
+}
 if (
     [int]$riskScoreMatch.Groups[1].Value -ne [int]$riskAssessment.riskScore -or
     $riskBandMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand -or
-    $riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand -or
     ([string]$dryRunMatch.Groups[1].Value -eq 'True') -ne [bool]$riskAssessment.dryRun
 ) {
     Stop-NeedsHuman 'The review report risk data does not match the deterministic assessment.'

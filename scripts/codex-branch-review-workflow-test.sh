@@ -226,6 +226,10 @@ for fallback_contract in \
     'needs-human' \
     'High-risk' \
     'Get-OwnerAutoMergeSignoff' \
+    'Assert-FixedApprovalPolicy' \
+    'Review policy dryRun is fixed to true' \
+    'expectedWeights' \
+    'expectedBands' \
     'current-head Squash auto-merge confirmation' \
     'Score concrete findings independently from risk; a High-risk label alone does not lower the score.' \
     'Do not use NEEDS_HUMAN solely because a change is High-risk' \
@@ -364,6 +368,7 @@ for approval_contract in \
     'CompareOrdinal' \
     'ReviewId' \
     'riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand' \
+    'The review report risk field does not match the deterministic risk band.' \
     'minimumApprovals' \
     'autoMergePolicy' \
     'dry-run is enabled, and no merge command was executed.' \

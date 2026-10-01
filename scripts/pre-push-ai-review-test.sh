@@ -217,6 +217,18 @@ if [ "$weak_summary_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$weak_summa
   fail '실질적인 rubric 근거가 없는 review_summary를 pre-push가 차단하지 않았습니다.'
 fi
 
+set +e
+invalid_score_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" JDSNACK_FAKE_SCORE=6 \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+invalid_score_status=$?
+set -e
+if [ "$invalid_score_status" -eq 0 ] || ! grep -Fq 'score 필드가 정확히 하나' <<< "$invalid_score_output"; then
+  printf '%s\n' "$invalid_score_output" >&2
+  fail '범위를 벗어난 score를 pre-push가 차단하지 않았습니다.'
+fi
+
 touch "$fake_root/codex.duplicate"
 set +e
 duplicate_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \

@@ -318,6 +318,13 @@ if ! score="$(extract_single_field 's/^[[:space:]]*score:[[:space:]]*([0-5])([[:
   echo "ERROR: Codex pre-push 리뷰의 score 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
   exit 1
 fi
+case "$score" in
+  0|1|2|3|4|5) ;;
+  *)
+    echo "ERROR: Codex pre-push 리뷰의 score는 0~5 범위여야 합니다. push를 차단합니다." >&2
+    exit 1
+    ;;
+esac
 if ! risk="$(extract_single_field 's/^[[:space:]]*risk:[[:space:]]*(Light|Standard|High-risk)[[:space:]]*$/\1/p')"; then
   echo "ERROR: Codex pre-push 리뷰의 risk 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
   exit 1
