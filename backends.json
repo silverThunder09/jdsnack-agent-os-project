@@ -15,7 +15,8 @@
       "review-fallback": {
         "provider": "openai",
         "model": "gpt-Luna MAX",
-        "reason": "Claude review backend 장애 시 gpt-Luna MAX로 동일 루브릭의 읽기 전용 PR 리뷰를 대행합니다."
+        "runtimeModel": "gpt-6-luna",
+        "reason": "Claude review backend 장애 시 요청된 gpt-Luna MAX 정책을 기록하고, 현재 Codex ChatGPT 런타임에서 지원되는 gpt-6-luna 별칭으로 동일 루브릭의 읽기 전용 PR 리뷰를 대행합니다."
       }
     },
     "claude": {

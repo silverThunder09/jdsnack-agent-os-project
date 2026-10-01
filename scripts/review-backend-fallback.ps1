@@ -75,7 +75,9 @@ function Get-ConfiguredCodexReviewModel {
 
     try {
         $backends = Get-Content -LiteralPath $backendsPath -Raw | ConvertFrom-Json
-        $model = [string]$backends.workers.codex.'review-fallback'.model
+        $reviewConfig = $backends.workers.codex.'review-fallback'
+        $model = [string]$reviewConfig.model
+        $runtimeModel = [string]$reviewConfig.runtimeModel
     } catch {
         throw "Could not read the Codex review model from ${backendsPath}: $($_.Exception.Message)"
     }
@@ -83,7 +85,13 @@ function Get-ConfiguredCodexReviewModel {
     if ([string]::IsNullOrWhiteSpace($model)) {
         throw "backends.json does not define workers.codex.review-fallback.model: ${backendsPath}"
     }
-    return $model
+    if ([string]::IsNullOrWhiteSpace($runtimeModel)) {
+        $runtimeModel = $model
+    }
+    return [pscustomobject]@{
+        Requested = $model
+        Runtime = $runtimeModel
+    }
 }
 
 function Read-ToolOutput {
@@ -693,7 +701,9 @@ $fallbackReason = switch -Regex ($claudeOutput) {
 Add-StepSummary "Claude could not provide a valid structured review ($fallbackReason); delegating PR #$PullRequestNumber to Codex read-only reviewer."
 
 try {
-    $codexReviewModel = Get-ConfiguredCodexReviewModel -ReviewWorkspace $Workspace
+    $codexModelConfig = Get-ConfiguredCodexReviewModel -ReviewWorkspace $Workspace
+    $codexReviewModel = [string]$codexModelConfig.Runtime
+    $codexRequestedModel = [string]$codexModelConfig.Requested
 } catch {
     Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
     Stop-NeedsHuman $_.Exception.Message ''
@@ -736,6 +746,8 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
+Requested reviewer model: $codexRequestedModel
+Runtime reviewer model: $codexReviewModel
 The deterministic review assessment in the supplied criteria is authoritative for risk score, risk band, merge policy, and the Security, Performance, Test Coverage, and Architecture routing labels. Review each supplied label's matched paths and report findings under the relevant label. Do not invent a different risk score or band.
 Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
 --- BEGIN PR DIFF ---

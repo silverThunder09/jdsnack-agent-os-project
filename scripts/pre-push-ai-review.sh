@@ -2,9 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MODEL="$(jq -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
+REQUESTED_MODEL="$(jq -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
+MODEL="$(jq -r '.workers.codex["review-fallback"].runtimeModel // .workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
 
-if [ -z "$MODEL" ]; then
+if [ -z "$REQUESTED_MODEL" ] || [ -z "$MODEL" ]; then
   echo "ERROR: backends.json에 Codex review-fallback 모델이 없습니다." >&2
   exit 1
 fi
@@ -77,7 +78,7 @@ findings:
 review_summary:
 
 PROMPT
-printf '\nConfigured reviewer model: %s\n' "$MODEL" >> "$prompt_path"
+printf '\nRequested reviewer model: %s\nRuntime reviewer model: %s\n' "$REQUESTED_MODEL" "$MODEL" >> "$prompt_path"
 printf '\nReview base: %s\nReview head: %s\n' "$base_sha" "$reviewed_ref" >> "$prompt_path"
 printf '\nSpecialized review routing labels and path rules (apply these to findings):\n' >> "$prompt_path"
 cat "$ROOT_DIR/scripts/review-policy.json" >> "$prompt_path"

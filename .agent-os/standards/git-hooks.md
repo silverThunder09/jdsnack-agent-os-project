@@ -85,7 +85,7 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 ## `pre-push` 훅
 
-푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. `scripts/pre-push-ai-review.sh`는 staged diff, working-tree diff, 현재 branch와 `origin/main`의 branch diff를 함께 전달하고 `scripts/review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙도 프롬프트에 포함합니다. 모델은 `backends.json`의 `workers.codex.review-fallback.model`을 사용합니다.
+푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. `scripts/pre-push-ai-review.sh`는 staged diff, working-tree diff, 현재 branch와 `origin/main`의 branch diff를 함께 전달하고 `scripts/review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙도 프롬프트에 포함합니다. 요청 모델은 `backends.json`의 `workers.codex.review-fallback.model`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
 
 검사 규칙:
 
