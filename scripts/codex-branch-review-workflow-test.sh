@@ -123,6 +123,11 @@ grep -Fq -- '여러 ref가 한 번에 push되어' "$ROOT_DIR/scripts/pre-push-ai
 grep -Fq -- '현재 checkout의 HEAD와' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push head와 local HEAD를 고정하지 않습니다.'
 grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
 grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex 환경 변수를 정리하지 않습니다.'
+grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
+grep -Fq -- 'export PATH="$codex_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 Codex 실행 디렉터리로 제한되지 않습니다.'
+if grep -Fq -- 'PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|TEMP' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
+    fail 'pre-push reviewer가 사용자 home/config 환경을 보존합니다.'
+fi
 jq -e '
     .version == 1
     and .dryRun == true

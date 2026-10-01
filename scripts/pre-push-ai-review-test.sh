@@ -93,7 +93,7 @@ run_review() {
         JDSNACK_FAKE_RISK="$expected_risk" \
         JDSNACK_FAKE_RISK_SCORE="$expected_score" \
         JDSNACK_FAKE_LABELS="$expected_labels" \
-        bash "$test_worktree/scripts/pre-push-ai-review.sh"
+        bash "$test_worktree/.githooks/pre-push" origin https://example.invalid
   )
 }
 

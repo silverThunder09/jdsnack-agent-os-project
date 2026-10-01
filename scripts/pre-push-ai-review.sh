@@ -13,7 +13,8 @@ if [ ! -f "$ROOT_DIR/scripts/review-policy.json" ]; then
   echo "ERROR: 전문 리뷰 라우팅 정책이 없습니다: scripts/review-policy.json" >&2
   exit 1
 fi
-if ! command -v codex >/dev/null 2>&1; then
+codex_bin="$(command -v codex || true)"
+if [ -z "$codex_bin" ]; then
   echo "ERROR: pre-push AI 리뷰를 위해 Codex CLI가 필요합니다." >&2
   exit 1
 fi
@@ -169,17 +170,23 @@ clear_review_environment() {
   local name
   for name in $(compgen -v); do
     case "$name" in
-      PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|TEMP|TMP|TMPDIR|SystemRoot|SYSTEMROOT|LANG|LC_*|TERM|PWD|OLDPWD|SHLVL|_)
+      TEMP|TMP|TMPDIR|SystemRoot|SYSTEMROOT|LANG|LC_*|TERM|PWD|OLDPWD|SHLVL|_)
         ;;
-      GITHUB_*|GH_*|AWS_*|AZURE_*|GOOGLE_*|OPENAI_*|ANTHROPIC_*|GEMINI_*|DATABASE_*|REDIS_*|SSH_*|GIT_*|*_TOKEN|*_KEY|*_SECRET|*_PASSWORD|*_CREDENTIAL*|*_AUTH*|*_URL)
+      PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|GITHUB_*|GH_*|AWS_*|AZURE_*|GOOGLE_*|OPENAI_*|ANTHROPIC_*|GEMINI_*|DATABASE_*|REDIS_*|SSH_*|GIT_*|*_TOKEN|*_KEY|*_SECRET|*_PASSWORD|*_CREDENTIAL*|*_AUTH*|*_URL)
         unset "$name" 2>/dev/null || true
         ;;
     esac
   done
 }
 clear_review_environment
+codex_dir="${codex_bin%/*}"
+if [ -z "$codex_dir" ] || [ "$codex_dir" = "$codex_bin" ]; then
+  echo "ERROR: Codex CLI 경로를 제한된 reviewer PATH로 고정할 수 없습니다." >&2
+  exit 1
+fi
+export PATH="$codex_dir"
 
-if ! codex exec \
+if ! "$codex_bin" exec \
   --ephemeral \
   --ignore-user-config \
   --model "$MODEL" \
