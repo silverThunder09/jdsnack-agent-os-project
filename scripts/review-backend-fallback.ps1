@@ -725,6 +725,8 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
+Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". The review_summary body must be non-empty and contain the concise review conclusion. Do not repeat any scalar field or structured header.
+
 The deterministic review assessment appended to the criteria is authoritative for risk score, risk band, merge policy, and the Security, Performance, Test Coverage, and Architecture routing labels. Review each supplied label's matched paths and report findings under the relevant label. Do not invent a different risk score or band.
 Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
 --- BEGIN PR DIFF ---
@@ -820,6 +822,8 @@ score: 0-5
 risk: Light | Standard | High-risk
 findings:
 review_summary:
+
+Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". The review_summary body must be non-empty and contain the concise review conclusion. Do not repeat any scalar field or structured header.
 
 Requested reviewer model: $codexRequestedModel
 Runtime reviewer model: $codexReviewModel

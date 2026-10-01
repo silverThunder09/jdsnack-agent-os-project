@@ -273,6 +273,15 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
     }
 }
 
+function Assert-NoUnresolvedChangeRequests {
+    param([pscustomobject]$ApprovalSummary)
+
+    $changesRequested = @($ApprovalSummary.ChangesRequested)
+    if ($changesRequested.Count -gt 0) {
+        Stop-NeedsHuman "Unresolved human change request(s) remain: $($changesRequested -join ', ')."
+    }
+}
+
 if ($PullRequestNumber -le 0 -or $Repository -notmatch '^[^/]+/[^/]+$') {
     Stop-NeedsHuman 'Pull request identity is invalid.'
 }
@@ -391,9 +400,8 @@ $requireCurrentHeadApproval = [bool]$branchProtectionApproval.DismissStaleReview
 $approvalSummary = Get-HumanApprovalSummary `
     -ExpectedHeadSha $HeadSha `
     -RequireCurrentHead:$requireCurrentHeadApproval
-if (@($approvalSummary.ChangesRequested).Count -gt 0) {
-    Stop-NeedsHuman "Unresolved human change request(s) remain: $(@($approvalSummary.ChangesRequested) -join ', ')."
-}
+# This assertion intentionally precedes the dry-run success path.
+Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary
 if ($approvalSummary.Count -lt $effectiveMinimumApprovals) {
     Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) and branch protection require at least $effectiveMinimumApprovals human approval(s); found $($approvalSummary.Count)."
 }

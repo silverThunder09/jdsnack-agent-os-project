@@ -330,6 +330,7 @@ for approval_contract in \
     'The review report must include deterministic risk score, risk band, and dry-run state.' \
     'review-risk.ps1' \
     'Get-HumanApprovalSummary' \
+    'Assert-NoUnresolvedChangeRequests' \
     'api' \
     'graphql' \
     'reviews(first: 100, after: $cursor)' \
@@ -369,6 +370,10 @@ for approval_contract in \
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
+unresolved_changes_line="$(grep -nF -- 'Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary' "$APPROVAL_SCRIPT" | cut -d: -f1)"
+dry_run_success_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun) {' "$APPROVAL_SCRIPT" | cut -d: -f1)"
+[[ -n "$unresolved_changes_line" && -n "$dry_run_success_line" && "$unresolved_changes_line" -lt "$dry_run_success_line" ]] \
+    || fail 'Unresolved change requests must be rejected before the dry-run success path.'
 RISK_SCRIPT="$ROOT_DIR/scripts/review-risk.ps1"
 grep -Fq -- 'expectedScoringPathPatterns' "$RISK_SCRIPT" || fail '위험도 계산기가 source/test scoring path patterns를 고정하지 않습니다.'
 grep -Fq -- 'scripts/.*-test' "$ROOT_DIR/scripts/review-policy.json" || fail 'PowerShell test path가 위험도 정책에 포함되지 않았습니다.'
