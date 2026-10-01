@@ -77,10 +77,11 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+codex_dir="${0%/*}"
+: > "$codex_dir/invoked"
 [ "$help_requested" -eq 1 ] && exit 0
 [ -n "$output_path" ] || exit 2
 [ "$network_config_seen" -eq 1 ] || exit 9
-codex_dir="${0%/*}"
 case ":${PATH-}:" in
   *":$codex_dir:"*) ;;
   *) exit 3 ;;
@@ -217,6 +218,7 @@ if [ "$multi_status" -eq 0 ] || ! grep -Fq '여러 ref가 한 번에 push되어'
 fi
 
 printf '\npre-push tracked fixture\n' >> "$test_worktree/scripts/README.md"
+rm -f "$fake_root/codex.invoked"
 set +e
 tracked_output="$(
   cd "$test_worktree"
@@ -230,6 +232,9 @@ set -e
 if [ "$tracked_status" -eq 0 ] || ! grep -Fq 'tracked checkout 상태가 다릅니다' <<< "$tracked_output"; then
   printf '%s\n' "$tracked_output" >&2
   fail 'tracked dirty checkout을 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail 'tracked dirty checkout이 Codex reviewer 실행 전에 차단되지 않았습니다.'
 fi
 
 echo 'Pre-push AI review contract tests passed'

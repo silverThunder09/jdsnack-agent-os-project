@@ -122,6 +122,7 @@ grep -Fq -- 'reported_review_labels' "$ROOT_DIR/scripts/pre-push-ai-review.sh" |
 grep -Fq -- '여러 ref가 한 번에 push되어' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 다중 ref push를 차단하지 않습니다.'
 grep -Fq -- '현재 checkout의 HEAD와' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push head와 local HEAD를 고정하지 않습니다.'
 grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
+grep -Fq -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex reviewer 전에 dirty checkout을 차단하지 않습니다.'
 grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
 grep -Fq -- 'review_path="$codex_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 Codex 실행 디렉터리로 제한되지 않습니다.'
 grep -Fq -- 'review_env_args=("PATH=$review_path")' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 명시적 allowlist 환경을 구성하지 않습니다.'
@@ -129,6 +130,10 @@ grep -Fq -- 'append_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh
 grep -Fq -- 'for tool in env git cat grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
 grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
 grep -Fq -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec --help' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 실제 Codex runtime을 사전 검증하지 않습니다.'
+clean_checkout_line="$(grep -nF -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
+review_runtime_line="$(grep -nF -- '"$env_bin" -i "${review_env_args[@]}" "$codex_bin" exec --help' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
+[[ -n "$clean_checkout_line" && -n "$review_runtime_line" && "$clean_checkout_line" -lt "$review_runtime_line" ]] \
+    || fail 'pre-push reviewer가 dirty checkout을 사전 차단하기 전에 실행됩니다.'
 if grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer가 denylist 환경 정리에 의존합니다.'
 fi
@@ -222,6 +227,9 @@ for fallback_contract in \
     'Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory' \
     'Get-StructuredField' \
     'Get-StructuredReviewResult' \
+    'HasStructuredBody' \
+    'hasFindings' \
+    'hasReviewSummary' \
     'Write-ReviewReport' \
     'RiskAssessment' \
     'Assert-FixedReviewPolicy' \
@@ -253,7 +261,7 @@ for fallback_contract in \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
 done
 availability_check_line="$(grep -nF -- '$claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 unavailable_route_line="$(grep -nF -- '$claudeReviewUnavailable = $claudeExitCode -ne 0 -or -not $claudeHasStructuredResult' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 claude_success_route_line="$(grep -nF -- 'if (-not $claudeReviewUnavailable) {' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 codex_fallback_route_line="$(grep -nF -- 'Claude could not provide a valid structured review' "$FALLBACK_SCRIPT" | cut -d: -f1)"
@@ -315,6 +323,10 @@ for approval_contract in \
     'requireCurrentHeadApproval' \
     'ExpectedHeadSha' \
     'commit.oid' \
+    'review.id' \
+    'review.databaseId' \
+    'CompareOrdinal' \
+    'ReviewId' \
     'riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand' \
     'minimumApprovals' \
     'autoMergePolicy' \

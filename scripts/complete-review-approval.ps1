@@ -163,14 +163,34 @@ function Get-HumanApprovalSummary {
         if ($RequireCurrentHead -and [string]$review.commit.oid -ne $ExpectedHeadSha) {
             continue
         }
+        $reviewId = [string]$review.id
+        if ([string]::IsNullOrWhiteSpace($reviewId)) {
+            $reviewId = [string]$review.databaseId
+        }
+        if ([string]::IsNullOrWhiteSpace($reviewId)) {
+            Stop-NeedsHuman "Human review data is missing a deterministic review id for '$login'."
+        }
         $submittedAt = [datetime]::MinValue
         if (-not [string]::IsNullOrWhiteSpace([string]$review.submittedAt)) {
             try { $submittedAt = [datetime]::Parse([string]$review.submittedAt) } catch { }
         }
-        if (-not $latestByLogin.ContainsKey($login) -or $submittedAt -gt $latestByLogin[$login].SubmittedAt) {
+        $isNewer = $false
+        if (-not $latestByLogin.ContainsKey($login)) {
+            $isNewer = $true
+        } else {
+            $existing = $latestByLogin[$login]
+            $timeComparison = $submittedAt.CompareTo($existing.SubmittedAt)
+            $idComparison = [string]::CompareOrdinal($reviewId, [string]$existing.ReviewId)
+            $isNewer = $timeComparison -gt 0 -or ($timeComparison -eq 0 -and $idComparison -gt 0)
+            if ($timeComparison -eq 0 -and $idComparison -eq 0 -and [string]$review.state -ne [string]$existing.State) {
+                Stop-NeedsHuman "Human review data contains conflicting states for review id '$reviewId'."
+            }
+        }
+        if ($isNewer) {
             $latestByLogin[$login] = [pscustomobject]@{
                 State = [string]$review.state
                 SubmittedAt = $submittedAt
+                ReviewId = $reviewId
             }
         }
     }

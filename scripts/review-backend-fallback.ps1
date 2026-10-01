@@ -439,10 +439,12 @@ function Get-StructuredReviewResult {
 
     $findings = Get-StructuredField -Text $Text -Name 'findings'
     $reviewSummary = Get-StructuredField -Text $Text -Name 'review_summary'
-    if ([string]::IsNullOrWhiteSpace($findings)) {
+    $hasFindings = -not [string]::IsNullOrWhiteSpace($findings)
+    $hasReviewSummary = -not [string]::IsNullOrWhiteSpace($reviewSummary)
+    if (-not $hasFindings) {
         $findings = 'Structured review findings were not returned.'
     }
-    if ([string]::IsNullOrWhiteSpace($reviewSummary)) {
+    if (-not $hasReviewSummary) {
         $reviewSummary = 'Structured review fields were missing or malformed; detailed runner output is intentionally omitted from the GitHub comment.'
     }
 
@@ -456,6 +458,9 @@ function Get-StructuredReviewResult {
         DecisionLabel = if ($decisionMatch.Success) { $decisionMatch.Groups[1].Value } else { 'unavailable' }
         ScoreLabel = if ($scoreMatch.Success) { "$($scoreMatch.Groups[1].Value)/5" } else { 'unavailable' }
         RiskLabel = if ($riskMatch.Success) { $riskMatch.Groups[1].Value } else { 'unavailable' }
+        HasFindings = $hasFindings
+        HasReviewSummary = $hasReviewSummary
+        HasStructuredBody = $hasFindings -and $hasReviewSummary
         Findings = $findings
         ReviewSummary = $reviewSummary
     }
@@ -599,7 +604,13 @@ function Complete-ReviewDecision {
         [int]$ProcessExitCode
     )
 
-    if ($ProcessExitCode -ne 0 -or -not $Result.DecisionMatch.Success -or -not $Result.ScoreMatch.Success -or -not $Result.RiskMatch.Success) {
+    if (
+        $ProcessExitCode -ne 0 -or
+        -not $Result.DecisionMatch.Success -or
+        -not $Result.ScoreMatch.Success -or
+        -not $Result.RiskMatch.Success -or
+        -not $Result.HasStructuredBody
+    ) {
         Stop-NeedsHuman "$($Result.ReviewerBackend) was unavailable or returned an invalid structured result." $ReportPath
     }
 
@@ -723,7 +734,7 @@ $claudeOutput = Read-ToolOutput $claudeLog
 $availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:failed\s+to\s+authenticate|oauth\s+session\s+expired|not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
 $claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)
 $claudeResult = Get-StructuredReviewResult -Text $claudeOutput -ReviewerBackend 'claude' -FallbackReason 'none'
-$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success
+$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody
 $claudeReviewUnavailable = $claudeExitCode -ne 0 -or -not $claudeHasStructuredResult
 
 # A failed invocation or missing structured review means Claude could not complete the review.

@@ -85,14 +85,14 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 ## `pre-push` 훅
 
-푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. `scripts/pre-push-ai-review.sh`는 staged diff, working-tree diff, 현재 branch와 `origin/main`의 branch diff를 함께 전달하고 `scripts/review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙도 프롬프트에 포함합니다. 요청 모델은 `backends.json`의 `workers.codex.review-fallback.model`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
+푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. `scripts/pre-push-ai-review.sh`는 tracked checkout이 clean한지 먼저 확인한 뒤 현재 branch와 `origin/main`의 branch diff만 전달하고, `scripts/review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙도 프롬프트에 포함합니다. 요청 모델은 `backends.json`의 `workers.codex.review-fallback.model`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
 
 검사 규칙:
 
 - Codex review-fallback 모델(`backends.json`)이 구조화된 `PASS`와 4점 이상을 반환해야 합니다.
 - 리뷰 결과의 `risk`, `risk_score`, 전문 라벨이 `scripts/review-risk.ps1`의 branch diff 계산과 일치해야 하며 `findings`와 `review_summary` 본문도 비어 있지 않아야 합니다.
 - 리뷰 실행 실패, 필드 누락, `COMMENT`, `REQUEST_CHANGES`, `NEEDS_HUMAN`, 4점 미만, 또는 findings에 `P0`, `P1`, `blocker`, `major`가 있으면 push를 차단합니다. PASS 응답은 `findings: - none` 또는 P2/P3 항목만 허용합니다.
-- 한 번에 하나의 ref만 허용하고 `origin/main`의 후손인 단일 push head만 리뷰합니다. push head가 현재 checkout의 `HEAD`와 정확히 같아야 하며, staged·working-tree의 tracked diff는 누락될 작업을 알려 주는 진단 증적으로만 전달합니다. 이 변경은 push tree에 포함되지 않으므로 tracked dirty 상태가 남아 있으면 리뷰 후에도 최종 push를 차단합니다. untracked 파일은 push 증적에 포함되지 않으므로 대상에서 제외합니다.
+- 한 번에 하나의 ref만 허용하고 `origin/main`의 후손인 단일 push head만 리뷰합니다. push head가 현재 checkout의 `HEAD`와 정확히 같아야 하며, staged·working-tree의 tracked 변경이 있으면 Codex reviewer를 시작하기 전에 차단합니다. reviewer 종료 후에도 staged·working-tree/status/HEAD 증적을 다시 비교해 리뷰 중 checkout 변경을 차단합니다. untracked 파일은 push 증적에 포함되지 않으므로 대상에서 제외합니다.
 - Codex에는 diff만 전달하고 shell·network·credential·repository access를 허용하지 않습니다.
 - reviewer 프로세스에는 Codex 실행 디렉터리만 `PATH`로 제공하고 실제 Codex CLI의 `exec --help` 기동을 먼저 확인합니다. `CODEX_HOME`과 실행에 필요한 Windows/runtime 변수만 명시적 allowlist로 전달하고, 그 밖의 사용자 home·CI·cloud·secret 환경변수는 전달하지 않습니다. sandbox 명령의 network access도 `sandbox_workspace_write.network_access=false`로 고정합니다. hook이 리뷰 후 결과를 판정하는 데 필요한 host 도구는 제한된 PATH에 추가하지 않고 절대 경로로 호출합니다.
 - 빌드·lint·test·E2E는 CI가 담당하며 hook에서 모델 배정으로 대체하지 않습니다.
