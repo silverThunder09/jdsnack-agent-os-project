@@ -226,10 +226,6 @@ for fallback_contract in \
     'needs-human' \
     'High-risk' \
     'Get-OwnerAutoMergeSignoff' \
-    'Assert-FixedApprovalPolicy' \
-    'Review policy dryRun is fixed to true' \
-    'expectedWeights' \
-    'expectedBands' \
     'current-head Squash auto-merge confirmation' \
     'Score concrete findings independently from risk; a High-risk label alone does not lower the score.' \
     'Do not use NEEDS_HUMAN solely because a change is High-risk' \
@@ -331,6 +327,10 @@ APPROVAL_SCRIPT="$ROOT_DIR/scripts/complete-review-approval.ps1"
 for approval_contract in \
     'Assert-ReviewedPullRequestIsCurrent' \
     'Get-OwnerAutoMergeSignoff' \
+    'Assert-FixedApprovalPolicy' \
+    'Review policy dryRun is fixed to true' \
+    'expectedWeights' \
+    'expectedBands' \
     "'Validate PR contract'" \
     "'PR CI Gate'" \
     "'review'" \
