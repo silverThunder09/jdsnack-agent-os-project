@@ -124,7 +124,15 @@ grep -Fq -- '현재 checkout의 HEAD와' "$ROOT_DIR/scripts/pre-push-ai-review.s
 grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
 grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex 환경 변수를 정리하지 않습니다.'
 grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
-grep -Fq -- 'export PATH="$codex_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 Codex 실행 디렉터리로 제한되지 않습니다.'
+grep -Fq -- 'review_path="$codex_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 Codex 실행 디렉터리로 제한되지 않습니다.'
+grep -Fq -- 'export PATH="$review_path"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 제한된 PATH를 적용하지 않습니다.'
+grep -Fq -- 'restore_host_environment()' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 종료 후 host 환경을 복구하지 않습니다.'
+grep -Fq -- 'export PATH="$host_path"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 host PATH를 복구하지 않습니다.'
+grep -Fq -- 'for tool in git cat grep tail sed head awk cmp rm' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 필요한 host 도구 경로를 고정하지 않습니다.'
+grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
+if grep -Fq -- 'for helper in cat grep cygpath' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
+    fail 'pre-push reviewer PATH가 host 도구 디렉터리로 확장됩니다.'
+fi
 if grep -Fq -- 'PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|TEMP' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer가 사용자 home/config 환경을 보존합니다.'
 fi

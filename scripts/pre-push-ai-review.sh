@@ -18,14 +18,28 @@ if [ -z "$codex_bin" ]; then
   echo "ERROR: pre-push AI 리뷰를 위해 Codex CLI가 필요합니다." >&2
   exit 1
 fi
-if ! command -v git >/dev/null 2>&1; then
-  echo "ERROR: pre-push AI 리뷰를 위해 Git이 필요합니다." >&2
-  exit 1
-fi
+host_path="$PATH"
+host_home="${HOME-}"
+host_userprofile="${USERPROFILE-}"
+host_homedrive="${HOMEDRIVE-}"
+host_homepath="${HOMEPATH-}"
+require_host_tool() {
+  local name="$1"
+  local path
+  path="$(command -v "$name" || true)"
+  if [ -z "$path" ]; then
+    echo "ERROR: pre-push AI 리뷰를 위해 $name이(가) 필요합니다." >&2
+    exit 1
+  fi
+  printf -v "${name}_bin" '%s' "$path"
+}
+for tool in git cat grep tail sed head awk cmp rm; do
+  require_host_tool "$tool"
+done
 
 tmp_dir="$(mktemp -d)"
 cleanup() {
-  rm -rf "$tmp_dir"
+  "$rm_bin" -rf "$tmp_dir"
 }
 trap cleanup EXIT
 
@@ -34,12 +48,12 @@ if [ "$base_ref" != "origin/main" ]; then
   echo "ERROR: pre-push 리뷰 기준은 origin/main으로 고정됩니다: $base_ref" >&2
   exit 1
 fi
-if ! base_sha="$(git rev-parse --verify "$base_ref^{commit}" 2>/dev/null)"; then
-  if ! git fetch --no-tags origin main:refs/remotes/origin/main >/dev/null 2>&1; then
+if ! base_sha="$("$git_bin" rev-parse --verify "$base_ref^{commit}" 2>/dev/null)"; then
+  if ! "$git_bin" fetch --no-tags origin main:refs/remotes/origin/main >/dev/null 2>&1; then
     echo "ERROR: origin/main을 fetch할 수 없어 리뷰 기준 브랜치를 확인할 수 없습니다." >&2
     exit 1
   fi
-  if ! base_sha="$(git rev-parse --verify "$base_ref^{commit}" 2>/dev/null)"; then
+  if ! base_sha="$("$git_bin" rev-parse --verify "$base_ref^{commit}" 2>/dev/null)"; then
     echo "ERROR: 리뷰 기준 브랜치를 확인할 수 없습니다: $base_ref" >&2
     exit 1
   fi
@@ -52,9 +66,9 @@ status_path="$tmp_dir/status.txt"
 prompt_path="$tmp_dir/prompt.md"
 answer_path="$tmp_dir/answer.md"
 
-git diff --cached --no-ext-diff --no-textconv --unified=80 > "$staged_path"
-git diff --no-ext-diff --no-textconv --unified=80 > "$working_path"
-git status --porcelain=v1 --untracked-files=no > "$status_path"
+"$git_bin" diff --cached --no-ext-diff --no-textconv --unified=80 > "$staged_path"
+"$git_bin" diff --no-ext-diff --no-textconv --unified=80 > "$working_path"
+"$git_bin" status --porcelain=v1 --untracked-files=no > "$status_path"
 
 push_refs=()
 push_shas=()
@@ -78,19 +92,19 @@ if [ "${#push_shas[@]}" -ne 1 ]; then
 fi
 reviewed_ref="${push_shas[0]}"
 
-local_head_sha="$(git rev-parse HEAD)"
+local_head_sha="$("$git_bin" rev-parse HEAD)"
 if [ "$local_head_sha" != "$reviewed_ref" ]; then
   echo "ERROR: push 대상 커밋이 현재 checkout의 HEAD와 달라 pre-push 리뷰 증적을 고정할 수 없습니다." >&2
   printf 'head=%s push=%s\n' "$local_head_sha" "$reviewed_ref" >&2
   exit 1
 fi
 
-if ! git merge-base --is-ancestor "$base_sha" "$reviewed_ref"; then
+if ! "$git_bin" merge-base --is-ancestor "$base_sha" "$reviewed_ref"; then
   echo "ERROR: push 대상 커밋이 origin/main의 후손이 아니어서 리뷰 범위를 고정할 수 없습니다." >&2
   exit 1
 fi
 
-if ! git diff --no-ext-diff --no-textconv --unified=80 "$base_sha...$reviewed_ref" > "$branch_path"; then
+if ! "$git_bin" diff --no-ext-diff --no-textconv --unified=80 "$base_sha...$reviewed_ref" > "$branch_path"; then
   echo "ERROR: branch diff를 만들 수 없습니다: $base_sha...$reviewed_ref" >&2
   exit 1
 fi
@@ -178,13 +192,21 @@ clear_review_environment() {
     esac
   done
 }
-clear_review_environment
+restore_host_environment() {
+  export PATH="$host_path"
+  [ -n "$host_home" ] && export HOME="$host_home" || unset HOME
+  [ -n "$host_userprofile" ] && export USERPROFILE="$host_userprofile" || unset USERPROFILE
+  [ -n "$host_homedrive" ] && export HOMEDRIVE="$host_homedrive" || unset HOMEDRIVE
+  [ -n "$host_homepath" ] && export HOMEPATH="$host_homepath" || unset HOMEPATH
+}
 codex_dir="${codex_bin%/*}"
 if [ -z "$codex_dir" ] || [ "$codex_dir" = "$codex_bin" ]; then
   echo "ERROR: Codex CLI 경로를 제한된 reviewer PATH로 고정할 수 없습니다." >&2
   exit 1
 fi
-export PATH="$codex_dir"
+review_path="$codex_dir"
+clear_review_environment
+export PATH="$review_path"
 
 if ! "$codex_bin" exec \
   --ephemeral \
@@ -216,26 +238,28 @@ if ! "$codex_bin" exec \
   --sandbox read-only \
   --output-last-message "$codex_answer_path" \
   - < "$prompt_path" > "$tmp_dir/codex.log" 2>&1; then
+  restore_host_environment
   echo "ERROR: Codex pre-push 리뷰를 완료하지 못했습니다. push를 차단합니다." >&2
-  tail -n 20 "$tmp_dir/codex.log" >&2 || true
+  "$tail_bin" -n 20 "$tmp_dir/codex.log" >&2 || true
   exit 1
 fi
+restore_host_environment
 
 if [ ! -s "$answer_path" ]; then
   echo "ERROR: Codex pre-push 리뷰 결과가 비어 있습니다. push를 차단합니다." >&2
   exit 1
 fi
 
-decision="$(sed -nE 's/^[[:space:]]*decision:[[:space:]]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[[:space:]]*$/\1/p' "$answer_path" | head -n 1)"
-score="$(sed -nE 's/^[[:space:]]*score:[[:space:]]*([0-5])([[:space:]]*\/5)?[[:space:]]*$/\1/p' "$answer_path" | head -n 1)"
-risk="$(sed -nE 's/^[[:space:]]*risk:[[:space:]]*(Light|Standard|High-risk)[[:space:]]*$/\1/p' "$answer_path" | head -n 1)"
-risk_score="$(sed -nE 's/^[[:space:]]*risk_score:[[:space:]]*([0-9]+)([[:space:]]*\/100)?[[:space:]]*$/\1/p' "$answer_path" | head -n 1)"
-review_labels="$(sed -nE 's/^[[:space:]]*review_labels:[[:space:]]*(.*)$/\1/p' "$answer_path" | head -n 1 | sed 's/[[:space:]]*$//')"
+decision="$("$sed_bin" -nE 's/^[[:space:]]*decision:[[:space:]]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[[:space:]]*$/\1/p' "$answer_path" | "$head_bin" -n 1)"
+score="$("$sed_bin" -nE 's/^[[:space:]]*score:[[:space:]]*([0-5])([[:space:]]*\/5)?[[:space:]]*$/\1/p' "$answer_path" | "$head_bin" -n 1)"
+risk="$("$sed_bin" -nE 's/^[[:space:]]*risk:[[:space:]]*(Light|Standard|High-risk)[[:space:]]*$/\1/p' "$answer_path" | "$head_bin" -n 1)"
+risk_score="$("$sed_bin" -nE 's/^[[:space:]]*risk_score:[[:space:]]*([0-9]+)([[:space:]]*\/100)?[[:space:]]*$/\1/p' "$answer_path" | "$head_bin" -n 1)"
+review_labels="$("$sed_bin" -nE 's/^[[:space:]]*review_labels:[[:space:]]*(.*)$/\1/p' "$answer_path" | "$head_bin" -n 1 | "$sed_bin" 's/[[:space:]]*$//')"
 
 has_structured_body() {
   local field="$1"
   local next_field="$2"
-  awk -v field="$field" -v next_field="$next_field" '
+  "$awk_bin" -v field="$field" -v next_field="$next_field" '
     $0 ~ "^[[:space:]]*" field ":[[:space:]]*$" { in_field=1; next }
     in_field && $0 ~ "^[[:space:]]*" next_field ":[[:space:]]*$" { in_field=0 }
     in_field && $0 ~ /[^[:space:]]/ { found=1 }
@@ -244,13 +268,13 @@ has_structured_body() {
 }
 
 has_blocking_finding() {
-  grep -Ei '^[[:space:]]*[-*][[:space:]]*(P0|P1|blocker|major)' "$answer_path" >/dev/null 2>&1
+  "$grep_bin" -Ei '^[[:space:]]*[-*][[:space:]]*(P0|P1|blocker|major)' "$answer_path" >/dev/null 2>&1
 }
 
 if [ "$decision" != "PASS" ] || [ "${score:-0}" -lt 4 ]; then
   echo "ERROR: Codex pre-push 리뷰 기준 미달입니다. push를 차단합니다." >&2
   printf 'decision=%s score=%s risk=%s risk_score=%s review_labels=%s\n' "${decision:-unavailable}" "${score:-unavailable}" "${risk:-unavailable}" "${risk_score:-unavailable}" "${review_labels:-unavailable}" >&2
-  sed -n '/^findings:/,$p' "$answer_path" | tail -n 20 >&2 || true
+  "$sed_bin" -n '/^findings:/,$p' "$answer_path" | "$tail_bin" -n 20 >&2 || true
   exit 1
 fi
 if [ -z "$risk" ] || [ "$risk" != "$expected_risk" ]; then
@@ -274,26 +298,26 @@ if ! has_structured_body findings review_summary || ! has_structured_body review
 fi
 if has_blocking_finding; then
   echo "ERROR: Codex pre-push 리뷰의 findings에 blocker/major 또는 P0/P1 항목이 있어 push를 차단합니다." >&2
-  sed -n '/^findings:/,/^review_summary:/p' "$answer_path" >&2 || true
+  "$sed_bin" -n '/^findings:/,/^review_summary:/p' "$answer_path" >&2 || true
   exit 1
 fi
 
 current_staged_path="$tmp_dir/current-staged.diff"
 current_working_path="$tmp_dir/current-working.diff"
 current_status_path="$tmp_dir/current-status.txt"
-git diff --cached --no-ext-diff --no-textconv --unified=80 > "$current_staged_path"
-git diff --no-ext-diff --no-textconv --unified=80 > "$current_working_path"
-git status --porcelain=v1 --untracked-files=no > "$current_status_path"
-if ! cmp -s "$staged_path" "$current_staged_path" || ! cmp -s "$working_path" "$current_working_path" || ! cmp -s "$status_path" "$current_status_path"; then
+"$git_bin" diff --cached --no-ext-diff --no-textconv --unified=80 > "$current_staged_path"
+"$git_bin" diff --no-ext-diff --no-textconv --unified=80 > "$current_working_path"
+"$git_bin" status --porcelain=v1 --untracked-files=no > "$current_status_path"
+if ! "$cmp_bin" -s "$staged_path" "$current_staged_path" || ! "$cmp_bin" -s "$working_path" "$current_working_path" || ! "$cmp_bin" -s "$status_path" "$current_status_path"; then
   echo "ERROR: Codex 리뷰 중 checkout이 바뀌어 staged/working-tree 증적이 push 대상과 달라졌습니다." >&2
   exit 1
 fi
 if [ -s "$status_path" ]; then
   echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. staged·working-tree 변경을 먼저 커밋하거나 정리하십시오." >&2
-  cat "$status_path" >&2
+  "$cat_bin" "$status_path" >&2
   exit 1
 fi
-current_head="$(git rev-parse HEAD)"
+current_head="$("$git_bin" rev-parse HEAD)"
 if [ "$current_head" != "$reviewed_ref" ]; then
   echo "ERROR: Codex 리뷰 중 HEAD가 바뀌어 push 증적을 고정할 수 없습니다." >&2
   exit 1

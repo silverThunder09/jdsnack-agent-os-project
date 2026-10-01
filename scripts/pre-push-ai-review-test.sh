@@ -34,6 +34,9 @@ fi
 expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
 expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
+test_cygpath_bin="$(command -v cygpath || true)"
+export JDSNACK_TEST_CYGPATH="$test_cygpath_bin"
+export JDSNACK_TEST_SECRET_TOKEN='must-be-cleared-before-review'
 
 cleanup() {
   if [ -d "$test_worktree" ]; then
@@ -60,27 +63,48 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$output_path" ] || exit 2
-if command -v cygpath >/dev/null 2>&1 && printf '%s' "$output_path" | grep -Eq '^[A-Za-z]:\\'; then
-  output_path="$(cygpath -u "$output_path")"
+codex_dir="${0%/*}"
+case ":${PATH-}:" in
+  *":$codex_dir:"*) ;;
+  *) exit 3 ;;
+esac
+if command -v git >/dev/null 2>&1; then
+  exit 4
 fi
+if [ -n "${HOME-}" ] || [ -n "${USERPROFILE-}" ] || [ -n "${HOMEDRIVE-}" ] || [ -n "${HOMEPATH-}" ]; then
+  exit 5
+fi
+if [ -n "${JDSNACK_TEST_SECRET_TOKEN-}" ]; then
+  exit 6
+fi
+case "$output_path" in
+  *\\*)
+    [ -n "${JDSNACK_TEST_CYGPATH-}" ] || exit 7
+    output_path="$("$JDSNACK_TEST_CYGPATH" -u "$output_path")"
+    ;;
+esac
 
-cat > "$output_path" <<EOF
-decision: ${JDSNACK_FAKE_DECISION:-PASS}
-score: ${JDSNACK_FAKE_SCORE:-5}
-risk: ${JDSNACK_FAKE_RISK}
-risk_score: ${JDSNACK_FAKE_RISK_SCORE}
-review_labels: ${JDSNACK_FAKE_LABELS}
-findings:
-EOF
+{
+  printf 'decision: %s\n' "${JDSNACK_FAKE_DECISION:-PASS}"
+  printf 'score: %s\n' "${JDSNACK_FAKE_SCORE:-5}"
+  printf 'risk: %s\n' "$JDSNACK_FAKE_RISK"
+  printf 'risk_score: %s\n' "$JDSNACK_FAKE_RISK_SCORE"
+  printf 'review_labels: %s\n' "$JDSNACK_FAKE_LABELS"
+  printf 'findings:\n'
+} > "$output_path"
 if [ -f "$0.blocking" ]; then
   printf '%s\n' '- P1 — synthetic blocker' >> "$output_path"
 else
   printf '%s\n' '- none' >> "$output_path"
 fi
-cat >> "$output_path" <<EOF
-review_summary:
-Synthetic pre-push contract result.
-EOF
+if [ -f "$0.failure" ]; then
+  printf '%s\n' 'synthetic reviewer failure' >&2
+  exit 8
+fi
+{
+  printf 'review_summary:\n'
+  printf 'Synthetic pre-push contract result.\n'
+} >> "$output_path"
 FAKE_CODEX
 chmod +x "$fake_root/codex"
 
@@ -98,6 +122,23 @@ run_review() {
 }
 
 run_review >/dev/null
+
+set +e
+touch "$fake_root/codex.failure"
+reviewer_failure_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      JDSNACK_FAKE_RISK="$expected_risk" \
+      JDSNACK_FAKE_RISK_SCORE="$expected_score" \
+      JDSNACK_FAKE_LABELS="$expected_labels" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh") 2>&1)"
+reviewer_failure_status=$?
+set -e
+rm -f "$fake_root/codex.failure"
+if [ "$reviewer_failure_status" -eq 0 ] || ! grep -Fq '리뷰를 완료하지 못했습니다' <<< "$reviewer_failure_output"; then
+  printf '%s\n' "$reviewer_failure_output" >&2
+  fail 'Codex reviewer 실패 경로가 제한된 PATH에서도 hook 도구를 사용할 수 없습니다.'
+fi
 
 set +e
 head_mismatch_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$base_sha" "$base_sha" \
