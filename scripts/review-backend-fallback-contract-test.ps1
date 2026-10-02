@@ -54,6 +54,19 @@ if (-not (Test-StructuredReviewSummary -Summary ($validSummary -join [Environmen
     throw 'A valid seven-line review summary was rejected.'
 }
 
+foreach ($severity in @('P2', 'P3')) {
+    $finding = "- $severity — a non-blocking finding must be reflected in the review summary."
+    if (Test-StructuredReviewSummary -Summary ($validSummary -join [Environment]::NewLine) -Score 5 -Findings $finding) {
+        throw "A $severity finding was accepted without a matching summary reference."
+    }
+
+    $referencedSummary = @($validSummary)
+    $referencedSummary[6] = "- conclusion: the $severity finding is retained and the review remains auditable."
+    if (-not (Test-StructuredReviewSummary -Summary ($referencedSummary -join [Environment]::NewLine) -Score 5 -Findings $finding)) {
+        throw "A $severity finding referenced in the conclusion was rejected."
+    }
+}
+
 foreach ($nonPassStatus in @('OK', 'SATISFIED')) {
     $weakerRubricSummary = @($validSummary)
     $weakerRubricSummary[0] = $weakerRubricSummary[0].Replace(': PASS ', ": $nonPassStatus ")
@@ -89,6 +102,11 @@ $validReview = @(
 $validResult = Get-StructuredReviewResult -Text $validReview -ReviewerBackend 'claude' -FallbackReason 'none'
 if (-not $validResult.FindingsContractValid -or -not $validResult.ReviewSummaryContractValid) {
     throw 'A valid structured review result did not preserve both contract-valid flags.'
+}
+$unreferencedFindingReview = $validReview.Replace('- none', '- P2 — the unresolved minor issue remains.')
+$unreferencedFindingResult = Get-StructuredReviewResult -Text $unreferencedFindingReview -ReviewerBackend 'claude' -FallbackReason 'none'
+if (-not $unreferencedFindingResult.FindingsContractValid -or $unreferencedFindingResult.ReviewSummaryContractValid) {
+    throw 'A P2 finding without a summary reference was not isolated as a summary contract failure.'
 }
 $malformedFindingsReview = $validReview.Replace('- none', '- informational finding')
 $malformedFindingsResult = Get-StructuredReviewResult -Text $malformedFindingsReview -ReviewerBackend 'claude' -FallbackReason 'none'

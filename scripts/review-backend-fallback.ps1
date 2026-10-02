@@ -483,7 +483,8 @@ function Test-StructuredFindings {
 function Test-StructuredReviewSummary {
     param(
         [string]$Summary,
-        [int]$Score
+        [int]$Score,
+        [string]$Findings = '- none'
     )
 
     $summaryLines = @($Summary -split '\r?\n' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
@@ -508,6 +509,14 @@ function Test-StructuredReviewSummary {
     $conclusionMatches = @($summaryLines | Where-Object { ([string]$_) -match '^\s*-\s*conclusion:\s+.{20,}$' })
     if ($conclusionMatches.Count -ne 1) {
         return $false
+    }
+    $assessmentLines = @($summaryLines | Where-Object { ([string]$_) -match '^\s*-\s*(?:score rationale|conclusion):' })
+    $assessmentText = $assessmentLines -join ' '
+    foreach ($severity in @('P2', 'P3')) {
+        $findingPattern = '(?im)^\s*-\s*' + $severity + '(?:[ \t—]|$)'
+        if ([regex]::IsMatch($Findings, $findingPattern) -and $assessmentText -notmatch "(?i)\b$severity\b") {
+            return $false
+        }
     }
     return $true
 }
@@ -538,7 +547,7 @@ function Get-StructuredReviewResult {
     $decisionLabel = if ($decisionMatch.Success) { $decisionMatch.Groups[1].Value } else { 'unavailable' }
     $findingsContractValid = $hasFindings -and (Test-StructuredFindings -Findings $findings -Decision $decisionLabel)
     $summaryScore = if ($scoreMatch.Success) { [int]$scoreMatch.Groups[1].Value } else { -1 }
-    $reviewSummaryContractValid = $hasReviewSummary -and $scoreMatch.Success -and (Test-StructuredReviewSummary -Summary $reviewSummary -Score $summaryScore)
+    $reviewSummaryContractValid = $hasReviewSummary -and $scoreMatch.Success -and (Test-StructuredReviewSummary -Summary $reviewSummary -Score $summaryScore -Findings $findings)
 
     return [pscustomobject]@{
         Text = $Text
@@ -818,7 +827,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
-Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly one line per rubric, each beginning "- <rubric>: PASS — ..." for correctness, contract, tests, security, and maintainability, one "- score rationale: <reported score>/5 — ..." line, and one "- conclusion: ..." line. Do not repeat any scalar field or structured header.
+Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly one line per rubric, each beginning "- <rubric>: PASS — ..." for correctness, contract, tests, security, and maintainability, one "- score rationale: <reported score>/5 — ..." line, and one "- conclusion: ..." line. When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion. Do not repeat any scalar field or structured header.
 
 The deterministic review assessment appended to the criteria is authoritative for risk score, risk band, merge policy, and the Security, Performance, Test Coverage, and Architecture routing labels. Review each supplied label's matched paths and report findings under the relevant label. Do not invent a different risk score or band.
 Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
@@ -916,7 +925,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
-Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly one line per rubric, each beginning "- <rubric>: PASS — ..." for correctness, contract, tests, security, and maintainability, one "- score rationale: <reported score>/5 — ..." line, and one "- conclusion: ..." line. Do not repeat any scalar field or structured header.
+Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly one line per rubric, each beginning "- <rubric>: PASS — ..." for correctness, contract, tests, security, and maintainability, one "- score rationale: <reported score>/5 — ..." line, and one "- conclusion: ..." line. When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion. Do not repeat any scalar field or structured header.
 
 Requested reviewer model: $codexRequestedModel
 Runtime reviewer model: $codexReviewModel

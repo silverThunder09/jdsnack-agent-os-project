@@ -391,6 +391,9 @@ grep -Fq -- '$summaryLines.Count -ne 7' "$FALLBACK_SCRIPT" || fail 'review_summa
 grep -Fq -- '$rubricMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary rubric 중복을 차단하지 않습니다.'
 grep -Fq -- '):\s+PASS\s+.{10,}$' "$FALLBACK_SCRIPT" || fail 'review_summary rubric은 PASS만 허용해야 합니다.'
 grep -Fq -- '$conclusionMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary conclusion 중복을 차단하지 않습니다.'
+grep -Fq -- '-Findings $findings' "$FALLBACK_SCRIPT" || fail 'review_summary 검증에 구조화 findings가 전달되지 않습니다.'
+grep -Fq -- 'When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion.' "$FALLBACK_SCRIPT" || fail 'review prompt가 P2/P3 finding의 summary 참조를 요구하지 않습니다.'
+grep -Fq -- 'A P2 finding without a summary reference was not isolated as a summary contract failure.' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" || fail 'P2 finding과 summary 불일치 회귀 테스트가 없습니다.'
 grep -Fq -- '$claudeResult.FindingsContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 findings 계약이 fallback 판단에 반영되지 않습니다.'
 grep -Fq -- '$claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 summary 계약이 fallback 판단에 반영되지 않습니다.'
 APPROVAL_SCRIPT="$ROOT_DIR/scripts/complete-review-approval.ps1"
