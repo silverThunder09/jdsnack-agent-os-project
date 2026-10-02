@@ -110,6 +110,12 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" ]] || fail "pre-push AI 리뷰 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" ]] || fail "pre-push AI 리뷰 계약 테스트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh" ]] || fail "실제 Git pre-push 진입 계약 테스트가 없습니다."
+cmp -s "$ROOT_DIR/.agents/skills/review-loop/SKILL.md" "$ROOT_DIR/.claude/skills/review-loop/SKILL.md" \
+  || fail 'Codex와 Claude review-loop skill 내용이 동기화되지 않았습니다.'
+grep -Fq -- '두 명 이상의 유효한 최신-head 사람 승인' "$ROOT_DIR/.agents/skills/review-loop/SKILL.md" \
+  || fail 'review-loop skill이 High-risk 추가 사람 승인 계약을 설명하지 않습니다.'
+grep -Fq -- '현재 고정된 `dryRun=true`' "$ROOT_DIR/.agents/skills/review-loop/SKILL.md" \
+  || fail 'review-loop skill이 dry-run 중 no-merge 경계를 설명하지 않습니다.'
 [[ -f "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh" ]] || fail "빈 branch diff pre-push 계약 테스트가 없습니다."
 grep -Fq -- 'bash "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"' "$ROOT_DIR/scripts/workflow-ci-test.sh" \
   || fail 'workflow CI가 실제 Git pre-push 진입 계약 테스트를 실행하지 않습니다.'
@@ -275,13 +281,13 @@ for fallback_contract in \
     "'codex'" \
     "'exec'" \
     "'--ephemeral'" \
-    'Get-ConfiguredCodexReviewModel' \
+    'Get-ConfiguredCodexReviewSettings' \
     'Get-ExactlyOneStructuredMatch' \
     'failed\s+to\s+authenticate' \
     'oauth\s+session\s+expired' \
     "'backends.json'" \
     "'review-fallback'" \
-    "'--config', 'model_reasoning_effort=\"medium\"'" \
+    "'--config', ('model_reasoning_effort=\"{0}\"' -f \$codexReviewEffort)" \
     "'--sandbox', 'read-only'" \
     "'--ignore-user-config'" \
     "'--config', 'web_search=\"disabled\"'" \
@@ -621,10 +627,11 @@ for skill_contract in \
     'PASS와 score 4 이상이면 review report를 artifact로 넘깁니다.' \
     'REQUEST_CHANGES는 GitHub review로 한 번 제출합니다.' \
     'COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 승인을 중단합니다.' \
-    'High-risk도 같은 리뷰 점수를 요구하며 소유자가 최신 head 이후 Squash auto-merge를 켜야 사람 확인을 통과합니다.' \
-    'approval job은 report와 최신 PR이 리뷰한 base/head SHA가 일치하는지' \
+    'High-risk 변경은 두 명 이상의 유효한 최신-head 사람 승인을 확인합니다.' \
+    'approval job은 report와 최신 PR이 리뷰한 base/head SHA, Validate PR contract' \
     'Validate PR contract, PR CI Gate, review check' \
-    '별도 GitHub APPROVE 리뷰 없이 확인한 head의 squash auto-merge를 큐에 넣습니다.' \
+    '현재 고정된 dry-run은 검증 결과만 반환하고 merge하지 않습니다.' \
+    '향후 dry-run 해제 시 owner 확인까지 통과한 뒤에만 Squash auto-merge를 큐에 넣습니다.' \
     'gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.' \
     'needs-human으로 멈춥니다.' \
     'autoMergeRequest' \

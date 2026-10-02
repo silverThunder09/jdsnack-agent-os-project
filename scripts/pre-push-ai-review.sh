@@ -95,13 +95,20 @@ if [ "$push_repository" != "$origin_push_repository" ] || [ "$origin_fetch_repos
   exit 1
 fi
 
-REQUESTED_MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
-MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].runtimeModel // .workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
+MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
+EFFORT="$("$jq_bin" -r '.workers.codex["review-fallback"].effort // empty' "$ROOT_DIR/backends.json")"
 
-if [ -z "$REQUESTED_MODEL" ] || [ -z "$MODEL" ]; then
-  echo "ERROR: backends.json에 Codex review-fallback 모델이 없습니다." >&2
+if [ -z "$MODEL" ] || [ -z "$EFFORT" ]; then
+  echo "ERROR: backends.json에 Codex review-fallback 모델과 effort가 필요합니다." >&2
   exit 1
 fi
+case "$EFFORT" in
+  minimal|low|medium|high|xhigh|max) ;;
+  *)
+    echo "ERROR: backends.json의 Codex review-fallback effort가 지원되지 않습니다: $EFFORT" >&2
+    exit 1
+    ;;
+esac
 if [ ! -f "$ROOT_DIR/scripts/review-policy.json" ]; then
   echo "ERROR: 전문 리뷰 라우팅 정책이 없습니다: scripts/review-policy.json" >&2
   exit 1
@@ -151,6 +158,7 @@ if command -v cygpath >/dev/null 2>&1; then
     local windows_script_path
     windows_path="$(cygpath -w "$path")" || return 1
     windows_script_path="$(cygpath -w "$ROOT_DIR/scripts/secure-review-temp-acl.ps1")" || return 1
+    # Both PowerShell arguments are already cygpath-converted Windows paths; keep this conversion override scoped to this call.
     MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path"
   }
   if ! secure_windows_temp_path "$tmp_dir"; then
@@ -383,7 +391,7 @@ The review_summary must contain exactly one concise evidence line for each rubri
 Use the actual reported score in score rationale. If findings contains P2/P3 items, mention P2 or P3 in score rationale or conclusion. Do not use placeholders such as TBD or N/A.
 
 PROMPT
-printf '\nRequested reviewer model: %s\nRuntime reviewer model: %s\n' "$REQUESTED_MODEL" "$MODEL" >> "$prompt_path"
+printf '\nReviewer model: %s\nReviewer effort: %s\n' "$MODEL" "$EFFORT" >> "$prompt_path"
 printf '\nReview base: %s\nReview head: %s\n' "$base_sha" "$reviewed_ref" >> "$prompt_path"
 printf '\nDeterministic risk score: %s/100\nDeterministic risk band: %s\nDeterministic review labels: %s\n' "$expected_risk_score" "$expected_risk" "$expected_labels" >> "$prompt_path"
 printf '\nSpecialized review routing labels and path rules (apply these to findings):\n' >> "$prompt_path"
@@ -586,7 +594,7 @@ run_reviewer exec \
   --ignore-user-config \
   --strict-config \
   --model "$MODEL" \
-  --config 'model_reasoning_effort="medium"' \
+  --config "model_reasoning_effort=\"$EFFORT\"" \
   --config 'web_search="disabled"' \
   --disable shell_tool \
   --disable apps \
@@ -847,4 +855,4 @@ if ! current_source_ref_sha="$("$git_bin" rev-parse --verify "${push_refs[0]}^{c
   exit 1
 fi
 
-printf 'Codex pre-push review passed: model=%s score=%s/5 risk=%s\n' "$MODEL" "$score" "$risk"
+printf 'Codex pre-push review passed: model=%s effort=%s score=%s/5 risk=%s\n' "$MODEL" "$EFFORT" "$score" "$risk"

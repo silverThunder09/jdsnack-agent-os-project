@@ -39,7 +39,7 @@ Worker의 역할·권한·작업 경계와 모델 배정을 분리합니다.
 
 - 고정 산식과 경로 규칙은 [review-routing.md](review-routing.md)와 `scripts/review-policy.json`에 둡니다. fallback 프롬프트와 로컬 `pre-push` hook은 같은 규칙을 사용합니다.
 - Claude 구독이 비활성화되어 실행되지 않는 경우에도 Claude 결과를 기다리거나 반려를 숨기지 않고 `claude-subscription` 사유로 Codex read-only reviewer에 위임합니다.
-- 리뷰 요청 모델 식별자는 `gpt-Luna MAX`로 유지하고, 현재 ChatGPT Codex 런타임에서 지원되지 않는 경우 `backends.json`의 `runtimeModel=gpt-6-luna`로 실행합니다. 보고에는 요청 모델과 실행 모델을 구분합니다.
+- Claude unavailable 시 Codex 리뷰 fallback은 `backends.json`의 `model`과 `effort`를 그대로 사용합니다. 현재 설정은 `gpt-6-luna` 모델과 `max` 추론 강도이며, pre-push와 PR fallback 실행 경로 모두 같은 값을 전달합니다.
 - 초기 `dryRun=true`에서는 리뷰 실행·PR 코멘트·전문 라벨만 허용하고 병합 명령을 금지합니다. 산식 구간별 승인 정책은 드라이런을 해제한 뒤에만 적용됩니다.
 
 ## 폴백 전환 조건 (outage 판정)

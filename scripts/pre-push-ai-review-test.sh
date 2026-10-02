@@ -33,9 +33,10 @@ git_bash_path="$(command -v bash)"
 [ -n "$git_bash_path" ] || fail 'hook entrypoint 검증에 사용할 Bash를 찾지 못했습니다.'
 git -C "$test_worktree" config --local jdsnack.hookBash "$git_bash_path"
 # git clone intentionally excludes uncommitted source edits, so include the
-# current hook implementation in the disposable fixture when it differs.
+# current hook implementation and reviewer settings in the disposable fixture.
 cp "$ROOT_DIR/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
-git -C "$test_worktree" add scripts/pre-push-ai-review.sh
+cp "$ROOT_DIR/backends.json" "$test_worktree/backends.json"
+git -C "$test_worktree" add scripts/pre-push-ai-review.sh backends.json
 if ! git -C "$test_worktree" diff --cached --quiet; then
   git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com \
     commit --quiet -m 'test: isolate current pre-push hook fixture'
@@ -104,6 +105,7 @@ fi
 
 fixture_dir='__FAKE_ROOT__'
 : > "$fixture_dir/runtime-dependency-invoked"
+printf '%s\n' "$@" > "$fixture_dir/codex.args"
 output_path=""
 help_requested=0
 read_only_sandbox_seen=0
@@ -417,7 +419,17 @@ MUTATE_SOURCE_REF
 sed -i "s|__REAL_GIT__|$real_git_bin|g; s|__TEST_WORKTREE__|$test_worktree|g; s|__HEAD_SHA__|$head_sha|g; s|__BASE_SHA__|$base_sha|g" "$fake_root/mutate-source-ref"
 chmod +x "$fake_root/mutate-source-ref"
 
+rm -f "$fake_root/codex.args"
 run_review >/dev/null
+for expected_reviewer_argument in \
+  '--model' \
+  'gpt-6-luna' \
+  '--config' \
+  'model_reasoning_effort="max"'; do
+  if ! grep -Fxq -- "$expected_reviewer_argument" "$fake_root/codex.args"; then
+    fail "pre-push가 backends.json의 모델/effort를 Codex에 전달하지 않았습니다: $expected_reviewer_argument"
+  fi
+done
 
 touch "$fake_root/codex.change-source-ref"
 set +e

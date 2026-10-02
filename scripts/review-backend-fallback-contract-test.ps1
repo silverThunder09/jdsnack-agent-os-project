@@ -29,7 +29,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -39,6 +39,39 @@ foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredFi
         throw "$functionName function was not found."
     }
     . ([scriptblock]::Create($dependencyAst.Extent.Text))
+}
+
+$modelFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-review-model-contract-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $modelFixtureRoot -Force | Out-Null
+try {
+    $modelFixture = @{
+        workers = @{
+            codex = @{
+                'review-fallback' = @{
+                    model = 'gpt-6-luna'
+                    effort = 'max'
+                }
+            }
+        }
+    }
+    $modelFixture | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $modelFixtureRoot 'backends.json') -Encoding utf8
+    $configuredModel = Get-ConfiguredCodexReviewSettings -ReviewWorkspace $modelFixtureRoot
+    if ($configuredModel.Model -ne 'gpt-6-luna' -or $configuredModel.Effort -ne 'max') {
+        throw 'The configured Codex reviewer model and effort were not preserved.'
+    }
+    $modelFixture.workers.codex.'review-fallback'.effort = 'unsupported'
+    $modelFixture | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $modelFixtureRoot 'backends.json') -Encoding utf8
+    $unsupportedEffortRejected = $false
+    try {
+        Get-ConfiguredCodexReviewSettings -ReviewWorkspace $modelFixtureRoot | Out-Null
+    } catch {
+        $unsupportedEffortRejected = $_.Exception.Message -match 'unsupported'
+    }
+    if (-not $unsupportedEffortRejected) {
+        throw 'An unsupported Codex reviewer effort was accepted.'
+    }
+} finally {
+    Remove-Item -LiteralPath $modelFixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 $validSummary = @(

@@ -420,6 +420,14 @@ if ($Arguments -contains 'graphql') {
                 createdAt = '2026-10-02T01:00:00Z'
             }
         }
+        'case-variant-change-request-approved' {
+            $latestApproval = New-SyntheticReview -Id 'R2' -State 'APPROVED' -CommitOid $env:JDSNACK_FAKE_HEAD_SHA -Timestamp '2026-10-02T01:00:00Z'
+            $latestApproval.author.login = 'Contributor'
+            $reviewNodes = @(
+                (New-SyntheticReview -Id 'R1' -State 'CHANGES_REQUESTED' -CommitOid $env:JDSNACK_FAKE_STALE_SHA -Timestamp '2026-10-02T00:00:00Z'),
+                $latestApproval
+            )
+        }
     }
     $review = [pscustomobject]@{
         data = [pscustomobject]@{
@@ -656,6 +664,11 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     $caseVariantSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
     if ($caseVariantSummary.Count -ne 0) {
         throw 'Case-variant GitHub logins were treated as separate reviewers.'
+    }
+    $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'case-variant-change-request-approved'
+    $caseVariantChangeRequestSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($caseVariantChangeRequestSummary.Count -ne 1 -or $caseVariantChangeRequestSummary.ChangesRequested.Count -ne 0) {
+        throw 'A current-head approval with different login capitalization did not resolve the earlier change request from the same human reviewer.'
     }
     Remove-Item Env:JDSNACK_FAKE_REVIEW_SCENARIO -ErrorAction SilentlyContinue
     $env:JDSNACK_FAKE_STATUS_CHECKS = 'missing'

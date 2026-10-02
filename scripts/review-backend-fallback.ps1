@@ -66,7 +66,7 @@ function Resolve-ToolPath {
     }
 }
 
-function Get-ConfiguredCodexReviewModel {
+function Get-ConfiguredCodexReviewSettings {
     param([string]$ReviewWorkspace)
 
     $backendsPath = Join-Path $ReviewWorkspace 'backends.json'
@@ -78,7 +78,7 @@ function Get-ConfiguredCodexReviewModel {
         $backends = Get-Content -LiteralPath $backendsPath -Raw | ConvertFrom-Json
         $reviewConfig = $backends.workers.codex.'review-fallback'
         $model = [string]$reviewConfig.model
-        $runtimeModel = [string]$reviewConfig.runtimeModel
+        $effort = ([string]$reviewConfig.effort).ToLowerInvariant()
     } catch {
         throw "Could not read the Codex review model from ${backendsPath}: $($_.Exception.Message)"
     }
@@ -86,12 +86,12 @@ function Get-ConfiguredCodexReviewModel {
     if ([string]::IsNullOrWhiteSpace($model)) {
         throw "backends.json does not define workers.codex.review-fallback.model: ${backendsPath}"
     }
-    if ([string]::IsNullOrWhiteSpace($runtimeModel)) {
-        $runtimeModel = $model
+    if ($effort -notin @('minimal', 'low', 'medium', 'high', 'xhigh', 'max')) {
+        throw "backends.json defines an unsupported workers.codex.review-fallback.effort: ${backendsPath}"
     }
     return [pscustomobject]@{
-        Requested = $model
-        Runtime = $runtimeModel
+        Model = $model
+        Effort = $effort
     }
 }
 
@@ -963,9 +963,9 @@ if ([string]::IsNullOrWhiteSpace($claudeFallbackReason)) {
 Add-StepSummary "Claude availability outage ($claudeFallbackReason); delegating PR #$PullRequestNumber to Codex read-only reviewer."
 
 try {
-    $codexModelConfig = Get-ConfiguredCodexReviewModel -ReviewWorkspace $Workspace
-    $codexReviewModel = [string]$codexModelConfig.Runtime
-    $codexRequestedModel = [string]$codexModelConfig.Requested
+    $codexModelConfig = Get-ConfiguredCodexReviewSettings -ReviewWorkspace $Workspace
+    $codexReviewModel = [string]$codexModelConfig.Model
+    $codexReviewEffort = [string]$codexModelConfig.Effort
 } catch {
     Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
     Stop-NeedsHuman $_.Exception.Message ''
@@ -1010,8 +1010,8 @@ review_summary:
 
 Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly one line per rubric, each beginning "- <rubric>: PASS — ..." for correctness, contract, tests, security, and maintainability, one "- score rationale: <reported score>/5 — ..." line, and one "- conclusion: ..." line. When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion. Do not repeat any scalar field or structured header.
 
-Requested reviewer model: $codexRequestedModel
-Runtime reviewer model: $codexReviewModel
+Reviewer model: $codexReviewModel
+Reviewer effort: $codexReviewEffort
 The deterministic review assessment in the supplied criteria is authoritative for risk score, risk band, merge policy, and the Security, Performance, Test Coverage, and Architecture routing labels. Review each supplied label's matched paths and report findings under the relevant label. Do not invent a different risk score or band.
 Use PASS only when the change is safe and complete at score 4 or higher. Score concrete findings independently from risk; a High-risk label alone does not lower the score. Do not use NEEDS_HUMAN solely because a change is High-risk; the workflow separately requires the repository owner's current-head Squash auto-merge confirmation. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.
 --- BEGIN PR DIFF ---
@@ -1030,7 +1030,7 @@ try {
         '--ephemeral',
         '--ignore-user-config',
         '--model', $codexReviewModel,
-        '--config', 'model_reasoning_effort="medium"',
+        '--config', ('model_reasoning_effort="{0}"' -f $codexReviewEffort),
         '--config', 'web_search="disabled"',
         '--disable', 'shell_tool',
         '--disable', 'apps',
