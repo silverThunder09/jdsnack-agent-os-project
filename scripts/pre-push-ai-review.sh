@@ -150,7 +150,7 @@ secure_windows_temp_path() {
   local path="$1"
   local windows_path
   windows_path="$(cygpath -w "$path")" || return 1
-  "$icacls_bin" "$windows_path" /inheritance:r \
+  MSYS2_ARG_CONV_EXCL='*' "$icacls_bin" "$windows_path" /inheritance:r \
     /grant:r "${windows_identity}:F" '*S-1-5-18:F' '*S-1-5-32-544:F' \
     /grant "${windows_identity}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' >/dev/null
 }
