@@ -37,6 +37,7 @@ expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
 expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
 test_cygpath_bin="$(command -v cygpath || true)"
+test_git_bin="$(command -v git)"
 export JDSNACK_TEST_SECRET_TOKEN='must-be-cleared-before-review'
 export JDSNACK_TEST_CUSTOM='must-be-cleared-by-allowlist'
 
@@ -196,6 +197,25 @@ fi
 FAKE_CODEX
 sed -i "s|__FAKE_ROOT__|$fake_root|g" "$fake_root/codex"
 chmod +x "$fake_root/codex"
+cat > "$fake_root/git" <<'FAKE_GIT'
+#!/bin/sh
+set -eu
+
+real_git='__REAL_GIT__'
+if [ "${1-}" = 'remote' ] && [ "${2-}" = 'get-url' ]; then
+  case " $* " in
+    *' --push '*) printf '%s\n' "${JDSNACK_TEST_ORIGIN_PUSH_URL:?missing fixture origin push URL}" ;;
+    *) printf '%s\n' "${JDSNACK_TEST_ORIGIN_FETCH_URL:?missing fixture origin fetch URL}" ;;
+  esac
+  exit 0
+fi
+
+exec "$real_git" "$@"
+FAKE_GIT
+sed -i "s|__REAL_GIT__|$test_git_bin|g" "$fake_root/git"
+chmod +x "$fake_root/git"
+export JDSNACK_TEST_ORIGIN_FETCH_URL='https://github.com/silverThunder09/jdsnack-agent-os-project'
+export JDSNACK_TEST_ORIGIN_PUSH_URL='https://github.com/silverThunder09/jdsnack-agent-os-project'
 if [ -n "$test_cygpath_bin" ]; then
   printf '#!/bin/sh\nexec "%s" "$@"\n' "$test_cygpath_bin" > "$fake_root/cygpath"
   chmod +x "$fake_root/cygpath"
@@ -207,11 +227,8 @@ run_hook_with_origin_urls() {
   local origin_fetch_url="$3"
   local origin_push_url="$4"
 
-  GIT_CONFIG_COUNT=2 \
-    GIT_CONFIG_KEY_0='remote.origin.url' \
-    GIT_CONFIG_VALUE_0="$origin_fetch_url" \
-    GIT_CONFIG_KEY_1='remote.origin.pushurl' \
-    GIT_CONFIG_VALUE_1="$origin_push_url" \
+  JDSNACK_TEST_ORIGIN_FETCH_URL="$origin_fetch_url" \
+    JDSNACK_TEST_ORIGIN_PUSH_URL="$origin_push_url" \
     bash "$hook_path" origin "$destination_url"
 }
 
