@@ -289,6 +289,10 @@ if ! "$git_bin" diff --no-ext-diff --no-textconv --unified=80 "$base_sha...$revi
   echo "ERROR: branch diff를 만들 수 없습니다: $base_sha...$reviewed_ref" >&2
   exit 1
 fi
+if [ ! -s "$branch_path" ]; then
+  echo "ERROR: branch diff가 비어 있어 리뷰할 변경이 없습니다. no-op push를 차단합니다." >&2
+  exit 1
+fi
 
 workspace_arg="$ROOT_DIR"
 if command -v cygpath >/dev/null 2>&1; then

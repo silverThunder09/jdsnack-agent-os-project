@@ -153,6 +153,8 @@ bash -n "$ROOT_DIR/scripts/pre-push-ai-review.sh"
 test -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
   || { echo 'scripts/pre-push-ai-review-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"
+bash -n "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
+bash "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
 test -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" \
   || { echo 'scripts/secure-review-temp-acl-contract-test.ps1 is missing' >&2; exit 1; }

@@ -109,6 +109,11 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/install-git-hooks.sh" ]] || fail "Git hook 설치 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" ]] || fail "pre-push AI 리뷰 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" ]] || fail "pre-push AI 리뷰 계약 테스트가 없습니다."
+[[ -f "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh" ]] || fail "빈 branch diff pre-push 계약 테스트가 없습니다."
+grep -Fq -- 'bash "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"' "$ROOT_DIR/scripts/workflow-ci-test.sh" \
+  || fail 'workflow CI가 빈 branch diff pre-push 계약을 실행하지 않습니다.'
+grep -Fq -- 'branch diff가 비어 있어 리뷰할 변경이 없습니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'pre-push가 빈 branch diff를 reviewer 호출 전에 차단하지 않습니다.'
 grep -Fq -- 'bash "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"' "$ROOT_DIR/scripts/workflow-ci-test.sh" \
   || fail 'workflow CI가 실행 권한과 무관하게 pre-push 계약 테스트를 Bash로 실행해야 합니다.'
 grep -Fq -- 'Git passes the destination remote name and its location as arguments 1 and 2.' "$ROOT_DIR/.githooks/pre-push" \
@@ -472,7 +477,8 @@ for approval_contract in \
     'collaborators/$encodedLogin/permission' \
     "@('admin', 'maintain', 'push')" \
     '$latest.State -eq '\''APPROVED'\'' -and $latest.CommitOid -eq $ExpectedHeadSha' \
-    '$changesRequestedLogins = @($eligibleLatestByLogin.Keys | Where-Object { $eligibleLatestByLogin[$_].State -eq '\''CHANGES_REQUESTED'\'' }' \
+    '$latestChangeRequestEventByLogin[$reviewEvent.Login] = $reviewEvent' \
+    'COMMENTED, PENDING, and approvals on stale commits do not resolve it.' \
     'Get-BranchProtectionApprovalRequirement' \
     'required_status_checks' \
     'RequiredCheckContexts' \
@@ -513,6 +519,10 @@ grep -Fq -- '-ReviewJobResult $env:REVIEW_JOB_RESULT' "$ROOT_DIR/.github/workflo
     || fail '승인 게이트가 상위 review job 결과를 사용하지 않습니다.'
 grep -Fq -- "State = 'DISMISSED'" "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
     || fail '승인 계약 테스트가 dismissed review state를 검증하지 않습니다.'
+grep -Fq -- "Scenario = 'stale-changes-requested-commented'" "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+    || fail '승인 계약 테스트가 후속 COMMENTED 뒤에도 stale change request를 차단하지 않습니다.'
+grep -Fq -- "Scenario = 'stale-changes-requested-dismissed'" "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+    || fail '승인 계약 테스트가 change request 명시적 dismissal 해제를 검증하지 않습니다.'
 grep -Fq -- 'Get-BranchProtectionApprovalRequirement -BaseBranch' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
     || fail '승인 계약 테스트가 branch protection live 검증 경로를 실행하지 않습니다.'
 grep -Fq -- 'Assert-FixedApprovalPolicy -ReviewPolicy' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \

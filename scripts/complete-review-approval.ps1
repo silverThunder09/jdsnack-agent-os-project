@@ -439,6 +439,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
     } while ([bool]$pageInfo.hasNextPage)
 
     $latestByLogin = @{}
+    $reviewEvents = @()
     foreach ($review in @($reviews)) {
         $login = [string]$review.author.login
         if ([string]::IsNullOrWhiteSpace($login) -or $login -eq $pullRequestAuthor -or $login -match '\[bot\]$') {
@@ -471,6 +472,14 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
         } catch {
             Stop-NeedsHuman "Human review data has an invalid timestamp for '$login'."
         }
+        $reviewEvent = [pscustomobject]@{
+            Login = $login
+            State = $reviewState
+            Timestamp = $reviewTimestamp
+            ReviewId = $reviewId
+            CommitOid = [string]$review.commit.oid
+        }
+        $reviewEvents += $reviewEvent
         $isNewer = $false
         if (-not $latestByLogin.ContainsKey($login)) {
             $isNewer = $true
@@ -484,28 +493,55 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
             $isNewer = $timeComparison -gt 0 -or ($timeComparison -eq 0 -and $idComparison -gt 0)
         }
         if ($isNewer) {
-            $latestByLogin[$login] = [pscustomobject]@{
-                State = $reviewState
-                Timestamp = $reviewTimestamp
-                ReviewId = $reviewId
-                CommitOid = [string]$review.commit.oid
-            }
+            $latestByLogin[$login] = $reviewEvent
         }
     }
 
     $eligibleLatestByLogin = @{}
+    $eligibleHumanByLogin = @{}
     foreach ($login in @($latestByLogin.Keys | Sort-Object)) {
         $latestReview = $latestByLogin[$login]
         if ($latestReview.State -notin @('APPROVED', 'CHANGES_REQUESTED')) {
             continue
         }
-        if (Test-EligibleHumanApprover -Login $login) {
+        $eligibleHumanByLogin[$login] = Test-EligibleHumanApprover -Login $login
+        if ($eligibleHumanByLogin[$login]) {
             $eligibleLatestByLogin[$login] = $latestReview
         }
     }
 
     $approvedLogins = @(Get-CurrentHeadApprovers -LatestByLogin $eligibleLatestByLogin -ExpectedHeadSha $ExpectedHeadSha)
-    $changesRequestedLogins = @($eligibleLatestByLogin.Keys | Where-Object { $eligibleLatestByLogin[$_].State -eq 'CHANGES_REQUESTED' } | Sort-Object)
+    # GitHub keeps CHANGES_REQUESTED blocking across new commits until that
+    # reviewer approves the current head or an authorized user dismisses it.
+    # COMMENTED, PENDING, and approvals on stale commits do not resolve it.
+    $changeRequestEvents = @($reviewEvents | Where-Object {
+        $_.State -eq 'CHANGES_REQUESTED' -or
+        $_.State -eq 'DISMISSED' -or
+        ($_.State -eq 'APPROVED' -and $_.CommitOid -eq $ExpectedHeadSha)
+    } | Sort-Object -Property @{
+        Expression = 'Timestamp'
+        Ascending = $true
+    }, @{
+        Expression = 'ReviewId'
+        Ascending = $true
+    })
+    $latestChangeRequestEventByLogin = @{}
+    foreach ($reviewEvent in $changeRequestEvents) {
+        $latestChangeRequestEventByLogin[$reviewEvent.Login] = $reviewEvent
+    }
+
+    $changesRequestedLogins = @()
+    foreach ($login in @($latestChangeRequestEventByLogin.Keys | Sort-Object)) {
+        if ($latestChangeRequestEventByLogin[$login].State -ne 'CHANGES_REQUESTED') {
+            continue
+        }
+        if (-not $eligibleHumanByLogin.ContainsKey($login)) {
+            $eligibleHumanByLogin[$login] = Test-EligibleHumanApprover -Login $login
+        }
+        if ($eligibleHumanByLogin[$login]) {
+            $changesRequestedLogins += $login
+        }
+    }
     return [pscustomobject]@{
         Count = $approvedLogins.Count
         Logins = $approvedLogins

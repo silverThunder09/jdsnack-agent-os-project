@@ -35,6 +35,10 @@
   (`admin`, `maintain`, `push`)을 모두 만족해야 합니다. `authorAssociation`만으로
   권한을 추정하지 않으며, collaborator가 아닌 reviewer의 404 응답은 승인으로
   세지 않습니다. 그 밖의 권한 조회 실패는 `needs-human`으로 중단합니다.
+- `CHANGES_REQUESTED`는 review commit이 오래됐거나 새 커밋이 push됐다는 이유만으로
+  해소하지 않습니다. 해당 reviewer가 현재 head를 `APPROVED`하거나 권한 있는 사용자가
+  review를 명시적으로 dismiss해야 합니다. 후속 `COMMENTED`·`PENDING` 또는 stale head
+  승인은 변경 요청을 해소하지 않습니다([GitHub review 정책](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews)).
 - 승인 job은 `required_status_checks.contexts`와 `checks[].context`의 합집합을
   branch protection의 기준으로 읽고, `gh pr checks --required`가 반환한 이름 집합과
   정확히 비교합니다. 빈·누락·추가 required check 또는 통과하지 않은 required check는

@@ -215,6 +215,15 @@ if ($null -eq $humanApprovalFunctionAst) {
     throw 'Get-HumanApprovalSummary function was not found.'
 }
 . ([scriptblock]::Create($humanApprovalFunctionAst.Extent.Text))
+$unresolvedChangesFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-NoUnresolvedChangeRequests'
+    }, $true)
+if ($null -eq $unresolvedChangesFunctionAst) {
+    throw 'Assert-NoUnresolvedChangeRequests function was not found.'
+}
+. ([scriptblock]::Create($unresolvedChangesFunctionAst.Extent.Text))
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-approval-contract-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 try {
@@ -239,6 +248,24 @@ if ($Arguments -contains 'graphql') {
         submittedAt = '2026-10-02T00:00:00Z'
         createdAt = '2026-10-02T00:00:00Z'
     })
+    function New-SyntheticReview {
+        param(
+            [string]$Id,
+            [string]$State,
+            [string]$CommitOid,
+            [string]$Timestamp
+        )
+        [pscustomobject]@{
+            author = [pscustomobject]@{ login = 'contributor' }
+            authorAssociation = 'CONTRIBUTOR'
+            commit = [pscustomobject]@{ oid = $CommitOid }
+            databaseId = [int]($Id -replace '\D', '')
+            id = $Id
+            state = $State
+            submittedAt = if ($State -eq 'PENDING') { $null } else { $Timestamp }
+            createdAt = $Timestamp
+        }
+    }
     switch ($env:JDSNACK_FAKE_REVIEW_SCENARIO) {
         'commented' {
             $reviewNodes += [pscustomobject]@{
@@ -316,6 +343,35 @@ if ($Arguments -contains 'graphql') {
                 submittedAt = '2026-10-02T01:00:00Z'
                 createdAt = '2026-10-02T01:00:00Z'
             }
+        }
+        'stale-changes-requested-commented' {
+            $reviewNodes = @(
+                (New-SyntheticReview -Id 'R1' -State 'CHANGES_REQUESTED' -CommitOid $env:JDSNACK_FAKE_STALE_SHA -Timestamp '2026-10-02T00:00:00Z'),
+                (New-SyntheticReview -Id 'R2' -State 'COMMENTED' -CommitOid $env:JDSNACK_FAKE_HEAD_SHA -Timestamp '2026-10-02T01:00:00Z')
+            )
+        }
+        'stale-changes-requested-pending' {
+            $reviewNodes = @(
+                (New-SyntheticReview -Id 'R1' -State 'CHANGES_REQUESTED' -CommitOid $env:JDSNACK_FAKE_STALE_SHA -Timestamp '2026-10-02T00:00:00Z'),
+                (New-SyntheticReview -Id 'R2' -State 'PENDING' -CommitOid $env:JDSNACK_FAKE_HEAD_SHA -Timestamp '2026-10-02T01:00:00Z')
+            )
+        }
+        'stale-changes-requested-stale-approved' {
+            $reviewNodes = @(
+                (New-SyntheticReview -Id 'R1' -State 'CHANGES_REQUESTED' -CommitOid $env:JDSNACK_FAKE_STALE_SHA -Timestamp '2026-10-02T00:00:00Z'),
+                (New-SyntheticReview -Id 'R2' -State 'APPROVED' -CommitOid $env:JDSNACK_FAKE_STALE_SHA -Timestamp '2026-10-02T01:00:00Z')
+            )
+        }
+        'stale-changes-requested-current-approved' {
+            $reviewNodes = @(
+                (New-SyntheticReview -Id 'R1' -State 'CHANGES_REQUESTED' -CommitOid $env:JDSNACK_FAKE_STALE_SHA -Timestamp '2026-10-02T00:00:00Z'),
+                (New-SyntheticReview -Id 'R2' -State 'APPROVED' -CommitOid $env:JDSNACK_FAKE_HEAD_SHA -Timestamp '2026-10-02T01:00:00Z')
+            )
+        }
+        'stale-changes-requested-dismissed' {
+            $reviewNodes = @(
+                (New-SyntheticReview -Id 'R1' -State 'DISMISSED' -CommitOid $env:JDSNACK_FAKE_STALE_SHA -Timestamp '2026-10-02T00:00:00Z')
+            )
         }
         'case-variant-same-user' {
             $reviewNodes += [pscustomobject]@{
@@ -494,6 +550,34 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     $paginatedSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
     if ($paginatedSummary.Count -ne 0 -or $paginatedSummary.ChangesRequested.Count -ne 1 -or $paginatedSummary.ChangesRequested[0] -ne 'contributor') {
         throw 'A later CHANGES_REQUESTED review on a subsequent page was not applied.'
+    }
+    foreach ($case in @(
+            [pscustomobject]@{ Scenario = 'stale-changes-requested-commented'; ExpectedApprovals = 0; ShouldBlock = $true },
+            [pscustomobject]@{ Scenario = 'stale-changes-requested-pending'; ExpectedApprovals = 0; ShouldBlock = $true },
+            [pscustomobject]@{ Scenario = 'stale-changes-requested-stale-approved'; ExpectedApprovals = 0; ShouldBlock = $true },
+            [pscustomobject]@{ Scenario = 'stale-changes-requested-current-approved'; ExpectedApprovals = 1; ShouldBlock = $false },
+            [pscustomobject]@{ Scenario = 'stale-changes-requested-dismissed'; ExpectedApprovals = 0; ShouldBlock = $false }
+        )) {
+        $env:JDSNACK_FAKE_REVIEW_SCENARIO = $case.Scenario
+        $summary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+        if ($summary.Count -ne $case.ExpectedApprovals) {
+            throw "Unexpected approval count for change-request lifecycle '$($case.Scenario)'."
+        }
+        $isBlocked = $false
+        try {
+            Assert-NoUnresolvedChangeRequests -ApprovalSummary $summary
+        } catch {
+            $isBlocked = $_.Exception.Message -match 'Unresolved human change request'
+            if (-not $isBlocked) {
+                throw
+            }
+        }
+        if ($isBlocked -ne $case.ShouldBlock) {
+            throw "Unexpected unresolved change-request state for '$($case.Scenario)'."
+        }
+        if (($summary.ChangesRequested.Count -gt 0) -ne $case.ShouldBlock) {
+            throw "Unexpected change-request summary for '$($case.Scenario)'."
+        }
     }
     $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'same-timestamp-conflict'
     $sameTimestampConflictRejected = $false
