@@ -745,6 +745,7 @@ Assert-MinimumHumanApprovalCount `
     -RiskBand $riskAssessment.riskBand
 
 if ([bool]$riskAssessment.dryRun) {
+    # Owner auto-merge signoff is a merge-only gate; fixed dry-run policy still checks human approvals but must not request a merge confirmation.
     $message = "Review gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; $($riskAssessment.riskBand) has the required human approval(s), dry-run is enabled, and no merge command was executed."
     Write-Output $message
     if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {

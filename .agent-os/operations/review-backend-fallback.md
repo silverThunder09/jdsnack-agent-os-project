@@ -17,7 +17,7 @@ Claude 리뷰 서비스가 구독 비활성화, 인증·쿼터·자격 증명 �
 
 ## 사람 확인이 필요한 경우
 
-- High-risk 판정은 저장소 소유자의 명시적 확인과 추가 사람 승인 2명이 필요합니다. 소유자는 최신 head 커밋 이후 해당 PR의 Squash auto-merge를 직접 켭니다. 확인은 현재 head SHA에만 적용되며, 새 커밋 뒤에는 다시 켜야 합니다.
+- dry-run 해제 후 High-risk merge에는 저장소 소유자의 명시적 확인과 추가 사람 승인 2명이 필요합니다. 소유자는 최신 head 커밋 이후 해당 PR의 Squash auto-merge를 직접 켭니다. 확인은 현재 head SHA에만 적용되며, 새 커밋 뒤에는 다시 켜야 합니다. 현재 `dryRun=true`에서는 사람 승인 수를 확인하지만 owner auto-merge 확인과 merge 명령은 실행하지 않습니다.
 - 점수 4점 미만, COMMENT, REQUEST_CHANGES, NEEDS_HUMAN, Codex 출력 형식 오류, Codex 실행 불가, 분류되지 않은 Claude 실행·구조화 결과 오류, 현재 PR SHA 변경, 실패·누락 상태의 필수 check, GitHub 작업 실패는 needs-human으로 중단합니다. High-risk라는 이유만으로 `NEEDS_HUMAN`을 반환하지 않습니다. 경로 기반 라우터가 제외한 체크의 `skipping`은 PR CI Gate가 성공했을 때 통과로 인정합니다.
 - REQUEST_CHANGES는 GitHub review로 한 번만 제출합니다. 제출 시도 뒤 추가 comment review를 만들지 않습니다.
 - findings는 여러 줄과 전체 길이를 유지해 review 본문에 포함합니다. 필드 추출 과정에서 공백을 합치거나 내용을 잘라내지 않습니다.

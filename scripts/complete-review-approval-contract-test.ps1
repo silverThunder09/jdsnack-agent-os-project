@@ -20,6 +20,19 @@ if ($parseErrors.Count -gt 0) {
     throw "Approval script parse failed: $sourcePath"
 }
 
+$approvalSource = Get-Content -LiteralPath $sourcePath -Raw
+$humanApprovalOffset = $approvalSource.IndexOf('$approvalSummary = Get-HumanApprovalSummary')
+$minimumApprovalOffset = $approvalSource.IndexOf('Assert-MinimumHumanApprovalCount `')
+$dryRunSuccessOffset = $approvalSource.IndexOf('if ([bool]$riskAssessment.dryRun)')
+$ownerSignoffOffset = $approvalSource.IndexOf('if ([bool]$riskAssessment.requiresOwnerSignoff)')
+if ($humanApprovalOffset -lt 0 -or $minimumApprovalOffset -lt 0 -or $dryRunSuccessOffset -lt 0 -or
+    $ownerSignoffOffset -lt 0 -or
+    -not ($humanApprovalOffset -lt $minimumApprovalOffset -and
+        $minimumApprovalOffset -lt $dryRunSuccessOffset -and
+        $dryRunSuccessOffset -lt $ownerSignoffOffset)) {
+    throw 'Dry-run must validate human approvals, avoid merge, and skip owner-only auto-merge confirmation until dry-run is disabled.'
+}
+
 $functionAst = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and

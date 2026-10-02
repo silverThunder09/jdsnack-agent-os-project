@@ -28,8 +28,9 @@
 - Light: 최신 head의 유효한 사람 승인 1명 이상.
 - Standard: 최신 head의 유효한 사람 리뷰를 확인하되 자동 병합은
   별도 정책과 CI 조건을 만족할 때만 진행합니다.
-- High-risk: 최신 head 이후 사람 승인 2명 이상과 저장소 소유자의
-  최신 head 기준 Squash auto-merge 확인이 필요합니다.
+- High-risk: 최신 head의 사람 승인 2명 이상이 필요합니다. 현재 `dryRun=true`에서는
+  owner auto-merge 확인 없이 승인 게이트를 끝내며 merge 명령을 호출하지 않습니다.
+  owner의 최신 head 기준 Squash auto-merge 확인은 dry-run 해제 뒤에만 요구합니다.
 - 유효한 사람 승인은 PR 작성자·봇·삭제된 계정을 제외한 뒤, 현재 head의
   최신 `APPROVED` review와 GitHub API의 현재 저장소 권한
   (`admin`, `maintain`, `push`)을 모두 만족해야 합니다. `authorAssociation`만으로
@@ -43,6 +44,12 @@
   branch protection의 기준으로 읽고, `gh pr checks --required`가 반환한 이름 집합과
   정확히 비교합니다. 빈·누락·추가 required check 또는 통과하지 않은 required check는
   모두 `needs-human`으로 중단합니다.
+- 이 비교는 check 이름만 검증합니다. GitHub branch protection의 `checks[].app_id`는
+  허용된 제공자까지 제한하는 별도 조건이며, `gh pr checks --json`에는 `app_id` 필드가
+  없습니다. GitHub가 실제 merge에서 제공자 조건을 계속 강제하고 현재 gate는 고정된
+  `dryRun=true`로 merge하지 않습니다. dry-run 해제 전에는 이 gate에도 제공자 식별 검증을
+  추가해야 합니다 ([branch protection API](https://docs.github.com/en/rest/branches/branch-protection),
+  [gh pr checks JSON fields](https://cli.github.com/manual/gh_pr_checks)).
 - 보호 설정 조회가 실패하거나 required pull request review 보호가 없으면
   승인 job은 `needs-human` 경계로 중단합니다.
 
