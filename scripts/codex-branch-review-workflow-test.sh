@@ -141,6 +141,16 @@ grep -Fq -- 'for candidate in python3 python; do' "$ROOT_DIR/scripts/install-git
   || fail 'Git hook 설치가 pre-commit readiness용 Python을 확인하지 않습니다.'
 grep -Fq -- 'PowerShell-only fallback runtime was not selected when pwsh was unavailable.' "$ROOT_DIR/scripts/review-risk-test.ps1" \
   || fail '위험도 계약 테스트가 powershell.exe 대체 실행기를 검증하지 않습니다.'
+[[ -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" ]] \
+  || fail '임시 ACL 재분석 지점 계약 테스트가 없습니다.'
+[[ -f "$ROOT_DIR/scripts/review-path-safety.ps1" ]] \
+  || fail '공유 경로 안전성 검증기가 없습니다.'
+grep -Fq -- "(Join-Path \$PSScriptRoot 'review-path-safety.ps1')" "$ROOT_DIR/scripts/secure-review-temp-acl.ps1" \
+  || fail '임시 ACL 적용기가 경로 안전성 검증기를 로드하지 않습니다.'
+grep -Fq -- 'Assert-NoReparsePointsInPath -Path $fullPath' "$ROOT_DIR/scripts/secure-review-temp-acl.ps1" \
+  || fail '임시 ACL 적용기가 DACL 적용 전후 재분석 지점을 재검증하지 않습니다.'
+grep -Fq -- '재분석 지점' "$ROOT_DIR/scripts/review-path-safety.ps1" \
+  || fail '경로 안전성 검증기가 재분석 지점을 거부하지 않습니다.'
 grep -Fq -- "Git Bash 도구, pre-commit readiness용 Python" "$ROOT_DIR/.agent-os/standards/git-hooks.md" \
   || fail 'git-hooks 문서가 설치 시 검증하는 도구 의존성을 설명하지 않습니다.'
 grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'
@@ -190,6 +200,13 @@ grep -Fq -- 'reviewer_entry="$codex_bin"' "$ROOT_DIR/scripts/pre-push-ai-review.
 grep -Fq -- 'review_env_args=(' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
 grep -Fq -- '"CODEX_HOME=$codex_home_arg"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 전용 CODEX_HOME을 고정하지 않습니다.'
 grep -Fq -- 'codex_home_dir="$codex_auth_home_root/review-fallback"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 사용자 설정과 분리된 reviewer 인증 홈을 사용하지 않습니다.'
+if grep -Fq -- 'codex_auth_source="$HOME/.codex/auth.json"' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
+    fail 'pre-push가 명시적 CODEX_HOME/CODEX_AUTH_FILE 없이 기본 사용자 auth를 암묵적으로 복사합니다.'
+fi
+grep -Fq -- 'set CODEX_HOME or CODEX_AUTH_FILE once to seed' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'pre-push가 reviewer sidecar 최초 seed 경로를 명시적으로 요구하지 않습니다.'
+grep -Fq -- '명시적 인증 seed 없이 Codex reviewer 인증 홈을 만들거나 실행했습니다.' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
+  || fail 'pre-push 계약 테스트가 암묵적 사용자 인증 seed를 차단하지 않습니다.'
 grep -Fq -- 'codex_auth_lock_dir="$codex_home_dir/.review-lock"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 동시 reviewer 인증 갱신을 직렬화하지 않습니다.'
 grep -Fq -- "codex_auth_link_count=" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 인증 파일의 hard link를 차단하지 않습니다.'
 grep -Fq -- 'current_source_ref_sha=' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 리뷰 후 push source ref를 재검증하지 않습니다.'

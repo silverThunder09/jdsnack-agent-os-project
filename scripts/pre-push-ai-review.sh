@@ -390,28 +390,28 @@ printf '\n--- END BRANCH DIFF ---\n' >> "$prompt_path"
 
 codex_tmp_dir="$tmp_dir"
 codex_answer_path="$answer_path"
-codex_auth_home_source="${CODEX_HOME-}"
-if [ -z "$codex_auth_home_source" ] && [ -n "${HOME-}" ]; then
-  codex_auth_home_source="$HOME"
-  if [ "${codex_auth_home_source:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
-    codex_auth_home_source="$(cygpath -u "$codex_auth_home_source")" || {
+codex_home_base="${CODEX_HOME-}"
+if [ -z "$codex_home_base" ] && [ -n "${HOME-}" ]; then
+  codex_home_base="$HOME"
+  if [ "${codex_home_base:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
+    codex_home_base="$(cygpath -u "$codex_home_base")" || {
       echo "ERROR: Codex 사용자 홈 경로를 확인할 수 없습니다." >&2
       exit 1
     }
   fi
-  codex_auth_home_source="$codex_auth_home_source/.codex"
+  codex_home_base="$codex_home_base/.codex"
 fi
-if [ "${codex_auth_home_source:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
-  codex_auth_home_source="$(cygpath -u "$codex_auth_home_source")" || {
+if [ "${codex_home_base:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
+  codex_home_base="$(cygpath -u "$codex_home_base")" || {
     echo "ERROR: Codex 사용자 홈 경로를 확인할 수 없습니다." >&2
     exit 1
   }
 fi
-if [ -z "$codex_auth_home_source" ] || [ ! -d "$codex_auth_home_source" ]; then
-  echo "ERROR: Codex reviewer 인증 홈 디렉터리가 없습니다." >&2
+if [ -z "$codex_home_base" ] || [ ! -d "$codex_home_base" ]; then
+  echo "ERROR: Codex CLI 홈 디렉터리가 없습니다." >&2
   exit 1
 fi
-codex_auth_home_root="$(cd "$codex_auth_home_source" && pwd -P)"
+codex_auth_home_root="$(cd "$codex_home_base" && pwd -P)"
 repo_root_real="$(cd "$ROOT_DIR" && pwd -P)"
 case "$codex_auth_home_root/" in
   "$repo_root_real/"*)
@@ -420,7 +420,7 @@ case "$codex_auth_home_root/" in
     ;;
 esac
 
-# Keep the minimum auth payload in a dedicated persistent CODEX_HOME. The
+# Seed the persistent reviewer CODEX_HOME only from an explicit source. The
 # trusted CLI refreshes its own copy; the user's source auth.json is never
 # replaced, so a concurrent login cannot be lost in a compare/replace race.
 codex_home_dir="$codex_auth_home_root/review-fallback"
@@ -454,14 +454,15 @@ codex_auth_source="${CODEX_AUTH_FILE-}"
 if [ -z "$codex_auth_source" ] && [ -n "${CODEX_HOME-}" ]; then
   codex_auth_source="$CODEX_HOME/auth.json"
 fi
-if [ -z "$codex_auth_source" ] && [ -n "${HOME-}" ]; then
-  codex_auth_source="$HOME/.codex/auth.json"
-fi
 if [ -n "$codex_auth_source" ] && [ "${codex_auth_source:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
   codex_auth_source="$(cygpath -u "$codex_auth_source")" || {
     echo "ERROR: Codex reviewer의 원본 인증 경로를 확인할 수 없습니다." >&2
     exit 1
   }
+fi
+if [ ! -f "$codex_auth_path" ] && { [ -z "$codex_auth_source" ] || [ ! -f "$codex_auth_source" ]; }; then
+  echo "ERROR: Codex reviewer auth is missing; set CODEX_HOME or CODEX_AUTH_FILE once to seed the dedicated reviewer home." >&2
+  exit 1
 fi
 if [ ! -f "$codex_auth_path" ] && [ -n "$codex_auth_source" ] && [ -f "$codex_auth_source" ]; then
   codex_auth_source_snapshot="$tmp_dir/codex-auth-source.json"

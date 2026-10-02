@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'review-path-safety.ps1')
 
 Add-Type -TypeDefinition @'
 using System;
@@ -126,6 +127,7 @@ public static class ReviewProtectedAclWriter
 '@
 
 $fullPath = [System.IO.Path]::GetFullPath($Path)
+Assert-NoReparsePointsInPath -Path $fullPath
 $item = Get-Item -LiteralPath $fullPath
 $parentPath = [System.IO.Directory]::GetParent($fullPath).FullName
 $parentAcl = Get-Acl -LiteralPath $parentPath
@@ -179,9 +181,11 @@ $allowedSids = @(
 $isDirectory = [bool]$item.PSIsContainer
 
 if (-not $VerifyOnly) {
+    Assert-NoReparsePointsInPath -Path $fullPath
     [ReviewProtectedAclWriter]::SetProtectedDacl($fullPath, [string[]]$allowedSids, $isDirectory)
 }
 
+Assert-NoReparsePointsInPath -Path $fullPath
 $actualAcl = Get-Acl -LiteralPath $fullPath
 if (-not $actualAcl.AreAccessRulesProtected) {
     throw '임시 경로 ACL의 상속이 차단되지 않았습니다.'

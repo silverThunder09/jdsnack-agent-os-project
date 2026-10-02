@@ -355,6 +355,35 @@ chmod 600 "$default_codex_home/auth.json"
 export CODEX_HOME="$default_codex_home"
 export CODEX_AUTH_FILE="$default_codex_home/auth.json"
 
+implicit_user_home="$fake_root/implicit-user-home"
+mkdir -p "$implicit_user_home/.codex"
+printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"implicit-access","refresh_token":"implicit-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account","client_id":"preserve-source-metadata"}' > "$implicit_user_home/.codex/auth.json"
+chmod 600 "$implicit_user_home/.codex/auth.json"
+rm -f "$fake_root/codex.invoked"
+set +e
+implicit_auth_output="$(CODEX_HOME= CODEX_AUTH_FILE= HOME="$implicit_user_home" run_review 2>&1)"
+implicit_auth_status=$?
+set -e
+if [ "$implicit_auth_status" -eq 0 ] || ! grep -Fq 'set CODEX_HOME or CODEX_AUTH_FILE once to seed' <<< "$implicit_auth_output"; then
+  printf '%s\n' "$implicit_auth_output" >&2
+  fail 'pre-push가 명시적 seed 설정 없이 일반 사용자 Codex 로그인을 암묵적으로 사용했습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ] || [ -e "$implicit_user_home/.codex/review-fallback/auth.json" ]; then
+  fail '명시적 인증 seed 없이 Codex reviewer 인증 홈을 만들거나 실행했습니다.'
+fi
+CODEX_HOME= CODEX_AUTH_FILE="$implicit_user_home/.codex/auth.json" HOME="$implicit_user_home" run_review >/dev/null
+implicit_reviewer_auth="$implicit_user_home/.codex/review-fallback/auth.json"
+if ! jq -e 'keys | sort == ["account_id", "auth_mode", "tokens"]' "$implicit_reviewer_auth" >/dev/null; then
+  fail '명시적 초기 seed가 최소 Codex 인증 payload만 reviewer 홈에 저장하지 않았습니다.'
+fi
+if ! jq -e '.client_id == "preserve-source-metadata"' "$implicit_user_home/.codex/auth.json" >/dev/null; then
+  fail '명시적 초기 seed가 원본 Codex 인증 파일의 메타데이터를 변경했습니다.'
+fi
+CODEX_HOME= CODEX_AUTH_FILE= HOME="$implicit_user_home" run_review >/dev/null
+if ! jq -e '.tokens.access_token == "implicit-access"' "$implicit_reviewer_auth" >/dev/null; then
+  fail '후속 리뷰가 사용자 원본 없이 영속 reviewer 인증 사본을 재사용하지 못했습니다.'
+fi
+
 cat > "$fake_root/mutate-source-ref" <<'MUTATE_SOURCE_REF'
 #!/bin/sh
 set -eu
