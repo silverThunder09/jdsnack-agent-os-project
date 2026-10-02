@@ -373,8 +373,15 @@ temp_dir_mode="$("$test_stat_bin" -c '%a' "$temp_dir_path")"
 if [ -n "$test_cygpath_bin" ]; then
   auth_acl="$("$test_icacls_bin" "$copied_auth_path")"
   if grep -Eiq 'Everyone|Authenticated Users|BUILTIN\\Users' <<< "$auth_acl"; then
-    fail "임시 인증 파일 ACL에 광범위한 사용자 권한이 남아 있습니다: $auth_acl"
+    fail '임시 인증 파일 ACL에 광범위한 사용자 권한이 남아 있습니다.'
   fi
+  for protected_path in "$temp_dir_path" "$codex_home_path" "$copied_auth_path"; do
+    protected_windows_path="$("$test_cygpath_bin" -w "$protected_path")"
+    if ! "$pwsh_bin" -NoProfile -File "$test_worktree/scripts/secure-review-temp-acl.ps1" \
+      -Path "$protected_windows_path" -VerifyOnly >/dev/null; then
+      fail '임시 리뷰 경로 ACL이 현재 제한 실행 환경의 허용 목록과 다릅니다.'
+    fi
+  done
 elif [ "$auth_file_mode" != '600' ] || [ "$codex_home_mode" != '700' ] || [ "$temp_dir_mode" != '700' ]; then
   fail "임시 인증 파일/디렉터리 권한이 제한되지 않았습니다 (auth=$auth_file_mode codex_home=$codex_home_mode temp=$temp_dir_mode)."
 fi

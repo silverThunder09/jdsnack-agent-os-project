@@ -23,6 +23,17 @@ for tool in env git grep tail sed head awk cmp rm chmod jq codex; do
 done
 require_host_tool cat
 
+pwsh_bin=""
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh_bin="$(command -v pwsh)"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  pwsh_bin="$(command -v powershell.exe)"
+fi
+if [ -z "$pwsh_bin" ]; then
+  echo "ERROR: 결정론적 pre-push 검증을 위해 PowerShell이 필요합니다." >&2
+  exit 1
+fi
+
 normalize_github_repository_url() {
   local candidate="${1%/}"
   local repository_path=""
@@ -131,32 +142,19 @@ trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
 
 "$chmod_bin" 700 "$tmp_dir"
-icacls_bin=""
-windows_identity=""
 if command -v cygpath >/dev/null 2>&1; then
-  icacls_bin="$(command -v icacls.exe || command -v icacls || true)"
-  whoami_bin="$(command -v whoami.exe || true)"
-  if [ -z "$icacls_bin" ] || [ -z "$whoami_bin" ]; then
-    echo "ERROR: Windows 임시 인증 디렉터리 ACL을 제한할 icacls/whoami 도구가 필요합니다." >&2
+  secure_windows_temp_path() {
+    local path="$1"
+    local windows_path
+    local windows_script_path
+    windows_path="$(cygpath -w "$path")" || return 1
+    windows_script_path="$(cygpath -w "$ROOT_DIR/scripts/secure-review-temp-acl.ps1")" || return 1
+    MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path"
+  }
+  if ! secure_windows_temp_path "$tmp_dir"; then
+    echo "ERROR: Windows pre-push 임시 디렉터리 ACL을 현재 제한 실행 환경에 맞게 고정할 수 없습니다." >&2
     exit 1
   fi
-  windows_identity="$("$whoami_bin" | "$sed_bin" 's/\r$//')"
-  if [ -z "$windows_identity" ]; then
-    echo "ERROR: Windows 임시 디렉터리 ACL용 사용자 SID를 확인할 수 없습니다." >&2
-    exit 1
-  fi
-fi
-secure_windows_temp_path() {
-  local path="$1"
-  local windows_path
-  windows_path="$(cygpath -w "$path")" || return 1
-  MSYS2_ARG_CONV_EXCL='*' "$icacls_bin" "$windows_path" /inheritance:r \
-    /grant:r "${windows_identity}:F" '*S-1-5-18:F' '*S-1-5-32-544:F' \
-    /grant "${windows_identity}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' >/dev/null
-}
-if [ -n "$icacls_bin" ] && ! secure_windows_temp_path "$tmp_dir"; then
-  echo "ERROR: Windows pre-push 임시 디렉터리 ACL을 사용자 전용으로 제한할 수 없습니다." >&2
-  exit 1
 fi
 
 base_ref="${JDSNACK_REVIEW_BASE_REF:-origin/main}"
@@ -285,16 +283,6 @@ if ! "$git_bin" diff --no-ext-diff --no-textconv --unified=80 "$base_sha...$revi
   exit 1
 fi
 
-pwsh_bin=""
-if command -v pwsh >/dev/null 2>&1; then
-  pwsh_bin="$(command -v pwsh)"
-elif command -v powershell.exe >/dev/null 2>&1; then
-  pwsh_bin="$(command -v powershell.exe)"
-fi
-if [ -z "$pwsh_bin" ]; then
-  echo "ERROR: 결정론적 pre-push 위험도 검증을 위해 PowerShell이 필요합니다." >&2
-  exit 1
-fi
 workspace_arg="$ROOT_DIR"
 if command -v cygpath >/dev/null 2>&1; then
   workspace_arg="$(cygpath -w "$ROOT_DIR")"
@@ -398,8 +386,8 @@ codex_answer_path="$answer_path"
 codex_home_dir="$tmp_dir/codex-home"
 mkdir -p "$codex_home_dir"
 "$chmod_bin" 700 "$codex_home_dir"
-if [ -n "$icacls_bin" ] && ! secure_windows_temp_path "$codex_home_dir"; then
-  echo "ERROR: Windows Codex 인증 디렉터리 ACL을 사용자 전용으로 제한할 수 없습니다." >&2
+if command -v cygpath >/dev/null 2>&1 && ! secure_windows_temp_path "$codex_home_dir"; then
+  echo "ERROR: Windows Codex 인증 디렉터리 ACL을 현재 제한 실행 환경에 맞게 고정할 수 없습니다." >&2
   exit 1
 fi
 codex_auth_path="$codex_home_dir/auth.json"
@@ -418,6 +406,12 @@ if [ -n "$codex_auth_source" ] && [ -f "$codex_auth_source" ]; then
   if [ -n "$codex_auth_json" ]; then
     printf '%s\n' "$codex_auth_json" > "$codex_auth_path"
     "$chmod_bin" 600 "$codex_auth_path"
+    if command -v cygpath >/dev/null 2>&1; then
+      secure_windows_temp_path "$codex_auth_path" || {
+        echo "ERROR: Windows Codex 임시 인증 파일 ACL을 현재 제한 실행 환경에 맞게 고정할 수 없습니다." >&2
+        exit 1
+      }
+    fi
   fi
 fi
 codex_home_arg="$codex_home_dir"
