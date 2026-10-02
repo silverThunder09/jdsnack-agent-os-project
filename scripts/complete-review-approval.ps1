@@ -305,6 +305,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
           id
           state
           submittedAt
+          createdAt
         }
         pageInfo { hasNextPage endCursor }
       }
@@ -379,26 +380,35 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
         if ([string]::IsNullOrWhiteSpace($reviewId)) {
             Stop-NeedsHuman "Human review data is missing a deterministic review id for '$login'."
         }
-        $submittedAt = [datetime]::MinValue
-        if (-not [string]::IsNullOrWhiteSpace([string]$review.submittedAt)) {
-            try { $submittedAt = [datetime]::Parse([string]$review.submittedAt) } catch { }
+        $reviewTimestampValue = [string]$review.submittedAt
+        if ([string]::IsNullOrWhiteSpace($reviewTimestampValue)) {
+            # Pending reviews have no submittedAt; createdAt must still supersede an older approval.
+            $reviewTimestampValue = [string]$review.createdAt
+        }
+        if ([string]::IsNullOrWhiteSpace($reviewTimestampValue)) {
+            Stop-NeedsHuman "Human review data is missing a submittedAt and createdAt timestamp for '$login'."
+        }
+        try {
+            $reviewTimestamp = [datetime]::Parse($reviewTimestampValue).ToUniversalTime()
+        } catch {
+            Stop-NeedsHuman "Human review data has an invalid timestamp for '$login'."
         }
         $isNewer = $false
         if (-not $latestByLogin.ContainsKey($login)) {
             $isNewer = $true
         } else {
             $existing = $latestByLogin[$login]
-            $timeComparison = $submittedAt.CompareTo($existing.SubmittedAt)
+            $timeComparison = $reviewTimestamp.CompareTo($existing.Timestamp)
+            if ($timeComparison -eq 0 -and ($reviewState -ne [string]$existing.State -or [string]$review.commit.oid -ne [string]$existing.CommitOid)) {
+                Stop-NeedsHuman "Human review data has conflicting states or commits at the same timestamp for '$login'."
+            }
             $idComparison = [string]::CompareOrdinal($reviewId, [string]$existing.ReviewId)
             $isNewer = $timeComparison -gt 0 -or ($timeComparison -eq 0 -and $idComparison -gt 0)
-            if ($timeComparison -eq 0 -and $idComparison -eq 0 -and $reviewState -ne [string]$existing.State) {
-                Stop-NeedsHuman "Human review data contains conflicting states for review id '$reviewId'."
-            }
         }
         if ($isNewer) {
             $latestByLogin[$login] = [pscustomobject]@{
                 State = $reviewState
-                SubmittedAt = $submittedAt
+                Timestamp = $reviewTimestamp
                 ReviewId = $reviewId
                 CommitOid = [string]$review.commit.oid
             }

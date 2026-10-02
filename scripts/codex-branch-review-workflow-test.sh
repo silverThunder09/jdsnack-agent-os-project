@@ -368,6 +368,7 @@ if grep -Fq -- "-replace '\s+' ' '" "$FALLBACK_SCRIPT" || grep -Fq -- 'MaximumCh
 fi
 grep -Fq -- '$summaryLines.Count -ne 7' "$FALLBACK_SCRIPT" || fail 'review_summary는 정확히 7개의 구조화 줄만 허용해야 합니다.'
 grep -Fq -- '$rubricMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary rubric 중복을 차단하지 않습니다.'
+grep -Fq -- '):\s+PASS\s+.{10,}$' "$FALLBACK_SCRIPT" || fail 'review_summary rubric은 PASS만 허용해야 합니다.'
 grep -Fq -- '$conclusionMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary conclusion 중복을 차단하지 않습니다.'
 grep -Fq -- '$claudeResult.FindingsContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 findings 계약이 fallback 판단에 반영되지 않습니다.'
 grep -Fq -- '$claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 summary 계약이 fallback 판단에 반영되지 않습니다.'
@@ -399,6 +400,10 @@ for approval_contract in \
     'hasNextPage' \
     'endCursor' \
     'Human review pagination did not provide a deterministic next cursor.' \
+    'createdAt' \
+    'Human review data is missing a submittedAt and createdAt timestamp' \
+    'conflicting states or commits at the same timestamp' \
+    'Timestamp = $reviewTimestamp' \
     'CommitOid = [string]$review.commit.oid' \
     'Get-CurrentHeadApprovers -LatestByLogin $eligibleLatestByLogin -ExpectedHeadSha $ExpectedHeadSha' \
     'collaborators/$encodedLogin/permission' \

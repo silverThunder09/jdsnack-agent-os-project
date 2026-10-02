@@ -54,6 +54,14 @@ if (-not (Test-StructuredReviewSummary -Summary ($validSummary -join [Environmen
     throw 'A valid seven-line review summary was rejected.'
 }
 
+foreach ($nonPassStatus in @('OK', 'SATISFIED')) {
+    $weakerRubricSummary = @($validSummary)
+    $weakerRubricSummary[0] = $weakerRubricSummary[0].Replace(': PASS ', ": $nonPassStatus ")
+    if (Test-StructuredReviewSummary -Summary ($weakerRubricSummary -join [Environment]::NewLine) -Score 5) {
+        throw "A rubric line using $nonPassStatus instead of PASS was accepted."
+    }
+}
+
 $duplicateRubric = @($validSummary[0..4] + $validSummary[0] + $validSummary[5..6])
 if (Test-StructuredReviewSummary -Summary ($duplicateRubric -join [Environment]::NewLine) -Score 5) {
     throw 'A duplicate rubric line was accepted.'

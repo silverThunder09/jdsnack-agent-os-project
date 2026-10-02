@@ -36,6 +36,8 @@ $latestByLogin = @{
     staleReviewer = [pscustomobject]@{ State = 'APPROVED'; CommitOid = $staleSha }
     currentReviewer = [pscustomobject]@{ State = 'APPROVED'; CommitOid = $headSha }
     dismissedReviewer = [pscustomobject]@{ State = 'DISMISSED'; CommitOid = $headSha }
+    commentedReviewer = [pscustomobject]@{ State = 'COMMENTED'; CommitOid = $headSha }
+    pendingReviewer = [pscustomobject]@{ State = 'PENDING'; CommitOid = $headSha }
     currentRequester = [pscustomobject]@{ State = 'CHANGES_REQUESTED'; CommitOid = $headSha }
 }
 $approvers = @(Get-CurrentHeadApprovers -LatestByLogin $latestByLogin -ExpectedHeadSha $headSha)
@@ -123,21 +125,61 @@ param(
 )
 $global:LASTEXITCODE = 0
 if ($Arguments -contains 'graphql') {
+    $reviewNodes = @([pscustomobject]@{
+        author = [pscustomobject]@{ login = 'contributor' }
+        authorAssociation = 'CONTRIBUTOR'
+        commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
+        databaseId = 1
+        id = 'R1'
+        state = 'APPROVED'
+        submittedAt = '2026-10-02T00:00:00Z'
+        createdAt = '2026-10-02T00:00:00Z'
+    })
+    switch ($env:JDSNACK_FAKE_REVIEW_SCENARIO) {
+        'commented' {
+            $reviewNodes += [pscustomobject]@{
+                author = [pscustomobject]@{ login = 'contributor' }
+                authorAssociation = 'CONTRIBUTOR'
+                commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
+                databaseId = 2
+                id = 'R2'
+                state = 'COMMENTED'
+                submittedAt = '2026-10-02T01:00:00Z'
+                createdAt = '2026-10-02T01:00:00Z'
+            }
+        }
+        'pending' {
+            $reviewNodes += [pscustomobject]@{
+                author = [pscustomobject]@{ login = 'contributor' }
+                authorAssociation = 'CONTRIBUTOR'
+                commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
+                databaseId = 2
+                id = 'R2'
+                state = 'PENDING'
+                submittedAt = $null
+                createdAt = '2026-10-02T01:00:00Z'
+            }
+        }
+        'changes-requested' {
+            $reviewNodes += [pscustomobject]@{
+                author = [pscustomobject]@{ login = 'contributor' }
+                authorAssociation = 'CONTRIBUTOR'
+                commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
+                databaseId = 2
+                id = 'R2'
+                state = 'CHANGES_REQUESTED'
+                submittedAt = '2026-10-02T01:00:00Z'
+                createdAt = '2026-10-02T01:00:00Z'
+            }
+        }
+    }
     $review = [pscustomobject]@{
         data = [pscustomobject]@{
             repository = [pscustomobject]@{
                 pullRequest = [pscustomobject]@{
                     author = [pscustomobject]@{ login = 'author' }
                     reviews = [pscustomobject]@{
-                        nodes = @([pscustomobject]@{
-                            author = [pscustomobject]@{ login = 'contributor' }
-                            authorAssociation = 'CONTRIBUTOR'
-                            commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
-                            databaseId = 1
-                            id = 'R1'
-                            state = 'APPROVED'
-                            submittedAt = '2026-10-02T00:00:00Z'
-                        })
+                        nodes = @($reviewNodes)
                         pageInfo = [pscustomobject]@{ hasNextPage = $false; endCursor = $null }
                     }
                 }
@@ -229,6 +271,22 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     if ($approvalSummary.Count -ne 1 -or $approvalSummary.Logins[0] -ne 'contributor') {
         throw 'A write-level collaborator review was not counted as a current-head human approval.'
     }
+    $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'commented'
+    $commentedReviewSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($commentedReviewSummary.Count -ne 0 -or $commentedReviewSummary.ChangesRequested.Count -ne 0) {
+        throw 'A later COMMENTED review did not supersede an earlier approval.'
+    }
+    $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'pending'
+    $pendingReviewSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($pendingReviewSummary.Count -ne 0 -or $pendingReviewSummary.ChangesRequested.Count -ne 0) {
+        throw 'A later PENDING review without submittedAt did not supersede an earlier approval.'
+    }
+    $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'changes-requested'
+    $changesRequestedSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($changesRequestedSummary.Count -ne 0 -or $changesRequestedSummary.ChangesRequested.Count -ne 1 -or $changesRequestedSummary.ChangesRequested[0] -ne 'contributor') {
+        throw 'A later CHANGES_REQUESTED review did not revoke approval and remain blocking.'
+    }
+    Remove-Item Env:JDSNACK_FAKE_REVIEW_SCENARIO -ErrorAction SilentlyContinue
     $env:JDSNACK_FAKE_STATUS_CHECKS = 'missing'
     $missingStatusChecksRejected = $false
     try {
@@ -261,6 +319,7 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     Remove-Item Env:JDSNACK_FAKE_DISMISS_STALE -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_HEAD_SHA -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_REVIEWER_PERMISSION -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_FAKE_REVIEW_SCENARIO -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_STATUS_CHECKS -ErrorAction SilentlyContinue
 }
 
