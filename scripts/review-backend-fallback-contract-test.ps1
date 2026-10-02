@@ -135,4 +135,113 @@ if ($null -ne (Get-ClaudeFallbackReason -Output 'decision: PASS')) {
     throw 'Malformed structured output without an availability signal was incorrectly routed to Codex fallback.'
 }
 
+$passCommentFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-ExistingPassComment'
+    }, $true)
+if ($null -eq $passCommentFunctionAst) {
+    throw 'Get-ExistingPassComment function was not found.'
+}
+. ([scriptblock]::Create($passCommentFunctionAst.Extent.Text))
+$publishPassCommentFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Publish-PassComment'
+    }, $true)
+if ($null -eq $publishPassCommentFunctionAst) {
+    throw 'Publish-PassComment function was not found.'
+}
+. ([scriptblock]::Create($publishPassCommentFunctionAst.Extent.Text))
+
+$passCommentTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-pass-comment-contract-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $passCommentTempRoot -Force | Out-Null
+try {
+    $script:fallbackRoot = $passCommentTempRoot
+    $script:Repository = 'silverThunder09/jdsnack-agent-os-project'
+    $script:PullRequestNumber = 220
+    $script:passCommentFakeGhPath = Join-Path $passCommentTempRoot 'gh.ps1'
+    $passCommentLog = Join-Path $passCommentTempRoot 'gh-commands.log'
+    $passCommentFixture = Join-Path $passCommentTempRoot 'comments.json'
+    @'
+$arguments = @($args | ForEach-Object { [string]$_ })
+Add-Content -LiteralPath $env:JDSNACK_PASS_GH_LOG -Value ($arguments -join '|')
+if ($arguments.Count -ge 2 -and $arguments[0] -eq 'api' -and $arguments[1] -eq 'user') {
+    Write-Output $env:JDSNACK_PASS_GH_LOGIN
+    $global:LASTEXITCODE = 0
+    return
+}
+if ($arguments.Count -gt 0 -and $arguments[-1] -match '^repos/.+/issues/\d+/comments$') {
+    Get-Content -LiteralPath $env:JDSNACK_PASS_GH_COMMENTS -Raw
+    $global:LASTEXITCODE = 0
+    return
+}
+$global:LASTEXITCODE = 0
+'@ | Set-Content -LiteralPath $script:passCommentFakeGhPath -Encoding utf8
+    function Resolve-ToolPath {
+        param([string]$Name)
+        if ($Name -eq 'gh') {
+            return $script:passCommentFakeGhPath
+        }
+        return $null
+    }
+    $env:JDSNACK_PASS_GH_LOG = $passCommentLog
+    $env:JDSNACK_PASS_GH_LOGIN = 'silverThunder09'
+    $env:JDSNACK_PASS_GH_COMMENTS = $passCommentFixture
+
+    $headSha = 'abcdef0123456789'
+    $riskAssessment = [pscustomobject]@{
+        componentScores = [pscustomobject]@{ security = 10; performance = 10 }
+        riskScore = 20
+        riskBand = 'Light'
+        reviewLabels = @('Security')
+        autoMergePolicy = 'dry-run'
+        dryRun = $true
+    }
+    $reviewInputs = [pscustomobject]@{ RiskAssessment = $riskAssessment }
+    $reviewResult = [pscustomobject]@{
+        ReviewerBackend = 'claude'
+        FallbackReason = 'none'
+        DecisionLabel = 'PASS'
+        ScoreLabel = '5/5'
+        ReviewSummary = 'All required review checks passed.'
+        Findings = '- none'
+    }
+
+    $matchingMarker = "<!-- jdsnack-review-result head:$headSha -->`n## JDSnack 리뷰 PASS"
+    @(
+        [pscustomobject]@{ id = 120; user = [pscustomobject]@{ login = 'another-user' }; body = $matchingMarker },
+        [pscustomobject]@{ id = 121; user = [pscustomobject]@{ login = 'silverThunder09' }; body = '<!-- jdsnack-review-result head:older-head -->' },
+        [pscustomobject]@{ id = 130; user = [pscustomobject]@{ login = 'silverThunder09' }; body = $matchingMarker },
+        [pscustomobject]@{ id = 131; user = [pscustomobject]@{ login = 'silverThunder09' }; body = $matchingMarker }
+    ) | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $passCommentFixture -Encoding utf8
+    Publish-PassComment -Result $reviewResult -ReviewInputs $reviewInputs -BaseSha 'base-sha' -HeadSha $headSha
+    $updateCommands = @(Get-Content -LiteralPath $passCommentLog)
+    if (-not ($updateCommands | Where-Object { $_ -match 'api\|-X\|PATCH\|repos/silverThunder09/jdsnack-agent-os-project/issues/comments/131\|-F\|body=@' })) {
+        throw 'A same-author PASS comment for the current head was not updated in place.'
+    }
+    if ($updateCommands | Where-Object { $_ -match '^pr\|comment\|' }) {
+        throw 'An existing PASS comment generated a duplicate comment instead of an update.'
+    }
+
+    Clear-Content -LiteralPath $passCommentLog
+    @(
+        [pscustomobject]@{ id = 140; user = [pscustomobject]@{ login = 'another-user' }; body = $matchingMarker },
+        [pscustomobject]@{ id = 141; user = [pscustomobject]@{ login = 'silverThunder09' }; body = '<!-- jdsnack-review-result head:older-head -->' }
+    ) | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $passCommentFixture -Encoding utf8
+    Publish-PassComment -Result $reviewResult -ReviewInputs $reviewInputs -BaseSha 'base-sha' -HeadSha $headSha
+    $createCommands = @(Get-Content -LiteralPath $passCommentLog)
+    if (-not ($createCommands | Where-Object { $_ -match '^pr\|comment\|220\|' })) {
+        throw 'A new head without an owned PASS comment did not create a comment.'
+    }
+    if ($createCommands | Where-Object { $_ -match '\|-X\|PATCH\|' }) {
+        throw 'A comment from another author or an older head was overwritten.'
+    }
+} finally {
+    Remove-Item -LiteralPath $passCommentTempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_PASS_GH_LOG -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_PASS_GH_LOGIN -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_PASS_GH_COMMENTS -ErrorAction SilentlyContinue
+}
+
 Write-Output 'Review backend fallback contract tests passed'

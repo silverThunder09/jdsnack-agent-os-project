@@ -665,6 +665,24 @@ function Publish-ReviewLabels {
     }
 }
 
+function Get-ExistingPassComment {
+    param(
+        [object[]]$Comments,
+        [string]$Login,
+        [string]$HeadSha
+    )
+
+    $marker = "<!-- jdsnack-review-result head:$HeadSha -->"
+    $matches = @($Comments | Where-Object {
+            [string]$_.user.login -ieq $Login -and
+            ([string]$_.body).Contains($marker)
+        })
+    if ($matches.Count -eq 0) {
+        return $null
+    }
+    return $matches | Sort-Object { [long]$_.id } -Descending | Select-Object -First 1
+}
+
 function Publish-PassComment {
     param(
         [pscustomobject]$Result,
@@ -707,7 +725,30 @@ $($Result.ReviewSummary)
 $($Result.Findings)
 "@
     Set-Content -LiteralPath $commentPath -Value $commentBody -Encoding utf8
-    & $ghPath pr comment $PullRequestNumber --repo $Repository --body-file $commentPath 2>&1 | Out-Null
+
+    $reviewLogin = & $ghPath api user --jq '.login' 2>&1 | Out-String
+    if ([int]$LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($reviewLogin)) {
+        throw 'Could not determine the authenticated GitHub login while publishing the PASS comment.'
+    }
+    $reviewLogin = $reviewLogin.Trim()
+
+    $commentsEndpoint = "repos/$Repository/issues/$PullRequestNumber/comments"
+    $commentsJson = & $ghPath api --paginate --slurp --jq 'flatten' $commentsEndpoint 2>&1 | Out-String
+    if ([int]$LASTEXITCODE -ne 0) {
+        throw "Could not read existing PR comments before publishing PASS: $commentsJson"
+    }
+    try {
+        $existingComments = @(ConvertFrom-Json -InputObject $commentsJson)
+    } catch {
+        throw "PR comments returned invalid JSON before publishing PASS: $($_.Exception.Message)"
+    }
+
+    $existingComment = Get-ExistingPassComment -Comments $existingComments -Login $reviewLogin -HeadSha $HeadSha
+    if ($null -ne $existingComment) {
+        & $ghPath api -X PATCH "repos/$Repository/issues/comments/$($existingComment.id)" -F "body=@$commentPath" 2>&1 | Out-Null
+    } else {
+        & $ghPath pr comment $PullRequestNumber --repo $Repository --body-file $commentPath 2>&1 | Out-Null
+    }
     if ([int]$LASTEXITCODE -ne 0) {
         throw "Could not publish the PASS comment for PR #$PullRequestNumber."
     }
