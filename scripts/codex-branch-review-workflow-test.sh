@@ -218,6 +218,10 @@ grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-pus
 grep -Fq -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex reviewer 전에 dirty checkout을 차단하지 않습니다.'
 grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
 grep -Fq -- 'forbidden_tool in git gh bash pwsh powershell.exe python python3 node' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" || fail 'pre-push 격리 fixture가 ambient 실행 파일 차단을 검증하지 않습니다.'
+grep -Fq -- 'set_fixture_windows_runtime()' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
+  || fail 'pre-push Linux workflow fixture가 격리 Codex runtime의 SystemRoot/WINDIR를 제공하지 않습니다.'
+grep -Fq -- 'test_windows_root="${SystemRoot:-${WINDIR:-$fixture_root}}"' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
+  || fail 'pre-push test fixture가 host runtime root가 없을 때 임시 경로를 선택하지 않습니다.'
 grep -Fq -- 'reviewer_bin_dir="$tmp_dir/reviewer-bin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer 전용 실행 디렉터리가 없습니다.'
 grep -Fq -- 'review_path="$reviewer_bin_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 전용 실행 디렉터리로 제한되지 않습니다.'
 grep -Fq -- 'reviewer_entry="$codex_bin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 Codex 실행 파일의 설치 경로를 보존하지 않습니다.'

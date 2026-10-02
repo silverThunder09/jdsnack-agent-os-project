@@ -365,6 +365,12 @@ run_review() {
   )
 }
 
+set_fixture_windows_runtime() {
+  local test_windows_root="${SystemRoot:-${WINDIR:-$fixture_root}}"
+  export SystemRoot="${SystemRoot:-$test_windows_root}"
+  export WINDIR="${WINDIR:-$test_windows_root}"
+}
+
 assert_malformed_duplicate_scalar_headers_rejected() {
   for malformed_duplicate_field in decision score risk; do
     touch "$fake_root/codex.malformed-duplicate-$malformed_duplicate_field"
@@ -386,6 +392,20 @@ printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"default-access",
 chmod 600 "$default_codex_home/auth.json"
 export CODEX_HOME="$default_codex_home"
 export CODEX_AUTH_FILE="$default_codex_home/auth.json"
+
+if [ "${JDSNACK_PRE_PUSH_TEST_CASE-}" = 'workflow-linux-runtime' ]; then
+  SystemRoot=''
+  WINDIR=''
+  set_fixture_windows_runtime
+  run_review >/dev/null
+  echo 'Workflow CI pre-push fixture has a synthetic Windows runtime root'
+  exit 0
+fi
+
+set_fixture_windows_runtime
+if [ -z "$SystemRoot" ] || [ -z "$WINDIR" ]; then
+  fail 'workflow fixture must provide SystemRoot and WINDIR to the isolated reviewer.'
+fi
 
 assert_malformed_duplicate_scalar_headers_rejected
 if [ "${JDSNACK_PRE_PUSH_TEST_CASE-}" = 'malformed-duplicate-headers' ]; then
