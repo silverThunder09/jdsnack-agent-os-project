@@ -394,6 +394,10 @@ grep -Fq -- '$conclusionMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_
 grep -Fq -- '-Findings $findings' "$FALLBACK_SCRIPT" || fail 'review_summary 검증에 구조화 findings가 전달되지 않습니다.'
 grep -Fq -- 'When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion.' "$FALLBACK_SCRIPT" || fail 'review prompt가 P2/P3 finding의 summary 참조를 요구하지 않습니다.'
 grep -Fq -- 'A P2 finding without a summary reference was not isolated as a summary contract failure.' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" || fail 'P2 finding과 summary 불일치 회귀 테스트가 없습니다.'
+grep -Fq -- "api --paginate --slurp --jq 'flatten'" "$FALLBACK_SCRIPT" || fail 'PASS 댓글 중복 방지를 위해 모든 PR 댓글을 조회하지 않습니다.'
+grep -Fq -- 'Get-ExistingPassComment -Comments $existingComments -Login $reviewLogin -HeadSha $HeadSha' "$FALLBACK_SCRIPT" || fail 'PASS 댓글 조회가 작성자와 현재 head SHA에 결합되지 않습니다.'
+grep -Fq -- 'api -X PATCH "repos/$Repository/issues/comments/$($existingComment.id)" -F "body=@$commentPath"' "$FALLBACK_SCRIPT" || fail '기존 PASS 댓글을 갱신하는 경로가 없습니다.'
+grep -Fq -- 'same-author PASS comment for the current head was not updated in place.' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" || fail '동일 head의 PASS 댓글 갱신 회귀 테스트가 없습니다.'
 grep -Fq -- '$claudeResult.FindingsContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 findings 계약이 fallback 판단에 반영되지 않습니다.'
 grep -Fq -- '$claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 summary 계약이 fallback 판단에 반영되지 않습니다.'
 APPROVAL_SCRIPT="$ROOT_DIR/scripts/complete-review-approval.ps1"
@@ -468,12 +472,18 @@ for approval_contract in \
     'dry-run is enabled, and no merge command was executed.' \
     "'skipping'" \
     ' --auto' \
+    "'--json', 'name,state,bucket,link'" \
+    'Test-CurrentRunReviewCheck' \
     'ConvertFrom-Json -InputObject $checksEnvelopeJson' \
     '$checks = @($checksEnvelope.checks)' \
     'return ,$checks'; do
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
+grep -Fq -- 'REVIEW_JOB_RESULT: ${{ needs.review.result }}' "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
+    || fail '승인 job에 상위 review job의 검증된 결과가 전달되지 않습니다.'
+grep -Fq -- '-ReviewJobResult $env:REVIEW_JOB_RESULT' "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
+    || fail '승인 게이트가 상위 review job 결과를 사용하지 않습니다.'
 grep -Fq -- "State = 'DISMISSED'" "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
     || fail '승인 계약 테스트가 dismissed review state를 검증하지 않습니다.'
 grep -Fq -- 'Get-BranchProtectionApprovalRequirement -BaseBranch' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
