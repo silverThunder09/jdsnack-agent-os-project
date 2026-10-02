@@ -13,6 +13,8 @@ param(
 
     [string]$Workspace = $env:GITHUB_WORKSPACE,
 
+    [string]$ReviewJobResult = '',
+
     [Parameter(Mandatory = $true)]
     [string]$ReportPath
 )
@@ -175,7 +177,7 @@ function Get-Checks {
     if ($Required) {
         $arguments += '--required'
     }
-    $arguments += @('--json', 'name,state,bucket')
+    $arguments += @('--json', 'name,state,bucket,link')
     $checksJson = & $script:ghPath @arguments 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0) {
         Stop-NeedsHuman "Could not read PR checks: $checksJson"
@@ -188,6 +190,45 @@ function Get-Checks {
     } catch {
         Stop-NeedsHuman "PR checks returned invalid JSON: $($_.Exception.Message)"
     }
+}
+
+function Test-CurrentRunReviewCheck {
+    param(
+        [pscustomobject]$Check,
+        [string]$ReviewJobResult,
+        [string]$WorkflowRunId,
+        [string]$Repository,
+        [string]$ServerUrl
+    )
+
+    if (
+        $null -eq $Check -or
+        $ReviewJobResult -ine 'success' -or
+        [string]$Check.name -notmatch '(^| / )review$' -or
+        [string]$Check.state -ine 'IN_PROGRESS' -or
+        [string]$Check.bucket -ine 'pending' -or
+        $WorkflowRunId -notmatch '^\d+$' -or
+        $Repository -notmatch '^[^/]+/[^/]+$'
+    ) {
+        return $false
+    }
+
+    [uri]$serverUri = $null
+    [uri]$checkUri = $null
+    if (
+        -not [uri]::TryCreate($ServerUrl, [System.UriKind]::Absolute, [ref]$serverUri) -or
+        -not [uri]::TryCreate([string]$Check.link, [System.UriKind]::Absolute, [ref]$checkUri) -or
+        $checkUri.Scheme -ine $serverUri.Scheme -or
+        $checkUri.Authority -ine $serverUri.Authority
+    ) {
+        return $false
+    }
+
+    $serverPath = $serverUri.AbsolutePath.TrimEnd('/')
+    $expectedRunPath = '{0}/{1}/actions/runs/{2}' -f $serverPath, $Repository.Trim('/'), $WorkflowRunId
+    $actualPath = [uri]::UnescapeDataString($checkUri.AbsolutePath)
+    return $actualPath.Equals($expectedRunPath, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $actualPath.StartsWith($expectedRunPath + '/', [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function Get-BranchProtectionApprovalRequirement {
@@ -589,7 +630,15 @@ if ($requiredChecks.Count -eq 0) {
     Stop-NeedsHuman 'No required PR checks were returned.'
 }
 Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $branchProtectionApproval.RequiredCheckContexts -RequiredChecks $requiredChecks
-$blockingChecks = @($requiredChecks | Where-Object { $_.bucket -notin @('pass', 'skipping') })
+$blockingChecks = @($requiredChecks | Where-Object {
+        $_.bucket -notin @('pass', 'skipping') -and
+        -not (Test-CurrentRunReviewCheck `
+                -Check $_ `
+                -ReviewJobResult $ReviewJobResult `
+                -WorkflowRunId $env:GITHUB_RUN_ID `
+                -Repository $Repository `
+                -ServerUrl $env:GITHUB_SERVER_URL)
+    })
 if ($blockingChecks.Count -gt 0) {
     $blockingSummary = ($blockingChecks | ForEach-Object { '{0}={1}' -f $_.name, $_.bucket }) -join ', '
     Stop-NeedsHuman "Required checks are not passing: $blockingSummary"
@@ -603,7 +652,16 @@ foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
     }
 }
 $reviewChecks = @($allChecks | Where-Object { $_.name -eq 'review' -or $_.name -match '(^| / )review$' })
-if ($reviewChecks.Count -ne 1 -or $reviewChecks[0].bucket -ne 'pass') {
+$reviewCheckAccepted = $reviewChecks.Count -eq 1 -and (
+    $reviewChecks[0].bucket -eq 'pass' -or
+    (Test-CurrentRunReviewCheck `
+        -Check $reviewChecks[0] `
+        -ReviewJobResult $ReviewJobResult `
+        -WorkflowRunId $env:GITHUB_RUN_ID `
+        -Repository $Repository `
+        -ServerUrl $env:GITHUB_SERVER_URL)
+)
+if (-not $reviewCheckAccepted) {
     Stop-NeedsHuman 'The review job gate is missing, ambiguous, or not passing.'
 }
 

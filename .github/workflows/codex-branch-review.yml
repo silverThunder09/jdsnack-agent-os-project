@@ -228,6 +228,7 @@ jobs:
           PR_NUMBER: ${{ needs.review.outputs.pr_number }}
           REVIEW_BASE_SHA: ${{ needs.review.outputs.base_sha }}
           REVIEW_HEAD_SHA: ${{ needs.review.outputs.head_sha }}
+          REVIEW_JOB_RESULT: ${{ needs.review.result }}
         run: |
           $approval = Join-Path $env:GITHUB_WORKSPACE 'scripts/complete-review-approval.ps1'
           if (-not (Test-Path -LiteralPath $approval -PathType Leaf)) {
@@ -239,5 +240,6 @@ jobs:
             -Repository '${{ github.repository }}' `
             -BaseSha $env:REVIEW_BASE_SHA `
             -HeadSha $env:REVIEW_HEAD_SHA `
+            -ReviewJobResult $env:REVIEW_JOB_RESULT `
             -Workspace $env:GITHUB_WORKSPACE `
             -ReportPath $report
