@@ -221,7 +221,18 @@ function Assert-RequiredChecksMatchBranchProtection {
     if ($expected.Count -eq 0) {
         Stop-NeedsHuman 'Branch protection did not provide any required check contexts.'
     }
-    $reported = @($RequiredChecks | ForEach-Object { [string]$_.name } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+    $reportedNames = @()
+    foreach ($requiredCheck in @($RequiredChecks)) {
+        if ($null -eq $requiredCheck -or $null -eq $requiredCheck.PSObject.Properties['name']) {
+            Stop-NeedsHuman 'gh pr checks --required returned an empty or malformed check name.'
+        }
+        $reportedName = [string]$requiredCheck.name
+        if ([string]::IsNullOrWhiteSpace($reportedName)) {
+            Stop-NeedsHuman 'gh pr checks --required returned an empty or malformed check name.'
+        }
+        $reportedNames += $reportedName
+    }
+    $reported = @($reportedNames | Sort-Object -Unique)
     $missing = @($expected | Where-Object { $_ -notin $reported })
     $unexpected = @($reported | Where-Object { $_ -notin $expected })
     if ($missing.Count -gt 0 -or $unexpected.Count -gt 0) {

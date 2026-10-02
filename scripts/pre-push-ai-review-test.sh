@@ -201,13 +201,28 @@ if [ -n "$test_cygpath_bin" ]; then
   chmod +x "$fake_root/cygpath"
 fi
 
+run_hook_with_origin_urls() {
+  local hook_path="$1"
+  local destination_url="$2"
+  local origin_fetch_url="$3"
+  local origin_push_url="$4"
+
+  GIT_CONFIG_COUNT=2 \
+    GIT_CONFIG_KEY_0='remote.origin.url' \
+    GIT_CONFIG_VALUE_0="$origin_fetch_url" \
+    GIT_CONFIG_KEY_1='remote.origin.pushurl' \
+    GIT_CONFIG_VALUE_1="$origin_push_url" \
+    bash "$hook_path" origin "$destination_url"
+}
+
 run_review() {
+  local canonical_origin_url='https://github.com/silverThunder09/jdsnack-agent-os-project'
   (
     cd "$test_worktree"
     printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
       | PATH="$fake_root:$PATH" \
         JDSNACK_REVIEW_BASE_REF="$base_ref" \
-        bash "$test_worktree/.githooks/pre-push" origin https://github.com/silverThunder09/jdsnack-agent-os-project
+        run_hook_with_origin_urls "$test_worktree/.githooks/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
   )
 }
 
@@ -215,6 +230,35 @@ run_review >/dev/null
 
 if [ ! -e "$fake_root/copied-entry-invoked" ]; then
   fail 'Codex reviewer가 원본 실행 파일이 아닌 전용 reviewer entrypoint를 사용하지 않았습니다.'
+fi
+
+fork_origin_url='https://github.com/example-user/jdsnack-agent-os-project.git'
+rm -f "$fake_root/codex.invoked"
+(
+  cd "$test_worktree"
+  printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+    | PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      run_hook_with_origin_urls "$test_worktree/scripts/pre-push-ai-review.sh" "$fork_origin_url" "$fork_origin_url" "$fork_origin_url"
+) >/dev/null
+if [ ! -e "$fake_root/codex.invoked" ]; then
+  fail 'fork origin의 동일 repository push가 Codex reviewer까지 진행되지 않았습니다.'
+fi
+
+rm -f "$fake_root/codex.invoked"
+set +e
+origin_identity_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      run_hook_with_origin_urls "$test_worktree/scripts/pre-push-ai-review.sh" https://github.com/silverThunder09/jdsnack-agent-os-project https://github.com/silverThunder09/jdsnack-agent-os-project "$fork_origin_url") 2>&1)"
+origin_identity_status=$?
+set -e
+if [ "$origin_identity_status" -eq 0 ] || ! grep -Fq '같은 GitHub repository' <<< "$origin_identity_output"; then
+  printf '%s\n' "$origin_identity_output" >&2
+  fail 'origin fetch/push repository 불일치를 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail 'origin repository 불일치가 Codex reviewer 실행 전에 차단되지 않았습니다.'
 fi
 
 rm -f "$fake_root/codex.invoked"
@@ -255,7 +299,7 @@ url_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-pus
       bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://evil.example) 2>&1)"
 url_status=$?
 set -e
-if [ "$url_status" -eq 0 ] || ! grep -Fq 'destination URL이 trusted repository' <<< "$url_output"; then
+if [ "$url_status" -eq 0 ] || ! grep -Fq 'destination URL은 GitHub owner/repository' <<< "$url_output"; then
   printf '%s\n' "$url_output" >&2
   fail 'origin push URL override를 pre-push가 차단하지 않았습니다.'
 fi

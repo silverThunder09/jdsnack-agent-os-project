@@ -23,41 +23,64 @@ for tool in env git grep tail sed head awk cmp rm cp jq codex; do
 done
 require_host_tool cat
 
-trusted_origin_urls=(
-  'https://github.com/silverThunder09/jdsnack-agent-os-project'
-  'https://github.com/silverThunder09/jdsnack-agent-os-project.git'
-  'git@github.com:silverThunder09/jdsnack-agent-os-project.git'
-  'ssh://git@github.com/silverThunder09/jdsnack-agent-os-project.git'
-)
-is_trusted_origin_url() {
-  local candidate="$1"
-  local trusted_url
-  for trusted_url in "${trusted_origin_urls[@]}"; do
-    if [ "$candidate" = "$trusted_url" ]; then
-      return 0
-    fi
-  done
-  return 1
+normalize_github_repository_url() {
+  local candidate="${1%/}"
+  local repository_path=""
+
+  case "$candidate" in
+    https://github.com/*)
+      repository_path="${candidate#https://github.com/}"
+      ;;
+    git@github.com:*)
+      repository_path="${candidate#git@github.com:}"
+      ;;
+    ssh://git@github.com/*)
+      repository_path="${candidate#ssh://git@github.com/}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  repository_path="${repository_path%.git}"
+  if [[ ! "$repository_path" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+    return 1
+  fi
+  printf '%s\n' "$repository_path"
 }
+
 push_url="${2-}"
-if ! is_trusted_origin_url "$push_url"; then
-  echo "ERROR: 이번 push invocation의 destination URL이 trusted repository로 고정되지 않았습니다: ${push_url:-unavailable}" >&2
+if ! push_repository="$(normalize_github_repository_url "$push_url")"; then
+  echo "ERROR: 이번 push invocation의 destination URL은 GitHub owner/repository 형식이어야 합니다: ${push_url:-unavailable}" >&2
   exit 1
 fi
 origin_push_urls=()
 while IFS= read -r origin_url; do
   [ -n "$origin_url" ] && origin_push_urls+=("$origin_url")
 done < <("$git_bin" remote get-url --all --push origin 2>/dev/null || true)
-if [ "${#origin_push_urls[@]}" -ne 1 ] || ! is_trusted_origin_url "${origin_push_urls[0]-}"; then
-  echo "ERROR: origin push URL이 trusted repository로 고정되지 않았습니다: ${origin_push_urls[*]-unavailable}" >&2
+if [ "${#origin_push_urls[@]}" -ne 1 ]; then
+  echo "ERROR: origin push URL은 하나여야 합니다: ${origin_push_urls[*]-unavailable}" >&2
+  exit 1
+fi
+if ! origin_push_repository="$(normalize_github_repository_url "${origin_push_urls[0]}")"; then
+  echo "ERROR: origin push URL은 GitHub owner/repository 형식이어야 합니다: ${origin_push_urls[0]}" >&2
   exit 1
 fi
 origin_fetch_urls=()
 while IFS= read -r origin_url; do
   [ -n "$origin_url" ] && origin_fetch_urls+=("$origin_url")
 done < <("$git_bin" remote get-url --all origin 2>/dev/null || true)
-if [ "${#origin_fetch_urls[@]}" -ne 1 ] || ! is_trusted_origin_url "${origin_fetch_urls[0]-}"; then
-  echo "ERROR: origin fetch URL이 trusted repository로 고정되지 않았습니다: ${origin_fetch_urls[*]-unavailable}" >&2
+if [ "${#origin_fetch_urls[@]}" -ne 1 ]; then
+  echo "ERROR: origin fetch URL은 하나여야 합니다: ${origin_fetch_urls[*]-unavailable}" >&2
+  exit 1
+fi
+if ! origin_fetch_repository="$(normalize_github_repository_url "${origin_fetch_urls[0]}")"; then
+  echo "ERROR: origin fetch URL은 GitHub owner/repository 형식이어야 합니다: ${origin_fetch_urls[0]}" >&2
+  exit 1
+fi
+if [ "$push_repository" != "$origin_push_repository" ] || [ "$origin_fetch_repository" != "$origin_push_repository" ]; then
+  echo "ERROR: push destination과 origin fetch/push URL은 같은 GitHub repository여야 합니다." >&2
+  printf 'destination=%s origin-push=%s origin-fetch=%s\n' "$push_repository" "$origin_push_repository" "$origin_fetch_repository" >&2
   exit 1
 fi
 

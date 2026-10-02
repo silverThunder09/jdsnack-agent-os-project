@@ -114,10 +114,10 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 전문 라우팅 정책을 읽지 않습니다.'
 grep -Fq -- 'push_remote="${1-}"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 hook destination remote를 읽지 않습니다.'
 grep -Fq -- 'push_remote" != "origin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin 이외 destination remote를 차단하지 않습니다.'
-grep -Fq -- 'trusted_origin_urls' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 trusted origin URL allowlist를 사용하지 않습니다.'
+grep -Fq -- 'normalize_github_repository_url' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 GitHub repository identity를 정규화하지 않습니다.'
 grep -Fq -- 'remote get-url --all --push origin' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin push URL을 검증하지 않습니다.'
 grep -Fq -- 'remote get-url --all origin' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin fetch URL을 검증하지 않습니다.'
-grep -Fq -- 'silverThunder09/jdsnack-agent-os-project' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 trusted 저장소 identity를 고정하지 않습니다.'
+grep -Fq -- 'push destination과 origin fetch/push URL은 같은 GitHub repository여야 합니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 destination과 origin repository identity 결합을 강제하지 않습니다.'
 grep -Fq -- 'refs/heads/*' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 branch ref 이외의 push를 차단하지 않습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm cp jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 jq와 Codex CLI를 실행 전에 확인하지 않습니다.'
 grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
@@ -281,6 +281,7 @@ for fallback_contract in \
     'Get-StructuredReviewResult' \
     'Test-StructuredFindings' \
     'Test-StructuredReviewSummary' \
+    'Get-ClaudeFallbackReason' \
     'FindingsContractValid' \
     'ReviewSummaryContractValid' \
     'HasStructuredBody' \
@@ -317,17 +318,24 @@ for fallback_contract in \
     grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
 done
-availability_check_line="$(grep -nF -- '$claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+fallback_classifier_line="$(grep -nF -- 'function Get-ClaudeFallbackReason' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-unavailable_route_line="$(grep -nF -- '$claudeReviewUnavailable = ($claudeExitCode -ne 0) -or (-not $claudeHasStructuredResult)' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-claude_success_route_line="$(grep -nF -- 'if (-not $claudeReviewUnavailable) {' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-codex_fallback_route_line="$(grep -nF -- 'Claude could not provide a valid structured review' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-[[ -n "$availability_check_line" && -n "$structured_result_line" && -n "$unavailable_route_line" && -n "$claude_success_route_line" && -n "$codex_fallback_route_line" \
-    && "$availability_check_line" -lt "$structured_result_line" \
-    && "$structured_result_line" -lt "$unavailable_route_line" \
-    && "$unavailable_route_line" -lt "$claude_success_route_line" \
-    && "$claude_success_route_line" -lt "$codex_fallback_route_line" ]] \
-    || fail 'A Claude invocation failure or malformed structured result must route review to Codex.'
+claude_success_line="$(grep -nF -- '$claudeReviewSucceeded = ($claudeExitCode -eq 0) -and $claudeHasStructuredResult' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+fallback_reason_line="$(grep -nF -- '$claudeFallbackReason = Get-ClaudeFallbackReason -Output $claudeOutput' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+claude_success_route_line="$(grep -nF -- 'if ($claudeReviewSucceeded) {' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+unclassified_needs_human_line="$(grep -nF -- 'Codex fallback is not allowed' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+codex_fallback_route_line="$(grep -nF -- 'Claude availability outage' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+[[ -n "$fallback_classifier_line" && -n "$structured_result_line" && -n "$claude_success_line" && -n "$fallback_reason_line" && -n "$claude_success_route_line" && -n "$unclassified_needs_human_line" && -n "$codex_fallback_route_line" \
+    && "$fallback_classifier_line" -lt "$structured_result_line" \
+    && "$structured_result_line" -lt "$claude_success_line" \
+    && "$claude_success_line" -lt "$fallback_reason_line" \
+    && "$fallback_reason_line" -lt "$claude_success_route_line" \
+    && "$claude_success_route_line" -lt "$unclassified_needs_human_line" \
+    && "$unclassified_needs_human_line" -lt "$codex_fallback_route_line" ]] \
+    || fail 'Only a recognized Claude availability outage may route review to Codex; other failures must stop as needs-human.'
+if grep -Fq -- 'claude-invalid-output' "$FALLBACK_SCRIPT"; then
+    fail 'Malformed Claude output must not be labeled as a Codex fallback reason.'
+fi
 for check_json_parse in \
     'ConvertFrom-Json -InputObject $checksEnvelopeJson' \
     '$checks = @($checksEnvelope.checks)' \

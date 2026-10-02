@@ -25,11 +25,11 @@ Worker의 역할·권한·작업 경계와 모델 배정을 분리합니다.
 - 배정에는 `provider`, `model`, `reason`을 모두 둡니다.
 - 모델명 변경은 `backends.json`만 수정하고, 역할·권한 변경은 이 문서와 `AGENTS.md` 또는 `CLAUDE.md`를 함께 수정합니다.
 - 빌드·lint·test·E2E 명령 실행 자체에는 모델 배정을 적용하지 않습니다.
-- Claude 문서 계획에는 자동 폴백을 두지 않습니다. Claude review backend가 unavailable이거나 유효한 구조화 리뷰를 만들지 못한 경우에만, 동일 5점 루브릭을 사용하는 Codex 리뷰 폴백을 허용합니다. 유효한 리뷰의 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달은 서비스 장애가 아니므로 Codex 폴백으로 바꾸지 않습니다.
+- Claude 문서 계획에는 자동 폴백을 두지 않습니다. Claude review backend가 구독·인증·쿼터 또는 명시적으로 식별된 실행 불가 신호로 unavailable일 때만, 동일 5점 루브릭을 사용하는 Codex 리뷰 폴백을 허용합니다. 유효한 리뷰의 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달과 분류되지 않은 실행·구조화 결과 오류는 서비스 장애로 바꾸지 않습니다.
 
 ## 리뷰 폴백 전환 조건
 
-- Claude review-loop를 한 번 실행하고 종료 코드와 구조화된 리뷰 필드를 확인합니다. Claude 실행이 실패하거나 필수 필드가 누락되면 구체적인 오류 문구와 종료 코드에 관계없이 `active_reviewer: codex-fallback`으로 전환합니다.
+- Claude review-loop를 한 번 실행하고 종료 코드와 구조화된 리뷰 필드를 확인합니다. 구독·인증·쿼터·CLI unavailable·timeout처럼 명시적으로 식별한 availability 신호가 있을 때만 `active_reviewer: codex-fallback`으로 전환합니다. 그 밖의 nonzero 종료와 필수 필드 누락·형식 오류는 원문 로그를 공개하지 않고 `needs-human`으로 중단합니다.
 - Claude가 유효한 리뷰 결과를 냈을 때는 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달을 Codex fallback으로 바꾸지 않습니다.
 - Codex는 read-only sandbox에서 diff와 해당 acceptance/test 기준만 읽고 `decision`, `score`, `risk`, `findings`를 반환합니다. 위험도 score와 Security·Performance·Test Coverage·Architecture 라벨은 trusted base의 결정론 계산기가 정하고 Codex가 임의로 바꾸지 않습니다.
 - Codex가 실행되지 않거나 출력 형식이 깨지거나 score가 4점 미만이면 `needs-human`입니다.
@@ -71,5 +71,7 @@ fallback_reason: codex-auth | codex-quota | null
 fallback_since: <ISO8601> | null
 fallback_approved: true | false
 active_reviewer: claude | codex-fallback
-review_fallback_reason: claude-auth | claude-subscription | claude-quota | claude-unavailable | claude-invalid-output | null
+review_fallback_reason: claude-auth | claude-subscription | claude-quota | claude-unavailable | null
 ```
+
+`claude-invalid-output`과 분류되지 않은 실행 오류는 fallback reason이 아니라 `needs-human` 사유입니다.

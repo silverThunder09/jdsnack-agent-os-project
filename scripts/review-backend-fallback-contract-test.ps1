@@ -29,7 +29,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult')) {
+foreach ($functionName in @('Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -91,6 +91,22 @@ $malformedSummaryReview = $validReview.Replace('- conclusion: the structured rev
 $malformedSummaryResult = Get-StructuredReviewResult -Text $malformedSummaryReview -ReviewerBackend 'claude' -FallbackReason 'none'
 if ($malformedSummaryResult.ReviewSummaryContractValid) {
     throw 'Malformed review_summary was marked contract-valid.'
+}
+
+if ((Get-ClaudeFallbackReason -Output 'Claude subscription access is disabled.') -ne 'claude-subscription') {
+    throw 'A Claude subscription outage was not classified for fallback.'
+}
+if ((Get-ClaudeFallbackReason -Output 'Authentication failed because the credential expired.') -ne 'claude-auth') {
+    throw 'A Claude authentication outage was not classified for fallback.'
+}
+if ((Get-ClaudeFallbackReason -Output 'Claude review backend timed out after 120 seconds.') -ne 'claude-unavailable') {
+    throw 'A Claude execution outage was not classified for fallback.'
+}
+if ($null -ne (Get-ClaudeFallbackReason -Output 'Claude exited with an internal review error.')) {
+    throw 'An unclassified Claude runner failure was incorrectly routed to Codex fallback.'
+}
+if ($null -ne (Get-ClaudeFallbackReason -Output 'decision: PASS')) {
+    throw 'Malformed structured output without an availability signal was incorrectly routed to Codex fallback.'
 }
 
 Write-Output 'Review backend fallback contract tests passed'

@@ -560,6 +560,22 @@ function Get-StructuredReviewResult {
     }
 }
 
+function Get-ClaudeFallbackReason {
+    param([string]$Output)
+
+    $availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:failed\s+to\s+authenticate|oauth\s+session\s+expired|not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
+    if (-not [regex]::IsMatch($Output, $availabilityPattern)) {
+        return $null
+    }
+
+    switch -Regex ($Output) {
+        '(?i)subscription' { return 'claude-subscription' }
+        '(?i)quota|rate\s+limit' { return 'claude-quota' }
+        '(?i)failed\s+to\s+authenticate|oauth\s+session\s+expired|authentication|not\s+authenticated|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired)' { return 'claude-auth' }
+        default { return 'claude-unavailable' }
+    }
+}
+
 function Write-ReviewReport {
     param(
         [pscustomobject]$Result,
@@ -829,30 +845,30 @@ try {
 }
 $claudeOutput = Read-ToolOutput $claudeLog
 
-$availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:failed\s+to\s+authenticate|oauth\s+session\s+expired|not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
-$claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)
 $claudeResult = Get-StructuredReviewResult -Text $claudeOutput -ReviewerBackend 'claude' -FallbackReason 'none'
 $claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid
-$claudeReviewUnavailable = ($claudeExitCode -ne 0) -or (-not $claudeHasStructuredResult)
+$claudeReviewSucceeded = ($claudeExitCode -eq 0) -and $claudeHasStructuredResult
+$claudeFallbackReason = Get-ClaudeFallbackReason -Output $claudeOutput
 
-# A nonzero Claude process exit means the runner failed even when it emitted complete-looking fields.
-if (-not $claudeReviewUnavailable) {
+if ($claudeReviewSucceeded) {
     Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
     Write-ReviewReport -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
     Complete-ReviewDecision -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha -ProcessExitCode $claudeExitCode
     exit 0
 }
 
-$fallbackReason = switch -Regex ($claudeOutput) {
-    '(?i)subscription' { 'claude-subscription'; break }
-    '(?i)quota|rate\s+limit' { 'claude-quota'; break }
-    '(?i)failed\s+to\s+authenticate|oauth\s+session\s+expired|authentication|not\s+authenticated|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired)' { 'claude-auth'; break }
-    default {
-        if ($claudeExitCode -ne 0 -or $claudeAvailabilitySignal) { 'claude-unavailable' }
-        else { 'claude-invalid-output' }
+if ([string]::IsNullOrWhiteSpace($claudeFallbackReason)) {
+    $claudeResult.FallbackReason = 'needs-human'
+    $failureDetail = if ($claudeExitCode -ne 0) {
+        "Claude exited with code $claudeExitCode without a recognized availability signal."
+    } else {
+        'Claude returned malformed structured review output without a recognized availability signal.'
     }
+    Write-ReviewReport -Result $claudeResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
+    Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue
+    Stop-NeedsHuman "Claude review cannot be classified as an availability outage; Codex fallback is not allowed: $failureDetail" $reviewReport
 }
-Add-StepSummary "Claude could not provide a valid structured review ($fallbackReason); delegating PR #$PullRequestNumber to Codex read-only reviewer."
+Add-StepSummary "Claude availability outage ($claudeFallbackReason); delegating PR #$PullRequestNumber to Codex read-only reviewer."
 
 try {
     $codexModelConfig = Get-ConfiguredCodexReviewModel -ReviewWorkspace $Workspace
@@ -976,7 +992,7 @@ try {
 $codexOutput = if (Test-Path -LiteralPath $codexAnswerPath -PathType Leaf) { Read-ToolOutput $codexAnswerPath } else { Read-ToolOutput $codexLog }
 Remove-Item -LiteralPath $codexAnswerPath -Force -ErrorAction SilentlyContinue
 
-$codexResult = Get-StructuredReviewResult -Text $codexOutput -ReviewerBackend 'codex-fallback' -FallbackReason $fallbackReason
+$codexResult = Get-StructuredReviewResult -Text $codexOutput -ReviewerBackend 'codex-fallback' -FallbackReason $claudeFallbackReason
 Write-ReviewReport -Result $codexResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha
 Complete-ReviewDecision -Result $codexResult -ReviewInputs $reviewInputs -ReportPath $reviewReport -BaseSha $BaseSha -HeadSha $HeadSha -ProcessExitCode $codexExitCode
 exit 0

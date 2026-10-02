@@ -196,6 +196,23 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     if (-not $missingRequiredCheckRejected) {
         throw 'A branch-protection required check missing from gh pr checks was accepted.'
     }
+    foreach ($malformedRequiredCheck in @(
+            [pscustomobject]@{ name = ''; bucket = 'pass' },
+            [pscustomobject]@{ bucket = 'pass' }
+        )) {
+        $malformedRequiredCheckRejected = $false
+        try {
+            Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks @($matchingRequiredChecks + $malformedRequiredCheck)
+        } catch {
+            $malformedRequiredCheckRejected = $true
+            if ($_.Exception.Message -notmatch 'empty or malformed check name') {
+                throw
+            }
+        }
+        if (-not $malformedRequiredCheckRejected) {
+            throw 'An empty or malformed gh pr checks --required name was accepted.'
+        }
+    }
     $env:JDSNACK_FAKE_HEAD_SHA = $headSha
     $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'pull'
     $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
