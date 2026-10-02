@@ -109,6 +109,8 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/install-git-hooks.sh" ]] || fail "Git hook 설치 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" ]] || fail "pre-push AI 리뷰 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" ]] || fail "pre-push AI 리뷰 계약 테스트가 없습니다."
+grep -Fq -- 'bash "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"' "$ROOT_DIR/scripts/workflow-ci-test.sh" \
+  || fail 'workflow CI가 실행 권한과 무관하게 pre-push 계약 테스트를 Bash로 실행해야 합니다.'
 [[ -f "$ROOT_DIR/.agent-os/operations/review-routing.md" ]] || fail "리뷰 라우팅 문서가 없습니다."
 [[ -f "$ROOT_DIR/.agent-os/operations/branch-protection-provisioning.md" ]] || fail "branch protection provisioning 문서가 없습니다."
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 전문 라우팅 정책을 읽지 않습니다.'
