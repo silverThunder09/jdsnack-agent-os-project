@@ -29,7 +29,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -119,20 +119,58 @@ if ($malformedSummaryResult.ReviewSummaryContractValid) {
     throw 'Malformed review_summary was marked contract-valid.'
 }
 
-if ((Get-ClaudeFallbackReason -Output 'Claude subscription access is disabled.') -ne 'claude-subscription') {
+if ((Get-ClaudeFallbackReason -Output 'ERROR: Claude subscription access is disabled.') -ne 'claude-subscription') {
     throw 'A Claude subscription outage was not classified for fallback.'
 }
-if ((Get-ClaudeFallbackReason -Output 'Authentication failed because the credential expired.') -ne 'claude-auth') {
+if ((Get-ClaudeFallbackReason -Output 'ERROR: Authentication failed because the credential expired.') -ne 'claude-auth') {
     throw 'A Claude authentication outage was not classified for fallback.'
 }
-if ((Get-ClaudeFallbackReason -Output 'Claude review backend timed out after 120 seconds.') -ne 'claude-unavailable') {
+if ((Get-ClaudeFallbackReason -Output 'JDSNACK RUNNER: tool timed out after 120 seconds (claude).' -ExitCode 124) -ne 'claude-unavailable') {
     throw 'A Claude execution outage was not classified for fallback.'
+}
+if ((Get-ClaudeFallbackReason -Output 'JDSNACK RUNNER: tool unavailable on PATH (claude).' -ExitCode 127) -ne 'claude-unavailable') {
+    throw 'An unavailable Claude executable was not classified for fallback.'
+}
+if ($null -ne (Get-ClaudeFallbackReason -Output 'review output mentions a timeout' -ExitCode 124)) {
+    throw 'An unrelated process exit code 124 was incorrectly classified as a Claude timeout.'
+}
+if ($null -ne (Get-ClaudeFallbackReason -Output 'review output mentions an unavailable executable' -ExitCode 127)) {
+    throw 'An unrelated process exit code 127 was incorrectly classified as an unavailable Claude executable.'
+}
+if ((Get-ClaudeFallbackReason -Output 'API ERROR: Claude rate limit exceeded.') -ne 'claude-quota') {
+    throw 'An explicit Claude quota error was not classified for fallback.'
 }
 if ($null -ne (Get-ClaudeFallbackReason -Output 'Claude exited with an internal review error.')) {
     throw 'An unclassified Claude runner failure was incorrectly routed to Codex fallback.'
 }
 if ($null -ne (Get-ClaudeFallbackReason -Output 'decision: PASS')) {
     throw 'Malformed structured output without an availability signal was incorrectly routed to Codex fallback.'
+}
+$malformedReviewWithAvailabilityPhrase = "decision: NEEDS_HUMAN`nscore: 1/5`nrisk: Standard`nfindings:`n- P2 — the review timed out in a quoted example.`nreview_summary:`nnot a valid summary"
+if ($null -ne (Get-ClaudeFallbackReason -Output $malformedReviewWithAvailabilityPhrase)) {
+    throw 'Malformed review content mentioning a timeout was incorrectly classified as a Claude availability outage.'
+}
+$ioTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-tool-stream-contract-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $ioTempRoot -Force | Out-Null
+$ioFixturePath = Join-Path $ioTempRoot 'native-stream-fixture.ps1'
+$ioOutputPath = Join-Path $ioTempRoot 'native-stream.stdout.log'
+$ioErrorPath = Join-Path $ioTempRoot 'native-stream.stderr.log'
+try {
+@'
+[System.Console]::Out.WriteLine('review text mentions a timeout, but is standard output')
+[System.Console]::Error.WriteLine('ERROR: Claude subscription access is disabled.')
+'@ | Set-Content -LiteralPath $ioFixturePath -Encoding utf8
+$ioExitCode = Invoke-Tool -Name 'pwsh' -Arguments @('-NoProfile', '-File', $ioFixturePath) -OutputPath $ioOutputPath -TimeoutSeconds 30 -ErrorOutputPath $ioErrorPath
+$ioStandardOutput = Get-Content -LiteralPath $ioOutputPath -Raw
+$ioStandardError = Get-Content -LiteralPath $ioErrorPath -Raw
+if ($ioExitCode -ne 0 -or
+    $ioStandardOutput -notmatch 'standard output' -or
+    $ioStandardError -notmatch 'ERROR: Claude subscription access is disabled' -or
+    $ioStandardError -match 'standard output') {
+    throw "Invoke-Tool did not preserve separate stdout/stderr for fallback classification (exit=$ioExitCode, stdout=$ioStandardOutput, stderr=$ioStandardError)."
+}
+} finally {
+    Remove-Item -LiteralPath $ioTempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 $passCommentFunctionAst = $ast.Find({

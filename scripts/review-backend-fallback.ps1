@@ -43,6 +43,7 @@ $fallbackRoot = Join-Path $tempRoot 'jdsnack-review-backend-fallback'
 New-Item -ItemType Directory -Path $fallbackRoot -Force | Out-Null
 
 $claudeLog = Join-Path $fallbackRoot "claude-$PullRequestNumber.log"
+$claudeErrorLog = Join-Path $fallbackRoot "claude-$PullRequestNumber.stderr.log"
 $codexLog = Join-Path $fallbackRoot "codex-$PullRequestNumber.log"
 $reviewReport = Join-Path $fallbackRoot "review-$PullRequestNumber.md"
 $ownerSignoffPath = Join-Path $Workspace 'scripts/review-owner-signoff.ps1'
@@ -183,12 +184,19 @@ function Invoke-Tool {
         [int]$TimeoutSeconds = 600,
         [string]$InputPath = '',
         [string[]]$ClearEnvironmentVariables = @(),
-        [string]$WorkingDirectory = ''
+        [string]$WorkingDirectory = '',
+        [string]$ErrorOutputPath = ''
     )
+
+    [System.IO.File]::WriteAllText($OutputPath, '')
+    if (-not [string]::IsNullOrWhiteSpace($ErrorOutputPath)) {
+        [System.IO.File]::WriteAllText($ErrorOutputPath, '')
+    }
 
     $toolPath = Resolve-ToolPath $Name
     if ([string]::IsNullOrWhiteSpace($toolPath)) {
-        [System.IO.File]::WriteAllText($OutputPath, "$Name is unavailable on PATH.")
+        $unavailablePath = if ([string]::IsNullOrWhiteSpace($ErrorOutputPath)) { $OutputPath } else { $ErrorOutputPath }
+        [System.IO.File]::WriteAllText($unavailablePath, "JDSNACK RUNNER: tool unavailable on PATH ($Name).")
         return 127
     }
 
@@ -198,6 +206,7 @@ function Invoke-Tool {
             [string]$ToolPath,
             [string]$ArgumentsJson,
             [string]$OutputFile,
+            [string]$ErrorOutputFile,
             [string]$InputFile,
             [string]$ClearEnvironmentVariablesJson,
             [string]$WorkingDirectory
@@ -211,16 +220,23 @@ function Invoke-Tool {
         if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
             Set-Location -LiteralPath $WorkingDirectory
         }
-        if ([string]::IsNullOrWhiteSpace($InputFile)) {
-            $null | & $ToolPath @ToolArguments *> $OutputFile
+        if ([string]::IsNullOrWhiteSpace($ErrorOutputFile)) {
+            if ([string]::IsNullOrWhiteSpace($InputFile)) {
+                $null | & $ToolPath @ToolArguments *> $OutputFile
+            } else {
+                Get-Content -LiteralPath $InputFile -Raw | & $ToolPath @ToolArguments *> $OutputFile
+            }
+        } elseif ([string]::IsNullOrWhiteSpace($InputFile)) {
+            $null | & $ToolPath @ToolArguments 1> $OutputFile 2> $ErrorOutputFile
         } else {
-            Get-Content -LiteralPath $InputFile -Raw | & $ToolPath @ToolArguments *> $OutputFile
+            Get-Content -LiteralPath $InputFile -Raw | & $ToolPath @ToolArguments 1> $OutputFile 2> $ErrorOutputFile
         }
         [int]$LASTEXITCODE
     } -ArgumentList @(
         $toolPath,
         $argumentsJson,
         $OutputPath,
+        $ErrorOutputPath,
         $InputPath,
         (ConvertTo-Json -InputObject @($ClearEnvironmentVariables) -Compress),
         $WorkingDirectory
@@ -230,7 +246,8 @@ function Invoke-Tool {
         $completedJob = Wait-Job -Job $job -Timeout $TimeoutSeconds
         if ($null -eq $completedJob) {
             Stop-Job -Job $job -ErrorAction SilentlyContinue
-            [System.IO.File]::WriteAllText($OutputPath, "$Name timed out after $TimeoutSeconds seconds.")
+            $timeoutPath = if ([string]::IsNullOrWhiteSpace($ErrorOutputPath)) { $OutputPath } else { $ErrorOutputPath }
+            [System.IO.File]::WriteAllText($timeoutPath, "JDSNACK RUNNER: tool timed out after $TimeoutSeconds seconds ($Name).")
             return 124
         }
 
@@ -570,14 +587,34 @@ function Get-StructuredReviewResult {
 }
 
 function Get-ClaudeFallbackReason {
-    param([string]$Output)
+    param(
+        [string]$Output,
+        [int]$ExitCode = 0
+    )
+
+    if ($ExitCode -eq 124 -and $Output -match '(?im)^JDSNACK RUNNER: tool timed out after \d+ seconds \(') {
+        return 'claude-unavailable'
+    }
+    if ($ExitCode -eq 127 -and $Output -match '(?im)^JDSNACK RUNNER: tool unavailable on PATH \(') {
+        return 'claude-unavailable'
+    }
+
+    # This input is the separately captured CLI stderr stream, never the
+    # model's stdout/review body. Only explicit CLI diagnostic lines qualify.
+    $diagnosticLines = @($Output -split '\r?\n' | Where-Object {
+        $_ -match '(?i)^\s*(?:ERROR|FATAL|API\s+ERROR)\s*[:\-]'
+    })
+    if ($diagnosticLines.Count -eq 0) {
+        return $null
+    }
+    $diagnosticOutput = $diagnosticLines -join [Environment]::NewLine
 
     $availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:failed\s+to\s+authenticate|oauth\s+session\s+expired|not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
-    if (-not [regex]::IsMatch($Output, $availabilityPattern)) {
+    if (-not [regex]::IsMatch($diagnosticOutput, $availabilityPattern)) {
         return $null
     }
 
-    switch -Regex ($Output) {
+    switch -Regex ($diagnosticOutput) {
         '(?i)subscription' { return 'claude-subscription' }
         '(?i)quota|rate\s+limit' { return 'claude-quota' }
         '(?i)failed\s+to\s+authenticate|oauth\s+session\s+expired|authentication|not\s+authenticated|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired)' { return 'claude-auth' }
@@ -889,16 +926,17 @@ try {
         '--permission-mode', 'plan',
         '--permission-prompts', 'none',
         '-p', $claudePrompt
-    ) $claudeLog 120
+    ) $claudeLog 120 -ErrorOutputPath $claudeErrorLog
 } catch {
-    [System.IO.File]::WriteAllText($claudeLog, "Claude invocation failed: $($_.Exception.Message)")
+    [System.IO.File]::WriteAllText($claudeErrorLog, "JDSNACK INTERNAL ERROR: Claude invocation failed: $($_.Exception.Message)")
 }
 $claudeOutput = Read-ToolOutput $claudeLog
+$claudeErrorOutput = Read-ToolOutput $claudeErrorLog
 
 $claudeResult = Get-StructuredReviewResult -Text $claudeOutput -ReviewerBackend 'claude' -FallbackReason 'none'
 $claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid
 $claudeReviewSucceeded = ($claudeExitCode -eq 0) -and $claudeHasStructuredResult
-$claudeFallbackReason = Get-ClaudeFallbackReason -Output $claudeOutput
+$claudeFallbackReason = Get-ClaudeFallbackReason -Output $claudeErrorOutput -ExitCode $claudeExitCode
 
 if ($claudeReviewSucceeded) {
     Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory -Recurse -Force -ErrorAction SilentlyContinue

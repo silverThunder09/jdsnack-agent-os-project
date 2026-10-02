@@ -325,6 +325,9 @@ for fallback_contract in \
     '$workspaceFullPath' \
     '$inheritedInstructions' \
     'ClearEnvironmentVariables' \
+    'ErrorOutputPath' \
+    '$claudeErrorOutput' \
+    '1> $OutputFile 2> $ErrorOutputFile' \
     'The PR diff and review criteria below are the only review evidence' \
     'Do not ask for or use any tools, shell, git, gh, web, or repository access' \
     'Get-Content -LiteralPath $reviewInputs.DiffPath -Raw' \
@@ -374,7 +377,7 @@ done
 fallback_classifier_line="$(grep -nF -- 'function Get-ClaudeFallbackReason' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 claude_success_line="$(grep -nF -- '$claudeReviewSucceeded = ($claudeExitCode -eq 0) -and $claudeHasStructuredResult' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-fallback_reason_line="$(grep -nF -- '$claudeFallbackReason = Get-ClaudeFallbackReason -Output $claudeOutput' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+fallback_reason_line="$(grep -nF -- '$claudeFallbackReason = Get-ClaudeFallbackReason -Output $claudeErrorOutput -ExitCode $claudeExitCode' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 claude_success_route_line="$(grep -nF -- 'if ($claudeReviewSucceeded) {' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 unclassified_needs_human_line="$(grep -nF -- 'Codex fallback is not allowed' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 codex_fallback_route_line="$(grep -nF -- 'Claude availability outage' "$FALLBACK_SCRIPT" | cut -d: -f1)"
@@ -386,6 +389,10 @@ codex_fallback_route_line="$(grep -nF -- 'Claude availability outage' "$FALLBACK
     && "$claude_success_route_line" -lt "$unclassified_needs_human_line" \
     && "$unclassified_needs_human_line" -lt "$codex_fallback_route_line" ]] \
     || fail 'Only a recognized Claude availability outage may route review to Codex; other failures must stop as needs-human.'
+grep -Fq -- 'Malformed review content mentioning a timeout was incorrectly classified as a Claude availability outage.' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" \
+    || fail 'malformed Claude review 본문의 outage 단어 오분류 회귀 테스트가 없습니다.'
+grep -Fq -- 'Invoke-Tool did not preserve separate stdout/stderr for fallback classification' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" \
+    || fail 'Claude CLI 표준 출력과 오류 출력 분리 계약 테스트가 없습니다.'
 if grep -Fq -- 'claude-invalid-output' "$FALLBACK_SCRIPT"; then
     fail 'Malformed Claude output must not be labeled as a Codex fallback reason.'
 fi
