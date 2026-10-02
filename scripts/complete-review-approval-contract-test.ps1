@@ -23,14 +23,12 @@ if ($parseErrors.Count -gt 0) {
 $approvalSource = Get-Content -LiteralPath $sourcePath -Raw
 $humanApprovalOffset = $approvalSource.IndexOf('$approvalSummary = Get-HumanApprovalSummary')
 $minimumApprovalOffset = $approvalSource.IndexOf('Assert-MinimumHumanApprovalCount `')
-$dryRunSuccessOffset = $approvalSource.IndexOf('if ([bool]$riskAssessment.dryRun)')
-$ownerSignoffOffset = $approvalSource.IndexOf('if ([bool]$riskAssessment.requiresOwnerSignoff)')
-if ($humanApprovalOffset -lt 0 -or $minimumApprovalOffset -lt 0 -or $dryRunSuccessOffset -lt 0 -or
-    $ownerSignoffOffset -lt 0 -or
-    -not ($humanApprovalOffset -lt $minimumApprovalOffset -and
-        $minimumApprovalOffset -lt $dryRunSuccessOffset -and
-        $dryRunSuccessOffset -lt $ownerSignoffOffset)) {
-    throw 'Dry-run must validate human approvals, avoid merge, and skip owner-only auto-merge confirmation until dry-run is disabled.'
+if ($humanApprovalOffset -lt 0 -or $minimumApprovalOffset -lt 0 -or
+    $approvalSource.IndexOf('& $script:ghPath pr merge $PullRequestNumber --repo $Repository --squash --delete-branch --auto') -lt 0 -or
+    $approvalSource.Contains('if ([bool]$riskAssessment.dryRun)') -or
+    $approvalSource.Contains('Get-OwnerAutoMergeSignoff') -or
+    $approvalSource.Contains('Implementation and reviewer backend are both Codex fallback')) {
+    throw 'Approval must enforce actual branch protection and queue Squash auto-merge without custom dry-run, owner-signoff, or same-backend gates.'
 }
 
 $functionAst = $ast.Find({
@@ -94,6 +92,7 @@ if (-not $threeApprovalMinimumRejected) {
     throw 'Two current-head approvals were accepted when branch protection requires three.'
 }
 Assert-MinimumHumanApprovalCount -ActualApprovals 3 -RiskMinimumApprovals 2 -BranchProtectionMinimumApprovals 3 -RiskBand 'High-risk'
+Assert-MinimumHumanApprovalCount -ActualApprovals 0 -RiskMinimumApprovals 0 -BranchProtectionMinimumApprovals 0 -RiskBand 'High-risk'
 $riskMinimumRejected = $false
 try {
     Assert-MinimumHumanApprovalCount -ActualApprovals 2 -RiskMinimumApprovals 3 -BranchProtectionMinimumApprovals 2 -RiskBand 'High-risk'
@@ -133,12 +132,11 @@ $validReport = @"
 - risk score: 65/100
 - risk band: High-risk
 - review labels: Security, Architecture
-- dry-run: True
 - reviewed base SHA: $headSha
 - reviewed head SHA: $headSha
 "@
 Assert-UniqueReviewReportFields -Report $validReport
-foreach ($duplicateField in @('risk', 'risk score', 'risk band', 'review labels', 'dry-run')) {
+foreach ($duplicateField in @('risk', 'risk score', 'risk band', 'review labels')) {
     $duplicateReport = "$validReport`r`n- ${duplicateField}: conflicting value"
     $duplicateFieldRejected = $false
     try {
@@ -191,18 +189,18 @@ foreach ($tamperScenario in @('scoring-pattern', 'review-routing', 'size-thresho
     }
 }
 $invalidDryRunPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
-$invalidDryRunPolicy.dryRun = $false
+$invalidDryRunPolicy.dryRun = $true
 $dryRunRejected = $false
 try {
     Assert-FixedApprovalPolicy -ReviewPolicy $invalidDryRunPolicy
 } catch {
     $dryRunRejected = $true
-    if ($_.Exception.Message -notmatch 'dryRun is fixed to true') {
+    if ($_.Exception.Message -notmatch 'dryRun must be false') {
         throw
     }
 }
 if (-not $dryRunRejected) {
-    throw 'Assert-FixedApprovalPolicy accepted dryRun=false.'
+    throw 'Assert-FixedApprovalPolicy accepted dryRun=true.'
 }
 
 $branchProtectionFunctionAst = $ast.Find({
@@ -232,6 +230,30 @@ if ($null -eq $currentReviewCheckFunctionAst) {
     throw 'Test-CurrentRunReviewCheck function was not found.'
 }
 . ([scriptblock]::Create($currentReviewCheckFunctionAst.Extent.Text))
+$canonicalReviewCheckFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-CanonicalReviewChecks'
+    }, $true)
+if ($null -eq $canonicalReviewCheckFunctionAst) {
+    throw 'Get-CanonicalReviewChecks function was not found.'
+}
+. ([scriptblock]::Create($canonicalReviewCheckFunctionAst.Extent.Text))
+$selectedReviewChecks = @(Get-CanonicalReviewChecks -Checks @(
+        [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass' }
+        [pscustomobject]@{ name = 'Codex Branch Review / run_review'; state = 'SUCCESS'; bucket = 'pass' }
+        [pscustomobject]@{ name = 'publish_review_check'; state = 'SUCCESS'; bucket = 'pass' }
+    ))
+if ($selectedReviewChecks.Count -ne 1 -or $selectedReviewChecks[0].name -cne 'review') {
+    throw 'The canonical PR-head review check was not isolated from the reviewer job check.'
+}
+$duplicateReviewChecks = @(Get-CanonicalReviewChecks -Checks @(
+        [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass' }
+        [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass' }
+    ))
+if ($duplicateReviewChecks.Count -ne 2) {
+    throw 'Duplicate canonical review checks were not preserved for ambiguity rejection.'
+}
 $eligibleHumanApproverFunctionAst = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -456,7 +478,9 @@ if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments
 if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments[1]) -match '^repos/.+/branches/.+/protection$' -and -not [string]::IsNullOrWhiteSpace($env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE)) {
     Set-Content -LiteralPath $env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE -Value ([string]$Arguments[1]) -Encoding Ascii
 }
-if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
+if ($env:JDSNACK_FAKE_ZERO_APPROVALS -eq 'true') {
+    $requiredReviews = [pscustomobject]@{ required_approving_review_count = 0; dismiss_stale_reviews = $false }
+} elseif ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
     $requiredApprovalCount = 2
     if ($env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT) {
         $requiredApprovalCount = [int]$env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT
@@ -489,6 +513,12 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         throw 'A branch-protection requirement greater than two approvals was not preserved.'
     }
     Remove-Item Env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT -ErrorAction SilentlyContinue
+    $env:JDSNACK_FAKE_ZERO_APPROVALS = 'true'
+    $zeroApprovalProtection = Get-BranchProtectionApprovalRequirement -BaseBranch 'main'
+    if ([int]$zeroApprovalProtection.RequiredApprovals -ne 0 -or $zeroApprovalProtection.DismissStaleReviews -ne $false) {
+        throw 'A zero-approval branch without stale-review dismissal was rejected.'
+    }
+    Remove-Item Env:JDSNACK_FAKE_ZERO_APPROVALS -ErrorAction SilentlyContinue
     $branchProtectionCapturePath = Join-Path $tempRoot 'branch-protection-api-path.txt'
     $env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE = $branchProtectionCapturePath
     [void](Get-BranchProtectionApprovalRequirement -BaseBranch 'release/2026')
@@ -589,10 +619,12 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     if ($nonCollaboratorSummary.Count -ne 0) {
         throw 'A non-collaborator review was counted as a protected-branch human approval.'
     }
-    $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'write'
-    $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
-    if ($approvalSummary.Count -ne 1 -or $approvalSummary.Logins[0] -ne 'contributor') {
-        throw 'A write-level collaborator review was not counted as a current-head human approval.'
+    foreach ($eligiblePermission in @('admin', 'maintain', 'push', 'write')) {
+        $env:JDSNACK_FAKE_REVIEWER_PERMISSION = $eligiblePermission
+        $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+        if ($approvalSummary.Count -ne 1 -or $approvalSummary.Logins[0] -ne 'contributor') {
+            throw "A '$eligiblePermission'-level collaborator review was not counted as a current-head human approval."
+        }
     }
     $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'commented'
     $commentedReviewSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha

@@ -6,21 +6,21 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 
 ## 코덱스와 분업 운영
 
-클로드는 **기획·검증·리뷰·통합**을 맡고, **기능 구현·테스트는 코덱스**가 맡습니다. Claude review backend가 구독·인증·쿼터 또는 명시적으로 식별된 실행 불가 신호로 unavailable일 때만 [`review-backend-fallback.md`](./.agent-os/operations/review-backend-fallback.md)의 절차에 따라 Codex 읽기 전용 리뷰어에게 위임합니다. 그 밖의 실행 오류나 구조화 결과 오류는 `needs-human`으로 중단합니다.
+클로드는 **기획·검증·PR 관리**를 맡고, **기능 구현·테스트와 기본 PR 리뷰는 코덱스**가 맡습니다. 현재 리뷰 정책은 Claude 구독이 비활성화되어 Codex 리뷰를 바로 시작합니다. 기본 리뷰어를 Claude로 바꾸더라도 Claude 실행 불가 또는 구조화 결과 누락·오류는 [`review-backend-fallback.md`](./.agent-os/operations/review-backend-fallback.md)의 절차에 따라 Codex 읽기 전용 리뷰로 넘깁니다. Codex 리뷰가 실행되지 않거나 유효한 결과를 내지 못하면 `needs-human`으로 중단합니다.
 
-- 클로드: 문서 계획(spec), 게이트 검증, 독립 리뷰(`code-reviewer` 서브에이전트에 diff만 넘겨 채점), PR 작성/관리, merge 판단/실행. `backend`/`frontend` 소스는 직접 수정하지 않습니다. Claude unavailable 신호일 때만 Codex fallback을 호출하고, 그 외 오류와 fallback의 `needs-human`은 자동 머지를 중단합니다.
-- 코덱스: 활성 spec 기준 기능 **구현 + 기능 테스트 작성**을 담당합니다. 기본 리뷰·판정은 담당하지 않으며, Claude unavailable 신호일 때만 명시된 Codex review fallback 예외를 적용합니다.
-- Claude review fallback: Codex에는 PR diff와 검토 기준만 주고 격리된 빈 작업공간에서 도구를 비활성화합니다. 별도 승인 job은 PR 계약·리뷰 게이트·필수 check·리뷰 SHA를 다시 확인합니다. 드라이런 해제 뒤 Light는 사람 승인 1명, Standard는 사람 리뷰 후 자동 병합 차단, High-risk는 사람 승인 2명과 저장소 소유자의 최신 head 이후 Squash auto-merge 확인을 요구합니다. 세부 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
+- 클로드: 문서 계획(spec), 결정론 게이트 검증, 필요 시 기본 리뷰, PR 관리. `backend`/`frontend` 소스는 직접 수정하지 않습니다.
+- 코덱스: 활성 spec 기준 기능 **구현 + 기능 테스트 작성**과 현재 기본 PR 리뷰를 담당합니다. PR 리뷰에서는 diff와 검토 기준만 받는 격리된 읽기 전용 경로를 사용합니다.
+- PR 리뷰·자동 병합: PASS 4/5 이상, 현재 base/head SHA, PR 계약, PR CI Gate, 모든 branch-required check, 미해결 변경요청 부재를 별도 approval job이 다시 확인한 뒤 Squash auto-merge를 큐에 넣습니다. 위험도 점수는 라벨에만 사용하고 자동화 정책의 추가 사람 승인 수는 0입니다. GitHub에 실제 설정된 필수 승인 규칙은 그대로 존중합니다. 세부 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
 - clone 직후 `sh scripts/install-git-hooks.sh`로 `core.hooksPath=.githooks`와 pre-commit/pre-push 설치를 검증합니다. pre-push는 staged/working-tree/branch diff를 Codex 읽기 전용 리뷰어에게 전달하고 PASS 4점 미만이면 push를 차단합니다.
-- 리뷰는 [review-routing.md](./.agent-os/operations/review-routing.md)의 고정 위험도 산식과 Security·Performance·Test Coverage·Architecture 라벨을 사용합니다. 초기 `scripts/review-policy.json`은 드라이런으로 리뷰·코멘트·라벨만 허용하고 병합 명령을 차단합니다.
+- 리뷰는 [review-routing.md](./.agent-os/operations/review-routing.md)의 고정 위험도 산식과 Security·Performance·Test Coverage·Architecture 라벨을 사용합니다. `scripts/review-policy.json`은 `dryRun=false`이며, 점수·현재 SHA·필수 check를 검증한 뒤 자동 Squash 병합을 허용합니다.
 - 폴백: 코덱스가 토큰이 없어 막힐 때만, 사용자가 "네가 구현해"라고 지시하면 클로드가 직접 구현·테스트합니다. 전환·복귀·가드레일은 `.agent-os/operations/worker-backends.md`의 폴백 규칙을 따릅니다.
-- **무인 배치**: Codex 구현 PR은 이벤트 기반 리뷰-머지 루프가 리뷰·CI를 확인합니다. 마지막 Feature가 머지되면 `spec-queue.json`의 eligible 후보를 자동으로 Spec으로 승격하고 T1을 다시 Codex에 디스패치합니다. High-risk는 저장소 소유자가 최신 head의 Squash auto-merge를 명시한 뒤 필수 게이트를 통과해야 진행합니다. 제품 판단·충돌은 `needs-human`으로 멈춥니다.
+- **무인 배치**: Codex 구현 PR은 이벤트 기반 리뷰-머지 루프가 리뷰·CI를 확인합니다. 마지막 Feature가 머지되면 `spec-queue.json`의 eligible 후보를 자동으로 Spec으로 승격하고 T1을 다시 Codex에 디스패치합니다. 리뷰 `PASS` 4점 이상과 필수 게이트가 모두 통과하면 위험도 구간과 무관하게 Squash auto-merge를 큐에 넣습니다. 제품 판단·충돌은 `needs-human`으로 멈춥니다.
 
 ### Codex 모델 정책
 
 - 기능 구현과 테스트 코드 작성·결과 분석의 모델 배정은 [backends.json](backends.json)과 [Worker 모델 배정](./.agent-os/operations/worker-backends.md)을 따릅니다.
 - 빌드·lint·test·E2E 명령 실행 자체: 모델을 사용하지 않습니다.
-- 기본 리뷰·판정은 Codex 모델 대상이 아니며 Claude `code-reviewer`가 담당합니다. Claude unavailable 신호일 때만 Codex fallback 규칙을 적용하고, 분류되지 않은 실패와 구조화 결과 오류는 `needs-human`으로 올립니다.
+- 기본 PR 리뷰어는 [리뷰 실행 정책](./.agent-os/operations/review-backend-fallback.md)을 따릅니다. 현재는 Codex가 즉시 리뷰하며, Claude를 기본으로 설정한 경우 실행 불가·누락·형식 오류는 Codex로 넘깁니다. Codex 리뷰의 실행 실패나 잘못된 결과는 `needs-human`으로 올립니다.
 - Claude review backend unavailable 시 REQUEST_CHANGES review는 한 번만 제출하고 findings 전체를 보존합니다. 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
 
 ## 먼저 읽을 문서

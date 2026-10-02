@@ -15,7 +15,7 @@ Worker의 역할·권한·작업 경계와 모델 배정을 분리합니다.
 |---|---|---|
 | Codex 구현 | 기능 구현, 관련 테스트, 커밋, push | `workers.codex.implementation` |
 | Codex 테스트 | 테스트 코드 작성, 실패 결과 분석 | `workers.codex.test-authoring-and-analysis` |
-| Codex 리뷰 폴백 | Claude review backend 장애 시 diff 기반 읽기 전용 리뷰 | `workers.codex.review-fallback` |
+| Codex PR 리뷰 | 기본 PR reviewer 또는 Claude 리뷰의 읽기 전용 대체 reviewer | `workers.codex.review-fallback` |
 | Claude 문서 계획 | spec·계약·운영 문서 설계 | `workers.claude.documentation-planning` |
 | Claude 리뷰 | 독립 리뷰, 변경 범위·품질 판정 | `workers.claude.review` |
 | Claude 구현 폴백 | Codex outage 시 구현·테스트 대행 | `workers.claude.implementation-fallback` |
@@ -25,22 +25,22 @@ Worker의 역할·권한·작업 경계와 모델 배정을 분리합니다.
 - 배정에는 `provider`, `model`, `reason`을 모두 둡니다.
 - 모델명 변경은 `backends.json`만 수정하고, 역할·권한 변경은 이 문서와 `AGENTS.md` 또는 `CLAUDE.md`를 함께 수정합니다.
 - 빌드·lint·test·E2E 명령 실행 자체에는 모델 배정을 적용하지 않습니다.
-- Claude 문서 계획에는 자동 폴백을 두지 않습니다. Claude review backend가 구독·인증·쿼터 또는 명시적으로 식별된 실행 불가 신호로 unavailable일 때만, 동일 5점 루브릭을 사용하는 Codex 리뷰 폴백을 허용합니다. 유효한 리뷰의 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달과 분류되지 않은 실행·구조화 결과 오류는 서비스 장애로 바꾸지 않습니다.
+- Claude 문서 계획에는 자동 폴백을 두지 않습니다. 현재 PR review 기본값은 Codex이며, Claude를 reviewer로 선택한 때에는 unavailable 또는 구조화 결과 누락·오류 시 Codex 읽기 전용 리뷰를 실행합니다. 유효한 리뷰의 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달은 Codex 결과로 덮어쓰지 않습니다.
 
 ## 리뷰 폴백 전환 조건
 
-- Claude review-loop를 한 번 실행하고 종료 코드와 구조화된 리뷰 필드를 확인합니다. 구독·인증·쿼터·CLI unavailable·timeout처럼 명시적으로 식별한 availability 신호가 있을 때만 `active_reviewer: codex-fallback`으로 전환합니다. 그 밖의 nonzero 종료와 필수 필드 누락·형식 오류는 원문 로그를 공개하지 않고 `needs-human`으로 중단합니다.
+- `scripts/review-policy.json`의 `primaryReviewer`를 사용합니다. 현재 값은 `codex`이므로 Claude 호출을 생략하고 Codex 리뷰를 바로 시작합니다. primary가 Claude인 경우 valid result가 없으면 Codex로 전환하며, Claude stdout/stderr 원문은 PR에 공개하지 않습니다.
 - Claude가 유효한 리뷰 결과를 냈을 때는 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달을 Codex fallback으로 바꾸지 않습니다.
 - Codex는 read-only sandbox에서 diff와 해당 acceptance/test 기준만 읽고 `decision`, `score`, `risk`, `findings`를 반환합니다. 위험도 score와 Security·Performance·Test Coverage·Architecture 라벨은 trusted base의 결정론 계산기가 정하고 Codex가 임의로 바꾸지 않습니다.
 - Codex가 실행되지 않거나 출력 형식이 깨지거나 score가 4점 미만이면 `needs-human`입니다.
-- `High-risk` PR은 Codex fallback만으로 자동 머지하지 않고 사람 판단으로 멈춥니다.
+- valid `PASS`와 score 4점 이상, 최신 SHA와 모든 필수 게이트가 통과하면 위험도 라벨과 구현/reviewer backend 동일 여부에 관계없이 Squash auto-merge를 큐에 넣습니다.
 
-## 리뷰 산식·드라이런
+## 리뷰 산식과 병합 조건
 
 - 고정 산식과 경로 규칙은 [review-routing.md](review-routing.md)와 `scripts/review-policy.json`에 둡니다. fallback 프롬프트와 로컬 `pre-push` hook은 같은 규칙을 사용합니다.
-- Claude 구독이 비활성화되어 실행되지 않는 경우에도 Claude 결과를 기다리거나 반려를 숨기지 않고 `claude-subscription` 사유로 Codex read-only reviewer에 위임합니다.
+- 현재 기본값은 Codex 직접 리뷰입니다. Claude가 primary일 때 Claude subscription unavailable은 Codex read-only reviewer로 넘기는 한 가지 fallback 사유입니다.
 - Claude unavailable 시 Codex 리뷰 fallback은 `backends.json`의 `model`과 `effort`를 그대로 사용합니다. 현재 설정은 `gpt-6-luna` 모델과 `max` 추론 강도이며, pre-push와 PR fallback 실행 경로 모두 같은 값을 전달합니다.
-- 초기 `dryRun=true`에서는 리뷰 실행·PR 코멘트·전문 라벨만 허용하고 병합 명령을 금지합니다. 산식 구간별 승인 정책은 드라이런을 해제한 뒤에만 적용됩니다.
+- `dryRun=false`입니다. 위험도별 사람 승인 수는 0이며, GitHub branch protection에 실제 필수 승인 수가 설정된 경우에만 그 규칙을 따릅니다.
 
 ## 폴백 전환 조건 (outage 판정)
 
@@ -50,8 +50,7 @@ Worker의 역할·권한·작업 경계와 모델 배정을 분리합니다.
 
 ## 폴백 중 가드레일
 
-- **자기 구현·자기 검수 차단**: 구현과 리뷰가 같은 backend가 되면 fallback PR은 `jdsnack-review-merge-loop`의 자동 머지 대상에서 제외하고 **사용자 머지로 강등**합니다([merge-rules.md](merge-rules.md)).
-- **리뷰 backend 기록**: 구현은 Codex가 수행하고 Claude가 unavailable하여 Codex fallback reviewer가 실행된 PR은 PR review report에 `reviewer backend: codex-fallback`과 fallback reason을 남깁니다. fallback은 파일을 수정하지 않습니다.
+- **리뷰 backend 기록**: PR review report에 실제 실행한 `reviewer backend`와 direct-primary/fallback 사유를 기록합니다. Codex 리뷰는 파일을 수정하지 않습니다.
 - **중간 교체 금지**: 진행 중인 구현 티켓은 시작한 구현 백엔드로 완주합니다. 단, Claude review backend unavailable은 구현 티켓 백엔드를 바꾸는 것이 아니라 별도로 정의된 읽기 전용 리뷰 fallback 전환입니다.
 - **범위 동결**: 폴백 중에도 active spec의 준비된 티켓만 구현합니다. spec 변경·범위 확장·백로그 승격은 하지 않습니다.
 - **규약 동일**: 브랜치(`codex/<spec-slug>-<ticket-id>`)·PR·traceability 규약은 백엔드와 무관하게 동일합니다. 단, PR 본문에 `backend: claude-fallback`을 명시해 리뷰·머지 단계에서 강등 여부를 판별할 수 있게 합니다.

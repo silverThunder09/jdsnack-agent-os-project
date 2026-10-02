@@ -9,28 +9,26 @@
 - GitHub API의
   `repos/$REPOSITORY/branches/$BASE_BRANCH/protection` 응답이 존재해야
   합니다.
-- `required_pull_request_reviews` 설정이 존재하고
-  `required_approving_review_count`는 최소 1이어야 합니다.
+- `required_pull_request_reviews` 설정이 존재해야 합니다. 현재 개인 저장소 정책의
+  `required_approving_review_count`는 0이며 위험도별 추가 승인도 없습니다. GitHub에
+  나중에 0보다 큰 값이 설정되면 그 native 보호 규칙은 그대로 적용됩니다.
 - 기존 required status checks는 보존해야 합니다. 설정을 덮어쓰기 전에
   현재 보호 설정과 check 목록을 캡처하고, 적용 후 동일한 목록이 유지되는지
   확인합니다.
-- 저장소 설정에서는 stale review dismissal을 활성화해야 하며, 승인 게이트도
-  `dismiss_stale_reviews=true`가 아니면 `needs-human`으로 중단합니다.
-  승인 게이트는 이 설정과 별개로 최신 review state와 현재 head SHA를
-  다시 확인하므로, 이전 head의 승인을 현재 head 승인으로 재사용하지
-  않습니다.
+- GitHub가 사람 승인을 요구하는 경우(`required_approving_review_count > 0`)에는 stale
+  review dismissal을 활성화해야 합니다. 승인 게이트는 최신 review state와 현재 head
+  SHA를 확인해 이전 head의 승인을 재사용하지 않습니다. 현재 승인 수가 0이면 stale
+  review dismissal은 자동 병합 선행 조건이 아닙니다.
 
 ## 위험도별 승인 계약
 
 `scripts/complete-review-approval.ps1`이 branch protection을 live
 검증 지점으로 사용합니다.
 
-- Light: 최신 head의 유효한 사람 승인 1명 이상.
-- Standard: 최신 head의 유효한 사람 리뷰를 확인하되 자동 병합은
-  별도 정책과 CI 조건을 만족할 때만 진행합니다.
-- High-risk: 최신 head의 사람 승인 2명 이상이 필요합니다. 현재 `dryRun=true`에서는
-  owner auto-merge 확인 없이 승인 게이트를 끝내며 merge 명령을 호출하지 않습니다.
-  owner의 최신 head 기준 Squash auto-merge 확인은 dry-run 해제 뒤에만 요구합니다.
+- Light/Standard/High-risk 구간 모두 자동화가 추가로 요구하는 사람 승인은 0입니다.
+  위험도 점수는 PR 라벨과 리뷰 경로에만 사용합니다.
+- GitHub branch protection이 요구하는 승인 수가 0보다 크면 해당 승인 수를 확인하고,
+  GitHub도 승인 충족 전에는 실제 merge하지 않습니다.
 - 유효한 사람 승인은 PR 작성자·봇·삭제된 계정을 제외한 뒤, 현재 head의
   최신 `APPROVED` review와 GitHub API의 현재 저장소 권한
   (`admin`, `maintain`, `push`)을 모두 만족해야 합니다. `authorAssociation`만으로
@@ -44,12 +42,11 @@
   branch protection의 기준으로 읽고, `gh pr checks --required`가 반환한 이름 집합과
   정확히 비교합니다. 빈·누락·추가 required check 또는 통과하지 않은 required check는
   모두 `needs-human`으로 중단합니다.
-- 이 비교는 check 이름만 검증합니다. GitHub branch protection의 `checks[].app_id`는
-  허용된 제공자까지 제한하는 별도 조건이며, `gh pr checks --json`에는 `app_id` 필드가
-  없습니다. GitHub가 실제 merge에서 제공자 조건을 계속 강제하고 현재 gate는 고정된
-  `dryRun=true`로 merge하지 않습니다. dry-run 해제 전에는 이 gate에도 제공자 식별 검증을
-  추가해야 합니다 ([branch protection API](https://docs.github.com/en/rest/branches/branch-protection),
-  [gh pr checks JSON fields](https://cli.github.com/manual/gh_pr_checks)).
+- branch protection의 `checks[].app_id`가 지정된 required check는 GitHub가 merge 시
+  제공자도 강제합니다. 현재 `review` check는 Actions 앱(15368)에서 발행하며, trusted
+  review workflow가 `checks:write` Actions 토큰으로 리뷰 대상 PR head SHA에 check run을
+  만들거나 갱신합니다. `gh pr merge --auto`는 허용된 제공자의 check만 통과시킵니다
+  ([branch protection API](https://docs.github.com/en/rest/branches/branch-protection)).
 - 보호 설정 조회가 실패하거나 required pull request review 보호가 없으면
   승인 job은 `needs-human` 경계로 중단합니다.
 
@@ -69,8 +66,8 @@ gh api "repos/$REPOSITORY/branches/$BASE_BRANCH/protection"
 gh api "repos/$REPOSITORY/branches/$BASE_BRANCH/protection/required_pull_request_reviews"
 ```
 
-두 번째 응답에서 `required_approving_review_count`와 stale review
-설정을 확인하고, 첫 번째 응답에서 required status checks와 branch
+두 번째 응답에서 `required_approving_review_count`를 확인하고, 승인 수가 0보다 크면
+stale review 설정도 확인합니다. 첫 번째 응답에서 required status checks와 branch
 보호가 실제로 활성화되어 있는지 확인합니다. 확인 대상 저장소와
 브랜치는 승인 job에 전달되는 `Repository`와 `BaseBranch`와 같아야
 합니다.
@@ -81,5 +78,6 @@ gh api "repos/$REPOSITORY/branches/$BASE_BRANCH/protection/required_pull_request
 2. `scripts/complete-review-approval.ps1`의 승인 계약 테스트와
    `scripts/codex-branch-review-workflow-test.sh`를 실행합니다.
 3. PR의 base/head SHA, 필수 CI check, 리뷰의 commit SHA를 다시 확인합니다.
-4. high-risk PR이면 저장소 소유자가 최신 head에서 Squash auto-merge를
-   명시적으로 확인한 뒤에만 approval job을 재실행합니다.
+4. PASS 4점 이상과 현재 head의 필수 check가 통과한 뒤 approval job이 Squash
+   auto-merge를 큐에 넣는지 확인합니다. 사람 승인은 GitHub branch protection의 실제
+   설정값이 0보다 큰 경우에만 추가로 요구됩니다.

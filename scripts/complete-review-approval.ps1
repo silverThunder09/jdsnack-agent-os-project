@@ -57,7 +57,6 @@ function Assert-UniqueReviewReportFields {
         'risk score'
         'risk band'
         'review labels'
-        'dry-run'
         'reviewed base SHA'
         'reviewed head SHA'
     )
@@ -102,8 +101,11 @@ function Test-ReviewLabelsMatchAssessment {
 function Assert-FixedApprovalPolicy {
     param([pscustomobject]$ReviewPolicy)
 
-    if ($ReviewPolicy.dryRun -isnot [bool] -or $ReviewPolicy.dryRun -ne $true) {
-        Stop-NeedsHuman 'Review policy dryRun is fixed to true for this workflow.'
+    if ([string]$ReviewPolicy.primaryReviewer -notin @('claude', 'codex')) {
+        Stop-NeedsHuman 'Review policy primaryReviewer must be claude or codex.'
+    }
+    if ($ReviewPolicy.dryRun -isnot [bool] -or $ReviewPolicy.dryRun -ne $false) {
+        Stop-NeedsHuman 'Review policy dryRun must be false to enable score-based auto-merge.'
     }
 
     $expectedWeights = [ordered]@{
@@ -120,9 +122,9 @@ function Assert-FixedApprovalPolicy {
     }
 
     $expectedBands = @(
-        [pscustomobject]@{ name = 'Light'; maxScore = 30; minimumApprovals = 1; autoMerge = 'allowed-after-approval'; requiresOwnerSignoff = $false }
-        [pscustomobject]@{ name = 'Standard'; maxScore = 60; minimumApprovals = 1; autoMerge = 'blocked'; requiresOwnerSignoff = $false }
-        [pscustomobject]@{ name = 'High-risk'; maxScore = 100; minimumApprovals = 2; autoMerge = 'allowed-after-additional-review-and-owner-signoff'; requiresOwnerSignoff = $true }
+        [pscustomobject]@{ name = 'Light'; maxScore = 30; minimumApprovals = 0; autoMerge = 'allowed-after-passing-review-and-required-checks'; requiresOwnerSignoff = $false }
+        [pscustomobject]@{ name = 'Standard'; maxScore = 60; minimumApprovals = 0; autoMerge = 'allowed-after-passing-review-and-required-checks'; requiresOwnerSignoff = $false }
+        [pscustomobject]@{ name = 'High-risk'; maxScore = 100; minimumApprovals = 0; autoMerge = 'allowed-after-passing-review-and-required-checks'; requiresOwnerSignoff = $false }
     )
     $actualBands = @($ReviewPolicy.bands)
     if ($actualBands.Count -ne $expectedBands.Count) {
@@ -150,7 +152,7 @@ function Assert-FixedApprovalPolicy {
     } finally {
         $sha256.Dispose()
     }
-    $expectedPolicyDigest = '006f215208f2951b70d946dbeb73f1ffb59e269703c290ee529e57906096ffc4'
+    $expectedPolicyDigest = '432fd66452e680a12dc84cced3f0a53cf0aeb4ee724dac4f7cd86d3da67ee9e8'
     if ($policyDigest -ne $expectedPolicyDigest) {
         Stop-NeedsHuman 'Review policy risk scoring and routing do not match the trusted fixed policy digest.'
     }
@@ -222,6 +224,13 @@ function Get-Checks {
     }
 }
 
+function Get-CanonicalReviewChecks {
+    param([object[]]$Checks)
+
+    $reviewChecks = @($Checks | Where-Object { [string]$_.name -ceq 'review' })
+    return $reviewChecks
+}
+
 function Test-CurrentRunReviewCheck {
     param(
         [pscustomobject]$Check,
@@ -282,11 +291,11 @@ function Get-BranchProtectionApprovalRequirement {
         Stop-NeedsHuman "Branch '$BaseBranch' has no required pull request review protection."
     }
     $requiredApprovals = [int]$requiredReviews.required_approving_review_count
-    if ($requiredApprovals -lt 1) {
-        Stop-NeedsHuman "Branch '$BaseBranch' requires fewer than one approving review."
+    if ($requiredApprovals -lt 0) {
+        Stop-NeedsHuman "Branch '$BaseBranch' returned an invalid negative approval count."
     }
     $dismissStaleReviews = [bool]$requiredReviews.dismiss_stale_reviews
-    if (-not $dismissStaleReviews) {
+    if ($requiredApprovals -gt 0 -and -not $dismissStaleReviews) {
         Stop-NeedsHuman "Branch '$BaseBranch' does not dismiss stale pull request reviews."
     }
     $requiredStatusChecks = $protection.required_status_checks
@@ -391,7 +400,7 @@ function Test-EligibleHumanApprover {
     if ([string]::IsNullOrWhiteSpace($permission)) {
         Stop-NeedsHuman "Reviewer permission is missing for '$Login'."
     }
-    return $permission -in @('admin', 'write')
+    return $permission -in @('admin', 'maintain', 'push', 'write')
 }
 
 function Get-HumanApprovalSummary {
@@ -624,11 +633,6 @@ if (-not (Test-Path -LiteralPath $ReportPath -PathType Leaf)) {
 if ([string]::IsNullOrWhiteSpace($Workspace) -or -not (Test-Path -LiteralPath $Workspace -PathType Container)) {
     Stop-NeedsHuman 'The trusted approval workspace is unavailable.'
 }
-$ownerSignoffPath = Join-Path $Workspace 'scripts/review-owner-signoff.ps1'
-if (-not (Test-Path -LiteralPath $ownerSignoffPath -PathType Leaf)) {
-    Stop-NeedsHuman 'The trusted owner signoff verifier is unavailable.'
-}
-. $ownerSignoffPath
 $policyPath = Join-Path $Workspace 'scripts/review-policy.json'
 $reviewPolicy = Get-ReviewPolicy $policyPath
 
@@ -641,14 +645,13 @@ $riskMatch = [regex]::Match($report, '(?im)^-\s*risk:\s*(Light|Standard|High-ris
 $riskScoreMatch = [regex]::Match($report, '(?im)^-\s*risk score:\s*(\d+)\s*/\s*100\s*$')
 $riskBandMatch = [regex]::Match($report, '(?im)^-\s*risk band:\s*(Light|Standard|High-risk)\s*$')
 $reviewLabelsMatch = [regex]::Match($report, '(?im)^-\s*review labels:\s*([^\r\n]+?)\s*$')
-$dryRunMatch = [regex]::Match($report, '(?im)^-\s*dry-run:\s*(True|False)\s*$')
 $baseMatch = [regex]::Match($report, '(?im)^-\s*reviewed base SHA:\s*([0-9a-f]{40})\s*$')
 $headMatch = [regex]::Match($report, '(?im)^-\s*reviewed head SHA:\s*([0-9a-f]{40})\s*$')
 if (-not $reviewerBackendMatch.Success -or -not $decisionMatch.Success -or -not $scoreMatch.Success -or -not $riskMatch.Success) {
     Stop-NeedsHuman 'The review report must have a PASS result with score 4 or higher.'
 }
-if (-not $riskScoreMatch.Success -or -not $riskBandMatch.Success -or -not $reviewLabelsMatch.Success -or -not $dryRunMatch.Success) {
-    Stop-NeedsHuman 'The review report must include deterministic risk score, risk band, labels, and dry-run state.'
+if (-not $riskScoreMatch.Success -or -not $riskBandMatch.Success -or -not $reviewLabelsMatch.Success) {
+    Stop-NeedsHuman 'The review report must include deterministic risk score, risk band, and labels.'
 }
 if (
     -not $baseMatch.Success -or
@@ -684,18 +687,17 @@ try {
 } catch {
     Stop-NeedsHuman "Deterministic review risk calculation returned invalid JSON: $($_.Exception.Message)"
 }
-if ($riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand) {
-    Stop-NeedsHuman 'The review report risk field does not match the deterministic risk band.'
-}
 if (
     [int]$riskScoreMatch.Groups[1].Value -ne [int]$riskAssessment.riskScore -or
     $riskBandMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand -or
     -not (Test-ReviewLabelsMatchAssessment `
         -ReportedLabels @($reviewLabelsMatch.Groups[1].Value -split ',') `
-        -ExpectedLabels @($riskAssessment.reviewLabels)) -or
-    ([string]$dryRunMatch.Groups[1].Value -eq 'True') -ne [bool]$riskAssessment.dryRun
+        -ExpectedLabels @($riskAssessment.reviewLabels))
 ) {
-    Stop-NeedsHuman 'The review report risk data and labels do not match the deterministic assessment.'
+    Stop-NeedsHuman 'The review report label data does not match the deterministic assessment.'
+}
+if ($riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand) {
+    Stop-NeedsHuman 'The normalized review risk label does not match the deterministic label.'
 }
 
 $branchProtectionApproval = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
@@ -717,7 +719,7 @@ foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
         Stop-NeedsHuman "PR gate '$gateName' is missing, ambiguous, or not passing."
     }
 }
-$reviewChecks = @($allChecks | Where-Object { $_.name -eq 'review' -or $_.name -match '(^| / )review$' })
+$reviewChecks = @(Get-CanonicalReviewChecks -Checks $allChecks)
 $reviewCheckAccepted = $reviewChecks.Count -eq 1 -and (
     $reviewChecks[0].bucket -eq 'pass' -or
     (Test-CurrentRunReviewCheck `
@@ -731,12 +733,7 @@ if (-not $reviewCheckAccepted) {
     Stop-NeedsHuman 'The review job gate is missing, ambiguous, or not passing.'
 }
 
-if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
-    Stop-NeedsHuman 'Implementation and reviewer backend are both Codex fallback; automatic merge is disabled for self-review prevention.'
-}
-
 $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
-# This assertion intentionally precedes the dry-run success path.
 Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary
 Assert-MinimumHumanApprovalCount `
     -ActualApprovals $approvalSummary.Count `
@@ -744,30 +741,9 @@ Assert-MinimumHumanApprovalCount `
     -BranchProtectionMinimumApprovals ([int]$branchProtectionApproval.RequiredApprovals) `
     -RiskBand $riskAssessment.riskBand
 
-if ([bool]$riskAssessment.dryRun) {
-    # Owner auto-merge signoff is a merge-only gate; fixed dry-run policy still checks human approvals but must not request a merge confirmation.
-    $message = "Review gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; $($riskAssessment.riskBand) has the required human approval(s), dry-run is enabled, and no merge command was executed."
-    Write-Output $message
-    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
-        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $message
-    }
-    exit 0
-}
-
 if ([string]$riskAssessment.autoMergePolicy -eq 'blocked') {
     Stop-NeedsHuman "Automatic merge is blocked by policy for risk band $($riskAssessment.riskBand); the approval gate will not report success for this merge policy."
 }
-if ([bool]$riskAssessment.requiresOwnerSignoff) {
-    $signoff = Get-OwnerAutoMergeSignoff `
-        -GhPath $script:ghPath `
-        -Repository $Repository `
-        -PullRequestNumber $PullRequestNumber `
-        -ExpectedHeadSha $HeadSha
-    if (-not $signoff.IsValid) {
-        Stop-NeedsHuman "High-risk change lacks current-head Squash auto-merge confirmation: $($signoff.Reason)"
-    }
-}
-
 # Recheck the target immediately before queueing Squash auto-merge for this exact commit.
 [void](Assert-ReviewedPullRequestIsCurrent)
 $mergeStateJson = & $script:ghPath pr view $PullRequestNumber --repo $Repository --json state,autoMergeRequest,mergeStateStatus

@@ -44,8 +44,9 @@ assert_contains "      contents: read"
 assert_contains "      checks: read"
 assert_contains "      pull-requests: write"
 assert_contains "  queue_squash:"
-assert_contains "    needs: [review]"
-assert_contains "    if: needs.review.result == 'success'"
+assert_contains "  run_review:"
+assert_contains "    needs: [run_review]"
+assert_contains "    if: needs.run_review.result == 'success'"
 assert_contains "      contents: write"
 assert_contains "      pull-requests: write"
 assert_contains '      pr_number: ${{ steps.resolve.outputs.pr_number }}'
@@ -75,14 +76,13 @@ assert_contains "Review target SHA is invalid"
 assert_not_contains "refs/pull/{0}/head"
 assert_contains "shell: powershell"
 assert_contains 'Join-Path $env:GITHUB_WORKSPACE'
-assert_contains "'.claude/skills/review-loop/SKILL.md'"
-assert_contains 'Test-Path -LiteralPath $skillPath -PathType Leaf'
+assert_contains 'Run configured reviewer with Codex fallback'
 assert_contains 'Verify GitHub review identity'
 assert_contains "gh api user --jq '.login'"
 assert_contains 'github.repository_owner'
 assert_contains '$actualLogin -ne $expectedLogin'
 assert_contains 'throw "Review runner identity mismatch: expected $expectedLogin, got $actualLogin"'
-assert_contains 'Run Claude review loop with Codex fallback'
+assert_contains 'Run configured reviewer with Codex fallback'
 assert_contains 'CLAUDE_BIN: claude'
 assert_contains 'CODEX_BIN: codex'
 assert_contains 'PR_NUMBER_INPUT: ${{ github.event.pull_request.number || inputs.pr_number ||'
@@ -99,7 +99,7 @@ assert_contains '-HeadSha'
 assert_contains '$pullRequestNumber = $env:PR_NUMBER'
 assert_contains "-notmatch '^\\d+\$'"
 assert_not_contains "\$pullRequestNumber = '\${{ github.event.pull_request.number || inputs.pr_number }}'"
-assert_not_contains 'GH_TOKEN: ${{ github.token }}'
+assert_contains 'GH_TOKEN: ${{ github.token }}'
 assert_not_contains 'claude --model sonnet --effort medium -p'
 FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$FALLBACK_SCRIPT" ]] || fail "리뷰 backend fallback 스크립트가 없습니다: $FALLBACK_SCRIPT"
@@ -112,10 +112,10 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh" ]] || fail "실제 Git pre-push 진입 계약 테스트가 없습니다."
 cmp -s "$ROOT_DIR/.agents/skills/review-loop/SKILL.md" "$ROOT_DIR/.claude/skills/review-loop/SKILL.md" \
   || fail 'Codex와 Claude review-loop skill 내용이 동기화되지 않았습니다.'
-grep -Fq -- '두 명 이상의 유효한 최신-head 사람 승인' "$ROOT_DIR/.agents/skills/review-loop/SKILL.md" \
-  || fail 'review-loop skill이 High-risk 추가 사람 승인 계약을 설명하지 않습니다.'
-grep -Fq -- '현재 고정된 `dryRun=true`' "$ROOT_DIR/.agents/skills/review-loop/SKILL.md" \
-  || fail 'review-loop skill이 dry-run 중 no-merge 경계를 설명하지 않습니다.'
+grep -Fq -- '현재 primary reviewer는 Codex이므로 Claude 호출 없이 바로 읽기 전용 리뷰를 실행합니다.' "$ROOT_DIR/.agents/skills/review-loop/SKILL.md" \
+  || fail 'review-loop skill이 Codex 직접 리뷰 경로를 설명하지 않습니다.'
+grep -Fq -- 'PASS와 score 4 이상이면 review report를 artifact로 넘깁니다.' "$ROOT_DIR/.agents/skills/review-loop/SKILL.md" \
+  || fail 'review-loop skill이 PASS 점수와 report artifact 조건을 설명하지 않습니다.'
 [[ -f "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh" ]] || fail "빈 branch diff pre-push 계약 테스트가 없습니다."
 grep -Fq -- 'bash "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"' "$ROOT_DIR/scripts/workflow-ci-test.sh" \
   || fail 'workflow CI가 실제 Git pre-push 진입 계약 테스트를 실행하지 않습니다.'
@@ -275,7 +275,8 @@ if grep -Fq -- 'PATH|HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|TEMP' "$ROOT_DIR/script
 fi
 jq -e '
     .version == 1
-    and .dryRun == true
+    and .primaryReviewer == "codex"
+    and .dryRun == false
     and .riskScore.weights.security == 30
     and .riskScore.weights.apiDbEnvironment == 20
     and .riskScore.weights.sizeScope == 15
@@ -326,21 +327,19 @@ for fallback_contract in \
     'risk: Light | Standard | High-risk' \
     'Stop-NeedsHuman' \
     'Get-RequiredCheckFailure' \
-    '(-not $self) -and $_.bucket -ne' \
+    '(-not $currentJobCheck) -and (-not $deferredReviewCheck) -and $_.bucket -ne' \
     '--required --json name,state,bucket' \
     "'--restricted'" \
     "'--tools', ''" \
     "'--permission-mode', 'plan'" \
     "'--permission-prompts', 'none'" \
-    'HighRisk' \
-    '[bool]$ReviewInputs.HighRisk' \
+    'primaryReviewer' \
     'needs-human' \
     'High-risk' \
-    'Get-OwnerAutoMergeSignoff' \
-    'current-head Squash auto-merge confirmation' \
-    'Score concrete findings independently from risk; a High-risk label alone does not lower the score.' \
-    'Do not use NEEDS_HUMAN solely because a change is High-risk' \
-    'Any NEEDS_HUMAN result remains blocked even when owner confirmation exists.' \
+    'Configured primary reviewer is Codex; skipping Claude and starting the read-only review' \
+    "\$codexFallbackReason = if (\$claudeFallbackReason -eq 'configured-primary') { 'none' } else { \$claudeFallbackReason }" \
+    'Risk must not change the review score or merge decision.' \
+    'claude-invalid-structured-result' \
     'BaseSha' \
     'HeadSha' \
     '$ReviewBaseSha' \
@@ -372,6 +371,10 @@ for fallback_contract in \
     'Write-ReviewReport' \
     'RiskAssessment' \
     'Assert-FixedReviewPolicy' \
+    'function Get-BlockingRequiredChecks' \
+    'AllowReviewCheckPending' \
+    "\$CurrentJob -ceq 'run_review' -and" \
+    "Get-RequiredCheckFailure -AllowReviewCheckPending" \
     'risk score:' \
     'risk band:' \
     'review labels:' \
@@ -384,8 +387,6 @@ for fallback_contract in \
     'decision: $($Result.DecisionLabel)' \
     '$($Result.Findings)' \
     'review-routing.md' \
-    'dry-run' \
-    'risk does not match deterministic risk band' \
     'Complete-ReviewDecision' \
     '-ProcessExitCode $claudeExitCode' \
     'DecisionLabel' \
@@ -403,25 +404,22 @@ done
 fallback_classifier_line="$(grep -nF -- 'function Get-ClaudeFallbackReason' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 claude_success_line="$(grep -nF -- '$claudeReviewSucceeded = ($claudeExitCode -eq 0) -and $claudeHasStructuredResult' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-fallback_reason_line="$(grep -nF -- '$claudeFallbackReason = Get-ClaudeFallbackReason -Output $claudeErrorOutput -ExitCode $claudeExitCode' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-claude_success_route_line="$(grep -nF -- 'if ($claudeReviewSucceeded) {' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-unclassified_needs_human_line="$(grep -nF -- 'Codex fallback is not allowed' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-codex_fallback_route_line="$(grep -nF -- 'Claude availability outage' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-[[ -n "$fallback_classifier_line" && -n "$structured_result_line" && -n "$claude_success_line" && -n "$fallback_reason_line" && -n "$claude_success_route_line" && -n "$unclassified_needs_human_line" && -n "$codex_fallback_route_line" \
-    && "$fallback_classifier_line" -lt "$structured_result_line" \
+primary_reviewer_line="$(grep -nF -- "if (\$reviewInputs.RiskAssessment.primaryReviewer -eq 'claude')" "$FALLBACK_SCRIPT" | cut -d: -f1)"
+direct_codex_line="$(grep -nF -- 'Configured primary reviewer is Codex; skipping Claude and starting the read-only review' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+fallback_reason_line="$(grep -nF -- '-HasStructuredResult $claudeHasStructuredResult' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+codex_fallback_route_line="$(grep -nF -- 'Claude did not produce a usable structured review' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+[[ -n "$fallback_classifier_line" && -n "$structured_result_line" && -n "$claude_success_line" && -n "$primary_reviewer_line" && -n "$direct_codex_line" && -n "$fallback_reason_line" && -n "$codex_fallback_route_line" \
+    && "$fallback_classifier_line" -lt "$primary_reviewer_line" \
+    && "$primary_reviewer_line" -lt "$structured_result_line" \
     && "$structured_result_line" -lt "$claude_success_line" \
-    && "$claude_success_line" -lt "$fallback_reason_line" \
-    && "$fallback_reason_line" -lt "$claude_success_route_line" \
-    && "$claude_success_route_line" -lt "$unclassified_needs_human_line" \
-    && "$unclassified_needs_human_line" -lt "$codex_fallback_route_line" ]] \
-    || fail 'Only a recognized Claude availability outage may route review to Codex; other failures must stop as needs-human.'
-grep -Fq -- 'Malformed review content mentioning a timeout was incorrectly classified as a Claude availability outage.' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" \
-    || fail 'malformed Claude review 본문의 outage 단어 오분류 회귀 테스트가 없습니다.'
+    && "$claude_success_line" -lt "$fallback_reason_line" ]] \
+    || fail 'Codex must be the direct configured reviewer, and Claude missing/invalid results must route to Codex.'
+grep -Fq -- 'Malformed Claude output mentioning a timeout was not routed as an invalid result.' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" \
+    || fail 'malformed Claude review output fallback 회귀 테스트가 없습니다.'
 grep -Fq -- 'Invoke-Tool did not preserve separate stdout/stderr for fallback classification' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" \
     || fail 'Claude CLI 표준 출력과 오류 출력 분리 계약 테스트가 없습니다.'
-if grep -Fq -- 'claude-invalid-output' "$FALLBACK_SCRIPT"; then
-    fail 'Malformed Claude output must not be labeled as a Codex fallback reason.'
-fi
+grep -Fq -- "return 'claude-invalid-structured-result'" "$FALLBACK_SCRIPT" \
+    || fail 'Malformed or missing Claude structured output must route to Codex fallback.'
 for check_json_parse in \
     'ConvertFrom-Json -InputObject $checksEnvelopeJson' \
     '$checks = @($checksEnvelope.checks)' \
@@ -477,9 +475,8 @@ for approval_regression in \
 done
 for approval_contract in \
     'Assert-ReviewedPullRequestIsCurrent' \
-    'Get-OwnerAutoMergeSignoff' \
     'Assert-FixedApprovalPolicy' \
-    'Review policy dryRun is fixed to true' \
+    'Review policy dryRun must be false to enable score-based auto-merge.' \
     'expectedWeights' \
     'expectedBands' \
     "'Validate PR contract'" \
@@ -487,12 +484,14 @@ for approval_contract in \
     "'review'" \
     'Required checks are not passing' \
     'The review report must have a PASS result with score 4 or higher.' \
-    'The review report must include deterministic risk score, risk band, labels, and dry-run state.' \
+    'The review report must include deterministic risk score, risk band, and labels.' \
     'review-risk.ps1' \
     'Get-CurrentHeadApprovers' \
     'Test-EligibleHumanApprover' \
     'Get-HumanApprovalSummary' \
     'Assert-RequiredChecksMatchBranchProtection' \
+    'Get-CanonicalReviewChecks' \
+    "[string]\$_.name -ceq 'review'" \
     "reportedBucket -ine 'pass'" \
     'Branch-required check' \
     'Test-ReviewLabelsMatchAssessment' \
@@ -512,7 +511,7 @@ for approval_contract in \
     'CommitOid = [string]$review.commit.oid' \
     'Get-CurrentHeadApprovers -LatestByLogin $eligibleLatestByLogin -ExpectedHeadSha $ExpectedHeadSha' \
     'collaborators/$encodedLogin/permission' \
-    "@('admin', 'write')" \
+    "@('admin', 'maintain', 'push', 'write')" \
     '$latest.State -eq '\''APPROVED'\'' -and $latest.CommitOid -eq $ExpectedHeadSha' \
     '$latestChangeRequestEventByLogin[$reviewEvent.Login] = $reviewEvent' \
     'COMMENTED, PENDING, and approvals on stale commits do not resolve it.' \
@@ -536,10 +535,9 @@ for approval_contract in \
     'CompareOrdinal' \
     'ReviewId' \
     'riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand' \
-    'The review report risk field does not match the deterministic risk band.' \
+    'The normalized review risk label does not match the deterministic label.' \
     'minimumApprovals' \
     'autoMergePolicy' \
-    'dry-run is enabled, and no merge command was executed.' \
     ' --auto' \
     "'--json', 'name,state,bucket,link'" \
     'Test-CurrentRunReviewCheck' \
@@ -551,7 +549,7 @@ for approval_contract in \
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
-grep -Fq -- 'REVIEW_JOB_RESULT: ${{ needs.review.result }}' "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
+grep -Fq -- 'REVIEW_JOB_RESULT: ${{ needs.run_review.result }}' "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
     || fail '승인 job에 상위 review job의 검증된 결과가 전달되지 않습니다.'
 grep -Fq -- '-ReviewJobResult $env:REVIEW_JOB_RESULT' "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
     || fail '승인 게이트가 상위 review job 결과를 사용하지 않습니다.'
@@ -564,7 +562,7 @@ grep -Fq -- "Scenario = 'stale-changes-requested-dismissed'" "$ROOT_DIR/scripts/
 grep -Fq -- 'Get-BranchProtectionApprovalRequirement -BaseBranch' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
     || fail '승인 계약 테스트가 branch protection live 검증 경로를 실행하지 않습니다.'
 grep -Fq -- 'Assert-FixedApprovalPolicy -ReviewPolicy' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
-    || fail '승인 계약 테스트가 dry-run 정책 검증 경로를 실행하지 않습니다.'
+    || fail '승인 계약 테스트가 고정 리뷰 정책 검증 경로를 실행하지 않습니다.'
 grep -Fq -- 'JDSNACK_FAKE_REVIEWER_PERMISSION' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
     || fail '승인 계약 테스트가 reviewer repository permission 경로를 실행하지 않습니다.'
 grep -Fq -- 'JDSNACK_FAKE_STATUS_CHECKS' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
@@ -575,44 +573,29 @@ if grep -Fq -- "if (\$reviewState -ieq 'DISMISSED')" "$APPROVAL_SCRIPT"; then
     fail 'Dismissed human reviews must remain in latest-state selection so they revoke earlier approvals.'
 fi
 unresolved_changes_line="$(grep -nF -- 'Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary' "$APPROVAL_SCRIPT" | cut -d: -f1)"
-dry_run_success_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun) {' "$APPROVAL_SCRIPT" | cut -d: -f1)"
-[[ -n "$unresolved_changes_line" && -n "$dry_run_success_line" && "$unresolved_changes_line" -lt "$dry_run_success_line" ]] \
-    || fail 'Unresolved change requests must be rejected before the dry-run success path.'
+merge_command_line="$(grep -nF -- '& $script:ghPath pr merge $PullRequestNumber --repo $Repository --squash --delete-branch --auto' "$APPROVAL_SCRIPT" | cut -d: -f1)"
+[[ -n "$unresolved_changes_line" && -n "$merge_command_line" && "$unresolved_changes_line" -lt "$merge_command_line" ]] \
+    || fail 'Unresolved change requests must be rejected before queuing Squash auto-merge.'
 RISK_SCRIPT="$ROOT_DIR/scripts/review-risk.ps1"
 grep -Fq -- 'expectedScoringPathPatterns' "$RISK_SCRIPT" || fail '위험도 계산기가 source/test scoring path patterns를 고정하지 않습니다.'
-grep -Fq -- 'dryRun is fixed to true' "$RISK_SCRIPT" || fail '위험도 계산기가 dryRun=true 정책을 고정하지 않습니다.'
+grep -Fq -- 'Review policy dryRun must be false to enable score-based auto-merge.' "$RISK_SCRIPT" || fail '위험도 계산기가 dryRun=false 정책을 고정하지 않습니다.'
 grep -Fq -- 'scripts/.*-test' "$ROOT_DIR/scripts/review-policy.json" || fail 'PowerShell test path가 위험도 정책에 포함되지 않았습니다.'
 grep -Fq -- 'ChangesRequested' "$APPROVAL_SCRIPT" || fail '승인 게이트가 unresolved change request를 차단하지 않습니다.'
 PR_GATE_SCRIPT="$ROOT_DIR/scripts/pr-review-gate.sh"
 grep -Fq -- 'current_refs_path' "$PR_GATE_SCRIPT" || fail 'PR review gate가 위험도 계산 후 최신 PR SHA를 보관하지 않습니다.'
 grep -Fq -- '위험도 계산 중 변경되어' "$PR_GATE_SCRIPT" || fail 'PR review gate가 위험도 계산 중 PR SHA 변경을 차단하지 않습니다.'
-dry_run_line="$(grep -nF -- 'if ([bool]$riskAssessment.dryRun)' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
-self_review_line="$(grep -nF -- "if (\$reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback')" "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
 approval_summary_line="$(grep -nF -- '$approvalSummary = Get-HumanApprovalSummary' "$APPROVAL_SCRIPT" | head -n 1 | cut -d: -f1)"
-[[ -n "$dry_run_line" && -n "$self_review_line" && -n "$approval_summary_line" && "$self_review_line" -lt "$dry_run_line" && "$approval_summary_line" -lt "$dry_run_line" ]] \
-    || fail '드라이런 종료 전에 fallback 자기검수와 사람 승인 게이트를 검증해야 합니다.'
+[[ -n "$approval_summary_line" ]] \
+    || fail '승인 게이트가 미해결 변경요청 및 GitHub branch protection 승인을 검증하지 않습니다.'
 if grep -Fq -- '--admin' "$APPROVAL_SCRIPT"; then
     fail '분리된 승인 게이트는 관리자 우회 머지를 포함하면 안 됩니다.'
 fi
 if ! grep -Fq -- 'pr merge' "$APPROVAL_SCRIPT"; then
-    fail '드라이런 이후 정책을 해제했을 때만 사용하는 병합 경로가 없습니다.'
+    fail 'PASS와 필수 게이트 통과 후 Squash auto-merge를 큐에 넣는 경로가 없습니다.'
 fi
 if grep -Fq -- 'pulls/$PullRequestNumber/reviews' "$APPROVAL_SCRIPT" || grep -Fq -- "event = 'APPROVE'" "$APPROVAL_SCRIPT"; then
     fail '저장소 소유자가 자기 PR에 별도 GitHub APPROVE 리뷰를 제출하도록 요구하지 않습니다.'
 fi
-OWNER_SIGNOFF_SCRIPT="$ROOT_DIR/scripts/review-owner-signoff.ps1"
-[[ -f "$OWNER_SIGNOFF_SCRIPT" ]] || fail "저장소 소유자 확인 스크립트가 없습니다: $OWNER_SIGNOFF_SCRIPT"
-for signoff_contract in \
-    "--json state,headRefOid,autoMergeRequest" \
-    'request.enabledBy.login' \
-    'request.mergeMethod' \
-    'ExpectedHeadSha' \
-    'enabledAt -lt $headCommittedAt' \
-    'The repository owner enabled Squash auto-merge after the current head commit.' \
-    'disable and re-enable Squash auto-merge'; do
-    grep -Fq -- "$signoff_contract" "$OWNER_SIGNOFF_SCRIPT" \
-        || fail "저장소 소유자 확인에 다음 계약이 없습니다: $signoff_contract"
-done
 assert_not_contains '--dangerously-skip-permissions'
 for unsafe_report_contract in \
     '- decision: $($decisionMatch.Value)' \
@@ -632,22 +615,21 @@ fi
 diff -u <(sed 's/\r$//' "$CLAUDE_SKILL") <(sed 's/\r$//' "$AGENTS_SKILL") >/dev/null || fail ".claude와 .agents의 review-loop 스킬이 서로 다릅니다."
 for skill_contract in \
     'bash scripts/pr-contract-test.sh <N>' \
+    '현재 primary reviewer는 Codex이므로 Claude 호출 없이 바로 읽기 전용 리뷰를 실행합니다.' \
     'PASS와 score 4 이상이면 review report를 artifact로 넘깁니다.' \
     'REQUEST_CHANGES는 GitHub review로 한 번 제출합니다.' \
-    'COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 승인을 중단합니다.' \
-    'High-risk 변경은 두 명 이상의 유효한 최신-head 사람 승인을 확인합니다.' \
+    'COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 병합을 중단합니다.' \
+    '위험도는 라벨일 뿐 PASS 기준이나 승인 수를 바꾸지 않습니다.' \
     'approval job은 report와 최신 PR이 리뷰한 base/head SHA, Validate PR contract' \
-    'Validate PR contract, PR CI Gate, review check' \
-    '현재 고정된 dry-run은 검증 결과만 반환하고 merge하지 않습니다.' \
-    '향후 dry-run 해제 시 owner 확인까지 통과한 뒤에만 Squash auto-merge를 큐에 넣습니다.' \
+    'PR head에 게시된 review check' \
+    '위험도 구간별 추가 사람 승인은 요구하지 않습니다.' \
+    'Squash auto-merge를 큐에 넣습니다.' \
     'gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.' \
     'needs-human으로 멈춥니다.' \
-    'autoMergeRequest' \
     '현재 실행의 review check도 GitHub가 SUCCESS/pass로 완료한 경우에만 인정하며' \
-    '최대 3회' \
-    'attempt == 3'; do
+    'Codex는 구현·테스트와 현재 기본 PR 리뷰'; do
     grep -Fq -- "$skill_contract" "$CLAUDE_SKILL" \
-        || fail "Claude review-loop 스킬에 다음 리뷰·머지 계약이 없습니다: $skill_contract"
+        || fail "review-loop 스킬에 다음 리뷰·머지 계약이 없습니다: $skill_contract"
 done
 if grep -Fq -- 'gh pr review <N> --approve' "$CLAUDE_SKILL" || grep -Fq -- 'gh pr merge <N>' "$CLAUDE_SKILL"; then
     fail 'The review skill must defer automatic approval to its gated dependent job.'
@@ -656,5 +638,24 @@ assert_not_contains "shell: bash"
 assert_not_contains "  push:"
 assert_not_contains "github.event_name == 'push'"
 assert_not_contains 'Join-Path $env:USERPROFILE'
+
+for review_check_contract in \
+    '  publish_review_check:' \
+    'needs: [run_review]' \
+    'checks: write' \
+    'head_sha = $env:REVIEW_HEAD_SHA' \
+    'external_id = $externalId' \
+    'name = '\''review'\''' \
+    'needs: [run_review, publish_review_check]' \
+    "if: needs.run_review.result == 'success' && needs.publish_review_check.result == 'success'"; do
+    grep -Fq -- "$review_check_contract" "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
+        || fail "PR head review-check publisher contract is missing: $review_check_contract"
+done
+if grep -Fq -- 'Verify Claude review skill' "$ROOT_DIR/.github/workflows/codex-branch-review.yml"; then
+    fail 'Codex-primary workflow must not require the unused Claude review skill.'
+fi
+if grep -Eq '^  review:$' "$ROOT_DIR/.github/workflows/codex-branch-review.yml"; then
+    fail 'The reviewer job must not share the required review check name with the PR-head check publisher.'
+fi
 
 printf 'Codex branch review workflow contract passed\n'

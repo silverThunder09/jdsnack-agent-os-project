@@ -14,9 +14,9 @@
 
 논리 scope는 `backend/src/main/controller`·`backend/src/main/resources`, `frontend/src/<영역>`, `.agent-os/<영역>`, `.github/<영역>`, `scripts`, `docs/<영역>`처럼 같은 최상위 디렉터리 안의 별도 변경 영역을 구분합니다. 총점은 0~100점이며 구간은 다음과 같습니다.
 
-- `0~30`: `Light` — 사람 승인 1명 뒤 자동 병합 허용
-- `31~60`: `Standard` — 사람 리뷰 필수, 자동 병합 차단
-- `61~100`: `High-risk` — 추가 리뷰 2명과 저장소 소유자의 최신 head 명시 승인 필요
+- `0~30`: `Light` — 라벨만 표시
+- `31~60`: `Standard` — 라벨만 표시
+- `61~100`: `High-risk` — 라벨만 표시
 
 ## 전문 리뷰 라벨
 
@@ -30,8 +30,8 @@
 `scripts/pr-review-gate.sh`은 이 라우팅 결과를 출력하고, Claude 또는 Codex fallback 프롬프트에는 변경 경로·라벨·점수·구간을 함께 전달합니다.
 경로 정규식과 라벨 규칙은 `review-risk.ps1`의 고정 배열과 결합 SHA-256 digest로 검증합니다. `riskScore.pathPatterns` 또는 `reviewRouting` 중 하나라도 바뀌면 계산기는 중단합니다. 규칙을 바꾸려면 정책 변경 자체를 별도 검토·커밋해야 하며, 임의의 PR이 점수나 라벨을 낮추도록 즉석에서 수정할 수 없습니다.
 
-## 드라이런과 보호 규칙
+## 자동 병합 게이트
 
-초기 `scripts/review-policy.json`의 `dryRun`은 `true`입니다. 이 상태에서는 리뷰 실행, PASS 코멘트, 위험도·전문 라벨 게시만 수행하고 `gh pr merge`는 실행하지 않습니다. 승인 job은 dry-run 종료 전에 Codex fallback 자기검수 금지와 위험도별 사람 승인 수를 먼저 검증합니다.
+`scripts/review-policy.json`의 `dryRun`은 `false`이며 현재 기본 reviewer는 `codex`입니다. 현재 PR head에 대해 리뷰 결과 `PASS`와 4점 이상, PR 계약, PR CI Gate, 모든 branch-required check, 미해결 `CHANGES_REQUESTED` 부재가 확인되면 Squash auto-merge를 큐에 넣습니다. 구현과 리뷰 backend가 같아도 같은 기준을 적용합니다.
 
-`dryRun`을 해제한 뒤에도 승인 게이트가 점수 구간을 다시 확인합니다. `Light`는 승인 1명, `Standard`는 사람 리뷰 후 자동 병합 차단, `High-risk`는 최신 head의 승인 2명과 최신 head 이후 소유자 명시 확인을 요구합니다. 승인 job은 GitHub 보호 규칙의 실제 `required_approving_review_count`와 `dismiss_stale_reviews=true`를 확인해 정책 최소값과 큰 수를 적용합니다. 모든 위험도에서 현재 head SHA의 승인과 현재 저장소의 `admin`·`maintain`·`push` 권한을 함께 확인하며, 보호 규칙·reviewer 권한·required check가 확인되지 않거나 stale review dismissal이 꺼져 있으면 `needs-human`으로 중단합니다.
+위험도는 PR 라벨과 리뷰 경로만 결정하며 점수 기준이나 추가 승인 수를 바꾸지 않습니다. 자동화 정책의 추가 사람 승인 수는 0입니다. GitHub branch protection에 실제 필수 승인 수가 설정되어 있으면 해당 수와 check-provider 조건은 그대로 존중하며, GitHub가 충족 전 merge하지 않습니다. PASS 보고서와 review check는 반드시 같은 base/head SHA를 가리켜야 합니다.

@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "dryRun": true,
+  "primaryReviewer": "codex",
+  "dryRun": false,
   "riskScore": {
     "weights": {
       "security": 30,
@@ -84,23 +85,23 @@
     {
       "name": "Light",
       "maxScore": 30,
-      "minimumApprovals": 1,
-      "autoMerge": "allowed-after-approval",
+      "minimumApprovals": 0,
+      "autoMerge": "allowed-after-passing-review-and-required-checks",
       "requiresOwnerSignoff": false
     },
     {
       "name": "Standard",
       "maxScore": 60,
-      "minimumApprovals": 1,
-      "autoMerge": "blocked",
+      "minimumApprovals": 0,
+      "autoMerge": "allowed-after-passing-review-and-required-checks",
       "requiresOwnerSignoff": false
     },
     {
       "name": "High-risk",
       "maxScore": 100,
-      "minimumApprovals": 2,
-      "autoMerge": "allowed-after-additional-review-and-owner-signoff",
-      "requiresOwnerSignoff": true
+      "minimumApprovals": 0,
+      "autoMerge": "allowed-after-passing-review-and-required-checks",
+      "requiresOwnerSignoff": false
     }
   ]
 }

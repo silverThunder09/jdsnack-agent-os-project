@@ -178,7 +178,6 @@ if [ "$current_base_sha" != "$base_sha" ] || [ "$current_head_sha" != "$head_sha
 fi
 risk_score="$(jq -r '.riskScore' <<< "$risk_json")"
 risk_level="$(jq -r '.riskBand' <<< "$risk_json")"
-risk_policy="$(jq -r '.autoMergePolicy' <<< "$risk_json")"
 risk_labels="$(jq -r '.reviewLabels[]' <<< "$risk_json")"
 
 if [ "$has_backend" -eq 1 ] && [ "$has_frontend" -eq 1 ]; then
@@ -241,7 +240,7 @@ echo
 echo "## 위험도 추정"
 echo
 echo "- ${risk_level} (${risk_score}/100)"
-echo "- 병합 정책: ${risk_policy}"
+echo "- 용도: 라벨·설명 정보만 사용 (리뷰 점수·승인 수·병합 판단에는 영향 없음)"
 echo
 
 echo "## AI 리뷰 라우팅 라벨"

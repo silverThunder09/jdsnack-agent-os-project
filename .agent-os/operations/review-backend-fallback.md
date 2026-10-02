@@ -1,35 +1,32 @@
-# 리뷰 백엔드 폴백
+# PR 리뷰 실행과 폴백
 
-## 목적
+## 실행 순서
 
-Claude 리뷰 서비스가 구독 비활성화, 인증·쿼터·자격 증명 장애, CLI unavailable 또는 timeout처럼 명시적으로 식별된 availability outage일 때 Codex를 읽기 전용 리뷰어로 사용합니다. 폴백은 자동 승인의 조건을 낮추지 않습니다.
+1. `.github/workflows/codex-branch-review.yml`은 `PR CI Router` 성공 뒤 trusted base에서 PR의 base/head SHA를 고정하고, head 코드는 checkout하거나 실행하지 않습니다.
+2. 기본 리뷰어는 `scripts/review-policy.json`의 `primaryReviewer`가 정합니다. 현재 값은 `codex`이므로 Claude 호출을 기다리지 않고 Codex가 격리된 읽기 전용 환경에서 즉시 리뷰합니다.
+3. 기본 리뷰어가 Claude로 설정된 경우 유효한 구조화 결과는 그대로 사용합니다. Claude 실행 불가·구독/인증/쿼터 오류·timeout 또는 결과 누락/형식 오류는 Codex 읽기 전용 리뷰로 넘깁니다. 유효한 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달은 backend 장애가 아니므로 Codex로 덮어쓰지 않습니다.
+4. Codex 입력은 PR diff와 review 기준뿐입니다. Codex는 checkout 밖의 빈 임시 작업공간에서 도구 없이 실행하며 diff에 포함된 지시문을 따르지 않습니다. Codex 실행 실패나 Codex의 누락·잘못된 구조화 결과는 `needs-human`으로 중단합니다.
 
-## 전환 및 승인 순서
+## 점수와 병합
 
-1. `PR CI Router`가 성공한 뒤 `codex-branch-review.yml`이 trusted base에서 Claude review-loop를 실행합니다. CI가 실패하면 리뷰는 시작하지 않고 PR Feedback Detector가 먼저 Codex 수정 작업을 디스패치합니다. Claude는 trusted base에서 만든 PR diff와 검토 기준만 restricted/plan 모드로 읽습니다. 저장소 소유자가 auto-merge를 켜면 `auto_merge_enabled` 이벤트도 같은 trusted workflow를 깨웁니다.
-2. Claude가 정상 종료와 함께 유효한 구조화 리뷰를 반환하면 그 판정을 사용합니다. `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달도 그대로 존중하며 Codex fallback으로 바꾸지 않습니다.
-3. Claude가 정상 종료와 함께 유효한 구조화 리뷰를 반환하지 못했을 때는 모델 stdout과 분리된 CLI stderr의 명시적 `ERROR`/`FATAL`/`API ERROR` availability 신호 또는 runner가 자체 생성한 timeout(124)·실행 불가(127) sentinel만 판별합니다. 리뷰 본문에 timeout·인증·쿼터 같은 단어가 있어도 폴백 사유로 쓰지 않습니다. 이 명시적 outage일 때만 Codex가 PR diff와 검토 기준만으로 리뷰를 이어받습니다. 그 밖의 nonzero 종료, 내부 runner 오류, 필수 필드 누락·형식 오류는 Codex fallback으로 가리지 않고 `needs-human`으로 중단하며, 구조화 결과에는 상세 runner 로그를 넣지 않습니다.
-4. Codex 입력은 PR diff와 검토 기준뿐입니다. Codex는 저장소 checkout 바깥의 빈 임시 작업공간에서 실행하며, 상위 경로의 AGENTS.md 존재 여부를 먼저 확인합니다. shell, app, plugin, remote plugin, multi-agent, memories, hooks, goals, browser/computer, code mode, skill 검색·설치를 끄고 web 검색을 비활성화합니다. 사용자 설정을 무시하고 저장소 경로와 GitHub 토큰·PR 환경 변수도 Codex 프로세스에 전달하지 않습니다. 모델은 루트 `backends.json`의 `workers.codex.review-fallback.model` 값인 `gpt-6-luna`, 추론 강도는 `effort` 값인 `max`를 사용하며, 두 실행 경로에서 설정을 그대로 전달합니다.
-5. 리뷰 job은 PASS, 4점 이상, 통과한 Validate PR contract와 PR CI Gate를 확인한 뒤 성공합니다. `scripts/review-risk.ps1`이 계산한 위험도 점수·구간과 Security·Performance·Test Coverage·Architecture 라벨을 프롬프트에 전달하고, 결과는 같은 head SHA에 대해 PR 코멘트와 라벨로 공개합니다. `NEEDS_HUMAN`은 항상 중단합니다. 결정론적으로 선택하지 않은 backend/frontend 체크의 `skipping`은 PR CI Gate가 통과했을 때 허용합니다.
+- 구조화 리뷰는 `decision`, `score`(0~5), `risk`, `findings`, `review_summary`를 반환합니다. 자동 병합에는 `PASS`와 4/5 이상이 모두 필요합니다. `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 4점 미만은 병합을 막습니다.
+- `review-risk.ps1`의 위험도 점수·구간은 표시 라벨과 검토 경로만 정합니다. 위험도 구간은 사람 승인 수, 점수 기준 또는 자동 병합 가능 여부를 바꾸지 않습니다.
+- `dryRun=false`입니다. 현재 PR의 base/head SHA가 리뷰 보고서와 일치하고, `Validate PR contract`, `PR CI Gate`, GitHub가 요구한 모든 check가 현재 head에서 통과하며, 미해결 `CHANGES_REQUESTED`가 없을 때 approval job이 Squash auto-merge를 큐에 넣습니다.
+- 추가 사람 승인 수는 이 저장소의 자동화 정책에서 0입니다. GitHub branch protection에 실제로 설정된 필수 승인 수가 0보다 크면 GitHub 보호 규칙은 그대로 존중합니다. 위험도 라벨만으로 사람 승인을 추가하지 않습니다.
+- review workflow는 `workflow_run`의 기본 브랜치 SHA에서 실행되므로, job 완료 뒤 GitHub Actions `checks:write` 토큰으로 이름이 `review`인 check run을 정확한 PR head SHA에 게시·갱신합니다. 그 check와 필수 CI가 모두 통과해야 merge job이 계속됩니다.
 
-리뷰 요약은 정확히 7줄이며, correctness·contract·tests·security·maintainability 각 rubric은 `PASS — 근거` 형식이어야 합니다. findings에 P2/P3가 있으면 요약의 score rationale 또는 conclusion에 해당 severity를 각각 명시해야 합니다. `OK`나 `SATISFIED`는 PASS로 인정하지 않습니다.
-6. 별도 approval job은 성공한 리뷰 job에 의존합니다. 리뷰 보고서의 점수·위험도·위험 점수·위험 구간·전문 리뷰 라벨·base/head SHA, 현재 열린 PR의 저장소와 SHA, Validate PR contract, PR CI Gate, 완료 상태가 `SUCCESS/pass`인 review check, 모든 branch-required check를 다시 확인합니다. 전문 리뷰 라벨은 결정론 평가의 라벨 집합과 일치해야 하며, 필수 check의 `skipping`도 통과로 취급하지 않습니다. 같은 실행의 review check가 `IN_PROGRESS/pending`이면 upstream job 결과가 success여도 통과로 간주하지 않습니다. 초기 `scripts/review-policy.json`의 `dryRun=true`에서는 리뷰·코멘트·라벨만 수행하고 `gh pr merge`를 호출하지 않습니다. 드라이런 해제 뒤 `Light`는 승인 1명, `Standard`는 사람 리뷰 후 자동 병합 차단, `High-risk`는 승인 2명과 최신 head 이후 소유자 명시 확인을 적용합니다.
+## 중단 조건
 
-## 사람 확인이 필요한 경우
+- Codex 리뷰 실행 실패, Codex 구조화 결과 누락/오류, `NEEDS_HUMAN`, 비-PASS 판정, 4점 미만
+- 리뷰 전후 base/head SHA 변경 또는 PR이 닫힘
+- PR 계약·PR CI Gate·branch-required check 누락/실패, check provider 또는 GitHub API 확인 실패
+- 미해결 `CHANGES_REQUESTED`, artifact 누락, Squash auto-merge 큐 등록 실패
 
-- dry-run 해제 후 High-risk merge에는 저장소 소유자의 명시적 확인과 추가 사람 승인 2명이 필요합니다. 소유자는 최신 head 커밋 이후 해당 PR의 Squash auto-merge를 직접 켭니다. 확인은 현재 head SHA에만 적용되며, 새 커밋 뒤에는 다시 켜야 합니다. 현재 `dryRun=true`에서는 사람 승인 수를 확인하지만 owner auto-merge 확인과 merge 명령은 실행하지 않습니다.
-- 점수 4점 미만, COMMENT, REQUEST_CHANGES, NEEDS_HUMAN, Codex 출력 형식 오류, Codex 실행 불가, 분류되지 않은 Claude 실행·구조화 결과 오류, 현재 PR SHA 변경, 실패·누락 상태의 필수 check, GitHub 작업 실패는 needs-human으로 중단합니다. High-risk라는 이유만으로 `NEEDS_HUMAN`을 반환하지 않습니다. 경로 기반 라우터가 제외한 체크의 `skipping`은 PR CI Gate가 성공했을 때 통과로 인정합니다.
-- REQUEST_CHANGES는 GitHub review로 한 번만 제출합니다. 제출 시도 뒤 추가 comment review를 만들지 않습니다.
-- findings는 여러 줄과 전체 길이를 유지해 review 본문에 포함합니다. 필드 추출 과정에서 공백을 합치거나 내용을 잘라내지 않습니다.
+`REQUEST_CHANGES`는 GitHub review로 한 번 제출하고 findings 전체를 보존합니다. 점수·판정이 통과해도 필수 check가 실패하면 자동 병합하지 않습니다.
 
-## 장애 경계
+## 안전 경계
 
-- `pull_request_target`은 trusted base의 workflow만 사용합니다. 리뷰 workflow를 바꾸는 PR은 새 `review` 상태 체크를 스스로 만들 수 없으므로 첫 적용은 저장소 소유자가 한 번 bootstrap해야 합니다. 기본 브랜치 보호 규칙은 사람 승인 1명과 `review`·`PR CI Gate`·`Validate PR contract`를 기본 required check로 유지하고, 승인 job이 위험도 구간에 따라 추가 승인을 결정론적으로 확인합니다. 기본 브랜치에 trusted workflow가 올라간 뒤에는 PR 변경 및 소유자의 `auto_merge_enabled` 이벤트가 리뷰를 다시 실행합니다.
-- 수동 workflow_dispatch는 GitHub API로 열린 PR의 base/head 저장소와 SHA를 확인한 뒤 같은 저장소 커밋만 fetch합니다. PR head의 파일·workflow·스크립트를 checkout하거나 실행하지 않습니다.
-- workflow, skill, fallback/approval script는 trusted base에서 가져옵니다. PR diff와 PR 본문은 지시문이 아닌 untrusted evidence로 취급합니다.
-- Codex fallback은 acceptance criteria, 테스트, 보안, 범위 게이트를 낮추지 않습니다.
-- --admin이나 보호 규칙 제거로 fallback을 성공 처리하지 않습니다.
-
-## 기록
-
-리뷰 보고서와 GitHub Actions summary에는 reviewer backend, Claude availability outage 또는 needs-human 사유, score/decision/risk, 고정 위험도 score·components·merge policy, 리뷰 라벨, 리뷰 대상 base/head SHA, findings, summary를 남깁니다. PASS 결과는 같은 정보를 담은 PR 코멘트로도 공개하고, 위험도·전문 라벨을 PR에 붙입니다. 성공한 리뷰 보고서는 현재 workflow run에만 연결된 artifact로 approval job에 전달합니다.
+- `pull_request_target`과 `workflow_run`은 trusted base의 workflow·script만 실행합니다. PR head의 스크립트, workflow, 설정은 실행하지 않습니다.
+- Codex에게는 diff와 검토 기준만 전달하며 shell·git·gh·web·저장소 접근·쓰기 기능을 제공하지 않습니다.
+- 리뷰 및 approval job은 각각 최신 PR SHA와 check 상태를 다시 확인합니다. Squash auto-merge 요청이 등록됐다는 사실만으로 완료로 보고하지 않습니다. `gh pr view`가 `MERGED`와 `mergedAt`을 반환해야 완료입니다.
+- workflow 변경 PR의 새 리뷰 코드는 해당 PR 자체를 리뷰할 때 실행되지 않습니다. trusted base에 반영된 뒤 후속 PR부터 적용됩니다.

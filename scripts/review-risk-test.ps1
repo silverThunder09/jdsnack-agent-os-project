@@ -156,14 +156,15 @@ try {
     $assessment = ConvertFrom-Json -InputObject $json
     Assert-Equal $assessment.riskScore 100 'high-risk fixture score'
     Assert-Equal $assessment.riskBand 'High-risk' 'high-risk fixture band'
-    Assert-Equal $assessment.minimumApprovals 2 'high-risk approval count'
-    Assert-Equal $assessment.requiresOwnerSignoff $true 'high-risk owner signoff'
+    Assert-Equal $assessment.minimumApprovals 0 'high-risk additional approval count'
+    Assert-Equal $assessment.requiresOwnerSignoff $false 'high-risk owner signoff disabled'
     Assert-Equal ($assessment.reviewLabels -contains 'Security') $true 'Security routing label'
     Assert-Equal ($assessment.reviewLabels -contains 'Test Coverage') $true 'Test Coverage routing label'
     Assert-Equal ($assessment.reviewLabels -contains 'Architecture') $true 'Architecture routing label'
     Assert-Equal ($assessment.topLevelScopes -contains 'backend/src/main/controller') $true 'controller logical scope'
     Assert-Equal ($assessment.topLevelScopes -contains 'backend/src/main/resources') $true 'resources logical scope'
-    Assert-Equal $assessment.dryRun $true 'default dry-run policy'
+    Assert-Equal $assessment.primaryReviewer 'codex' 'configured primary reviewer'
+    Assert-Equal $assessment.dryRun $false 'automatic merge policy'
 
     $invalidShaResult = Invoke-RiskAssessmentProcess -Workspace $tempRoot -BaseSha 'invalid-base-sha' -HeadSha $headSha -PolicyPath $policyPath
     if ($invalidShaResult.ExitCode -eq 0) {
@@ -172,11 +173,11 @@ try {
 
     $tamperedDryRunPath = Join-Path $tempRoot 'tampered-dry-run-policy.json'
     $tamperedDryRunPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
-    $tamperedDryRunPolicy.dryRun = $false
+    $tamperedDryRunPolicy.dryRun = $true
     $tamperedDryRunPolicy | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tamperedDryRunPath -Encoding utf8
     $tamperedDryRunResult = Invoke-RiskAssessmentProcess -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedDryRunPath
     if ($tamperedDryRunResult.ExitCode -eq 0) {
-        throw "review-risk.ps1 accepted a policy with dryRun=false: $($tamperedDryRunResult.Output)"
+        throw "review-risk.ps1 accepted a policy with dryRun=true: $($tamperedDryRunResult.Output)"
     }
 
     $policyPath = Join-Path $PSScriptRoot 'review-policy.json'
@@ -205,14 +206,14 @@ try {
     $lightAssessment = New-SingleFileAssessment -Name 'light' -RelativePath 'docs/note.md' -Content 'small change'
     Assert-Equal $lightAssessment.riskScore 0 'light fixture score'
     Assert-Equal $lightAssessment.riskBand 'Light' 'light fixture band'
-    Assert-Equal $lightAssessment.minimumApprovals 1 'light approval count'
-    Assert-Equal $lightAssessment.autoMergePolicy 'allowed-after-approval' 'light merge policy'
+    Assert-Equal $lightAssessment.minimumApprovals 0 'light additional approval count'
+    Assert-Equal $lightAssessment.autoMergePolicy 'allowed-after-passing-review-and-required-checks' 'light merge policy'
 
     $standardAssessment = New-SingleFileAssessment -Name 'standard' -RelativePath 'backend/src/main/controller/FixtureController.java' -Content 'class FixtureController {}'
     Assert-Equal $standardAssessment.riskScore 35 'standard fixture score'
     Assert-Equal $standardAssessment.riskBand 'Standard' 'standard fixture band'
-    Assert-Equal $standardAssessment.minimumApprovals 1 'standard approval count'
-    Assert-Equal $standardAssessment.autoMergePolicy 'blocked' 'standard merge policy'
+    Assert-Equal $standardAssessment.minimumApprovals 0 'standard additional approval count'
+    Assert-Equal $standardAssessment.autoMergePolicy 'allowed-after-passing-review-and-required-checks' 'standard merge policy'
 
     $shellTestAssessment = New-SingleFileAssessment -Name 'shell-test-path' -RelativePath 'scripts/pre-push-ai-review-test.sh' -Content '# fixture test'
     Assert-Equal $shellTestAssessment.componentScores.testGap 0 'scripts/*-test.sh test evidence'

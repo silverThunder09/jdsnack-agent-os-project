@@ -329,11 +329,6 @@ fi
 expected_risk_score="$("$jq_bin" -r '.riskScore' <<< "$risk_json")"
 expected_risk="$("$jq_bin" -r '.riskBand' <<< "$risk_json")"
 expected_labels="$("$jq_bin" -r '.reviewLabels | join(", ")' <<< "$risk_json")"
-expected_dry_run="$("$jq_bin" -r '.dryRun' <<< "$risk_json")"
-if [ "$expected_dry_run" != "true" ]; then
-  echo "ERROR: 초기 pre-push 정책은 dry-run=true여야 합니다. 정책 변경은 별도 운영 승인으로 진행하십시오." >&2
-  exit 1
-fi
 if [ -z "$expected_risk_score" ] || [ -z "$expected_risk" ] || [ -z "$expected_labels" ]; then
   echo "ERROR: 결정론적 pre-push 위험도 결과가 불완전합니다. push를 차단합니다." >&2
   exit 1

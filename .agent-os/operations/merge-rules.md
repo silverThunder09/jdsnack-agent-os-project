@@ -6,24 +6,24 @@
 
 ## 실행 주체
 
-- 머지 판단, 머지 실행, 머지 후 운영 기록은 클로드가 담당합니다.
-- 코덱스는 머지를 직접 수행하지 않습니다.
+- 머지 판단은 리뷰·검증 결과로 자동화하며, trusted GitHub approval job만 Squash auto-merge를 큐에 넣습니다.
+- 코덱스는 GitHub에서 직접 머지 명령을 실행하지 않습니다.
 - 코덱스는 머지 전 리뷰 결과에 따른 코드 수정, 테스트, 사용자가 지시한 자동 배포 작업만 수행합니다.
-- **무인 배치**: `codex/*` 구현 PR은 무인 리뷰-머지 루프(`jdsnack-review-merge-loop`)가 `code-reviewer` 5점 채점에서 **4점 이상이면 위험도 승인 정책을 다시 확인**한다(4점 미만이면 구조화된 변경요청을 코덱스로). 자율 루프가 `spec-queue.json`에서 선택한 `automation/spec-*` promotion PR은 Docs Harness·traceability·diff 범위 검증을 통과하면 자동 머지한다. **`High-risk` 변경(보안/외부 API/배포/DB/인증/CI)은 사람 승인 2명과 저장소 소유자의 최신 head Squash auto-merge 확인을 요구한다.** 구현 backend와 reviewer backend가 같은 Codex fallback PR은 점수와 무관하게 자동 머지하지 않고 사용자 확인으로 강등한다([worker-backends.md](worker-backends.md)의 폴백 규칙).
+- **무인 배치**: `codex/*` 구현 PR은 configured reviewer의 `PASS`와 **4/5 이상**, 최신 base/head SHA, PR 계약, PR CI Gate, 모든 branch-required check, 미해결 변경요청 부재를 확인하면 Squash auto-merge를 큐에 넣습니다. 4점 미만이면 구조화된 변경요청을 Codex에 전달합니다. 자율 루프가 `spec-queue.json`에서 선택한 `automation/spec-*` promotion PR은 Docs Harness·traceability·diff 범위 검증을 통과하면 자동 머지합니다. 위험도는 라벨로만 기록하며, High-risk 또는 구현/reviewer backend 동일 여부만으로 추가 사람 승인을 요구하지 않습니다.
 
 ## 기본 전략
 
-Claude review backend가 unavailable하여 Codex read-only reviewer로 전환된 경우에도 동일한 5점 루브릭과 결정론 게이트를 적용합니다. `High-risk` 변경은 4점 이상이어도 소유자의 최신 head Squash auto-merge 확인 전까지 `needs-human`으로 멈춥니다. 확인 시각은 head 커밋 이후여야 하며, 새 head에는 다시 확인이 필요합니다. 구현 backend와 reviewer backend가 같은 PR은 fallback 점수만으로 자동 머지하지 않고 `needs-human`으로 멈춥니다.
+현재는 Claude 구독이 비활성화되어 Codex read-only reviewer가 바로 시작됩니다. Claude를 기본으로 선택한 경우 Claude가 unavailable이거나 구조화 결과를 만들지 못하면 같은 Codex reviewer로 전환합니다. 두 번째 리뷰도 실행 불가·형식 오류면 `needs-human`으로 멈춥니다. 각 경우 모두 동일한 5점 루브릭과 결정론 필수 게이트를 적용합니다.
 
-위험도 점수와 승인 정책은 `scripts/review-policy.json` 및 [review-routing.md](review-routing.md)를 정본으로 사용합니다.
+위험도 점수와 라벨은 `scripts/review-policy.json` 및 [review-routing.md](review-routing.md)를 정본으로 사용합니다. 위험도는 병합 조건이 아닙니다.
 
-| 위험도 | 승인 조건 | 자동 병합 |
+| 위험도 | 추가 사람 승인 조건 | 자동 병합 |
 |---|---|---|
-| `0~30 Light` | 사람 승인 1명 | 승인 후 허용 |
-| `31~60 Standard` | 사람 리뷰 1명 이상 | 차단 |
-| `61~100 High-risk` | 사람 승인 2명 이상과 최신 head 이후 저장소 소유자 명시 확인 | 확인 후 허용 |
+| `0~30 Light` | 없음* | PASS 4/5 이상 및 필수 게이트 통과 시 허용 |
+| `31~60 Standard` | 없음* | PASS 4/5 이상 및 필수 게이트 통과 시 허용 |
+| `61~100 High-risk` | 없음* | PASS 4/5 이상 및 필수 게이트 통과 시 허용 |
 
-초기 `dryRun=true`에서는 세 구간 모두 리뷰·PR 코멘트·라벨만 수행하고 병합 명령을 실행하지 않습니다. 구현 backend와 reviewer backend가 같은 PR인 Codex fallback은 위 구간을 충족해도 자기 검수 방지 규칙에 따라 `needs-human`으로 멈춥니다.
+`dryRun=false`이며 위험도별 추가 승인 정책은 없습니다. *GitHub branch protection에 실제로 설정된 필수 승인 수가 있으면 그 규칙은 GitHub가 계속 적용합니다. 구현 backend와 reviewer backend가 같은 경우도 점수·check 조건을 통과하면 동일하게 처리합니다.
 
 - 기본 브랜치는 `main`입니다.
 - MVP 초기에는 작은 PR 단위로 `main`에 머지합니다.
@@ -35,7 +35,7 @@ Claude review backend가 unavailable하여 Codex read-only reviewer로 전환된
 - PR 주 목적이 하나이고 변경 범위가 [pr-rules.md](pr-rules.md)의 `PR 범위 경계`를 통과
 - PR 본문 체크리스트 완료
 - 작업 시작 체크포인트와 PR 범위 판단이 일치
-- [pr-review-gate.md](pr-review-gate.md) 기준 자체 리뷰 결과가 `PASS` 또는 허용 가능한 `COMMENT`
+- [pr-review-gate.md](pr-review-gate.md) 기준 자동 병합 후보의 리뷰 결과가 `PASS`이고 4점 이상
 - 관련 문서 최신화
 - 테스트 통과
 - CI 체크리스트 통과

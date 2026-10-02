@@ -29,7 +29,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -39,6 +39,26 @@ foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredFi
         throw "$functionName function was not found."
     }
     . ([scriptblock]::Create($dependencyAst.Extent.Text))
+}
+
+$pendingReviewChecks = @(
+    [pscustomobject]@{ name = 'review'; bucket = 'pending' }
+    [pscustomobject]@{ name = 'Codex Branch Review / run_review'; bucket = 'pending' }
+    [pscustomobject]@{ name = 'Codex Branch Review / review'; bucket = 'pending' }
+    [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
+)
+$preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $pendingReviewChecks -CurrentJob 'run_review' -AllowReviewCheckPending)
+if ($preReviewBlockingChecks.Count -ne 0) {
+    throw 'A pending PR-head review check blocked the reviewer job before it could publish its result.'
+}
+$unrelatedFailureChecks = @($pendingReviewChecks + [pscustomobject]@{ name = 'Backend tests'; bucket = 'fail' })
+$preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $unrelatedFailureChecks -CurrentJob 'run_review' -AllowReviewCheckPending)
+if ($preReviewBlockingChecks.Count -ne 1 -or $preReviewBlockingChecks[0].name -ne 'Backend tests') {
+    throw 'Allowing the not-yet-published review check also bypassed an unrelated required failure.'
+}
+$withoutReviewExemption = @(Get-BlockingRequiredChecks -Checks $pendingReviewChecks -CurrentJob 'run_review')
+if ($withoutReviewExemption.Count -ne 1 -or $withoutReviewExemption[0].name -ne 'review') {
+    throw 'A non-review gate was able to ignore a pending required review check.'
 }
 
 $modelFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-review-model-contract-' + [guid]::NewGuid().ToString('N'))
@@ -174,24 +194,24 @@ if ((Get-ClaudeFallbackReason -Output 'JDSNACK RUNNER: tool timed out after 120 
 if ((Get-ClaudeFallbackReason -Output 'JDSNACK RUNNER: tool unavailable on PATH (claude).' -ExitCode 127) -ne 'claude-unavailable') {
     throw 'An unavailable Claude executable was not classified for fallback.'
 }
-if ($null -ne (Get-ClaudeFallbackReason -Output 'review output mentions a timeout' -ExitCode 124)) {
-    throw 'An unrelated process exit code 124 was incorrectly classified as a Claude timeout.'
+if ((Get-ClaudeFallbackReason -Output 'review output mentions a timeout' -ExitCode 124) -ne 'claude-execution-failed') {
+    throw 'An unclassified Claude process failure did not route to the Codex reviewer.'
 }
-if ($null -ne (Get-ClaudeFallbackReason -Output 'review output mentions an unavailable executable' -ExitCode 127)) {
-    throw 'An unrelated process exit code 127 was incorrectly classified as an unavailable Claude executable.'
+if ((Get-ClaudeFallbackReason -Output 'review output mentions an unavailable executable' -ExitCode 127) -ne 'claude-execution-failed') {
+    throw 'An unclassified Claude process failure did not route to the Codex reviewer.'
 }
 if ((Get-ClaudeFallbackReason -Output 'API ERROR: Claude rate limit exceeded.') -ne 'claude-quota') {
     throw 'An explicit Claude quota error was not classified for fallback.'
 }
-if ($null -ne (Get-ClaudeFallbackReason -Output 'Claude exited with an internal review error.')) {
-    throw 'An unclassified Claude runner failure was incorrectly routed to Codex fallback.'
+if ((Get-ClaudeFallbackReason -Output 'Claude exited with an internal review error.' -ExitCode 1) -ne 'claude-execution-failed') {
+    throw 'An unclassified Claude runner failure was not routed to Codex fallback.'
 }
-if ($null -ne (Get-ClaudeFallbackReason -Output 'decision: PASS')) {
-    throw 'Malformed structured output without an availability signal was incorrectly routed to Codex fallback.'
+if ((Get-ClaudeFallbackReason -Output '' -ExitCode 0 -HasStructuredResult $false) -ne 'claude-invalid-structured-result') {
+    throw 'A missing Claude result was not routed to Codex fallback.'
 }
 $malformedReviewWithAvailabilityPhrase = "decision: NEEDS_HUMAN`nscore: 1/5`nrisk: Standard`nfindings:`n- P2 — the review timed out in a quoted example.`nreview_summary:`nnot a valid summary"
-if ($null -ne (Get-ClaudeFallbackReason -Output $malformedReviewWithAvailabilityPhrase)) {
-    throw 'Malformed review content mentioning a timeout was incorrectly classified as a Claude availability outage.'
+if ((Get-ClaudeFallbackReason -Output $malformedReviewWithAvailabilityPhrase -ExitCode 0 -HasStructuredResult $false) -ne 'claude-invalid-structured-result') {
+    throw 'Malformed Claude output mentioning a timeout was not routed as an invalid result.'
 }
 $ioTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-tool-stream-contract-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $ioTempRoot -Force | Out-Null
@@ -276,8 +296,8 @@ $global:LASTEXITCODE = 0
         riskScore = 20
         riskBand = 'Light'
         reviewLabels = @('Security')
-        autoMergePolicy = 'dry-run'
-        dryRun = $true
+        autoMergePolicy = 'allowed-after-passing-review-and-required-checks'
+        dryRun = $false
     }
     $reviewInputs = [pscustomobject]@{ RiskAssessment = $riskAssessment }
     $reviewResult = [pscustomobject]@{

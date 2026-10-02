@@ -44,6 +44,10 @@ function Matches-AnyPattern {
 function Assert-FixedReviewPolicy {
     param([pscustomobject]$ReviewPolicy)
 
+    if ([string]$ReviewPolicy.primaryReviewer -notin @('claude', 'codex')) {
+        throw 'The configured primary PR reviewer must be claude or codex.'
+    }
+
     $expectedWeights = [ordered]@{
         security = 30
         apiDbEnvironment = 20
@@ -71,9 +75,9 @@ function Assert-FixedReviewPolicy {
     }
 
     $expectedBands = @(
-        [pscustomobject]@{ name = 'Light'; maxScore = 30; minimumApprovals = 1; autoMerge = 'allowed-after-approval'; requiresOwnerSignoff = $false }
-        [pscustomobject]@{ name = 'Standard'; maxScore = 60; minimumApprovals = 1; autoMerge = 'blocked'; requiresOwnerSignoff = $false }
-        [pscustomobject]@{ name = 'High-risk'; maxScore = 100; minimumApprovals = 2; autoMerge = 'allowed-after-additional-review-and-owner-signoff'; requiresOwnerSignoff = $true }
+        [pscustomobject]@{ name = 'Light'; maxScore = 30; minimumApprovals = 0; autoMerge = 'allowed-after-passing-review-and-required-checks'; requiresOwnerSignoff = $false }
+        [pscustomobject]@{ name = 'Standard'; maxScore = 60; minimumApprovals = 0; autoMerge = 'allowed-after-passing-review-and-required-checks'; requiresOwnerSignoff = $false }
+        [pscustomobject]@{ name = 'High-risk'; maxScore = 100; minimumApprovals = 0; autoMerge = 'allowed-after-passing-review-and-required-checks'; requiresOwnerSignoff = $false }
     )
     $actualBands = @($ReviewPolicy.bands)
     if ($actualBands.Count -ne $expectedBands.Count) {
@@ -187,8 +191,8 @@ function Assert-FixedReviewPolicy {
     if ($null -eq $ReviewPolicy.dryRun -or $ReviewPolicy.dryRun -isnot [bool]) {
         throw 'Review policy dryRun must be an explicit boolean.'
     }
-    if ($ReviewPolicy.dryRun -ne $true) {
-        throw 'Review policy dryRun is fixed to true for this workflow.'
+    if ($ReviewPolicy.dryRun -ne $false) {
+        throw 'Review policy dryRun must be false to enable score-based auto-merge.'
     }
 }
 
@@ -359,6 +363,7 @@ function Get-ReviewRiskAssessment {
 
     [pscustomobject]@{
         policyVersion = [int]$policy.version
+        primaryReviewer = [string]$policy.primaryReviewer
         dryRun = [bool]$policy.dryRun
         changedFiles = $changedPaths.Count
         changedLines = $changedLines
