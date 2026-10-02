@@ -14,7 +14,8 @@
 - 기존 required status checks는 보존해야 합니다. 설정을 덮어쓰기 전에
   현재 보호 설정과 check 목록을 캡처하고, 적용 후 동일한 목록이 유지되는지
   확인합니다.
-- 저장소 설정에서는 stale review dismissal을 활성화합니다.
+- 저장소 설정에서는 stale review dismissal을 활성화해야 하며, 승인 게이트도
+  `dismiss_stale_reviews=true`가 아니면 `needs-human`으로 중단합니다.
   승인 게이트는 이 설정과 별개로 최신 review state와 현재 head SHA를
   다시 확인하므로, 이전 head의 승인을 현재 head 승인으로 재사용하지
   않습니다.

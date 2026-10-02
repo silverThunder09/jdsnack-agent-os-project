@@ -113,6 +113,10 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 전문 라우팅 정책을 읽지 않습니다.'
 grep -Fq -- 'push_remote="${1-}"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 hook destination remote를 읽지 않습니다.'
 grep -Fq -- 'push_remote" != "origin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin 이외 destination remote를 차단하지 않습니다.'
+grep -Fq -- 'trusted_origin_urls' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 trusted origin URL allowlist를 사용하지 않습니다.'
+grep -Fq -- 'remote get-url --all --push origin' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin push URL을 검증하지 않습니다.'
+grep -Fq -- 'remote get-url --all origin' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin fetch URL을 검증하지 않습니다.'
+grep -Fq -- 'silverThunder09/jdsnack-agent-os-project' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 trusted 저장소 identity를 고정하지 않습니다.'
 grep -Fq -- 'refs/heads/*' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 branch ref 이외의 push를 차단하지 않습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm cp jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 jq와 Codex CLI를 실행 전에 확인하지 않습니다.'
 grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
@@ -388,6 +392,7 @@ for approval_contract in \
     'effectiveMinimumApprovals' \
     'DismissStaleReviews' \
     'dismiss_stale_reviews' \
+    'does not dismiss stale pull request reviews' \
     'ExpectedHeadSha' \
     'commit.oid' \
     'reviewState' \
@@ -412,6 +417,10 @@ for approval_contract in \
 done
 grep -Fq -- "State = 'DISMISSED'" "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
     || fail '승인 계약 테스트가 dismissed review state를 검증하지 않습니다.'
+grep -Fq -- 'Get-BranchProtectionApprovalRequirement -BaseBranch' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+    || fail '승인 계약 테스트가 branch protection live 검증 경로를 실행하지 않습니다.'
+grep -Fq -- 'Assert-FixedApprovalPolicy -ReviewPolicy' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+    || fail '승인 계약 테스트가 dry-run 정책 검증 경로를 실행하지 않습니다.'
 if grep -Fq -- "if (\$reviewState -ieq 'DISMISSED')" "$APPROVAL_SCRIPT"; then
     fail 'Dismissed human reviews must remain in latest-state selection so they revoke earlier approvals.'
 fi

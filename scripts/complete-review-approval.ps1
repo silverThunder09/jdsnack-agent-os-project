@@ -176,9 +176,13 @@ function Get-BranchProtectionApprovalRequirement {
     if ($requiredApprovals -lt 1) {
         Stop-NeedsHuman "Branch '$BaseBranch' requires fewer than one approving review."
     }
+    $dismissStaleReviews = [bool]$requiredReviews.dismiss_stale_reviews
+    if (-not $dismissStaleReviews) {
+        Stop-NeedsHuman "Branch '$BaseBranch' does not dismiss stale pull request reviews."
+    }
     return [pscustomobject]@{
         RequiredApprovals = $requiredApprovals
-        DismissStaleReviews = [bool]$requiredReviews.dismiss_stale_reviews
+        DismissStaleReviews = $dismissStaleReviews
     }
 }
 

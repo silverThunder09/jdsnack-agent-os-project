@@ -23,6 +23,39 @@ for tool in env git grep tail sed head awk cmp rm cp jq codex; do
 done
 require_host_tool cat
 
+trusted_origin_urls=(
+  'https://github.com/silverThunder09/jdsnack-agent-os-project'
+  'https://github.com/silverThunder09/jdsnack-agent-os-project.git'
+  'git@github.com:silverThunder09/jdsnack-agent-os-project.git'
+  'ssh://git@github.com/silverThunder09/jdsnack-agent-os-project.git'
+)
+is_trusted_origin_url() {
+  local candidate="$1"
+  local trusted_url
+  for trusted_url in "${trusted_origin_urls[@]}"; do
+    if [ "$candidate" = "$trusted_url" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+origin_push_urls=()
+while IFS= read -r origin_url; do
+  [ -n "$origin_url" ] && origin_push_urls+=("$origin_url")
+done < <("$git_bin" remote get-url --all --push origin 2>/dev/null || true)
+if [ "${#origin_push_urls[@]}" -ne 1 ] || ! is_trusted_origin_url "${origin_push_urls[0]-}"; then
+  echo "ERROR: origin push URL이 trusted repository로 고정되지 않았습니다: ${origin_push_urls[*]-unavailable}" >&2
+  exit 1
+fi
+origin_fetch_urls=()
+while IFS= read -r origin_url; do
+  [ -n "$origin_url" ] && origin_fetch_urls+=("$origin_url")
+done < <("$git_bin" remote get-url --all origin 2>/dev/null || true)
+if [ "${#origin_fetch_urls[@]}" -ne 1 ] || ! is_trusted_origin_url "${origin_fetch_urls[0]-}"; then
+  echo "ERROR: origin fetch URL이 trusted repository로 고정되지 않았습니다: ${origin_fetch_urls[*]-unavailable}" >&2
+  exit 1
+fi
+
 REQUESTED_MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
 MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].runtimeModel // .workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
 
