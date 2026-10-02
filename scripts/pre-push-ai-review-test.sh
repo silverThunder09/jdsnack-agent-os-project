@@ -26,6 +26,12 @@ fixture_root="$(mktemp -d)"
 test_worktree="$fixture_root/test-worktree"
 git clone --quiet --no-checkout "$ROOT_DIR" "$test_worktree"
 git -C "$test_worktree" checkout -B codex/pre-push-test "$head_sha" >/dev/null
+# The real hook requires an explicitly configured executable Git Bash. Configure
+# the disposable clone so run_review exercises the hook entry point, not just
+# the review script behind it; piped pre-push ref updates must reach that script.
+git_bash_path="$(command -v bash)"
+[ -n "$git_bash_path" ] || fail 'hook entrypoint 검증에 사용할 Bash를 찾지 못했습니다.'
+git -C "$test_worktree" config --local jdsnack.hookBash "$git_bash_path"
 # git clone intentionally excludes uncommitted source edits, so include the
 # current hook implementation in the disposable fixture when it differs.
 cp "$ROOT_DIR/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
