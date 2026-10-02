@@ -28,6 +28,11 @@ git -C "$test_worktree" checkout -B codex/pre-push-test "$head_sha" >/dev/null
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$base_sha"
 fixture_head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 [ "$fixture_head_sha" = "$head_sha" ] || fail '격리 fixture가 현재 HEAD에서 생성되지 않았습니다.'
+head_tree="$(git -C "$test_worktree" rev-parse "$head_sha^{tree}")"
+non_ff_remote_sha="$(git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com commit-tree "$head_tree" -p "$base_sha" -m 'non-fast-forward pre-push fixture')"
+if git -C "$test_worktree" merge-base --is-ancestor "$non_ff_remote_sha" "$head_sha"; then
+  fail '격리 fixture의 non-fast-forward remote tip이 push head의 조상이 아닙니다.'
+fi
 workspace_arg="$test_worktree"
 if command -v cygpath >/dev/null 2>&1; then
   workspace_arg="$(cygpath -w "$test_worktree")"
@@ -179,7 +184,13 @@ fi
     printf 'insufficient summary\n'
   else
     fake_score="${JDSNACK_FAKE_SCORE:-5}"
-    printf '%s\n' '- correctness: PASS — the reviewed diff has a coherent implementation.'
+    fake_first_rubric_status='PASS'
+    if [ -f "$fixture_dir/codex.ok-summary" ]; then
+      fake_first_rubric_status='OK'
+    elif [ -f "$fixture_dir/codex.satisfied-summary" ]; then
+      fake_first_rubric_status='SATISFIED'
+    fi
+    printf '%s\n' "- correctness: ${fake_first_rubric_status} — the reviewed diff has a coherent implementation."
     printf '%s\n' '- contract: PASS — the requested workflow contracts are covered.'
     printf '%s\n' '- tests: PASS — executable contract tests cover the changed paths.'
     printf '%s\n' '- security: PASS — restricted execution and fail-closed checks are preserved.'
@@ -239,7 +250,7 @@ fork_origin_url='https://github.com/example-user/jdsnack-agent-os-project.git'
 rm -f "$fake_root/codex.invoked"
 (
   cd "$test_worktree"
-  printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$base_sha" \
     | PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
       run_hook_with_origin_urls "$test_worktree/scripts/pre-push-ai-review.sh" "$fork_origin_url" "$fork_origin_url" "$fork_origin_url"
@@ -311,6 +322,22 @@ if [ -e "$fake_root/codex.invoked" ]; then
   fail 'origin push URL override가 Codex reviewer 실행 전에 차단되지 않았습니다.'
 fi
 
+rm -f "$fake_root/codex.invoked"
+set +e
+non_ff_remote_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$non_ff_remote_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
+non_ff_remote_status=$?
+set -e
+if [ "$non_ff_remote_status" -eq 0 ] || ! grep -Fq 'non-fast-forward/force push' <<< "$non_ff_remote_output"; then
+  printf '%s\n' "$non_ff_remote_output" >&2
+  fail 'push 대상 HEAD와 무관한 기존 remote tip을 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail 'non-fast-forward remote tip이 Codex reviewer 실행 전에 차단되지 않았습니다.'
+fi
+
 touch "$fake_root/codex.weak-summary"
 set +e
 weak_summary_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
@@ -324,6 +351,26 @@ if [ "$weak_summary_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$weak_summa
   printf '%s\n' "$weak_summary_output" >&2
   fail '실질적인 rubric 근거가 없는 review_summary를 pre-push가 차단하지 않았습니다.'
 fi
+
+for unsupported_rubric_status in OK SATISFIED; do
+  case "$unsupported_rubric_status" in
+    OK) invalid_summary_marker="$fake_root/codex.ok-summary" ;;
+    SATISFIED) invalid_summary_marker="$fake_root/codex.satisfied-summary" ;;
+  esac
+  touch "$invalid_summary_marker"
+  set +e
+  unsupported_summary_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+    | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+        JDSNACK_REVIEW_BASE_REF="$base_ref" \
+        bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
+  unsupported_summary_status=$?
+  set -e
+  rm -f "$invalid_summary_marker"
+  if [ "$unsupported_summary_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$unsupported_summary_output"; then
+    printf '%s\n' "$unsupported_summary_output" >&2
+    fail "review_summary rubric의 $unsupported_rubric_status 상태를 pre-push가 차단하지 않았습니다."
+  fi
+done
 
 set +e
 touch "$fake_root/codex.duplicate-summary"
@@ -504,7 +551,7 @@ rm -f "$fake_root/codex.invoked"
 set +e
 tracked_output="$(
   cd "$test_worktree"
-  printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" '0000000000000000000000000000000000000000' \
     | PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
       bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project 2>&1

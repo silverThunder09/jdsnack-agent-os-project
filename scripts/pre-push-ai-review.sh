@@ -142,6 +142,7 @@ assert_clean_checkout() {
 push_refs=()
 push_shas=()
 push_remote_refs=()
+push_remote_shas=()
 deletion_ref_seen=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "${local_ref:-}" ] && continue
@@ -161,6 +162,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   push_refs+=("$local_ref")
   push_shas+=("$local_sha")
   push_remote_refs+=("$remote_ref")
+  push_remote_shas+=("$remote_sha")
 done
 
 if [ "${#push_shas[@]}" -eq 0 ]; then
@@ -198,6 +200,20 @@ if [ "$local_head_sha" != "$reviewed_ref" ]; then
   echo "ERROR: push 대상 커밋이 현재 checkout의 HEAD와 달라 pre-push 리뷰 증적을 고정할 수 없습니다." >&2
   printf 'head=%s push=%s\n' "$local_head_sha" "$reviewed_ref" >&2
   exit 1
+fi
+
+# pre-push's remote_sha is the existing remote tip, not the new local target.
+remote_head_sha="${push_remote_shas[0]}"
+if [[ ! "$remote_head_sha" =~ ^0+$ ]]; then
+  if [ -z "$remote_head_sha" ] || ! "$git_bin" cat-file -e "$remote_head_sha^{commit}" 2>/dev/null; then
+    echo "ERROR: 원격의 기존 ref tip을 로컬 commit으로 확인할 수 없어 push를 차단합니다." >&2
+    exit 1
+  fi
+  if ! "$git_bin" merge-base --is-ancestor "$remote_head_sha" "$reviewed_ref"; then
+    echo "ERROR: non-fast-forward/force push는 리뷰된 head와 기존 remote tip의 관계를 고정할 수 없어 차단합니다." >&2
+    printf 'remote=%s push=%s\n' "$remote_head_sha" "$reviewed_ref" >&2
+    exit 1
+  fi
 fi
 
 assert_clean_checkout
@@ -518,7 +534,7 @@ has_auditable_review_summary() {
   local rubric_name
   local match_count
   for rubric_name in correctness contract tests security maintainability; do
-    match_count="$("$grep_bin" -Eic "^[[:space:]]*-[[:space:]]+$rubric_name:[[:space:]]+(PASS|OK|SATISFIED)[[:space:]]+.{10,}$" "$summary_path" || true)"
+    match_count="$("$grep_bin" -Eic "^[[:space:]]*-[[:space:]]+$rubric_name:[[:space:]]+PASS[[:space:]]+.{10,}$" "$summary_path" || true)"
     if [ "$match_count" -ne 1 ]; then
       return 1
     fi
