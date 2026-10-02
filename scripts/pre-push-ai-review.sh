@@ -417,12 +417,36 @@ if [ -z "$codex_home_base" ] || [ ! -d "$codex_home_base" ]; then
 fi
 codex_auth_home_root="$(cd "$codex_home_base" && pwd -P)"
 repo_root_real="$(cd "$ROOT_DIR" && pwd -P)"
-case "$codex_auth_home_root/" in
-  "$repo_root_real/"*)
-    echo "ERROR: Codex reviewer 인증 홈은 repository 외부에 있어야 합니다." >&2
-    exit 1
+codex_auth_home_comparison="$codex_auth_home_root"
+repo_root_comparison="$repo_root_real"
+case "${OSTYPE-}" in
+  msys*|cygwin*|mingw*)
+    codex_auth_home_comparison="${codex_auth_home_comparison,,}"
+    repo_root_comparison="${repo_root_comparison,,}"
     ;;
 esac
+path_is_within_or_equal() {
+  candidate_path="$1"
+  parent_path="$2"
+  if [ "$candidate_path" = "$parent_path" ]; then
+    return 0
+  fi
+  if [ "$parent_path" = "/" ]; then
+    case "$candidate_path" in
+      /*) return 0 ;;
+    esac
+  else
+    case "$candidate_path" in
+      "$parent_path"/*) return 0 ;;
+    esac
+  fi
+  return 1
+}
+if path_is_within_or_equal "$codex_auth_home_comparison" "$repo_root_comparison" ||
+  path_is_within_or_equal "$repo_root_comparison" "$codex_auth_home_comparison"; then
+  echo "ERROR: Codex reviewer 인증 홈은 repository 외부에 있어야 합니다. repository를 포함하는 상위 경로도 사용할 수 없습니다." >&2
+  exit 1
+fi
 
 # Seed the persistent reviewer CODEX_HOME only from an explicit source. The
 # trusted CLI refreshes its own copy; the user's source auth.json is never

@@ -355,6 +355,20 @@ chmod 600 "$default_codex_home/auth.json"
 export CODEX_HOME="$default_codex_home"
 export CODEX_AUTH_FILE="$default_codex_home/auth.json"
 
+ancestor_codex_home="$fixture_root"
+rm -f "$fake_root/codex.invoked"
+set +e
+ancestor_codex_home_output="$(CODEX_HOME="$ancestor_codex_home" CODEX_AUTH_FILE="$default_codex_home/auth.json" run_review 2>&1)"
+ancestor_codex_home_status=$?
+set -e
+if [ "$ancestor_codex_home_status" -eq 0 ] || ! grep -Fq 'repository 외부에 있어야 합니다' <<< "$ancestor_codex_home_output"; then
+  printf '%s\n' "$ancestor_codex_home_output" >&2
+  fail 'pre-push가 repository 상위 경로의 CODEX_HOME을 차단하지 않았습니다.'
+fi
+if [ -e "$ancestor_codex_home/review-fallback" ] || [ -e "$fake_root/codex.invoked" ]; then
+  fail 'repository 상위 경로 CODEX_HOME 차단 전에 reviewer 인증 홈을 만들거나 Codex를 실행했습니다.'
+fi
+
 implicit_user_home="$fake_root/implicit-user-home"
 mkdir -p "$implicit_user_home/.codex"
 printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"implicit-access","refresh_token":"implicit-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account","client_id":"preserve-source-metadata"}' > "$implicit_user_home/.codex/auth.json"

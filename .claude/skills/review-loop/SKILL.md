@@ -57,7 +57,7 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
    - REQUEST_CHANGES는 GitHub review로 한 번 제출합니다. 제출을 시도한 뒤 추가 comment review를 만들지 않습니다.
    - COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 승인을 중단합니다. High-risk라는 이유만으로 NEEDS_HUMAN을 반환하지 않습니다.
    - 본문에는 review-loop, attempt, 점수, 결정, findings를 포함합니다.
-3. score가 4 미만이거나 결정론 게이트가 실패하면 review job을 통과시키지 않습니다. 현재 실행 중인 review check는 완료 전에 IN_PROGRESS일 수 있으므로, 그 check가 완료되길 기다리는 무한 대기를 하지 않습니다.
+3. score가 4 미만이거나 결정론 게이트가 실패하면 review job을 통과시키지 않습니다. approval job은 현재 실행의 review check도 GitHub가 SUCCESS/pass로 완료한 경우에만 인정하며, IN_PROGRESS/pending은 통과로 취급하지 않습니다.
 4. High-risk 변경은 scripts/pr-contract-test.sh, scripts/pr-review-gate.sh, merge-rules.md 조건을 적용합니다. 소유자의 현재 head Squash auto-merge 확인이 없으면 중단합니다.
 5. approval job은 report와 최신 PR이 리뷰한 base/head SHA가 일치하는지, Validate PR contract, PR CI Gate, review check 및 모든 branch-required check가 통과했는지 확인합니다. 별도 GitHub APPROVE 리뷰 없이 확인한 head의 squash auto-merge를 큐에 넣습니다.
 6. auto-merge 명령 성공만으로 머지 완료로 보고하지 않습니다.

@@ -6,7 +6,7 @@ Git 훅은 사람이 놓치기 쉬운 하네스 규칙을 커밋/푸시 전에 �
 
 ## 적용 단계
 
-현재 저장소는 버전관리되는 `.githooks/pre-commit`과 `.githooks/pre-push`를 사용합니다. clone 직후 `sh scripts/install-git-hooks.sh`를 실행하면 hook 파일과 downstream 스크립트, pre-push의 Git Bash 도구, pre-commit readiness용 Python, `jq`, PowerShell(`pwsh` 또는 `powershell.exe`), Codex CLI를 확인한 뒤에만 `core.hooksPath=.githooks`를 로컬 Git 설정에 연결합니다. 사전조건이나 설정 검증이 실패하면 hook 활성화를 성공으로 처리하지 않습니다.
+현재 저장소는 버전관리되는 `.githooks/pre-commit`과 `.githooks/pre-push`를 사용합니다. clone 직후 `sh scripts/install-git-hooks.sh`를 실행하면 hook 파일과 downstream 스크립트, pre-push에서 사용할 실행 가능한 Git Bash를 검증해 절대 경로로 로컬 Git 설정(`jdsnack.hookBash`)에 저장하고, pre-commit readiness용 Python, `jq`, PowerShell(`pwsh` 또는 `powershell.exe`), Codex CLI를 확인한 뒤에만 `core.hooksPath=.githooks`를 연결합니다. push hook은 이 검증된 Bash 경로를 호출하므로 실행 시점의 PATH 차이로 Bash를 찾지 못하는 경우를 막습니다. 사전조건이나 설정 검증이 실패하면 hook 활성화를 성공으로 처리하지 않습니다.
 
 ## `commit-msg` 훅
 

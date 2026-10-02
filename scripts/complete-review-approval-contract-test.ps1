@@ -475,27 +475,29 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     $workflowRunId = '123456789'
     $currentReviewCheck = [pscustomobject]@{
         name = 'review'
-        state = 'IN_PROGRESS'
-        bucket = 'pending'
+        state = 'SUCCESS'
+        bucket = 'pass'
         link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100"
     }
     if (-not (Test-CurrentRunReviewCheck -Check $currentReviewCheck -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com')) {
-        throw 'A pending required review check from this successful workflow run was not recognized.'
+        throw 'A completed successful review check from this workflow run was not recognized.'
     }
     foreach ($invalidCurrentReviewCheck in @(
             [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/987654321/job/100" },
+            [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'fail'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
             [pscustomobject]@{ name = 'PR CI Gate'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-        [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://evil.example/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-        [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "http://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-        [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/other/repository/actions/runs/$workflowRunId/job/100" },
-        [pscustomobject]@{ name = 'review'; state = 'COMPLETED'; bucket = 'fail'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" }
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = "https://evil.example/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = "http://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = "https://github.com/other/repository/actions/runs/$workflowRunId/job/100" },
+            [pscustomobject]@{ name = 'review'; state = 'FAILURE'; bucket = 'fail'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" }
         )) {
         if (Test-CurrentRunReviewCheck -Check $invalidCurrentReviewCheck -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com') {
-            throw 'An unrelated host, repository, run, failed, or completed review check was accepted as the current workflow review.'
+            throw 'A pending, failed, unrelated host, repository, or run review check was accepted as the current workflow review.'
         }
     }
     if (Test-CurrentRunReviewCheck -Check $currentReviewCheck -ReviewJobResult 'failure' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com') {
-        throw 'A pending check was exempted without a successful upstream review job.'
+        throw 'A completed review check was accepted without a successful upstream review job.'
     }
     foreach ($malformedRequiredCheck in @(
             [pscustomobject]@{ name = ''; bucket = 'pass' },

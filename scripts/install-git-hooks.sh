@@ -32,9 +32,19 @@ require_tool() {
   fi
 }
 
-for required_tool in bash dirname env git grep tail sed head awk cmp rm chmod mktemp stat jq codex cat; do
+for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat jq codex cat; do
   require_tool "$required_tool"
 done
+
+git_bash_path="$(command -v bash || true)"
+if [ -z "$git_bash_path" ] || [ ! -x "$git_bash_path" ]; then
+  echo "ERROR: Git hooks require an executable Git Bash on PATH before core.hooksPath can be enabled." >&2
+  exit 1
+fi
+case "$git_bash_path" in
+  /*) ;;
+  *) git_bash_path="$(cd "$(dirname "$git_bash_path")" && pwd -P)/$(basename "$git_bash_path")" ;;
+esac
 
 python_tool=""
 for candidate in python3 python; do
@@ -69,6 +79,20 @@ if ! codex exec \
   exit 1
 fi
 
+git config --local jdsnack.hookBash "$git_bash_path"
+configured_bash_path="$(git config --local --get jdsnack.hookBash)"
+configured_bash_comparison="$configured_bash_path"
+if command -v cygpath >/dev/null 2>&1; then
+  configured_bash_comparison="$(cygpath -u "$configured_bash_path")" || {
+    echo "ERROR: persisted Git Bash path could not be normalized: $configured_bash_path" >&2
+    exit 1
+  }
+fi
+if [ "$configured_bash_comparison" != "$git_bash_path" ] || [ ! -x "$configured_bash_path" ]; then
+  echo "ERROR: verified Git Bash path could not be persisted: $configured_bash_path" >&2
+  exit 1
+fi
+
 for hook in pre-commit pre-push; do
   if [ ! -x "$repo_root/$hooks_path/$hook" ]; then
     chmod +x "$repo_root/$hooks_path/$hook"
@@ -82,5 +106,5 @@ if [ "$configured_path" != "$hooks_path" ]; then
   exit 1
 fi
 
-echo "Git hook prerequisites verified: Bash, $python_tool, jq, $powershell_tool, Codex CLI and required Git Bash tools"
+echo "Git hook prerequisites verified: $git_bash_path, $python_tool, jq, $powershell_tool, Codex CLI and required Git Bash tools"
 echo "Git hooks enabled: $configured_path (pre-commit, pre-push)"

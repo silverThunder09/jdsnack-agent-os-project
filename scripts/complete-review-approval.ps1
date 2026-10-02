@@ -205,8 +205,8 @@ function Test-CurrentRunReviewCheck {
         $null -eq $Check -or
         $ReviewJobResult -ine 'success' -or
         [string]$Check.name -notmatch '(^| / )review$' -or
-        [string]$Check.state -ine 'IN_PROGRESS' -or
-        [string]$Check.bucket -ine 'pending' -or
+        [string]$Check.state -ine 'SUCCESS' -or
+        [string]$Check.bucket -ine 'pass' -or
         $WorkflowRunId -notmatch '^\d+$' -or
         $Repository -notmatch '^[^/]+/[^/]+$'
     ) {
