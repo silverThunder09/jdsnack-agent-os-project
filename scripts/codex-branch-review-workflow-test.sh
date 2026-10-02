@@ -377,6 +377,7 @@ for approval_contract in \
     'The review report must include deterministic risk score, risk band, and dry-run state.' \
     'review-risk.ps1' \
     'Get-CurrentHeadApprovers' \
+    'Test-EligibleHumanApprover' \
     'Get-HumanApprovalSummary' \
     'Assert-NoUnresolvedChangeRequests' \
     'api' \
@@ -387,9 +388,11 @@ for approval_contract in \
     'endCursor' \
     'Human review pagination did not provide a deterministic next cursor.' \
     'CommitOid = [string]$review.commit.oid' \
-    'Get-CurrentHeadApprovers -LatestByLogin $latestByLogin -ExpectedHeadSha $ExpectedHeadSha' \
+    'Get-CurrentHeadApprovers -LatestByLogin $eligibleLatestByLogin -ExpectedHeadSha $ExpectedHeadSha' \
+    'collaborators/$encodedLogin/permission' \
+    "@('admin', 'maintain', 'push')" \
     '$latest.State -eq '\''APPROVED'\'' -and $latest.CommitOid -eq $ExpectedHeadSha' \
-    '$changesRequestedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq '\''CHANGES_REQUESTED'\'' }' \
+    '$changesRequestedLogins = @($eligibleLatestByLogin.Keys | Where-Object { $eligibleLatestByLogin[$_].State -eq '\''CHANGES_REQUESTED'\'' }' \
     'Get-BranchProtectionApprovalRequirement' \
     'required_approving_review_count' \
     'effectiveMinimumApprovals' \
@@ -425,6 +428,10 @@ grep -Fq -- 'Get-BranchProtectionApprovalRequirement -BaseBranch' "$ROOT_DIR/scr
     || fail '승인 계약 테스트가 branch protection live 검증 경로를 실행하지 않습니다.'
 grep -Fq -- 'Assert-FixedApprovalPolicy -ReviewPolicy' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
     || fail '승인 계약 테스트가 dry-run 정책 검증 경로를 실행하지 않습니다.'
+grep -Fq -- 'JDSNACK_FAKE_REVIEWER_PERMISSION' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+    || fail '승인 계약 테스트가 reviewer repository permission 경로를 실행하지 않습니다.'
+grep -Fq -- 'fixture_head_sha=' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
+    || fail 'pre-push AI 리뷰 계약 테스트가 fixture HEAD를 명시적으로 검증하지 않습니다.'
 if grep -Fq -- "if (\$reviewState -ieq 'DISMISSED')" "$APPROVAL_SCRIPT"; then
     fail 'Dismissed human reviews must remain in latest-state selection so they revoke earlier approvals.'
 fi

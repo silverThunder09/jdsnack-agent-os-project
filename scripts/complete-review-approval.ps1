@@ -198,6 +198,34 @@ function Get-CurrentHeadApprovers {
     } | Sort-Object)
 }
 
+function Test-EligibleHumanApprover {
+    param([string]$Login)
+
+    if ([string]::IsNullOrWhiteSpace($Login)) {
+        Stop-NeedsHuman 'Human review data is missing a reviewer login while verifying repository permission.'
+    }
+    $encodedLogin = [uri]::EscapeDataString($Login)
+    $permissionJson = & $script:ghPath api "repos/$Repository/collaborators/$encodedLogin/permission" 2>&1 | Out-String
+    if ([int]$LASTEXITCODE -ne 0) {
+        # GitHub returns HTTP 404 when the reviewer is not a repository collaborator.
+        # That review is valid evidence, but it must not satisfy the protected-branch approval count.
+        if ($permissionJson -match '(?i)\bHTTP\s+404\b') {
+            return $false
+        }
+        Stop-NeedsHuman "Could not verify repository permission for reviewer '$Login': $permissionJson"
+    }
+    try {
+        $permissionResponse = ConvertFrom-Json -InputObject $permissionJson
+        $permission = [string]$permissionResponse.permission
+    } catch {
+        Stop-NeedsHuman "Reviewer permission returned invalid JSON for '$Login': $($_.Exception.Message)"
+    }
+    if ([string]::IsNullOrWhiteSpace($permission)) {
+        Stop-NeedsHuman "Reviewer permission is missing for '$Login'."
+    }
+    return $permission -in @('admin', 'maintain', 'push')
+}
+
 function Get-HumanApprovalSummary {
     param(
         [string]$ExpectedHeadSha
@@ -281,9 +309,9 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
         if ([string]::IsNullOrWhiteSpace($login) -or $login -eq $pullRequestAuthor -or $login -match '\[bot\]$') {
             continue
         }
-        # GitHub branch protection determines whether a submitted review is effective.
-        # authorAssociation can be CONTRIBUTOR, FIRST_TIMER, FIRST_TIME_CONTRIBUTOR, or NONE
-        # for a legitimate human reviewer, so only deleted mannequin identities are excluded.
+        # authorAssociation does not prove a reviewer's current repository permission.
+        # It can be CONTRIBUTOR, FIRST_TIMER, FIRST_TIME_CONTRIBUTOR, or NONE for a human.
+        # Deleted mannequin identities are excluded here; write-level collaborator status is checked below.
         if ([string]$review.authorAssociation -eq 'MANNEQUIN') {
             continue
         }
@@ -321,8 +349,19 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
         }
     }
 
-    $approvedLogins = @(Get-CurrentHeadApprovers -LatestByLogin $latestByLogin -ExpectedHeadSha $ExpectedHeadSha)
-    $changesRequestedLogins = @($latestByLogin.Keys | Where-Object { $latestByLogin[$_].State -eq 'CHANGES_REQUESTED' } | Sort-Object)
+    $eligibleLatestByLogin = @{}
+    foreach ($login in @($latestByLogin.Keys | Sort-Object)) {
+        $latestReview = $latestByLogin[$login]
+        if ($latestReview.State -notin @('APPROVED', 'CHANGES_REQUESTED')) {
+            continue
+        }
+        if (Test-EligibleHumanApprover -Login $login) {
+            $eligibleLatestByLogin[$login] = $latestReview
+        }
+    }
+
+    $approvedLogins = @(Get-CurrentHeadApprovers -LatestByLogin $eligibleLatestByLogin -ExpectedHeadSha $ExpectedHeadSha)
+    $changesRequestedLogins = @($eligibleLatestByLogin.Keys | Where-Object { $eligibleLatestByLogin[$_].State -eq 'CHANGES_REQUESTED' } | Sort-Object)
     return [pscustomobject]@{
         Count = $approvedLogins.Count
         Logins = $approvedLogins

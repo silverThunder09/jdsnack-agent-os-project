@@ -85,6 +85,15 @@ if ($null -eq $branchProtectionFunctionAst) {
     throw 'Get-BranchProtectionApprovalRequirement function was not found.'
 }
 . ([scriptblock]::Create($branchProtectionFunctionAst.Extent.Text))
+$eligibleHumanApproverFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Test-EligibleHumanApprover'
+    }, $true)
+if ($null -eq $eligibleHumanApproverFunctionAst) {
+    throw 'Test-EligibleHumanApprover function was not found.'
+}
+. ([scriptblock]::Create($eligibleHumanApproverFunctionAst.Extent.Text))
 $humanApprovalFunctionAst = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -129,6 +138,14 @@ if ($Arguments -contains 'graphql') {
     $review | ConvertTo-Json -Depth 10 -Compress
     exit 0
 }
+if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments[1]) -match '^repos/.+/collaborators/.+/permission$') {
+    if ($env:JDSNACK_FAKE_REVIEWER_PERMISSION -eq 'not-found') {
+        Write-Output 'gh: Not Found (HTTP 404)'
+        exit 1
+    }
+    [pscustomobject]@{ permission = $env:JDSNACK_FAKE_REVIEWER_PERMISSION } | ConvertTo-Json -Compress
+    exit 0
+}
 if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
     Write-Output '{"required_pull_request_reviews":{"required_approving_review_count":2,"dismiss_stale_reviews":true}}'
 } else {
@@ -144,9 +161,20 @@ if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
         throw 'Valid branch protection was not returned as an enforced approval requirement.'
     }
     $env:JDSNACK_FAKE_HEAD_SHA = $headSha
+    $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'pull'
+    $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($approvalSummary.Count -ne 0) {
+        throw 'A read-only contributor review was counted as a protected-branch human approval.'
+    }
+    $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'not-found'
+    $nonCollaboratorSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($nonCollaboratorSummary.Count -ne 0) {
+        throw 'A non-collaborator review was counted as a protected-branch human approval.'
+    }
+    $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'push'
     $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
     if ($approvalSummary.Count -ne 1 -or $approvalSummary.Logins[0] -ne 'contributor') {
-        throw 'A legitimate contributor review was not counted as a current-head human approval.'
+        throw 'A write-level collaborator review was not counted as a current-head human approval.'
     }
     $env:JDSNACK_FAKE_DISMISS_STALE = 'false'
     $staleProtectionRejected = $false
@@ -165,6 +193,7 @@ if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_DISMISS_STALE -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_HEAD_SHA -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_FAKE_REVIEWER_PERMISSION -ErrorAction SilentlyContinue
 }
 
 

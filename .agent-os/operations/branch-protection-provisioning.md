@@ -30,6 +30,11 @@
   별도 정책과 CI 조건을 만족할 때만 진행합니다.
 - High-risk: 최신 head 이후 사람 승인 2명 이상과 저장소 소유자의
   최신 head 기준 Squash auto-merge 확인이 필요합니다.
+- 유효한 사람 승인은 PR 작성자·봇·삭제된 계정을 제외한 뒤, 현재 head의
+  최신 `APPROVED` review와 GitHub API의 현재 저장소 권한
+  (`admin`, `maintain`, `push`)을 모두 만족해야 합니다. `authorAssociation`만으로
+  권한을 추정하지 않으며, collaborator가 아닌 reviewer의 404 응답은 승인으로
+  세지 않습니다. 그 밖의 권한 조회 실패는 `needs-human`으로 중단합니다.
 - 보호 설정 조회가 실패하거나 required pull request review 보호가 없으면
   승인 job은 `needs-human` 경계로 중단합니다.
 

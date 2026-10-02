@@ -24,6 +24,8 @@ fake_root="$(mktemp -d)"
 fixture_root="$(mktemp -d)"
 test_worktree="$fixture_root/test-worktree"
 git worktree add --detach "$test_worktree" "$head_sha" >/dev/null
+fixture_head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
+[ "$fixture_head_sha" = "$head_sha" ] || fail '격리 fixture가 현재 HEAD에서 생성되지 않았습니다.'
 workspace_arg="$test_worktree"
 if command -v cygpath >/dev/null 2>&1; then
   workspace_arg="$(cygpath -w "$test_worktree")"
