@@ -59,10 +59,67 @@ function Stop-NeedsHuman {
     throw $Reason
 }
 
+$reportFieldsFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-UniqueReviewReportFields'
+    }, $true)
+if ($null -eq $reportFieldsFunctionAst) {
+    throw 'Assert-UniqueReviewReportFields function was not found.'
+}
+. ([scriptblock]::Create($reportFieldsFunctionAst.Extent.Text))
+$validReport = @"
+- reviewer backend: claude
+- decision: PASS
+- score: 4/5
+- risk: High-risk
+- risk score: 65/100
+- risk band: High-risk
+- dry-run: True
+- reviewed base SHA: $headSha
+- reviewed head SHA: $headSha
+"@
+Assert-UniqueReviewReportFields -Report $validReport
+foreach ($duplicateField in @('risk', 'risk score', 'risk band', 'dry-run')) {
+    $duplicateReport = "$validReport`r`n- ${duplicateField}: conflicting value"
+    $duplicateFieldRejected = $false
+    try {
+        Assert-UniqueReviewReportFields -Report $duplicateReport
+    } catch {
+        $duplicateFieldRejected = $true
+        if ($_.Exception.Message -notmatch 'exactly one') {
+            throw
+        }
+    }
+    if (-not $duplicateFieldRejected) {
+        throw "A duplicate '$duplicateField' report field was accepted."
+    }
+}
+
 . ([scriptblock]::Create($policyFunctionAst.Extent.Text))
 $policyPath = Join-Path $Workspace 'scripts/review-policy.json'
 $validPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
 Assert-FixedApprovalPolicy -ReviewPolicy $validPolicy
+foreach ($tamperScenario in @('scoring-pattern', 'review-routing', 'size-threshold')) {
+    $tamperedPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
+    switch ($tamperScenario) {
+        'scoring-pattern' { $tamperedPolicy.riskScore.pathPatterns.security[0] = '.*' }
+        'review-routing' { $tamperedPolicy.reviewRouting.Security[0] = '.*' }
+        'size-threshold' { $tamperedPolicy.riskScore.size.small.maxChangedLines = 101 }
+    }
+    $tamperedPolicyRejected = $false
+    try {
+        Assert-FixedApprovalPolicy -ReviewPolicy $tamperedPolicy
+    } catch {
+        $tamperedPolicyRejected = $true
+        if ($_.Exception.Message -notmatch 'fixed policy digest') {
+            throw
+        }
+    }
+    if (-not $tamperedPolicyRejected) {
+        throw "Assert-FixedApprovalPolicy accepted a tampered $tamperScenario field."
+    }
+}
 $invalidDryRunPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
 $invalidDryRunPolicy.dryRun = $false
 $dryRunRejected = $false

@@ -44,6 +44,29 @@ function Stop-NeedsHuman {
     exit 20
 }
 
+function Assert-UniqueReviewReportFields {
+    param([string]$Report)
+
+    $requiredFields = @(
+        'reviewer backend'
+        'decision'
+        'score'
+        'risk'
+        'risk score'
+        'risk band'
+        'dry-run'
+        'reviewed base SHA'
+        'reviewed head SHA'
+    )
+    foreach ($fieldName in $requiredFields) {
+        $fieldPattern = '(?im)^-[ \t]*' + [regex]::Escape($fieldName) + '[ \t]*:'
+        $fieldCount = [regex]::Matches($Report, $fieldPattern).Count
+        if ($fieldCount -ne 1) {
+            Stop-NeedsHuman "The review report must contain exactly one '$fieldName' field."
+        }
+    }
+}
+
 function Assert-FixedApprovalPolicy {
     param([pscustomobject]$ReviewPolicy)
 
@@ -85,6 +108,19 @@ function Assert-FixedApprovalPolicy {
         ) {
             Stop-NeedsHuman "Review policy risk band is not fixed: $($expected.name)."
         }
+    }
+
+    $canonicalPolicy = ConvertTo-Json -InputObject $ReviewPolicy -Depth 20 -Compress
+    $policyBytes = [System.Text.Encoding]::UTF8.GetBytes($canonicalPolicy)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $policyDigest = (($sha256.ComputeHash($policyBytes) | ForEach-Object { $_.ToString('x2') }) -join '')
+    } finally {
+        $sha256.Dispose()
+    }
+    $expectedPolicyDigest = '006f215208f2951b70d946dbeb73f1ffb59e269703c290ee529e57906096ffc4'
+    if ($policyDigest -ne $expectedPolicyDigest) {
+        Stop-NeedsHuman 'Review policy risk scoring and routing do not match the trusted fixed policy digest.'
     }
 }
 
@@ -471,6 +507,7 @@ $policyPath = Join-Path $Workspace 'scripts/review-policy.json'
 $reviewPolicy = Get-ReviewPolicy $policyPath
 
 $report = Get-Content -LiteralPath $ReportPath -Raw
+Assert-UniqueReviewReportFields -Report $report
 $reviewerBackendMatch = [regex]::Match($report, '(?im)^-\s*reviewer backend:\s*([^\r\n]+)$')
 $decisionMatch = [regex]::Match($report, '(?im)^-\s*decision:\s*(PASS)\s*$')
 $scoreMatch = [regex]::Match($report, '(?im)^-\s*score:\s*([4-5])\s*/\s*5\s*$')
