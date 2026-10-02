@@ -247,6 +247,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Contract tests compare PR base/head using a three-dot Git diff.
+          fetch-depth: 0
       - name: Validate workflow contracts
         run: bash scripts/workflow-ci-test.sh
 

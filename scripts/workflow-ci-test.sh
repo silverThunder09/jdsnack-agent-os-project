@@ -119,6 +119,9 @@ grep -Fq -- 'name: Validate PR contract' "$PR_CI_ROUTER" \
   || { echo 'PR CI Router must run the PR contract job' >&2; exit 1; }
 grep -Fq -- 'bash scripts/pr-contract-test.sh' "$PR_CI_ROUTER" \
   || { echo 'PR CI Router must execute scripts/pr-contract-test.sh' >&2; exit 1; }
+workflow_ci_job="$(sed -n '/^  workflow:/,/^  gate:/p' "$PR_CI_ROUTER")"
+grep -Fq -- 'fetch-depth: 0' <<< "$workflow_ci_job" \
+  || { echo 'Workflow CI must fetch full history for origin/main and three-dot diff contracts' >&2; exit 1; }
 grep -Fq -- 'pr_contract' "$PR_CI_ROUTER" \
   || { echo 'PR CI Gate must include the PR contract result' >&2; exit 1; }
 test -f "$ROOT_DIR/scripts/pr-contract-test.sh" \
