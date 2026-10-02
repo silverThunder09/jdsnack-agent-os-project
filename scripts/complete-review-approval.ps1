@@ -56,6 +56,7 @@ function Assert-UniqueReviewReportFields {
         'risk'
         'risk score'
         'risk band'
+        'review labels'
         'dry-run'
         'reviewed base SHA'
         'reviewed head SHA'
@@ -67,6 +68,35 @@ function Assert-UniqueReviewReportFields {
             Stop-NeedsHuman "The review report must contain exactly one '$fieldName' field."
         }
     }
+}
+
+function Test-ReviewLabelsMatchAssessment {
+    param(
+        [string[]]$ReportedLabels,
+        [string[]]$ExpectedLabels
+    )
+
+    $reportedSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($label in @($ReportedLabels | ForEach-Object { ([string]$_).Trim() })) {
+        if ([string]::IsNullOrWhiteSpace($label) -or -not $reportedSet.Add($label)) {
+            return $false
+        }
+    }
+    $expectedSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($label in @($ExpectedLabels | ForEach-Object { ([string]$_).Trim() })) {
+        if ([string]::IsNullOrWhiteSpace($label) -or -not $expectedSet.Add($label)) {
+            return $false
+        }
+    }
+    if ($reportedSet.Count -eq 0 -or $reportedSet.Count -ne $expectedSet.Count) {
+        return $false
+    }
+    foreach ($label in $reportedSet) {
+        if (-not $expectedSet.Contains($label)) {
+            return $false
+        }
+    }
+    return $true
 }
 
 function Assert-FixedApprovalPolicy {
@@ -307,6 +337,10 @@ function Assert-RequiredChecksMatchBranchProtection {
         $reportedName = [string]$requiredCheck.name
         if ([string]::IsNullOrWhiteSpace($reportedName)) {
             Stop-NeedsHuman 'gh pr checks --required returned an empty or malformed check name.'
+        }
+        $reportedBucket = [string]$requiredCheck.bucket
+        if ($reportedBucket -ine 'pass') {
+            Stop-NeedsHuman "Branch-required check '$reportedName' is not passing (bucket=$reportedBucket)."
         }
         $reportedNames += $reportedName
     }
@@ -606,14 +640,15 @@ $scoreMatch = [regex]::Match($report, '(?im)^-\s*score:\s*([4-5])\s*/\s*5\s*$')
 $riskMatch = [regex]::Match($report, '(?im)^-\s*risk:\s*(Light|Standard|High-risk)\s*$')
 $riskScoreMatch = [regex]::Match($report, '(?im)^-\s*risk score:\s*(\d+)\s*/\s*100\s*$')
 $riskBandMatch = [regex]::Match($report, '(?im)^-\s*risk band:\s*(Light|Standard|High-risk)\s*$')
+$reviewLabelsMatch = [regex]::Match($report, '(?im)^-\s*review labels:\s*([^\r\n]+?)\s*$')
 $dryRunMatch = [regex]::Match($report, '(?im)^-\s*dry-run:\s*(True|False)\s*$')
 $baseMatch = [regex]::Match($report, '(?im)^-\s*reviewed base SHA:\s*([0-9a-f]{40})\s*$')
 $headMatch = [regex]::Match($report, '(?im)^-\s*reviewed head SHA:\s*([0-9a-f]{40})\s*$')
 if (-not $reviewerBackendMatch.Success -or -not $decisionMatch.Success -or -not $scoreMatch.Success -or -not $riskMatch.Success) {
     Stop-NeedsHuman 'The review report must have a PASS result with score 4 or higher.'
 }
-if (-not $riskScoreMatch.Success -or -not $riskBandMatch.Success -or -not $dryRunMatch.Success) {
-    Stop-NeedsHuman 'The review report must include deterministic risk score, risk band, and dry-run state.'
+if (-not $riskScoreMatch.Success -or -not $riskBandMatch.Success -or -not $reviewLabelsMatch.Success -or -not $dryRunMatch.Success) {
+    Stop-NeedsHuman 'The review report must include deterministic risk score, risk band, labels, and dry-run state.'
 }
 if (
     -not $baseMatch.Success -or
@@ -655,9 +690,12 @@ if ($riskMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand) {
 if (
     [int]$riskScoreMatch.Groups[1].Value -ne [int]$riskAssessment.riskScore -or
     $riskBandMatch.Groups[1].Value -ne [string]$riskAssessment.riskBand -or
+    -not (Test-ReviewLabelsMatchAssessment `
+        -ReportedLabels @($reviewLabelsMatch.Groups[1].Value -split ',') `
+        -ExpectedLabels @($riskAssessment.reviewLabels)) -or
     ([string]$dryRunMatch.Groups[1].Value -eq 'True') -ne [bool]$riskAssessment.dryRun
 ) {
-    Stop-NeedsHuman 'The review report risk data does not match the deterministic assessment.'
+    Stop-NeedsHuman 'The review report risk data and labels do not match the deterministic assessment.'
 }
 
 $branchProtectionApproval = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
@@ -666,15 +704,7 @@ if ($requiredChecks.Count -eq 0) {
     Stop-NeedsHuman 'No required PR checks were returned.'
 }
 Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $branchProtectionApproval.RequiredCheckContexts -RequiredChecks $requiredChecks
-$blockingChecks = @($requiredChecks | Where-Object {
-        $_.bucket -notin @('pass', 'skipping') -and
-        -not (Test-CurrentRunReviewCheck `
-                -Check $_ `
-                -ReviewJobResult $ReviewJobResult `
-                -WorkflowRunId $env:GITHUB_RUN_ID `
-                -Repository $Repository `
-                -ServerUrl $env:GITHUB_SERVER_URL)
-    })
+$blockingChecks = @($requiredChecks | Where-Object { $_.bucket -ine 'pass' })
 if ($blockingChecks.Count -gt 0) {
     $blockingSummary = ($blockingChecks | ForEach-Object { '{0}={1}' -f $_.name, $_.bucket }) -join ', '
     Stop-NeedsHuman "Required checks are not passing: $blockingSummary"

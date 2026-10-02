@@ -13,7 +13,7 @@ Claude 리뷰 서비스가 구독 비활성화, 인증·쿼터·자격 증명 �
 5. 리뷰 job은 PASS, 4점 이상, 통과한 Validate PR contract와 PR CI Gate를 확인한 뒤 성공합니다. `scripts/review-risk.ps1`이 계산한 위험도 점수·구간과 Security·Performance·Test Coverage·Architecture 라벨을 프롬프트에 전달하고, 결과는 같은 head SHA에 대해 PR 코멘트와 라벨로 공개합니다. `NEEDS_HUMAN`은 항상 중단합니다. 결정론적으로 선택하지 않은 backend/frontend 체크의 `skipping`은 PR CI Gate가 통과했을 때 허용합니다.
 
 리뷰 요약은 정확히 7줄이며, correctness·contract·tests·security·maintainability 각 rubric은 `PASS — 근거` 형식이어야 합니다. findings에 P2/P3가 있으면 요약의 score rationale 또는 conclusion에 해당 severity를 각각 명시해야 합니다. `OK`나 `SATISFIED`는 PASS로 인정하지 않습니다.
-6. 별도 approval job은 성공한 리뷰 job에 의존합니다. 리뷰 보고서의 점수·위험도·위험도 점수·base/head SHA, 현재 열린 PR의 저장소와 SHA, Validate PR contract, PR CI Gate, 완료 상태가 `SUCCESS/pass`인 review check, 모든 branch-required check를 다시 확인합니다. 같은 실행의 review check가 `IN_PROGRESS/pending`이면 upstream job 결과가 success여도 통과로 간주하지 않습니다. 초기 `scripts/review-policy.json`의 `dryRun=true`에서는 리뷰·코멘트·라벨만 수행하고 `gh pr merge`를 호출하지 않습니다. 드라이런 해제 뒤 `Light`는 승인 1명, `Standard`는 사람 리뷰 후 자동 병합 차단, `High-risk`는 승인 2명과 최신 head 이후 소유자 명시 확인을 적용합니다.
+6. 별도 approval job은 성공한 리뷰 job에 의존합니다. 리뷰 보고서의 점수·위험도·위험 점수·위험 구간·전문 리뷰 라벨·base/head SHA, 현재 열린 PR의 저장소와 SHA, Validate PR contract, PR CI Gate, 완료 상태가 `SUCCESS/pass`인 review check, 모든 branch-required check를 다시 확인합니다. 전문 리뷰 라벨은 결정론 평가의 라벨 집합과 일치해야 하며, 필수 check의 `skipping`도 통과로 취급하지 않습니다. 같은 실행의 review check가 `IN_PROGRESS/pending`이면 upstream job 결과가 success여도 통과로 간주하지 않습니다. 초기 `scripts/review-policy.json`의 `dryRun=true`에서는 리뷰·코멘트·라벨만 수행하고 `gh pr merge`를 호출하지 않습니다. 드라이런 해제 뒤 `Light`는 승인 1명, `Standard`는 사람 리뷰 후 자동 병합 차단, `High-risk`는 승인 2명과 최신 head 이후 소유자 명시 확인을 적용합니다.
 
 ## 사람 확인이 필요한 경우
 

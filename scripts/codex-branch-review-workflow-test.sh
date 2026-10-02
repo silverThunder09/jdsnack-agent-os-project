@@ -309,6 +309,7 @@ for fallback_contract in \
     'risk: Light | Standard | High-risk' \
     'Stop-NeedsHuman' \
     'Get-RequiredCheckFailure' \
+    '(-not $self) -and $_.bucket -ne' \
     '--required --json name,state,bucket' \
     "'--restricted'" \
     "'--tools', ''" \
@@ -469,12 +470,16 @@ for approval_contract in \
     "'review'" \
     'Required checks are not passing' \
     'The review report must have a PASS result with score 4 or higher.' \
-    'The review report must include deterministic risk score, risk band, and dry-run state.' \
+    'The review report must include deterministic risk score, risk band, labels, and dry-run state.' \
     'review-risk.ps1' \
     'Get-CurrentHeadApprovers' \
     'Test-EligibleHumanApprover' \
     'Get-HumanApprovalSummary' \
     'Assert-RequiredChecksMatchBranchProtection' \
+    "reportedBucket -ine 'pass'" \
+    'Branch-required check' \
+    'Test-ReviewLabelsMatchAssessment' \
+    "'review labels'" \
     'Assert-NoUnresolvedChangeRequests' \
     'api' \
     'graphql' \
@@ -518,7 +523,6 @@ for approval_contract in \
     'minimumApprovals' \
     'autoMergePolicy' \
     'dry-run is enabled, and no merge command was executed.' \
-    "'skipping'" \
     ' --auto' \
     "'--json', 'name,state,bucket,link'" \
     'Test-CurrentRunReviewCheck' \

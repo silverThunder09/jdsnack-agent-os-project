@@ -101,7 +101,17 @@ $validReview = @(
 ) -join [Environment]::NewLine
 $validResult = Get-StructuredReviewResult -Text $validReview -ReviewerBackend 'claude' -FallbackReason 'none'
 if (-not $validResult.FindingsContractValid -or -not $validResult.ReviewSummaryContractValid) {
-    throw 'A valid structured review result did not preserve both contract-valid flags.'
+    throw "A valid structured review result did not preserve both contract-valid flags (decision=$($validResult.DecisionMatch.Success), score=$($validResult.ScoreMatch.Success), risk=$($validResult.RiskMatch.Success), findings=$($validResult.FindingsContractValid), summary=$($validResult.ReviewSummaryContractValid))."
+}
+$splitDecisionReview = $validReview.Replace('decision: PASS', "decision:`nPASS")
+$splitDecisionResult = Get-StructuredReviewResult -Text $splitDecisionReview -ReviewerBackend 'claude' -FallbackReason 'none'
+if ($splitDecisionResult.DecisionMatch.Success) {
+    throw 'A decision value split onto another line was accepted as a valid scalar field.'
+}
+$conflictingDecisionReview = $validReview.Replace('decision: PASS', "decision: MAYBE`ndecision: PASS")
+$conflictingDecisionResult = Get-StructuredReviewResult -Text $conflictingDecisionReview -ReviewerBackend 'claude' -FallbackReason 'none'
+if ($conflictingDecisionResult.DecisionMatch.Success) {
+    throw 'Conflicting decision headers were accepted as a valid structured result.'
 }
 $unreferencedFindingReview = $validReview.Replace('- none', '- P2 — the unresolved minor issue remains.')
 $unreferencedFindingResult = Get-StructuredReviewResult -Text $unreferencedFindingReview -ReviewerBackend 'claude' -FallbackReason 'none'

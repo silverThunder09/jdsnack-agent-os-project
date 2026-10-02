@@ -167,9 +167,13 @@ function Get-ExactlyOneStructuredMatch {
     )
 
     $escapedName = [regex]::Escape($Name)
-    $headerMatches = [regex]::Matches($Text, "(?im)^\s*$escapedName\s*:")
-    $valueMatches = [regex]::Matches($Text, "(?im)^\s*$escapedName\s*:\s*$ValuePattern\s*$")
-    if ($headerMatches.Count -ne 1 -or $valueMatches.Count -ne 1) {
+    $headerMatches = [regex]::Matches($Text, "(?im)^[ \t]*$escapedName[ \t]*:")
+    $valueMatches = [regex]::Matches($Text, "(?im)^[ \t]*$escapedName[ \t]*:[ \t]*$ValuePattern[ \t]*\r?$")
+    if (
+        $headerMatches.Count -ne 1 -or
+        $valueMatches.Count -ne 1 -or
+        $headerMatches[0].Index -ne $valueMatches[0].Index
+    ) {
         return [regex]::Match('', '(?!)')
     }
 
@@ -299,7 +303,7 @@ function Get-RequiredCheckFailure {
     $currentJob = $env:GITHUB_JOB
     $blocking = @($checks | Where-Object {
         $self = ($_.name -eq $currentJob) -or (($currentJob -eq 'review') -and ($_.name -eq 'Codex Branch Review / review'))
-        (-not $self) -and $_.bucket -notin @('pass', 'skipping')
+        (-not $self) -and $_.bucket -ne 'pass'
     })
     if ($blocking.Count -gt 0) { return "Required PR checks are not passing: $(($blocking | ForEach-Object { '{0}={1}' -f $_.name, $_.bucket }) -join ', ')" }
 

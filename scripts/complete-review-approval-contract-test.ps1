@@ -103,6 +103,15 @@ if ($null -eq $reportFieldsFunctionAst) {
     throw 'Assert-UniqueReviewReportFields function was not found.'
 }
 . ([scriptblock]::Create($reportFieldsFunctionAst.Extent.Text))
+$reviewLabelsFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Test-ReviewLabelsMatchAssessment'
+    }, $true)
+if ($null -eq $reviewLabelsFunctionAst) {
+    throw 'Test-ReviewLabelsMatchAssessment function was not found.'
+}
+. ([scriptblock]::Create($reviewLabelsFunctionAst.Extent.Text))
 $validReport = @"
 - reviewer backend: claude
 - decision: PASS
@@ -110,12 +119,13 @@ $validReport = @"
 - risk: High-risk
 - risk score: 65/100
 - risk band: High-risk
+- review labels: Security, Architecture
 - dry-run: True
 - reviewed base SHA: $headSha
 - reviewed head SHA: $headSha
 "@
 Assert-UniqueReviewReportFields -Report $validReport
-foreach ($duplicateField in @('risk', 'risk score', 'risk band', 'dry-run')) {
+foreach ($duplicateField in @('risk', 'risk score', 'risk band', 'review labels', 'dry-run')) {
     $duplicateReport = "$validReport`r`n- ${duplicateField}: conflicting value"
     $duplicateFieldRejected = $false
     try {
@@ -128,6 +138,18 @@ foreach ($duplicateField in @('risk', 'risk score', 'risk band', 'dry-run')) {
     }
     if (-not $duplicateFieldRejected) {
         throw "A duplicate '$duplicateField' report field was accepted."
+    }
+}
+if (-not (Test-ReviewLabelsMatchAssessment -ReportedLabels @('Security', 'Architecture') -ExpectedLabels @('Architecture', 'Security'))) {
+    throw 'A review label set matching deterministic assessment was rejected because of ordering.'
+}
+foreach ($invalidReviewLabels in @(
+        ,@('Security'),
+        ,@('Security', 'Performance'),
+        ,@('Security', 'Security')
+    )) {
+    if (Test-ReviewLabelsMatchAssessment -ReportedLabels $invalidReviewLabels -ExpectedLabels @('Security', 'Architecture')) {
+        throw 'A missing, extra, or duplicated review label was accepted against deterministic assessment.'
     }
 }
 
@@ -471,6 +493,24 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     }
     if (-not $missingRequiredCheckRejected) {
         throw 'A branch-protection required check missing from gh pr checks was accepted.'
+    }
+    foreach ($nonPassingBucket in @('skipping', 'pending', 'fail', 'cancel')) {
+        $nonPassingChecks = @($matchingRequiredChecks | ForEach-Object {
+                if ($_.name -eq 'review') { [pscustomobject]@{ name = $_.name; bucket = $nonPassingBucket } }
+                else { $_ }
+            })
+        $nonPassingCheckRejected = $false
+        try {
+            Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks $nonPassingChecks
+        } catch {
+            $nonPassingCheckRejected = $true
+            if ($_.Exception.Message -notmatch 'is not passing') {
+                throw
+            }
+        }
+        if (-not $nonPassingCheckRejected) {
+            throw "A required check with bucket '$nonPassingBucket' was accepted."
+        }
     }
     $workflowRunId = '123456789'
     $currentReviewCheck = [pscustomobject]@{
