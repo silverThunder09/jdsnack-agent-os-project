@@ -144,6 +144,10 @@ grep -Fq -- 'push_remote_shas+=("$remote_sha")' "$ROOT_DIR/scripts/pre-push-ai-r
 grep -Fq -- 'cat-file -e "$remote_head_sha^{commit}"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 기존 remote tip을 commit으로 검증하지 않습니다.'
 grep -Fq -- 'merge-base --is-ancestor "$remote_head_sha" "$reviewed_ref"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 non-fast-forward push를 차단하지 않습니다.'
 grep -Fq -- 'PASS[[:space:]]+' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push rubric이 PASS 이외 상태를 거부하지 않습니다.'
+for scalar_field in decision score risk; do
+  grep -Fq -- "has_exactly_one_key_value_field $scalar_field" "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+    || fail "pre-push 리뷰가 malformed duplicate $scalar_field 헤더를 거부하지 않습니다."
+done
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
@@ -504,7 +508,7 @@ for approval_contract in \
     'CommitOid = [string]$review.commit.oid' \
     'Get-CurrentHeadApprovers -LatestByLogin $eligibleLatestByLogin -ExpectedHeadSha $ExpectedHeadSha' \
     'collaborators/$encodedLogin/permission' \
-    "@('admin', 'maintain', 'push')" \
+    "@('admin', 'write')" \
     '$latest.State -eq '\''APPROVED'\'' -and $latest.CommitOid -eq $ExpectedHeadSha' \
     '$latestChangeRequestEventByLogin[$reviewEvent.Login] = $reviewEvent' \
     'COMMENTED, PENDING, and approvals on stale commits do not resolve it.' \

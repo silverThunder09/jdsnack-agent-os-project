@@ -579,7 +579,7 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     }
     $env:JDSNACK_FAKE_HEAD_SHA = $headSha
     $env:JDSNACK_FAKE_STALE_SHA = $staleSha
-    $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'pull'
+    $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'read'
     $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
     if ($approvalSummary.Count -ne 0) {
         throw 'A read-only contributor review was counted as a protected-branch human approval.'
@@ -589,7 +589,7 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     if ($nonCollaboratorSummary.Count -ne 0) {
         throw 'A non-collaborator review was counted as a protected-branch human approval.'
     }
-    $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'push'
+    $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'write'
     $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
     if ($approvalSummary.Count -ne 1 -or $approvalSummary.Logins[0] -ne 'contributor') {
         throw 'A write-level collaborator review was not counted as a current-head human approval.'

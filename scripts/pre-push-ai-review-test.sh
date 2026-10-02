@@ -241,6 +241,15 @@ fi
   printf 'risk: %s\n' "$fake_risk"
   printf 'risk_score: %s\n' "$fake_risk_score"
   printf 'review_labels: %s\n' "$fake_labels"
+  for malformed_duplicate_field in decision score risk; do
+    if [ -f "$fixture_dir/codex.malformed-duplicate-$malformed_duplicate_field" ]; then
+      case "$malformed_duplicate_field" in
+        decision) printf '%s\n' 'decision: MAYBE' ;;
+        score) printf '%s\n' 'score: not-a-score' ;;
+        risk) printf '%s\n' 'risk: Unspecified' ;;
+      esac
+    fi
+  done
   printf 'findings:\n'
 } > "$output_path"
 if [ -f "$fixture_dir/codex.blocking" ]; then
@@ -356,12 +365,33 @@ run_review() {
   )
 }
 
+assert_malformed_duplicate_scalar_headers_rejected() {
+  for malformed_duplicate_field in decision score risk; do
+    touch "$fake_root/codex.malformed-duplicate-$malformed_duplicate_field"
+    set +e
+    malformed_duplicate_output="$(run_review 2>&1)"
+    malformed_duplicate_status=$?
+    set -e
+    rm -f "$fake_root/codex.malformed-duplicate-$malformed_duplicate_field"
+    if [ "$malformed_duplicate_status" -eq 0 ] || ! grep -Fq "$malformed_duplicate_field 필드가 정확히 하나" <<< "$malformed_duplicate_output"; then
+      printf '%s\n' "$malformed_duplicate_output" >&2
+      fail "유효 헤더 뒤에 붙은 잘못된 중복 $malformed_duplicate_field 헤더를 pre-push가 거부하지 않았습니다."
+    fi
+  done
+}
+
 default_codex_home="$fake_root/user-codex"
 mkdir -p "$default_codex_home"
 printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"default-access","refresh_token":"default-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account"}' > "$default_codex_home/auth.json"
 chmod 600 "$default_codex_home/auth.json"
 export CODEX_HOME="$default_codex_home"
 export CODEX_AUTH_FILE="$default_codex_home/auth.json"
+
+assert_malformed_duplicate_scalar_headers_rejected
+if [ "${JDSNACK_PRE_PUSH_TEST_CASE-}" = 'malformed-duplicate-headers' ]; then
+  echo 'Malformed duplicate scalar headers are rejected'
+  exit 0
+fi
 
 ancestor_codex_home="$fixture_root"
 rm -f "$fake_root/codex.invoked"

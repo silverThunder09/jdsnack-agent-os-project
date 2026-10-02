@@ -391,7 +391,7 @@ function Test-EligibleHumanApprover {
     if ([string]::IsNullOrWhiteSpace($permission)) {
         Stop-NeedsHuman "Reviewer permission is missing for '$Login'."
     }
-    return $permission -in @('admin', 'maintain', 'push')
+    return $permission -in @('admin', 'write')
 }
 
 function Get-HumanApprovalSummary {
