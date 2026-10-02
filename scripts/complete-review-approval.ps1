@@ -480,6 +480,20 @@ function Assert-NoUnresolvedChangeRequests {
     }
 }
 
+function Assert-MinimumHumanApprovalCount {
+    param(
+        [int]$ActualApprovals,
+        [int]$RiskMinimumApprovals,
+        [int]$BranchProtectionMinimumApprovals,
+        [string]$RiskBand
+    )
+
+    $effectiveMinimumApprovals = [Math]::Max($RiskMinimumApprovals, $BranchProtectionMinimumApprovals)
+    if ($ActualApprovals -lt $effectiveMinimumApprovals) {
+        Stop-NeedsHuman "Risk band $RiskBand and branch protection require at least $effectiveMinimumApprovals human approval(s); found $ActualApprovals."
+    }
+}
+
 if ($PullRequestNumber -le 0 -or $Repository -notmatch '^[^/]+/[^/]+$') {
     Stop-NeedsHuman 'Pull request identity is invalid.'
 }
@@ -596,13 +610,14 @@ if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
     Stop-NeedsHuman 'Implementation and reviewer backend are both Codex fallback; automatic merge is disabled for self-review prevention.'
 }
 
-$effectiveMinimumApprovals = [Math]::Max([int]$riskAssessment.minimumApprovals, [int]$branchProtectionApproval.RequiredApprovals)
 $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
 # This assertion intentionally precedes the dry-run success path.
 Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary
-if ($approvalSummary.Count -lt $effectiveMinimumApprovals) {
-    Stop-NeedsHuman "Risk band $($riskAssessment.riskBand) and branch protection require at least $effectiveMinimumApprovals human approval(s); found $($approvalSummary.Count)."
-}
+Assert-MinimumHumanApprovalCount `
+    -ActualApprovals $approvalSummary.Count `
+    -RiskMinimumApprovals ([int]$riskAssessment.minimumApprovals) `
+    -BranchProtectionMinimumApprovals ([int]$branchProtectionApproval.RequiredApprovals) `
+    -RiskBand $riskAssessment.riskBand
 
 if ([bool]$riskAssessment.dryRun) {
     $message = "Review gates passed for PR #$PullRequestNumber at $($scoreMatch.Groups[1].Value)/5; $($riskAssessment.riskBand) has the required human approval(s), dry-run is enabled, and no merge command was executed."

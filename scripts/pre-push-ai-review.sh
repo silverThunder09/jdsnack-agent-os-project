@@ -437,6 +437,13 @@ extract_single_field() {
   printf '%s' "${values[0]}"
 }
 
+has_exactly_one_key_value_field() {
+  local field_name="$1"
+  local count
+  count="$("$grep_bin" -Ec "^[[:space:]]*${field_name}[[:space:]]*:" "$answer_path" || true)"
+  [ "$count" -eq 1 ]
+}
+
 if ! decision="$(extract_single_field 's/^[[:space:]]*decision:[[:space:]]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[[:space:]]*$/\1/p')"; then
   echo "ERROR: Codex pre-push 리뷰의 decision 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
   exit 1
@@ -456,8 +463,16 @@ if ! risk="$(extract_single_field 's/^[[:space:]]*risk:[[:space:]]*(Light|Standa
   echo "ERROR: Codex pre-push 리뷰의 risk 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
   exit 1
 fi
+if ! has_exactly_one_key_value_field risk_score; then
+  echo "ERROR: Codex pre-push 리뷰의 risk_score 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
+  exit 1
+fi
 if ! risk_score="$(extract_single_field 's/^[[:space:]]*risk_score:[[:space:]]*([0-9]+)([[:space:]]*\/100)?[[:space:]]*$/\1/p')"; then
   echo "ERROR: Codex pre-push 리뷰의 risk_score 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
+  exit 1
+fi
+if ! has_exactly_one_key_value_field review_labels; then
+  echo "ERROR: Codex pre-push 리뷰의 review_labels 필드가 정확히 하나가 아닙니다. push를 차단합니다." >&2
   exit 1
 fi
 if ! review_labels="$(extract_single_field 's/^[[:space:]]*review_labels:[[:space:]]*(.*)$/\1/p')"; then

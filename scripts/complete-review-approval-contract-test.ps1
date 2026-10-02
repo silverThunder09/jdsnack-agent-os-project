@@ -45,6 +45,15 @@ if ($approvers.Count -ne 1 -or $approvers[0] -ne 'currentReviewer') {
     throw 'Stale approvals or non-approvals were counted for the current head.'
 }
 
+$minimumApprovalFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-MinimumHumanApprovalCount'
+    }, $true)
+if ($null -eq $minimumApprovalFunctionAst) {
+    throw 'Assert-MinimumHumanApprovalCount function was not found.'
+}
+
 $policyFunctionAst = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -57,6 +66,32 @@ if ($null -eq $policyFunctionAst) {
 function Stop-NeedsHuman {
     param([string]$Reason)
     throw $Reason
+}
+. ([scriptblock]::Create($minimumApprovalFunctionAst.Extent.Text))
+$threeApprovalMinimumRejected = $false
+try {
+    Assert-MinimumHumanApprovalCount -ActualApprovals 2 -RiskMinimumApprovals 2 -BranchProtectionMinimumApprovals 3 -RiskBand 'High-risk'
+} catch {
+    $threeApprovalMinimumRejected = $true
+    if ($_.Exception.Message -notmatch 'at least 3 human approval\(s\); found 2') {
+        throw
+    }
+}
+if (-not $threeApprovalMinimumRejected) {
+    throw 'Two current-head approvals were accepted when branch protection requires three.'
+}
+Assert-MinimumHumanApprovalCount -ActualApprovals 3 -RiskMinimumApprovals 2 -BranchProtectionMinimumApprovals 3 -RiskBand 'High-risk'
+$riskMinimumRejected = $false
+try {
+    Assert-MinimumHumanApprovalCount -ActualApprovals 2 -RiskMinimumApprovals 3 -BranchProtectionMinimumApprovals 2 -RiskBand 'High-risk'
+} catch {
+    $riskMinimumRejected = $true
+    if ($_.Exception.Message -notmatch 'at least 3 human approval\(s\); found 2') {
+        throw
+    }
+}
+if (-not $riskMinimumRejected) {
+    throw 'Two current-head approvals were accepted when the risk policy requires three.'
 }
 
 $reportFieldsFunctionAst = $ast.Find({
@@ -311,7 +346,11 @@ if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments
     exit 0
 }
 if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
-    $requiredReviews = [pscustomobject]@{ required_approving_review_count = 2; dismiss_stale_reviews = $true }
+    $requiredApprovalCount = 2
+    if ($env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT) {
+        $requiredApprovalCount = [int]$env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT
+    }
+    $requiredReviews = [pscustomobject]@{ required_approving_review_count = $requiredApprovalCount; dismiss_stale_reviews = $true }
 } else {
     $requiredReviews = [pscustomobject]@{ required_approving_review_count = 2; dismiss_stale_reviews = $false }
 }
@@ -333,6 +372,12 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     if ([int]$protection.RequiredApprovals -ne 2 -or $protection.DismissStaleReviews -ne $true) {
         throw 'Valid branch protection was not returned as an enforced approval requirement.'
     }
+    $env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT = '3'
+    $threeApprovalProtection = Get-BranchProtectionApprovalRequirement -BaseBranch 'main'
+    if ([int]$threeApprovalProtection.RequiredApprovals -ne 3) {
+        throw 'A branch-protection requirement greater than two approvals was not preserved.'
+    }
+    Remove-Item Env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT -ErrorAction SilentlyContinue
     $expectedRequiredCheckContexts = @('Validate PR contract', 'PR CI Gate', 'review')
     if ($protection.RequiredCheckContexts.Count -ne $expectedRequiredCheckContexts.Count -or @($expectedRequiredCheckContexts | Where-Object { $_ -notin $protection.RequiredCheckContexts }).Count -gt 0) {
         throw 'Branch protection required check contexts were not returned completely.'
