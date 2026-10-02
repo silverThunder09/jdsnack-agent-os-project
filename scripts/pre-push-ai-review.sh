@@ -18,7 +18,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm jq codex; do
+for tool in env git grep tail sed head awk cmp rm chmod jq codex; do
   require_host_tool "$tool"
 done
 require_host_tool cat
@@ -96,11 +96,40 @@ if [ ! -f "$ROOT_DIR/scripts/review-policy.json" ]; then
   exit 1
 fi
 
+umask 077
 tmp_dir="$(mktemp -d)"
+"$chmod_bin" 700 "$tmp_dir"
+reviewer_pid=""
+codex_auth_path=""
 cleanup() {
-  "$rm_bin" -rf "$tmp_dir"
+  local exit_code=$?
+  trap - EXIT HUP INT TERM
+  if [ -n "$reviewer_pid" ]; then
+    kill -TERM "$reviewer_pid" 2>/dev/null || true
+    wait "$reviewer_pid" 2>/dev/null || true
+    reviewer_pid=""
+  fi
+  if [ -n "$codex_auth_path" ]; then
+    "$rm_bin" -f "$codex_auth_path" 2>/dev/null || true
+  fi
+  if [ -n "$tmp_dir" ]; then
+    "$rm_bin" -rf "$tmp_dir" 2>/dev/null || exit_code=1
+  fi
+  exit "$exit_code"
 }
 trap cleanup EXIT
+handle_signal() {
+  local exit_code="$1"
+  if [ -n "$reviewer_pid" ]; then
+    kill -TERM "$reviewer_pid" 2>/dev/null || true
+    wait "$reviewer_pid" 2>/dev/null || true
+    reviewer_pid=""
+  fi
+  exit "$exit_code"
+}
+trap 'handle_signal 129' HUP
+trap 'handle_signal 130' INT
+trap 'handle_signal 143' TERM
 
 base_ref="${JDSNACK_REVIEW_BASE_REF:-origin/main}"
 if [ "$base_ref" != "origin/main" ]; then
@@ -340,6 +369,8 @@ codex_tmp_dir="$tmp_dir"
 codex_answer_path="$answer_path"
 codex_home_dir="$tmp_dir/codex-home"
 mkdir -p "$codex_home_dir"
+"$chmod_bin" 700 "$codex_home_dir"
+codex_auth_path="$codex_home_dir/auth.json"
 codex_auth_source="${CODEX_AUTH_FILE-}"
 if [ -z "$codex_auth_source" ] && [ -n "${CODEX_HOME-}" ]; then
   codex_auth_source="$CODEX_HOME/auth.json"
@@ -353,7 +384,8 @@ if [ -n "$codex_auth_source" ] && [ -f "$codex_auth_source" ]; then
     exit 1
   fi
   if [ -n "$codex_auth_json" ]; then
-    printf '%s\n' "$codex_auth_json" > "$codex_home_dir/auth.json"
+    printf '%s\n' "$codex_auth_json" > "$codex_auth_path"
+    "$chmod_bin" 600 "$codex_auth_path"
   fi
 fi
 codex_home_arg="$codex_home_dir"
@@ -380,9 +412,9 @@ review_path="$reviewer_bin_dir"
 review_env_args=(
   "PATH=$review_path"
   "CODEX_HOME=$codex_home_arg"
-  "TEMP=$tmp_dir"
-  "TMP=$tmp_dir"
-  "TMPDIR=$tmp_dir"
+  "TEMP=$codex_tmp_dir"
+  "TMP=$codex_tmp_dir"
+  "TMPDIR=$codex_tmp_dir"
   'LANG=C'
   'TERM=dumb'
 )
@@ -393,16 +425,14 @@ if [ -z "$windows_root" ]; then
 fi
 review_env_args+=("SystemRoot=$windows_root" "WINDIR=$windows_root")
 
-run_reviewer() {
-  (
+run_reviewer() (
     cd "$tmp_dir"
-    "$env_bin" -i "${review_env_args[@]}" "$reviewer_entry" "$@"
-  )
-}
+    exec "$env_bin" -i "${review_env_args[@]}" "$reviewer_entry" "$@"
+)
 
 # sandbox_workspace_write.network_access is only valid in workspace-write mode.
 # The supported read-only sandbox below keeps this reviewer outside that mode.
-if ! run_reviewer exec \
+run_reviewer exec \
   --ephemeral \
   --ignore-user-config \
   --strict-config \
@@ -432,7 +462,15 @@ if ! run_reviewer exec \
   --skip-git-repo-check \
   --sandbox read-only \
   --output-last-message "$codex_answer_path" \
-  - < "$prompt_path" > "$tmp_dir/codex.log" 2>&1; then
+  - < "$prompt_path" > "$tmp_dir/codex.log" 2>&1 &
+reviewer_pid=$!
+if wait "$reviewer_pid"; then
+  reviewer_status=0
+else
+  reviewer_status=$?
+fi
+reviewer_pid=""
+if [ "$reviewer_status" -ne 0 ]; then
   echo "ERROR: Codex pre-push 리뷰를 완료하지 못했습니다. push를 차단합니다." >&2
   "$tail_bin" -n 20 "$tmp_dir/codex.log" >&2 || true
   exit 1

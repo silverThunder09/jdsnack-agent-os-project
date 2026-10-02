@@ -44,6 +44,11 @@ expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
 expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
 test_cygpath_bin="$(command -v cygpath || true)"
+test_sleep_bin="$(command -v sleep || true)"
+test_stat_bin="$(command -v stat || true)"
+[ -n "$test_sleep_bin" ] || fail 'sleep가 필요합니다.'
+[ -n "$test_stat_bin" ] || fail 'stat가 필요합니다.'
+interrupted_hook_pid=""
 export JDSNACK_TEST_SECRET_TOKEN='must-be-cleared-before-review'
 export JDSNACK_TEST_CUSTOM='must-be-cleared-by-allowlist'
 
@@ -52,6 +57,10 @@ printf '%s\n' "$expected_score" > "$fake_root/expected-risk-score"
 printf '%s\n' "$expected_labels" > "$fake_root/expected-labels"
 
 cleanup() {
+  if [ -n "$interrupted_hook_pid" ]; then
+    kill -TERM "$interrupted_hook_pid" 2>/dev/null || true
+    wait "$interrupted_hook_pid" 2>/dev/null || true
+  fi
   rm -rf "$fake_root"
   rm -rf "$fixture_root"
 }
@@ -152,6 +161,14 @@ case "${CODEX_HOME-}" in
   *codex-home*) ;;
   *) exit 10 ;;
 esac
+printf '%s\n' "${TEMP-}" "${TMP-}" "${TMPDIR-}" "$CODEX_HOME" > "$fixture_dir/reviewer-temp-values"
+if [ -f "$fixture_dir/codex.wait-for-signal" ]; then
+  printf '%s\n' "$CODEX_HOME/auth.json" > "$fixture_dir/copied-auth-path"
+  : > "$fixture_dir/codex.waiting"
+  while [ -f "$fixture_dir/codex.wait-for-signal" ]; do
+    "$fixture_dir/sleep-one-second"
+  done
+fi
 IFS= read -r fake_risk < "$fixture_dir/expected-risk"
 IFS= read -r fake_risk_score < "$fixture_dir/expected-risk-score"
 IFS= read -r fake_labels < "$fixture_dir/expected-labels"
@@ -247,9 +264,26 @@ FAKE_PWSH
 sed -i "s|__FAKE_ROOT__|$fake_root|g; s|__REAL_PWSH__|$pwsh_bin|g" "$fake_root/pwsh"
 chmod +x "$fake_root/pwsh"
 if [ -n "$test_cygpath_bin" ]; then
-  printf '#!/bin/sh\nexec "%s" "$@"\n' "$test_cygpath_bin" > "$fake_root/cygpath"
+  cat > "$fake_root/cygpath" <<'FAKE_CYGPATH'
+#!/bin/sh
+set -eu
+
+fixture_dir='__FAKE_ROOT__'
+real_cygpath='__REAL_CYGPATH__'
+if [ "${1:-}" = '-w' ]; then
+  case "${2:-}" in
+    */codex-home)
+      "$real_cygpath" -w "${2%/codex-home}" > "$fixture_dir/expected-codex-temp-path"
+      ;;
+  esac
+fi
+exec "$real_cygpath" "$@"
+FAKE_CYGPATH
+  sed -i "s|__FAKE_ROOT__|$fake_root|g; s|__REAL_CYGPATH__|$test_cygpath_bin|g" "$fake_root/cygpath"
   chmod +x "$fake_root/cygpath"
 fi
+printf '#!/bin/sh\nexec "%s" 1\n' "$test_sleep_bin" > "$fake_root/sleep-one-second"
+chmod +x "$fake_root/sleep-one-second"
 
 set_origin_urls() {
   local origin_fetch_url="$1"
@@ -281,6 +315,71 @@ run_review() {
 }
 
 run_review >/dev/null
+
+mapfile -t reviewer_temp_values < "$fake_root/reviewer-temp-values"
+if [ "${#reviewer_temp_values[@]}" -ne 4 ] || [ "${reviewer_temp_values[0]}" != "${reviewer_temp_values[1]}" ] || [ "${reviewer_temp_values[1]}" != "${reviewer_temp_values[2]}" ]; then
+  fail '리뷰어 TEMP/TMP/TMPDIR이 같은 격리 디렉터리를 가리키지 않습니다.'
+fi
+if [ -n "$test_cygpath_bin" ]; then
+  expected_codex_temp_path="$(<"$fake_root/expected-codex-temp-path")"
+else
+  expected_codex_temp_path="${reviewer_temp_values[3]%/codex-home}"
+fi
+if [ "${reviewer_temp_values[0]}" != "$expected_codex_temp_path" ]; then
+  fail '리뷰어 임시 경로가 CODEX_HOME 기준 Windows/호스트 경로로 변환되지 않았습니다.'
+fi
+
+printf '%s\n' '{"OPENAI_API_KEY":"synthetic-test-key"}' > "$fake_root/synthetic-auth.json"
+chmod 600 "$fake_root/synthetic-auth.json"
+touch "$fake_root/codex.wait-for-signal"
+printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$base_sha" > "$fake_root/interrupted-push-input"
+canonical_origin_url='https://github.com/silverThunder09/jdsnack-agent-os-project'
+(
+  cd "$test_worktree"
+  export PATH="$fake_root:$PATH"
+  export JDSNACK_REVIEW_BASE_REF="$base_ref"
+  export CODEX_AUTH_FILE="$fake_root/synthetic-auth.json"
+  exec bash "$test_worktree/scripts/pre-push-ai-review.sh" origin "$canonical_origin_url" < "$fake_root/interrupted-push-input"
+) > "$fake_root/interrupted-hook.log" 2>&1 &
+interrupted_hook_pid=$!
+wait_attempt=0
+while [ ! -e "$fake_root/codex.waiting" ] && [ "$wait_attempt" -lt 100 ]; do
+  "$test_sleep_bin" 0.1
+  wait_attempt=$((wait_attempt + 1))
+done
+if [ ! -e "$fake_root/codex.waiting" ]; then
+  kill -TERM "$interrupted_hook_pid" 2>/dev/null || true
+  wait "$interrupted_hook_pid" 2>/dev/null || true
+  interrupted_hook_pid=""
+  "$tail_bin" -n 20 "$fake_root/interrupted-hook.log" >&2 || true
+  fail 'signal 정리 fixture가 Codex 리뷰 단계에 도달하지 않았습니다.'
+fi
+copied_auth_path="$(<"$fake_root/copied-auth-path")"
+if [ -n "$test_cygpath_bin" ]; then
+  copied_auth_path="$("$test_cygpath_bin" -u "$copied_auth_path")"
+fi
+if [ ! -f "$copied_auth_path" ]; then
+  fail 'signal fixture에서 임시 인증 사본을 찾을 수 없습니다.'
+fi
+auth_file_mode="$("$test_stat_bin" -c '%a' "$copied_auth_path")"
+codex_home_path="${copied_auth_path%/auth.json}"
+temp_dir_path="${codex_home_path%/codex-home}"
+codex_home_mode="$("$test_stat_bin" -c '%a' "$codex_home_path")"
+temp_dir_mode="$("$test_stat_bin" -c '%a' "$temp_dir_path")"
+if [ "$auth_file_mode" != '600' ] || [ "$codex_home_mode" != '700' ] || [ "$temp_dir_mode" != '700' ]; then
+  fail "임시 인증 파일/디렉터리 권한이 제한되지 않았습니다 (auth=$auth_file_mode codex_home=$codex_home_mode temp=$temp_dir_mode)."
+fi
+kill -TERM "$interrupted_hook_pid"
+set +e
+wait "$interrupted_hook_pid"
+interrupted_hook_status=$?
+set -e
+interrupted_hook_pid=""
+rm -f "$fake_root/codex.wait-for-signal"
+if [ "$interrupted_hook_status" -ne 143 ] || [ -e "$copied_auth_path" ] || [ -e "$temp_dir_path" ]; then
+  "$tail_bin" -n 20 "$fake_root/interrupted-hook.log" >&2 || true
+  fail 'TERM 중단 시 Codex 인증 사본 또는 임시 디렉터리가 정리되지 않았습니다.'
+fi
 
 for risk_failure in invalid-json stderr-zero-exit; do
   touch "$fake_root/pwsh.$risk_failure"
