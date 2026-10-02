@@ -61,7 +61,18 @@ cat > "$fake_root/codex" <<'FAKE_CODEX'
 #!/bin/sh
 set -eu
 
+runtime_dependency="${0%/*}/codex-runtime.sh"
+if [ ! -f "$runtime_dependency" ]; then
+  printf 'missing sibling runtime dependency: %s\n' "$runtime_dependency" >&2
+  exit 17
+fi
+. "$runtime_dependency"
+if [ "${CODEX_FIXTURE_RUNTIME_DEPENDENCY-}" != 'available' ]; then
+  exit 18
+fi
+
 fixture_dir='__FAKE_ROOT__'
+: > "$fixture_dir/runtime-dependency-invoked"
 output_path=""
 help_requested=0
 read_only_sandbox_seen=0
@@ -95,6 +106,9 @@ printf '%s\n' "$0" > "$fixture_dir/codex.invoked"
 case "$0" in
   */reviewer-bin/codex|*\\reviewer-bin\\codex)
     : > "$fixture_dir/copied-entry-invoked"
+    ;;
+  *)
+    : > "$fixture_dir/original-entry-invoked"
     ;;
 esac
 [ "$help_requested" -eq 1 ] && exit 0
@@ -204,6 +218,7 @@ if [ -f "$fixture_dir/codex.duplicate-summary" ]; then
   printf '%s\n' '- conclusion: duplicate conclusion evidence must be rejected.' >> "$output_path"
 fi
 FAKE_CODEX
+printf '%s\n' 'CODEX_FIXTURE_RUNTIME_DEPENDENCY=available' > "$fake_root/codex-runtime.sh"
 sed -i "s|__FAKE_ROOT__|$fake_root|g" "$fake_root/codex"
 chmod +x "$fake_root/codex"
 if [ -n "$test_cygpath_bin" ]; then
@@ -233,7 +248,7 @@ run_review() {
   local canonical_origin_url='https://github.com/silverThunder09/jdsnack-agent-os-project'
   (
     cd "$test_worktree"
-    printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+    printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$base_sha" \
       | PATH="$fake_root:$PATH" \
         JDSNACK_REVIEW_BASE_REF="$base_ref" \
         run_hook_with_origin_urls "$test_worktree/.githooks/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
@@ -242,8 +257,11 @@ run_review() {
 
 run_review >/dev/null
 
-if [ ! -e "$fake_root/copied-entry-invoked" ]; then
-  fail 'Codex reviewer가 원본 실행 파일이 아닌 전용 reviewer entrypoint를 사용하지 않았습니다.'
+if [ ! -e "$fake_root/original-entry-invoked" ] || [ ! -e "$fake_root/runtime-dependency-invoked" ]; then
+  fail 'Codex reviewer가 원본 실행 경로와 형제 runtime dependency를 보존하지 않았습니다.'
+fi
+if [ -e "$fake_root/copied-entry-invoked" ]; then
+  fail 'Codex reviewer가 runtime sidecar가 분리되는 복사 실행 파일을 사용했습니다.'
 fi
 
 fork_origin_url='https://github.com/example-user/jdsnack-agent-os-project.git'

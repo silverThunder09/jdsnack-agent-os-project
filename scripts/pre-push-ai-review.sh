@@ -18,7 +18,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm cp jq codex; do
+for tool in env git grep tail sed head awk cmp rm jq codex; do
   require_host_tool "$tool"
 done
 require_host_tool cat
@@ -131,7 +131,7 @@ answer_path="$tmp_dir/answer.md"
 
 assert_clean_checkout() {
   if [ -s "$staged_path" ] || [ -s "$working_path" ] || [ -s "$status_path" ]; then
-    echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. Codex 리뷰 전에 staged·working-tree 변경을 먼저 커밋하거나 정리하십시오." >&2
+    echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. Codex 리뷰 전에 staged·working-tree 변경을 해결하십시오: push할 내용은 커밋하고, 보류할 tracked 변경은 git stash push로 보관한 뒤 재시도하십시오." >&2
     if [ -s "$status_path" ]; then
       "$cat_bin" "$status_path" >&2
     fi
@@ -349,16 +349,17 @@ fi
 
 codex_dir="${codex_bin%/*}"
 if [ -z "$codex_dir" ] || [ "$codex_dir" = "$codex_bin" ]; then
-  echo "ERROR: Codex CLI 경로를 제한된 reviewer PATH로 고정할 수 없습니다." >&2
+  echo "ERROR: Codex CLI의 resolved executable 경로를 확인할 수 없습니다." >&2
   exit 1
 fi
 reviewer_bin_dir="$tmp_dir/reviewer-bin"
 mkdir -p "$reviewer_bin_dir"
-reviewer_entry="$reviewer_bin_dir/codex"
-if ! "$cp_bin" "$codex_bin" "$reviewer_entry"; then
-  echo "ERROR: Codex reviewer 전용 실행 디렉터리를 만들 수 없습니다." >&2
+if [ ! -x "$codex_bin" ]; then
+  echo "ERROR: resolved Codex CLI가 실행 가능하지 않습니다: $codex_bin" >&2
   exit 1
 fi
+# Invoke the resolved executable in place so adjacent runtimes and libraries remain available.
+reviewer_entry="$codex_bin"
 review_path="$reviewer_bin_dir"
 review_env_args=(
   "PATH=$review_path"
@@ -606,7 +607,7 @@ if ! "$cmp_bin" -s "$staged_path" "$current_staged_path" || ! "$cmp_bin" -s "$wo
   exit 1
 fi
 if [ -s "$status_path" ]; then
-  echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. staged·working-tree 변경을 먼저 커밋하거나 정리하십시오." >&2
+  echo "ERROR: push 대상 커밋과 tracked checkout 상태가 다릅니다. Codex 리뷰 후 staged·working-tree 변경이 생겼습니다. push할 내용은 커밋하고, 보류할 tracked 변경은 git stash push로 보관한 뒤 재시도하십시오." >&2
   "$cat_bin" "$status_path" >&2
   exit 1
 fi
