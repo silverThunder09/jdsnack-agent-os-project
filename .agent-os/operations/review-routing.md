@@ -28,7 +28,7 @@
 - `Architecture`: `.agent-os/**`, `docs/architecture/**`, backend·frontend 소스, workflow·scripts·hooks, `AGENTS.md`·`CLAUDE.md`·`backends.json`
 
 `scripts/pr-review-gate.sh`은 이 라우팅 결과를 출력하고, Claude 또는 Codex fallback 프롬프트에는 변경 경로·라벨·점수·구간을 함께 전달합니다.
-경로 정규식과 라벨 규칙은 `review-risk.ps1`의 고정 digest로도 검증합니다. 규칙을 바꾸려면 정책 변경 자체를 별도 검토·커밋해야 하며, 임의의 PR이 점수나 라벨을 낮추도록 즉석에서 수정할 수 없습니다.
+경로 정규식과 라벨 규칙은 `review-risk.ps1`의 고정 배열과 결합 SHA-256 digest로 검증합니다. `riskScore.pathPatterns` 또는 `reviewRouting` 중 하나라도 바뀌면 계산기는 중단합니다. 규칙을 바꾸려면 정책 변경 자체를 별도 검토·커밋해야 하며, 임의의 PR이 점수나 라벨을 낮추도록 즉석에서 수정할 수 없습니다.
 
 ## 드라이런과 보호 규칙
 

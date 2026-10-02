@@ -35,6 +35,10 @@
   (`admin`, `maintain`, `push`)을 모두 만족해야 합니다. `authorAssociation`만으로
   권한을 추정하지 않으며, collaborator가 아닌 reviewer의 404 응답은 승인으로
   세지 않습니다. 그 밖의 권한 조회 실패는 `needs-human`으로 중단합니다.
+- 승인 job은 `required_status_checks.contexts`와 `checks[].context`의 합집합을
+  branch protection의 기준으로 읽고, `gh pr checks --required`가 반환한 이름 집합과
+  정확히 비교합니다. 빈·누락·추가 required check 또는 통과하지 않은 required check는
+  모두 `needs-human`으로 중단합니다.
 - 보호 설정 조회가 실패하거나 required pull request review 보호가 없으면
   승인 job은 `needs-human` 경계로 중단합니다.
 

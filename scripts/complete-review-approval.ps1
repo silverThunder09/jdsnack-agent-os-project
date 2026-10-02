@@ -129,6 +129,7 @@ function Assert-ReviewedPullRequestIsCurrent {
     if ($pullRequest.base.sha -ne $BaseSha -or $pullRequest.head.sha -ne $HeadSha) {
         Stop-NeedsHuman 'The pull request base or head changed after the review; approval was not submitted.'
     }
+    return $pullRequest
 }
 
 function Get-Checks {
@@ -180,9 +181,53 @@ function Get-BranchProtectionApprovalRequirement {
     if (-not $dismissStaleReviews) {
         Stop-NeedsHuman "Branch '$BaseBranch' does not dismiss stale pull request reviews."
     }
+    $requiredStatusChecks = $protection.required_status_checks
+    if ($null -eq $requiredStatusChecks) {
+        Stop-NeedsHuman "Branch '$BaseBranch' has no required status check protection."
+    }
+    $requiredCheckContexts = @()
+    foreach ($context in @($requiredStatusChecks.contexts | Where-Object { $null -ne $_ })) {
+        $contextName = [string]$context
+        if ([string]::IsNullOrWhiteSpace($contextName)) {
+            Stop-NeedsHuman "Branch '$BaseBranch' contains an empty required status check context."
+        }
+        $requiredCheckContexts += $contextName
+    }
+    foreach ($check in @($requiredStatusChecks.checks | Where-Object { $null -ne $_ })) {
+        $contextName = [string]$check.context
+        if ([string]::IsNullOrWhiteSpace($contextName)) {
+            Stop-NeedsHuman "Branch '$BaseBranch' contains an invalid required status check entry."
+        }
+        $requiredCheckContexts += $contextName
+    }
+    $requiredCheckContexts = @($requiredCheckContexts | Sort-Object -Unique)
+    if ($requiredCheckContexts.Count -eq 0) {
+        Stop-NeedsHuman "Branch '$BaseBranch' has an empty required status check set."
+    }
     return [pscustomobject]@{
         RequiredApprovals = $requiredApprovals
         DismissStaleReviews = $dismissStaleReviews
+        RequiredCheckContexts = $requiredCheckContexts
+    }
+}
+
+function Assert-RequiredChecksMatchBranchProtection {
+    param(
+        [string[]]$ExpectedContexts,
+        [object[]]$RequiredChecks
+    )
+
+    $expected = @($ExpectedContexts | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+    if ($expected.Count -eq 0) {
+        Stop-NeedsHuman 'Branch protection did not provide any required check contexts.'
+    }
+    $reported = @($RequiredChecks | ForEach-Object { [string]$_.name } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+    $missing = @($expected | Where-Object { $_ -notin $reported })
+    $unexpected = @($reported | Where-Object { $_ -notin $expected })
+    if ($missing.Count -gt 0 -or $unexpected.Count -gt 0) {
+        $missingSummary = if ($missing.Count -gt 0) { $missing -join ', ' } else { '<none>' }
+        $unexpectedSummary = if ($unexpected.Count -gt 0) { $unexpected -join ', ' } else { '<none>' }
+        Stop-NeedsHuman "Branch protection required check set does not match gh pr checks --required (missing: $missingSummary; unexpected: $unexpectedSummary)."
     }
 }
 
@@ -429,7 +474,7 @@ if (
     Stop-NeedsHuman 'The review report does not match the reviewed base and head SHA.'
 }
 
-Assert-ReviewedPullRequestIsCurrent
+$currentPullRequest = Assert-ReviewedPullRequestIsCurrent
 
 $gitPath = Resolve-ToolPath 'git'
 if ([string]::IsNullOrWhiteSpace($gitPath)) {
@@ -465,10 +510,12 @@ if (
     Stop-NeedsHuman 'The review report risk data does not match the deterministic assessment.'
 }
 
+$branchProtectionApproval = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
 $requiredChecks = Get-Checks -Required
 if ($requiredChecks.Count -eq 0) {
     Stop-NeedsHuman 'No required PR checks were returned.'
 }
+Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $branchProtectionApproval.RequiredCheckContexts -RequiredChecks $requiredChecks
 $blockingChecks = @($requiredChecks | Where-Object { $_.bucket -notin @('pass', 'skipping') })
 if ($blockingChecks.Count -gt 0) {
     $blockingSummary = ($blockingChecks | ForEach-Object { '{0}={1}' -f $_.name, $_.bucket }) -join ', '
@@ -491,8 +538,6 @@ if ($reviewerBackendMatch.Groups[1].Value.Trim() -eq 'codex-fallback') {
     Stop-NeedsHuman 'Implementation and reviewer backend are both Codex fallback; automatic merge is disabled for self-review prevention.'
 }
 
-$currentPullRequest = Get-CurrentPullRequest
-$branchProtectionApproval = Get-BranchProtectionApprovalRequirement -BaseBranch ([string]$currentPullRequest.base.ref)
 $effectiveMinimumApprovals = [Math]::Max([int]$riskAssessment.minimumApprovals, [int]$branchProtectionApproval.RequiredApprovals)
 $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
 # This assertion intentionally precedes the dry-run success path.
@@ -525,7 +570,7 @@ if ([bool]$riskAssessment.requiresOwnerSignoff) {
 }
 
 # Recheck the target immediately before queueing Squash auto-merge for this exact commit.
-Assert-ReviewedPullRequestIsCurrent
+[void](Assert-ReviewedPullRequestIsCurrent)
 $mergeStateJson = & $script:ghPath pr view $PullRequestNumber --repo $Repository --json state,autoMergeRequest,mergeStateStatus
 if ([int]$LASTEXITCODE -ne 0) {
     Stop-NeedsHuman 'Could not verify auto-merge state after approval.'

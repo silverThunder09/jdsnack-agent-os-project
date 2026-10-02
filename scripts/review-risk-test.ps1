@@ -138,6 +138,24 @@ try {
         }
     }
 
+    foreach ($routingLabel in @('Security', 'Performance', 'Test Coverage', 'Architecture')) {
+        $tamperedRoutingPath = Join-Path $tempRoot ("tampered-routing-$($routingLabel -replace ' ', '-')-policy.json")
+        $tamperedRoutingPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
+        $tamperedRoutingPolicy.reviewRouting.$routingLabel = @('^tampered$')
+        $tamperedRoutingPolicy | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tamperedRoutingPath -Encoding utf8
+        $tamperedRoutingExitCode = 0
+        try {
+            $tamperedRoutingOutput = & $scriptPath -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedRoutingPath 2>&1 | Out-String
+            $tamperedRoutingExitCode = [int]$LASTEXITCODE
+        } catch {
+            $tamperedRoutingExitCode = 1
+            $tamperedRoutingOutput = $_ | Out-String
+        }
+        if ($tamperedRoutingExitCode -eq 0 -or $tamperedRoutingOutput -notmatch 'routing rules are not fixed|trusted fixed policy digest') {
+            throw "tampered $routingLabel review routing rule was accepted: $tamperedRoutingOutput"
+        }
+    }
+
     $lightAssessment = New-SingleFileAssessment -Name 'light' -RelativePath 'docs/note.md' -Content 'small change'
     Assert-Equal $lightAssessment.riskScore 0 'light fixture score'
     Assert-Equal $lightAssessment.riskBand 'Light' 'light fixture band'

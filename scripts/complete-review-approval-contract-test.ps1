@@ -85,6 +85,15 @@ if ($null -eq $branchProtectionFunctionAst) {
     throw 'Get-BranchProtectionApprovalRequirement function was not found.'
 }
 . ([scriptblock]::Create($branchProtectionFunctionAst.Extent.Text))
+$requiredCheckMatchFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-RequiredChecksMatchBranchProtection'
+    }, $true)
+if ($null -eq $requiredCheckMatchFunctionAst) {
+    throw 'Assert-RequiredChecksMatchBranchProtection function was not found.'
+}
+. ([scriptblock]::Create($requiredCheckMatchFunctionAst.Extent.Text))
 $eligibleHumanApproverFunctionAst = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -147,18 +156,45 @@ if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments
     exit 0
 }
 if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
-    Write-Output '{"required_pull_request_reviews":{"required_approving_review_count":2,"dismiss_stale_reviews":true}}'
+    $requiredReviews = [pscustomobject]@{ required_approving_review_count = 2; dismiss_stale_reviews = $true }
 } else {
-    Write-Output '{"required_pull_request_reviews":{"required_approving_review_count":2,"dismiss_stale_reviews":false}}'
+    $requiredReviews = [pscustomobject]@{ required_approving_review_count = 2; dismiss_stale_reviews = $false }
 }
+$protection = [ordered]@{ required_pull_request_reviews = $requiredReviews }
+if ($env:JDSNACK_FAKE_STATUS_CHECKS -ne 'missing') {
+    $protection['required_status_checks'] = [pscustomobject]@{
+        contexts = @('Validate PR contract', 'PR CI Gate')
+        checks = @([pscustomobject]@{ context = 'review'; app_id = 1 })
+    }
+}
+$protection | ConvertTo-Json -Depth 10 -Compress
 '@ | Set-Content -LiteralPath $fakeGhPath -Encoding utf8
     $script:ghPath = $fakeGhPath
     $script:Repository = 'silverThunder09/jdsnack-agent-os-project'
     $script:PullRequestNumber = 220
     $env:JDSNACK_FAKE_DISMISS_STALE = 'true'
+    $env:JDSNACK_FAKE_STATUS_CHECKS = 'present'
     $protection = Get-BranchProtectionApprovalRequirement -BaseBranch 'main'
     if ([int]$protection.RequiredApprovals -ne 2 -or $protection.DismissStaleReviews -ne $true) {
         throw 'Valid branch protection was not returned as an enforced approval requirement.'
+    }
+    $expectedRequiredCheckContexts = @('Validate PR contract', 'PR CI Gate', 'review')
+    if ($protection.RequiredCheckContexts.Count -ne $expectedRequiredCheckContexts.Count -or @($expectedRequiredCheckContexts | Where-Object { $_ -notin $protection.RequiredCheckContexts }).Count -gt 0) {
+        throw 'Branch protection required check contexts were not returned completely.'
+    }
+    $matchingRequiredChecks = @($expectedRequiredCheckContexts | ForEach-Object { [pscustomobject]@{ name = $_; bucket = 'pass' } })
+    Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks $matchingRequiredChecks
+    $missingRequiredCheckRejected = $false
+    try {
+        Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks @($matchingRequiredChecks | Where-Object { $_.name -ne 'review' })
+    } catch {
+        $missingRequiredCheckRejected = $true
+        if ($_.Exception.Message -notmatch 'does not match gh pr checks --required') {
+            throw
+        }
+    }
+    if (-not $missingRequiredCheckRejected) {
+        throw 'A branch-protection required check missing from gh pr checks was accepted.'
     }
     $env:JDSNACK_FAKE_HEAD_SHA = $headSha
     $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'pull'
@@ -176,6 +212,20 @@ if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
     if ($approvalSummary.Count -ne 1 -or $approvalSummary.Logins[0] -ne 'contributor') {
         throw 'A write-level collaborator review was not counted as a current-head human approval.'
     }
+    $env:JDSNACK_FAKE_STATUS_CHECKS = 'missing'
+    $missingStatusChecksRejected = $false
+    try {
+        [void](Get-BranchProtectionApprovalRequirement -BaseBranch 'main')
+    } catch {
+        $missingStatusChecksRejected = $true
+        if ($_.Exception.Message -notmatch 'has no required status check protection') {
+            throw
+        }
+    }
+    if (-not $missingStatusChecksRejected) {
+        throw 'Branch protection without required status checks was accepted.'
+    }
+    $env:JDSNACK_FAKE_STATUS_CHECKS = 'present'
     $env:JDSNACK_FAKE_DISMISS_STALE = 'false'
     $staleProtectionRejected = $false
     try {
@@ -194,6 +244,7 @@ if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
     Remove-Item Env:JDSNACK_FAKE_DISMISS_STALE -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_HEAD_SHA -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_REVIEWER_PERMISSION -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_FAKE_STATUS_CHECKS -ErrorAction SilentlyContinue
 }
 
 

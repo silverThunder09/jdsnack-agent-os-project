@@ -60,7 +60,8 @@ set -eu
 fixture_dir='__FAKE_ROOT__'
 output_path=""
 help_requested=0
-network_config_seen=0
+read_only_sandbox_seen=0
+workspace_write_network_config_seen=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help)
@@ -69,7 +70,13 @@ while [ "$#" -gt 0 ]; do
     --config)
       shift
       if [ "${1:-}" = 'sandbox_workspace_write.network_access=false' ]; then
-        network_config_seen=1
+        workspace_write_network_config_seen=1
+      fi
+      ;;
+    --sandbox)
+      shift
+      if [ "${1:-}" = 'read-only' ]; then
+        read_only_sandbox_seen=1
       fi
       ;;
     --output-last-message)
@@ -88,7 +95,8 @@ case "$0" in
 esac
 [ "$help_requested" -eq 1 ] && exit 0
 [ -n "$output_path" ] || exit 2
-[ "$network_config_seen" -eq 1 ] || exit 9
+[ "$read_only_sandbox_seen" -eq 1 ] || exit 9
+[ "$workspace_write_network_config_seen" -eq 0 ] || exit 16
 case "${PATH-}" in
   */reviewer-bin) ;;
   *) exit 3 ;;

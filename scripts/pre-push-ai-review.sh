@@ -328,6 +328,8 @@ run_reviewer() {
   )
 }
 
+# sandbox_workspace_write.network_access is only valid in workspace-write mode.
+# The supported read-only sandbox below keeps this reviewer outside that mode.
 if ! run_reviewer exec \
   --ephemeral \
   --ignore-user-config \
@@ -335,7 +337,6 @@ if ! run_reviewer exec \
   --model "$MODEL" \
   --config 'model_reasoning_effort="medium"' \
   --config 'web_search="disabled"' \
-  --config 'sandbox_workspace_write.network_access=false' \
   --disable shell_tool \
   --disable apps \
   --disable remote_plugin \

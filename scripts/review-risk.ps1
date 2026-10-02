@@ -134,6 +134,40 @@ function Assert-FixedReviewPolicy {
             throw "Review policy scoring path patterns are not fixed: $($scoringPatternGroup.Key)."
         }
     }
+    $expectedReviewRouting = [ordered]@{
+        'Security' = @(
+            '^\.github/'
+            '^\.githooks/'
+            '(^|/)(scripts/review|\.agent-os/operations/review)'
+            '(^|/)(auth|security|secret|credential|token|permission|workflow)([-_/.]|$)'
+            '(^|/)(AGENTS\.md|CLAUDE\.md|backends\.json)$'
+        )
+        'Performance' = @(
+            '(^|/)(performance|benchmark|load|cache|async|worker|query|repository|sql)([-_/.]|$)'
+            '^frontend/src/(components|hooks|pages|services)/'
+        )
+        'Test Coverage' = @(
+            '^(backend|frontend|scripts|\.github/workflows|\.githooks)/'
+            '(^|/)(test|tests)/'
+        )
+        'Architecture' = @(
+            '^\.agent-os/'
+            '^docs/architecture/'
+            '^backend/'
+            '^frontend/src/'
+            '^\.github/'
+            '^scripts/'
+            '^\.githooks/'
+            '(^|/)(AGENTS\.md|CLAUDE\.md|backends\.json)$'
+        )
+    }
+    foreach ($routingRule in $expectedReviewRouting.GetEnumerator()) {
+        $actualRules = @($ReviewPolicy.reviewRouting.($routingRule.Key))
+        if ($actualRules.Count -ne @($routingRule.Value).Count -or
+            (($actualRules -join "`n") -ne (@($routingRule.Value) -join "`n"))) {
+            throw "Review policy routing rules are not fixed: $($routingRule.Key)."
+        }
+    }
     $routingPayload = [ordered]@{
         pathPatterns = $ReviewPolicy.riskScore.pathPatterns
         reviewRouting = $ReviewPolicy.reviewRouting
@@ -146,7 +180,8 @@ function Assert-FixedReviewPolicy {
     } finally {
         $sha256.Dispose()
     }
-    if ($routingHash -ne 'facb6cf57c1ffe7ba78c63e0f7538ce0423309ada0b49b5de947b108be7efc99') {
+    $expectedRoutingPolicyDigest = 'facb6cf57c1ffe7ba78c63e0f7538ce0423309ada0b49b5de947b108be7efc99'
+    if ($routingHash -ne $expectedRoutingPolicyDigest) {
         throw 'Review policy path patterns and routing labels do not match the trusted fixed policy digest.'
     }
     if ($null -eq $ReviewPolicy.dryRun -or $ReviewPolicy.dryRun -isnot [bool]) {

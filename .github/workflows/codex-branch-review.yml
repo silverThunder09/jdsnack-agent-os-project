@@ -198,6 +198,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      checks: read
       pull-requests: write
     steps:
       - name: Check out trusted approval base

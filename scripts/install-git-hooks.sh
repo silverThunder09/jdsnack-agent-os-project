@@ -47,7 +47,6 @@ if ! codex exec \
   --ephemeral \
   --ignore-user-config \
   --strict-config \
-  --config 'sandbox_workspace_write.network_access=false' \
   --sandbox read-only \
   --skip-git-repo-check \
   --help >/dev/null 2>&1; then

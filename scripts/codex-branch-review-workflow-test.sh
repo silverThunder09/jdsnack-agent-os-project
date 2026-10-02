@@ -41,6 +41,7 @@ assert_contains "permissions:"
 assert_contains "concurrency:"
 assert_contains "  group: jdsnack-review-pr-"
 assert_contains "      contents: read"
+assert_contains "      checks: read"
 assert_contains "      pull-requests: write"
 assert_contains "  queue_squash:"
 assert_contains "    needs: [review]"
@@ -135,6 +136,10 @@ install_exec_line="$(grep -nF -- 'if ! codex exec' "$ROOT_DIR/scripts/install-gi
     || fail 'Git hook 설치가 Codex exec 호환성 확인 전에 tracked hook을 변경합니다.'
 grep -Fq -- 'Specialized review routing labels and path rules' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 전문 라우팅 지침이 없습니다.'
 grep -Fq -- '--sandbox read-only' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 read-only sandbox를 강제하지 않습니다.'
+if grep -Fq -- 'sandbox_workspace_write.network_access=false' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || grep -Fq -- 'sandbox_workspace_write.network_access=false' "$ROOT_DIR/scripts/install-git-hooks.sh"; then
+    fail 'read-only reviewer에 workspace-write 전용 network 설정을 전달하면 안 됩니다.'
+fi
+grep -Fq -- 'read_only_sandbox_seen' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" || fail 'pre-push 계약 테스트가 read-only sandbox 인자를 검증하지 않습니다.'
 grep -Fq -- '--disable shell_tool' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 shell tool을 비활성화하지 않습니다.'
 grep -Fq -- 'risk_score:' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 결정론 위험도 점수를 검증하지 않습니다.'
 grep -Fq -- 'has_structured_body' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 구조화된 findings/summary를 검증하지 않습니다.'
@@ -171,7 +176,6 @@ grep -Fq -- 'require_host_tool cat' "$ROOT_DIR/scripts/pre-push-ai-review.sh" ||
 grep -Fq -- '"$git_bin" diff' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer 이후 Git을 절대 경로로 호출하지 않습니다.'
 grep -Fq -- '"$env_bin" -i "${review_env_args[@]}" "$reviewer_entry" "$@"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 제한된 PATH에서 전용 Codex runtime을 실행하지 않습니다.'
 grep -Fq -- 'run_reviewer exec' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 전용 reviewer 실행 경계를 사용하지 않습니다.'
-grep -Fq -- "--config 'sandbox_workspace_write.network_access=false'" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer network access 차단 설정을 전달하지 않습니다.'
 grep -Fq -- '--strict-config' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 reviewer config를 엄격 모드로 검증하지 않습니다.'
 clean_checkout_line="$(grep -nF -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
 review_runtime_line="$(grep -nF -- 'run_reviewer exec' "$ROOT_DIR/scripts/pre-push-ai-review.sh" | head -n 1 | cut -d: -f1)"
@@ -180,7 +184,6 @@ review_runtime_line="$(grep -nF -- 'run_reviewer exec' "$ROOT_DIR/scripts/pre-pu
 if grep -Fq -- 'clear_review_environment' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer가 denylist 환경 정리에 의존합니다.'
 fi
-grep -Fq -- "sandbox_workspace_write.network_access=false" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer sandbox가 network access를 명시적으로 차단하지 않습니다.'
 if grep -Fq -- 'for helper in cat grep cygpath' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push reviewer PATH가 host 도구 디렉터리로 확장됩니다.'
 fi
@@ -379,6 +382,7 @@ for approval_contract in \
     'Get-CurrentHeadApprovers' \
     'Test-EligibleHumanApprover' \
     'Get-HumanApprovalSummary' \
+    'Assert-RequiredChecksMatchBranchProtection' \
     'Assert-NoUnresolvedChangeRequests' \
     'api' \
     'graphql' \
@@ -394,6 +398,9 @@ for approval_contract in \
     '$latest.State -eq '\''APPROVED'\'' -and $latest.CommitOid -eq $ExpectedHeadSha' \
     '$changesRequestedLogins = @($eligibleLatestByLogin.Keys | Where-Object { $eligibleLatestByLogin[$_].State -eq '\''CHANGES_REQUESTED'\'' }' \
     'Get-BranchProtectionApprovalRequirement' \
+    'required_status_checks' \
+    'RequiredCheckContexts' \
+    'Branch protection required check set does not match gh pr checks --required' \
     'required_approving_review_count' \
     'effectiveMinimumApprovals' \
     'DismissStaleReviews' \
@@ -430,6 +437,8 @@ grep -Fq -- 'Assert-FixedApprovalPolicy -ReviewPolicy' "$ROOT_DIR/scripts/comple
     || fail '승인 계약 테스트가 dry-run 정책 검증 경로를 실행하지 않습니다.'
 grep -Fq -- 'JDSNACK_FAKE_REVIEWER_PERMISSION' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
     || fail '승인 계약 테스트가 reviewer repository permission 경로를 실행하지 않습니다.'
+grep -Fq -- 'JDSNACK_FAKE_STATUS_CHECKS' "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+    || fail '승인 계약 테스트가 branch protection required check 경로를 실행하지 않습니다.'
 grep -Fq -- 'fixture_head_sha=' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
     || fail 'pre-push AI 리뷰 계약 테스트가 fixture HEAD를 명시적으로 검증하지 않습니다.'
 if grep -Fq -- "if (\$reviewState -ieq 'DISMISSED')" "$APPROVAL_SCRIPT"; then
