@@ -242,8 +242,24 @@ workspace_arg="$ROOT_DIR"
 if command -v cygpath >/dev/null 2>&1; then
   workspace_arg="$(cygpath -w "$ROOT_DIR")"
 fi
-if ! risk_json="$($pwsh_bin -NoProfile -File "$workspace_arg/scripts/review-risk.ps1" -Workspace "$workspace_arg" -BaseSha "$base_sha" -HeadSha "$reviewed_ref")"; then
-  echo "ERROR: 결정론적 pre-push 위험도 검증에 실패했습니다. push를 차단합니다." >&2
+risk_stderr_path="$tmp_dir/review-risk.stderr"
+if ! risk_json="$($pwsh_bin -NoProfile -File "$workspace_arg/scripts/review-risk.ps1" -Workspace "$workspace_arg" -BaseSha "$base_sha" -HeadSha "$reviewed_ref" 2>"$risk_stderr_path")"; then
+  echo "ERROR: 결정론적 pre-push 위험도 계산기가 실패했습니다. push를 차단합니다." >&2
+  exit 1
+fi
+if [ -s "$risk_stderr_path" ]; then
+  echo "ERROR: 결정론적 pre-push 위험도 계산기가 오류 출력을 반환했습니다. push를 차단합니다." >&2
+  exit 1
+fi
+if ! "$jq_bin" -s -e '
+  length == 1 and
+  (.[0] | type == "object" and
+    (.riskScore | type == "number" and . >= 0 and . <= 100 and floor == .) and
+    (.riskBand | type == "string" and (. == "Light" or . == "Standard" or . == "High-risk")) and
+    (.reviewLabels | type == "array" and length > 0 and all(.[]; type == "string" and length > 0) and length == (unique | length)) and
+    (.dryRun | type == "boolean"))
+' <<< "$risk_json" >/dev/null 2>&1; then
+  echo "ERROR: 결정론적 pre-push 위험도 결과의 JSON 형식 또는 필수 필드가 유효하지 않습니다. push를 차단합니다." >&2
   exit 1
 fi
 expected_risk_score="$("$jq_bin" -r '.riskScore' <<< "$risk_json")"

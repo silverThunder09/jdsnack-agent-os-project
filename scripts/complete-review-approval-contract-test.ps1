@@ -345,6 +345,9 @@ if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments
     [pscustomobject]@{ permission = $env:JDSNACK_FAKE_REVIEWER_PERMISSION } | ConvertTo-Json -Compress
     exit 0
 }
+if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments[1]) -match '^repos/.+/branches/.+/protection$' -and -not [string]::IsNullOrWhiteSpace($env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE)) {
+    Set-Content -LiteralPath $env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE -Value ([string]$Arguments[1]) -Encoding Ascii
+}
 if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
     $requiredApprovalCount = 2
     if ($env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT) {
@@ -378,6 +381,14 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         throw 'A branch-protection requirement greater than two approvals was not preserved.'
     }
     Remove-Item Env:JDSNACK_FAKE_REQUIRED_APPROVAL_COUNT -ErrorAction SilentlyContinue
+    $branchProtectionCapturePath = Join-Path $tempRoot 'branch-protection-api-path.txt'
+    $env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE = $branchProtectionCapturePath
+    [void](Get-BranchProtectionApprovalRequirement -BaseBranch 'release/2026')
+    $branchProtectionApiPath = (Get-Content -LiteralPath $branchProtectionCapturePath -Raw).Trim()
+    if ($branchProtectionApiPath -ne 'repos/silverThunder09/jdsnack-agent-os-project/branches/release%2F2026/protection') {
+        throw "A slash-containing base branch was not encoded as one API path segment: $branchProtectionApiPath"
+    }
+    Remove-Item Env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE -ErrorAction SilentlyContinue
     $expectedRequiredCheckContexts = @('Validate PR contract', 'PR CI Gate', 'review')
     if ($protection.RequiredCheckContexts.Count -ne $expectedRequiredCheckContexts.Count -or @($expectedRequiredCheckContexts | Where-Object { $_ -notin $protection.RequiredCheckContexts }).Count -gt 0) {
         throw 'Branch protection required check contexts were not returned completely.'
@@ -509,6 +520,7 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     Remove-Item Env:JDSNACK_FAKE_REVIEWER_PERMISSION -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_REVIEW_SCENARIO -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_STATUS_CHECKS -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE -ErrorAction SilentlyContinue
 }
 
 

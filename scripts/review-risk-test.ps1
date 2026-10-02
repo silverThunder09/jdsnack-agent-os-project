@@ -1,7 +1,27 @@
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'review-risk.ps1'
+$powerShellPath = (Get-Command pwsh -ErrorAction Stop).Source
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("jdsnack-review-risk-test-" + [guid]::NewGuid().ToString('N'))
+
+function Invoke-RiskAssessmentProcess {
+    param(
+        [string]$Workspace,
+        [string]$BaseSha,
+        [string]$HeadSha,
+        [string]$PolicyPath
+    )
+
+    $processOutput = & $powerShellPath -NoLogo -NoProfile -File $scriptPath `
+        -Workspace $Workspace `
+        -BaseSha $BaseSha `
+        -HeadSha $HeadSha `
+        -PolicyPath $PolicyPath 2>&1 | Out-String
+    return [pscustomobject]@{
+        ExitCode = [int]$LASTEXITCODE
+        Output = $processOutput
+    }
+}
 
 function Invoke-Git {
     param([string[]]$Arguments)
@@ -104,19 +124,18 @@ try {
     Assert-Equal ($assessment.topLevelScopes -contains 'backend/src/main/resources') $true 'resources logical scope'
     Assert-Equal $assessment.dryRun $true 'default dry-run policy'
 
+    $invalidShaResult = Invoke-RiskAssessmentProcess -Workspace $tempRoot -BaseSha 'invalid-base-sha' -HeadSha $headSha -PolicyPath $policyPath
+    if ($invalidShaResult.ExitCode -eq 0) {
+        throw "review-risk.ps1 did not report an invalid SHA as a failing process: $($invalidShaResult.Output)"
+    }
+
     $tamperedDryRunPath = Join-Path $tempRoot 'tampered-dry-run-policy.json'
     $tamperedDryRunPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
     $tamperedDryRunPolicy.dryRun = $false
     $tamperedDryRunPolicy | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tamperedDryRunPath -Encoding utf8
-    $tamperedDryRunExitCode = 0
-    try {
-        $tamperedDryRunOutput = & $scriptPath -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedDryRunPath 2>&1 | Out-String
-        $tamperedDryRunExitCode = [int]$LASTEXITCODE
-    } catch {
-        $tamperedDryRunExitCode = 1
-    }
-    if ($tamperedDryRunExitCode -eq 0) {
-        throw 'review-risk.ps1 accepted a policy with dryRun=false.'
+    $tamperedDryRunResult = Invoke-RiskAssessmentProcess -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedDryRunPath
+    if ($tamperedDryRunResult.ExitCode -eq 0) {
+        throw "review-risk.ps1 accepted a policy with dryRun=false: $($tamperedDryRunResult.Output)"
     }
 
     $policyPath = Join-Path $PSScriptRoot 'review-policy.json'
@@ -125,16 +144,9 @@ try {
         $tamperedPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
         $tamperedPolicy.riskScore.pathPatterns.$patternGroup = @('^tampered$')
         $tamperedPolicy | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tamperedPolicyPath -Encoding utf8
-        $tamperedExitCode = 0
-        try {
-            $tamperedOutput = & $scriptPath -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedPolicyPath 2>&1 | Out-String
-            $tamperedExitCode = [int]$LASTEXITCODE
-        } catch {
-            $tamperedExitCode = 1
-            $tamperedOutput = $_ | Out-String
-        }
-        if ($tamperedExitCode -eq 0 -or $tamperedOutput -notmatch 'path patterns are not fixed|trusted fixed policy digest') {
-            throw "tampered $patternGroup scoring path pattern was accepted: $tamperedOutput"
+        $tamperedResult = Invoke-RiskAssessmentProcess -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedPolicyPath
+        if ($tamperedResult.ExitCode -eq 0 -or $tamperedResult.Output -notmatch 'path patterns are not fixed|trusted fixed policy digest') {
+            throw "tampered $patternGroup scoring path pattern was accepted: $($tamperedResult.Output)"
         }
     }
 
@@ -143,16 +155,9 @@ try {
         $tamperedRoutingPolicy = Get-Content -LiteralPath $policyPath -Raw | ConvertFrom-Json
         $tamperedRoutingPolicy.reviewRouting.$routingLabel = @('^tampered$')
         $tamperedRoutingPolicy | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tamperedRoutingPath -Encoding utf8
-        $tamperedRoutingExitCode = 0
-        try {
-            $tamperedRoutingOutput = & $scriptPath -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedRoutingPath 2>&1 | Out-String
-            $tamperedRoutingExitCode = [int]$LASTEXITCODE
-        } catch {
-            $tamperedRoutingExitCode = 1
-            $tamperedRoutingOutput = $_ | Out-String
-        }
-        if ($tamperedRoutingExitCode -eq 0 -or $tamperedRoutingOutput -notmatch 'routing rules are not fixed|trusted fixed policy digest') {
-            throw "tampered $routingLabel review routing rule was accepted: $tamperedRoutingOutput"
+        $tamperedRoutingResult = Invoke-RiskAssessmentProcess -Workspace $tempRoot -BaseSha $baseSha -HeadSha $headSha -PolicyPath $tamperedRoutingPath
+        if ($tamperedRoutingResult.ExitCode -eq 0 -or $tamperedRoutingResult.Output -notmatch 'routing rules are not fixed|trusted fixed policy digest') {
+            throw "tampered $routingLabel review routing rule was accepted: $($tamperedRoutingResult.Output)"
         }
     }
 

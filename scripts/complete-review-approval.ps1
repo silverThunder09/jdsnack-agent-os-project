@@ -196,7 +196,8 @@ function Get-BranchProtectionApprovalRequirement {
     if ([string]::IsNullOrWhiteSpace($BaseBranch)) {
         Stop-NeedsHuman 'The pull request base branch is unavailable while verifying branch protection.'
     }
-    $protectionJson = & $script:ghPath api "repos/$Repository/branches/$BaseBranch/protection" 2>&1 | Out-String
+    $encodedBaseBranch = [uri]::EscapeDataString($BaseBranch)
+    $protectionJson = & $script:ghPath api "repos/$Repository/branches/$encodedBaseBranch/protection" 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0) {
         Stop-NeedsHuman "Could not read effective branch protection for '$BaseBranch': $protectionJson"
     }

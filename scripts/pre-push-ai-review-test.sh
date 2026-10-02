@@ -227,6 +227,25 @@ FAKE_CODEX
 printf '%s\n' 'CODEX_FIXTURE_RUNTIME_DEPENDENCY=available' > "$fake_root/codex-runtime.sh"
 sed -i "s|__FAKE_ROOT__|$fake_root|g" "$fake_root/codex"
 chmod +x "$fake_root/codex"
+cat > "$fake_root/pwsh" <<'FAKE_PWSH'
+#!/bin/sh
+set -eu
+
+fixture_dir='__FAKE_ROOT__'
+real_pwsh='__REAL_PWSH__'
+if [ -f "$fixture_dir/pwsh.invalid-json" ]; then
+  printf '%s\n' '{"riskScore":65}'
+  exit 0
+fi
+if [ -f "$fixture_dir/pwsh.stderr-zero-exit" ]; then
+  "$real_pwsh" "$@"
+  printf '%s\n' 'synthetic PowerShell error with zero exit status' >&2
+  exit 0
+fi
+exec "$real_pwsh" "$@"
+FAKE_PWSH
+sed -i "s|__FAKE_ROOT__|$fake_root|g; s|__REAL_PWSH__|$pwsh_bin|g" "$fake_root/pwsh"
+chmod +x "$fake_root/pwsh"
 if [ -n "$test_cygpath_bin" ]; then
   printf '#!/bin/sh\nexec "%s" "$@"\n' "$test_cygpath_bin" > "$fake_root/cygpath"
   chmod +x "$fake_root/cygpath"
@@ -262,6 +281,26 @@ run_review() {
 }
 
 run_review >/dev/null
+
+for risk_failure in invalid-json stderr-zero-exit; do
+  touch "$fake_root/pwsh.$risk_failure"
+  rm -f "$fake_root/codex.invoked"
+  set +e
+  risk_failure_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+    | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+        JDSNACK_REVIEW_BASE_REF="$base_ref" \
+        bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
+  risk_failure_status=$?
+  set -e
+  rm -f "$fake_root/pwsh.$risk_failure"
+  if [ "$risk_failure_status" -eq 0 ] || ! grep -Fq '결정론적 pre-push 위험도' <<< "$risk_failure_output"; then
+    printf '%s\n' "$risk_failure_output" >&2
+    fail "위험도 계산의 $risk_failure 결과를 pre-push가 차단하지 않았습니다."
+  fi
+  if [ -e "$fake_root/codex.invoked" ]; then
+    fail "위험도 계산의 $risk_failure 결과가 Codex 리뷰 실행 전에 차단되지 않았습니다."
+  fi
+done
 
 if [ ! -e "$fake_root/original-entry-invoked" ] || [ ! -e "$fake_root/runtime-dependency-invoked" ]; then
   fail 'Codex reviewer가 원본 실행 경로와 형제 runtime dependency를 보존하지 않았습니다.'
