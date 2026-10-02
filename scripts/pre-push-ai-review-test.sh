@@ -24,7 +24,7 @@ fake_root="$(mktemp -d)"
 fixture_root="$(mktemp -d)"
 test_worktree="$fixture_root/test-worktree"
 git clone --quiet --no-checkout "$ROOT_DIR" "$test_worktree"
-git -C "$test_worktree" checkout --detach "$head_sha" >/dev/null
+git -C "$test_worktree" checkout -B codex/pre-push-test "$head_sha" >/dev/null
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$base_sha"
 fixture_head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 [ "$fixture_head_sha" = "$head_sha" ] || fail '격리 fixture가 현재 HEAD에서 생성되지 않았습니다.'
@@ -405,6 +405,38 @@ set -e
 if [ "$head_mismatch_status" -eq 0 ] || ! grep -Fq '현재 checkout의 HEAD와' <<< "$head_mismatch_output"; then
   printf '%s\n' "$head_mismatch_output" >&2
   fail 'push head와 local HEAD 불일치를 pre-push가 차단하지 않았습니다.'
+fi
+
+rm -f "$fake_root/codex.invoked"
+set +e
+destination_ref_mismatch_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/main %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
+destination_ref_mismatch_status=$?
+set -e
+if [ "$destination_ref_mismatch_status" -eq 0 ] || ! grep -Fq 'destination ref가 현재 checkout 브랜치' <<< "$destination_ref_mismatch_output"; then
+  printf '%s\n' "$destination_ref_mismatch_output" >&2
+  fail '현재 브랜치가 아닌 원격 destination ref push를 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail '원격 destination ref 불일치가 Codex reviewer 실행 전에 차단되지 않았습니다.'
+fi
+
+rm -f "$fake_root/codex.invoked"
+set +e
+source_ref_mismatch_output="$(printf 'refs/heads/codex/unreviewed %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
+source_ref_mismatch_status=$?
+set -e
+if [ "$source_ref_mismatch_status" -eq 0 ] || ! grep -Fq 'local ref가 현재 checkout 브랜치' <<< "$source_ref_mismatch_output"; then
+  printf '%s\n' "$source_ref_mismatch_output" >&2
+  fail '현재 브랜치가 아닌 local ref push를 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail 'local ref 불일치가 Codex reviewer 실행 전에 차단되지 않았습니다.'
 fi
 
 touch "$fake_root/codex.bad-risk"

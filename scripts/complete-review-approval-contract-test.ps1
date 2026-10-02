@@ -125,6 +125,9 @@ param(
 )
 $global:LASTEXITCODE = 0
 if ($Arguments -contains 'graphql') {
+    $cursorArgument = @($Arguments | Where-Object { [string]$_ -like 'cursor=*' } | Select-Object -Last 1)
+    $hasNextPage = $false
+    $endCursor = $null
     $reviewNodes = @([pscustomobject]@{
         author = [pscustomobject]@{ login = 'contributor' }
         authorAssociation = 'CONTRIBUTOR'
@@ -172,6 +175,59 @@ if ($Arguments -contains 'graphql') {
                 createdAt = '2026-10-02T01:00:00Z'
             }
         }
+        'paginated-changes-requested' {
+            if ($cursorArgument.Count -gt 0 -and [string]$cursorArgument[0] -eq 'cursor=review-page-2') {
+                $reviewNodes = @([pscustomobject]@{
+                    author = [pscustomobject]@{ login = 'contributor' }
+                    authorAssociation = 'CONTRIBUTOR'
+                    commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
+                    databaseId = 2
+                    id = 'R2'
+                    state = 'CHANGES_REQUESTED'
+                    submittedAt = '2026-10-02T01:00:00Z'
+                    createdAt = '2026-10-02T01:00:00Z'
+                })
+            } else {
+                $hasNextPage = $true
+                $endCursor = 'review-page-2'
+            }
+        }
+        'same-timestamp-conflict' {
+            $reviewNodes += [pscustomobject]@{
+                author = [pscustomobject]@{ login = 'contributor' }
+                authorAssociation = 'CONTRIBUTOR'
+                commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
+                databaseId = 2
+                id = 'R2'
+                state = 'COMMENTED'
+                submittedAt = '2026-10-02T00:00:00Z'
+                createdAt = '2026-10-02T00:00:00Z'
+            }
+        }
+        'stale-current-head' {
+            $reviewNodes += [pscustomobject]@{
+                author = [pscustomobject]@{ login = 'contributor' }
+                authorAssociation = 'CONTRIBUTOR'
+                commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_STALE_SHA }
+                databaseId = 2
+                id = 'R2'
+                state = 'APPROVED'
+                submittedAt = '2026-10-02T01:00:00Z'
+                createdAt = '2026-10-02T01:00:00Z'
+            }
+        }
+        'case-variant-same-user' {
+            $reviewNodes += [pscustomobject]@{
+                author = [pscustomobject]@{ login = 'Contributor' }
+                authorAssociation = 'CONTRIBUTOR'
+                commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
+                databaseId = 2
+                id = 'R2'
+                state = 'COMMENTED'
+                submittedAt = '2026-10-02T01:00:00Z'
+                createdAt = '2026-10-02T01:00:00Z'
+            }
+        }
     }
     $review = [pscustomobject]@{
         data = [pscustomobject]@{
@@ -180,7 +236,7 @@ if ($Arguments -contains 'graphql') {
                     author = [pscustomobject]@{ login = 'author' }
                     reviews = [pscustomobject]@{
                         nodes = @($reviewNodes)
-                        pageInfo = [pscustomobject]@{ hasNextPage = $false; endCursor = $null }
+                        pageInfo = [pscustomobject]@{ hasNextPage = $hasNextPage; endCursor = $endCursor }
                     }
                 }
             }
@@ -256,6 +312,7 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         }
     }
     $env:JDSNACK_FAKE_HEAD_SHA = $headSha
+    $env:JDSNACK_FAKE_STALE_SHA = $staleSha
     $env:JDSNACK_FAKE_REVIEWER_PERMISSION = 'pull'
     $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
     if ($approvalSummary.Count -ne 0) {
@@ -285,6 +342,34 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     $changesRequestedSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
     if ($changesRequestedSummary.Count -ne 0 -or $changesRequestedSummary.ChangesRequested.Count -ne 1 -or $changesRequestedSummary.ChangesRequested[0] -ne 'contributor') {
         throw 'A later CHANGES_REQUESTED review did not revoke approval and remain blocking.'
+    }
+    $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'paginated-changes-requested'
+    $paginatedSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($paginatedSummary.Count -ne 0 -or $paginatedSummary.ChangesRequested.Count -ne 1 -or $paginatedSummary.ChangesRequested[0] -ne 'contributor') {
+        throw 'A later CHANGES_REQUESTED review on a subsequent page was not applied.'
+    }
+    $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'same-timestamp-conflict'
+    $sameTimestampConflictRejected = $false
+    try {
+        [void](Get-HumanApprovalSummary -ExpectedHeadSha $headSha)
+    } catch {
+        $sameTimestampConflictRejected = $true
+        if ($_.Exception.Message -notmatch 'conflicting states or commits at the same timestamp') {
+            throw
+        }
+    }
+    if (-not $sameTimestampConflictRejected) {
+        throw 'Conflicting review states at the same timestamp were not rejected.'
+    }
+    $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'stale-current-head'
+    $staleCurrentHeadSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($staleCurrentHeadSummary.Count -ne 0) {
+        throw 'A newer approval on a stale commit was counted for the current head.'
+    }
+    $env:JDSNACK_FAKE_REVIEW_SCENARIO = 'case-variant-same-user'
+    $caseVariantSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($caseVariantSummary.Count -ne 0) {
+        throw 'Case-variant GitHub logins were treated as separate reviewers.'
     }
     Remove-Item Env:JDSNACK_FAKE_REVIEW_SCENARIO -ErrorAction SilentlyContinue
     $env:JDSNACK_FAKE_STATUS_CHECKS = 'missing'
@@ -318,6 +403,7 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_DISMISS_STALE -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_HEAD_SHA -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_FAKE_STALE_SHA -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_REVIEWER_PERMISSION -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_REVIEW_SCENARIO -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_STATUS_CHECKS -ErrorAction SilentlyContinue

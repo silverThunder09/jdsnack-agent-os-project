@@ -141,6 +141,7 @@ assert_clean_checkout() {
 
 push_refs=()
 push_shas=()
+push_remote_refs=()
 deletion_ref_seen=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "${local_ref:-}" ] && continue
@@ -159,6 +160,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   esac
   push_refs+=("$local_ref")
   push_shas+=("$local_sha")
+  push_remote_refs+=("$remote_ref")
 done
 
 if [ "${#push_shas[@]}" -eq 0 ]; then
@@ -173,6 +175,20 @@ fi
 if [ "${#push_shas[@]}" -ne 1 ]; then
   echo "ERROR: 여러 ref가 한 번에 push되어 pre-push 리뷰 대상을 단일 커밋에 고정할 수 없습니다. ref별로 다시 push하십시오." >&2
   printf 'refs=%s\n' "${push_refs[*]}" >&2
+  exit 1
+fi
+if ! checkout_ref="$("$git_bin" symbolic-ref --quiet HEAD 2>/dev/null)"; then
+  echo "ERROR: detached checkout에서는 push branch를 리뷰 대상 ref에 고정할 수 없습니다." >&2
+  exit 1
+fi
+if [ "${push_refs[0]}" != "$checkout_ref" ]; then
+  echo "ERROR: push local ref가 현재 checkout 브랜치와 달라 리뷰 증적을 고정할 수 없습니다." >&2
+  printf 'checkout=%s local=%s\n' "$checkout_ref" "${push_refs[0]}" >&2
+  exit 1
+fi
+if [ "${push_remote_refs[0]}" != "$checkout_ref" ]; then
+  echo "ERROR: push destination ref가 현재 checkout 브랜치와 달라 리뷰 증적을 고정할 수 없습니다." >&2
+  printf 'checkout=%s destination=%s\n' "$checkout_ref" "${push_remote_refs[0]}" >&2
   exit 1
 fi
 reviewed_ref="${push_shas[0]}"

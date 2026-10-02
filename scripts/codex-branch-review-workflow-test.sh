@@ -119,6 +119,9 @@ grep -Fq -- 'remote get-url --all --push origin' "$ROOT_DIR/scripts/pre-push-ai-
 grep -Fq -- 'remote get-url --all origin' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 origin fetch URL을 검증하지 않습니다.'
 grep -Fq -- 'push destination과 origin fetch/push URL은 같은 GitHub repository여야 합니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 destination과 origin repository identity 결합을 강제하지 않습니다.'
 grep -Fq -- 'refs/heads/*' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 branch ref 이외의 push를 차단하지 않습니다.'
+grep -Fq -- 'symbolic-ref --quiet HEAD' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 현재 checkout branch ref를 확인하지 않습니다.'
+grep -Fq -- 'push local ref가 현재 checkout 브랜치와 달라' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 source ref와 현재 checkout branch를 결합하지 않습니다.'
+grep -Fq -- 'push destination ref가 현재 checkout 브랜치와 달라' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 destination ref와 리뷰 대상 branch를 결합하지 않습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm cp jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 jq와 Codex CLI를 실행 전에 확인하지 않습니다.'
 grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'require_tool codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex CLI 사전조건을 확인하지 않습니다.'
@@ -374,6 +377,14 @@ grep -Fq -- '$claudeResult.FindingsContractValid' "$FALLBACK_SCRIPT" || fail 'Cl
 grep -Fq -- '$claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 summary 계약이 fallback 판단에 반영되지 않습니다.'
 APPROVAL_SCRIPT="$ROOT_DIR/scripts/complete-review-approval.ps1"
 [[ -f "$APPROVAL_SCRIPT" ]] || fail "분리된 승인 게이트 스크립트가 없습니다: $APPROVAL_SCRIPT"
+for approval_regression in \
+    'paginated-changes-requested' \
+    'same-timestamp-conflict' \
+    'stale-current-head' \
+    'case-variant-same-user'; do
+    grep -Fq -- "'$approval_regression'" "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+        || fail "승인 계약 회귀 테스트가 누락되었습니다: $approval_regression"
+done
 for approval_contract in \
     'Assert-ReviewedPullRequestIsCurrent' \
     'Get-OwnerAutoMergeSignoff' \
