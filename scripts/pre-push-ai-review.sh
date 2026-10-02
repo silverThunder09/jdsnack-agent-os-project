@@ -150,10 +150,9 @@ secure_windows_temp_path() {
   local path="$1"
   local windows_path
   windows_path="$(cygpath -w "$path")" || return 1
-  "$icacls_bin" "$windows_path" /inheritance:r /grant:r \
-    "${windows_identity}:(OI)(CI)F" \
-    '*S-1-5-18:(OI)(CI)F' \
-    '*S-1-5-32-544:(OI)(CI)F' >/dev/null
+  "$icacls_bin" "$windows_path" /inheritance:r \
+    /grant:r "${windows_identity}:F" '*S-1-5-18:F' '*S-1-5-32-544:F' \
+    /grant "${windows_identity}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' >/dev/null
 }
 if [ -n "$icacls_bin" ] && ! secure_windows_temp_path "$tmp_dir"; then
   echo "ERROR: Windows pre-push 임시 디렉터리 ACL을 사용자 전용으로 제한할 수 없습니다." >&2
