@@ -155,6 +155,7 @@ grep -Fq -- '삭제 ref만 있는 push는' "$ROOT_DIR/scripts/pre-push-ai-review
 grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
 grep -Fq -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex reviewer 전에 dirty checkout을 차단하지 않습니다.'
 grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
+grep -Fq -- 'forbidden_tool in git gh bash pwsh powershell.exe python python3 node' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" || fail 'pre-push 격리 fixture가 ambient 실행 파일 차단을 검증하지 않습니다.'
 grep -Fq -- 'reviewer_bin_dir="$tmp_dir/reviewer-bin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer 전용 실행 디렉터리가 없습니다.'
 grep -Fq -- 'review_path="$reviewer_bin_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer PATH가 전용 실행 디렉터리로 제한되지 않습니다.'
 grep -Fq -- 'review_env_args=(' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
@@ -314,7 +315,7 @@ for fallback_contract in \
         || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
 done
 availability_check_line="$(grep -nF -- '$claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)' "$FALLBACK_SCRIPT" | cut -d: -f1)"
-structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody' "$FALLBACK_SCRIPT" | cut -d: -f1)"
+structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 unavailable_route_line="$(grep -nF -- '$claudeReviewUnavailable = ($claudeExitCode -ne 0) -or (-not $claudeHasStructuredResult)' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 claude_success_route_line="$(grep -nF -- 'if (-not $claudeReviewUnavailable) {' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 codex_fallback_route_line="$(grep -nF -- 'Claude could not provide a valid structured review' "$FALLBACK_SCRIPT" | cut -d: -f1)"
@@ -357,6 +358,8 @@ fi
 grep -Fq -- '$summaryLines.Count -ne 7' "$FALLBACK_SCRIPT" || fail 'review_summary는 정확히 7개의 구조화 줄만 허용해야 합니다.'
 grep -Fq -- '$rubricMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary rubric 중복을 차단하지 않습니다.'
 grep -Fq -- '$conclusionMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary conclusion 중복을 차단하지 않습니다.'
+grep -Fq -- '$claudeResult.FindingsContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 findings 계약이 fallback 판단에 반영되지 않습니다.'
+grep -Fq -- '$claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" || fail 'Claude 구조화 summary 계약이 fallback 판단에 반영되지 않습니다.'
 APPROVAL_SCRIPT="$ROOT_DIR/scripts/complete-review-approval.ps1"
 [[ -f "$APPROVAL_SCRIPT" ]] || fail "분리된 승인 게이트 스크립트가 없습니다: $APPROVAL_SCRIPT"
 for approval_contract in \
@@ -396,7 +399,8 @@ for approval_contract in \
     'ExpectedHeadSha' \
     'commit.oid' \
     'reviewState' \
-    "'OWNER', 'MEMBER', 'COLLABORATOR'" \
+    "authorAssociation -eq 'MANNEQUIN'" \
+    'CONTRIBUTOR' \
     'authorAssociation' \
     'review.id' \
     'review.databaseId' \

@@ -85,6 +85,15 @@ if ($null -eq $branchProtectionFunctionAst) {
     throw 'Get-BranchProtectionApprovalRequirement function was not found.'
 }
 . ([scriptblock]::Create($branchProtectionFunctionAst.Extent.Text))
+$humanApprovalFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-HumanApprovalSummary'
+    }, $true)
+if ($null -eq $humanApprovalFunctionAst) {
+    throw 'Get-HumanApprovalSummary function was not found.'
+}
+. ([scriptblock]::Create($humanApprovalFunctionAst.Extent.Text))
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-approval-contract-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 try {
@@ -95,6 +104,31 @@ param(
     [string[]]$Arguments
 )
 $global:LASTEXITCODE = 0
+if ($Arguments -contains 'graphql') {
+    $review = [pscustomobject]@{
+        data = [pscustomobject]@{
+            repository = [pscustomobject]@{
+                pullRequest = [pscustomobject]@{
+                    author = [pscustomobject]@{ login = 'author' }
+                    reviews = [pscustomobject]@{
+                        nodes = @([pscustomobject]@{
+                            author = [pscustomobject]@{ login = 'contributor' }
+                            authorAssociation = 'CONTRIBUTOR'
+                            commit = [pscustomobject]@{ oid = $env:JDSNACK_FAKE_HEAD_SHA }
+                            databaseId = 1
+                            id = 'R1'
+                            state = 'APPROVED'
+                            submittedAt = '2026-10-02T00:00:00Z'
+                        })
+                        pageInfo = [pscustomobject]@{ hasNextPage = $false; endCursor = $null }
+                    }
+                }
+            }
+        }
+    }
+    $review | ConvertTo-Json -Depth 10 -Compress
+    exit 0
+}
 if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
     Write-Output '{"required_pull_request_reviews":{"required_approving_review_count":2,"dismiss_stale_reviews":true}}'
 } else {
@@ -103,10 +137,16 @@ if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
 '@ | Set-Content -LiteralPath $fakeGhPath -Encoding utf8
     $script:ghPath = $fakeGhPath
     $script:Repository = 'silverThunder09/jdsnack-agent-os-project'
+    $script:PullRequestNumber = 220
     $env:JDSNACK_FAKE_DISMISS_STALE = 'true'
     $protection = Get-BranchProtectionApprovalRequirement -BaseBranch 'main'
     if ([int]$protection.RequiredApprovals -ne 2 -or $protection.DismissStaleReviews -ne $true) {
         throw 'Valid branch protection was not returned as an enforced approval requirement.'
+    }
+    $env:JDSNACK_FAKE_HEAD_SHA = $headSha
+    $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $headSha
+    if ($approvalSummary.Count -ne 1 -or $approvalSummary.Logins[0] -ne 'contributor') {
+        throw 'A legitimate contributor review was not counted as a current-head human approval.'
     }
     $env:JDSNACK_FAKE_DISMISS_STALE = 'false'
     $staleProtectionRejected = $false
@@ -124,6 +164,7 @@ if ($env:JDSNACK_FAKE_DISMISS_STALE -eq 'true') {
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item Env:JDSNACK_FAKE_DISMISS_STALE -ErrorAction SilentlyContinue
+    Remove-Item Env:JDSNACK_FAKE_HEAD_SHA -ErrorAction SilentlyContinue
 }
 
 

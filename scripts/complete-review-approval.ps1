@@ -281,7 +281,10 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
         if ([string]::IsNullOrWhiteSpace($login) -or $login -eq $pullRequestAuthor -or $login -match '\[bot\]$') {
             continue
         }
-        if ([string]$review.authorAssociation -notin @('OWNER', 'MEMBER', 'COLLABORATOR')) {
+        # GitHub branch protection determines whether a submitted review is effective.
+        # authorAssociation can be CONTRIBUTOR, FIRST_TIMER, FIRST_TIME_CONTRIBUTOR, or NONE
+        # for a legitimate human reviewer, so only deleted mannequin identities are excluded.
+        if ([string]$review.authorAssociation -eq 'MANNEQUIN') {
             continue
         }
         $reviewState = [string]$review.state

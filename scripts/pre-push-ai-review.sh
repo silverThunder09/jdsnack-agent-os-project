@@ -39,6 +39,11 @@ is_trusted_origin_url() {
   done
   return 1
 }
+push_url="${2-}"
+if ! is_trusted_origin_url "$push_url"; then
+  echo "ERROR: 이번 push invocation의 destination URL이 trusted repository로 고정되지 않았습니다: ${push_url:-unavailable}" >&2
+  exit 1
+fi
 origin_push_urls=()
 while IFS= read -r origin_url; do
   [ -n "$origin_url" ] && origin_push_urls+=("$origin_url")

@@ -29,6 +29,17 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
+foreach ($functionName in @('Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult')) {
+    $dependencyAst = $ast.Find({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq $functionName
+        }, $true)
+    if ($null -eq $dependencyAst) {
+        throw "$functionName function was not found."
+    }
+    . ([scriptblock]::Create($dependencyAst.Extent.Text))
+}
 
 $validSummary = @(
     '- correctness: PASS — concrete correctness evidence is present.'
@@ -56,6 +67,30 @@ if (Test-StructuredReviewSummary -Summary ($duplicateConclusion -join [Environme
 $extraLine = @($validSummary + '- unrelated extra evidence must be rejected.')
 if (Test-StructuredReviewSummary -Summary ($extraLine -join [Environment]::NewLine) -Score 5) {
     throw 'An extra summary line was accepted.'
+}
+
+$validReview = @(
+    'decision: PASS'
+    'score: 5/5'
+    'risk: Light'
+    'findings:'
+    '- none'
+    'review_summary:'
+    $validSummary
+) -join [Environment]::NewLine
+$validResult = Get-StructuredReviewResult -Text $validReview -ReviewerBackend 'claude' -FallbackReason 'none'
+if (-not $validResult.FindingsContractValid -or -not $validResult.ReviewSummaryContractValid) {
+    throw 'A valid structured review result did not preserve both contract-valid flags.'
+}
+$malformedFindingsReview = $validReview.Replace('- none', '- informational finding')
+$malformedFindingsResult = Get-StructuredReviewResult -Text $malformedFindingsReview -ReviewerBackend 'claude' -FallbackReason 'none'
+if ($malformedFindingsResult.FindingsContractValid) {
+    throw 'Malformed findings were marked contract-valid.'
+}
+$malformedSummaryReview = $validReview.Replace('- conclusion: the structured review is complete and auditable.', '- conclusion: the structured review is complete and auditable.' + [Environment]::NewLine + '- conclusion: duplicate')
+$malformedSummaryResult = Get-StructuredReviewResult -Text $malformedSummaryReview -ReviewerBackend 'claude' -FallbackReason 'none'
+if ($malformedSummaryResult.ReviewSummaryContractValid) {
+    throw 'Malformed review_summary was marked contract-valid.'
 }
 
 Write-Output 'Review backend fallback contract tests passed'

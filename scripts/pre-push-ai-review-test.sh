@@ -94,6 +94,14 @@ esac
 if command -v git >/dev/null 2>&1; then
   exit 4
 fi
+for forbidden_tool in git gh bash pwsh powershell.exe python python3 node; do
+  if command -v "$forbidden_tool" >/dev/null 2>&1; then
+    exit 14
+  fi
+done
+if [ -n "${GIT_DIR-}" ] || [ -n "${GIT_WORK_TREE-}" ]; then
+  exit 15
+fi
 if [ -n "${HOME-}" ] || [ -n "${USERPROFILE-}" ] || [ -n "${HOMEDRIVE-}" ] || [ -n "${HOMEPATH-}" ]; then
   exit 5
 fi
@@ -189,7 +197,7 @@ run_review() {
     printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
       | PATH="$fake_root:$PATH" \
         JDSNACK_REVIEW_BASE_REF="$base_ref" \
-        bash "$test_worktree/.githooks/pre-push" origin https://example.invalid
+        bash "$test_worktree/.githooks/pre-push" origin https://github.com/silverThunder09/jdsnack-agent-os-project
   )
 }
 
@@ -204,7 +212,7 @@ set +e
 tag_output="$(printf 'refs/tags/v1.0.0 %s refs/tags/v1.0.0 %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 tag_status=$?
 set -e
 if [ "$tag_status" -eq 0 ] || ! grep -Fq 'branch push만 허용됩니다' <<< "$tag_output"; then
@@ -219,7 +227,7 @@ set +e
 remote_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" upstream https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" upstream https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 remote_status=$?
 set -e
 if [ "$remote_status" -eq 0 ] || ! grep -Fq 'remote는 origin으로 고정' <<< "$remote_output"; then
@@ -230,12 +238,27 @@ if [ -e "$fake_root/codex.invoked" ]; then
   fail 'origin 이외 remote push가 Codex reviewer 실행 전에 차단되지 않았습니다.'
 fi
 
+set +e
+url_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://evil.example) 2>&1)"
+url_status=$?
+set -e
+if [ "$url_status" -eq 0 ] || ! grep -Fq 'destination URL이 trusted repository' <<< "$url_output"; then
+  printf '%s\n' "$url_output" >&2
+  fail 'origin push URL override를 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail 'origin push URL override가 Codex reviewer 실행 전에 차단되지 않았습니다.'
+fi
+
 touch "$fake_root/codex.weak-summary"
 set +e
 weak_summary_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 weak_summary_status=$?
 set -e
 rm -f "$fake_root/codex.weak-summary"
@@ -249,7 +272,7 @@ touch "$fake_root/codex.duplicate-summary"
 duplicate_summary_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 duplicate_summary_status=$?
 set -e
 rm -f "$fake_root/codex.duplicate-summary"
@@ -263,7 +286,7 @@ touch "$fake_root/codex.invalid-score"
 invalid_score_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 invalid_score_status=$?
 set -e
 rm -f "$fake_root/codex.invalid-score"
@@ -277,7 +300,7 @@ set +e
 duplicate_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 duplicate_status=$?
 set -e
 rm -f "$fake_root/codex.duplicate"
@@ -291,7 +314,7 @@ set +e
 malformed_findings_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 malformed_findings_status=$?
 set -e
 rm -f "$fake_root/codex.malformed-findings"
@@ -305,7 +328,7 @@ touch "$fake_root/codex.failure"
 reviewer_failure_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 reviewer_failure_status=$?
 set -e
 rm -f "$fake_root/codex.failure"
@@ -318,7 +341,7 @@ set +e
 head_mismatch_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$base_sha" "$base_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 head_mismatch_status=$?
 set -e
 if [ "$head_mismatch_status" -eq 0 ] || ! grep -Fq '현재 checkout의 HEAD와' <<< "$head_mismatch_output"; then
@@ -331,7 +354,7 @@ set +e
 bad_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 bad_status=$?
 set -e
 rm -f "$fake_root/codex.bad-risk"
@@ -345,7 +368,7 @@ touch "$fake_root/codex.blocking"
 blocking_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 blocking_status=$?
 set -e
 rm -f "$fake_root/codex.blocking"
@@ -358,7 +381,7 @@ set +e
 multi_output="$(printf 'refs/heads/codex/one %s refs/remotes/origin/one %s\nrefs/heads/codex/two %s refs/remotes/origin/two %s\n' "$head_sha" "$head_sha" "$head_sha" "$head_sha" \
   | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid) 2>&1)"
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
 multi_status=$?
 set -e
 if [ "$multi_status" -eq 0 ] || ! grep -Fq '여러 ref가 한 번에 push되어' <<< "$multi_output"; then
@@ -374,7 +397,7 @@ delete_only_output="$(
   printf 'refs/heads/codex/pre-push-test 0000000000000000000000000000000000000000 refs/heads/codex/pre-push-test %s\n' "$head_sha" \
     | PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid 2>&1
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project 2>&1
 )"
 delete_only_status=$?
 set -e
@@ -394,7 +417,7 @@ tracked_output="$(
   printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$head_sha" \
     | PATH="$fake_root:$PATH" \
       JDSNACK_REVIEW_BASE_REF="$base_ref" \
-      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://example.invalid 2>&1
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project 2>&1
 )"
 tracked_status=$?
 set -e

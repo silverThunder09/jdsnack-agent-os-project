@@ -832,7 +832,7 @@ $claudeOutput = Read-ToolOutput $claudeLog
 $availabilityPattern = '(?im)(disabled\s+.*subscription|subscription\s+access.*(?:disabled|denied|unavailable)|(?:quota|rate\s+limit).*(?:exceed|reach|unavailable|denied|limit)|(?:failed\s+to\s+authenticate|oauth\s+session\s+expired|not\s+authenticated|authentication\s+failed|invalid\s+(?:api\s+)?(?:key|credential)|(?:credential|token).*(?:missing|invalid|expired))|claude(?:\.exe)?(?:\s+code)?\s+(?:is\s+)?unavailable|(?:command|executable).*(?:not\s+found|not\s+recognized|unavailable)|(?:claude|review|backend).*(?:timed\s*out|timeout))'
 $claudeAvailabilitySignal = [regex]::IsMatch($claudeOutput, $availabilityPattern)
 $claudeResult = Get-StructuredReviewResult -Text $claudeOutput -ReviewerBackend 'claude' -FallbackReason 'none'
-$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody
+$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid
 $claudeReviewUnavailable = ($claudeExitCode -ne 0) -or (-not $claudeHasStructuredResult)
 
 # A nonzero Claude process exit means the runner failed even when it emitted complete-looking fields.
