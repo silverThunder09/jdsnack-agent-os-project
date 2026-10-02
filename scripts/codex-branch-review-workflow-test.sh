@@ -109,7 +109,10 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/install-git-hooks.sh" ]] || fail "Git hook 설치 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" ]] || fail "pre-push AI 리뷰 스크립트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" ]] || fail "pre-push AI 리뷰 계약 테스트가 없습니다."
+[[ -f "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh" ]] || fail "실제 Git pre-push 진입 계약 테스트가 없습니다."
 [[ -f "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh" ]] || fail "빈 branch diff pre-push 계약 테스트가 없습니다."
+grep -Fq -- 'bash "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"' "$ROOT_DIR/scripts/workflow-ci-test.sh" \
+  || fail 'workflow CI가 실제 Git pre-push 진입 계약 테스트를 실행하지 않습니다.'
 grep -Fq -- 'bash "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"' "$ROOT_DIR/scripts/workflow-ci-test.sh" \
   || fail 'workflow CI가 빈 branch diff pre-push 계약을 실행하지 않습니다.'
 grep -Fq -- 'branch diff가 비어 있어 리뷰할 변경이 없습니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
