@@ -23,7 +23,9 @@ head_sha="$(git rev-parse HEAD)"
 fake_root="$(mktemp -d)"
 fixture_root="$(mktemp -d)"
 test_worktree="$fixture_root/test-worktree"
-git worktree add --detach "$test_worktree" "$head_sha" >/dev/null
+git clone --quiet --no-checkout "$ROOT_DIR" "$test_worktree"
+git -C "$test_worktree" checkout --detach "$head_sha" >/dev/null
+git -C "$test_worktree" update-ref refs/remotes/origin/main "$base_sha"
 fixture_head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 [ "$fixture_head_sha" = "$head_sha" ] || fail '격리 fixture가 현재 HEAD에서 생성되지 않았습니다.'
 workspace_arg="$test_worktree"
@@ -37,7 +39,6 @@ expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
 expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
 test_cygpath_bin="$(command -v cygpath || true)"
-test_git_bin="$(command -v git)"
 export JDSNACK_TEST_SECRET_TOKEN='must-be-cleared-before-review'
 export JDSNACK_TEST_CUSTOM='must-be-cleared-by-allowlist'
 
@@ -46,9 +47,6 @@ printf '%s\n' "$expected_score" > "$fake_root/expected-risk-score"
 printf '%s\n' "$expected_labels" > "$fake_root/expected-labels"
 
 cleanup() {
-  if [ -d "$test_worktree" ]; then
-    git worktree remove --force "$test_worktree" >/dev/null 2>&1 || true
-  fi
   rm -rf "$fake_root"
   rm -rf "$fixture_root"
 }
@@ -197,29 +195,18 @@ fi
 FAKE_CODEX
 sed -i "s|__FAKE_ROOT__|$fake_root|g" "$fake_root/codex"
 chmod +x "$fake_root/codex"
-cat > "$fake_root/git" <<'FAKE_GIT'
-#!/bin/sh
-set -eu
-
-real_git='__REAL_GIT__'
-if [ "${1-}" = 'remote' ] && [ "${2-}" = 'get-url' ]; then
-  case " $* " in
-    *' --push '*) printf '%s\n' "${JDSNACK_TEST_ORIGIN_PUSH_URL:?missing fixture origin push URL}" ;;
-    *) printf '%s\n' "${JDSNACK_TEST_ORIGIN_FETCH_URL:?missing fixture origin fetch URL}" ;;
-  esac
-  exit 0
-fi
-
-exec "$real_git" "$@"
-FAKE_GIT
-sed -i "s|__REAL_GIT__|$test_git_bin|g" "$fake_root/git"
-chmod +x "$fake_root/git"
-export JDSNACK_TEST_ORIGIN_FETCH_URL='https://github.com/silverThunder09/jdsnack-agent-os-project'
-export JDSNACK_TEST_ORIGIN_PUSH_URL='https://github.com/silverThunder09/jdsnack-agent-os-project'
 if [ -n "$test_cygpath_bin" ]; then
   printf '#!/bin/sh\nexec "%s" "$@"\n' "$test_cygpath_bin" > "$fake_root/cygpath"
   chmod +x "$fake_root/cygpath"
 fi
+
+set_origin_urls() {
+  local origin_fetch_url="$1"
+  local origin_push_url="$2"
+
+  git -C "$test_worktree" remote set-url origin "$origin_fetch_url"
+  git -C "$test_worktree" remote set-url --push origin "$origin_push_url"
+}
 
 run_hook_with_origin_urls() {
   local hook_path="$1"
@@ -227,9 +214,8 @@ run_hook_with_origin_urls() {
   local origin_fetch_url="$3"
   local origin_push_url="$4"
 
-  JDSNACK_TEST_ORIGIN_FETCH_URL="$origin_fetch_url" \
-    JDSNACK_TEST_ORIGIN_PUSH_URL="$origin_push_url" \
-    bash "$hook_path" origin "$destination_url"
+  set_origin_urls "$origin_fetch_url" "$origin_push_url"
+  bash "$hook_path" origin "$destination_url"
 }
 
 run_review() {
@@ -277,6 +263,7 @@ fi
 if [ -e "$fake_root/codex.invoked" ]; then
   fail 'origin repository 불일치가 Codex reviewer 실행 전에 차단되지 않았습니다.'
 fi
+set_origin_urls https://github.com/silverThunder09/jdsnack-agent-os-project https://github.com/silverThunder09/jdsnack-agent-os-project
 
 rm -f "$fake_root/codex.invoked"
 set +e
