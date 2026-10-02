@@ -190,6 +190,23 @@ case "$output_path" in
     ;;
 esac
 
+if [ -f "$fixture_dir/codex.rotate-auth" ] || [ -f "$fixture_dir/codex.change-source-auth" ]; then
+  review_auth_path="$CODEX_HOME/auth.json"
+  case "$review_auth_path" in
+    *\\*)
+      [ -x "$fixture_dir/cygpath" ] || exit 19
+      review_auth_path="$("$fixture_dir/cygpath" -u "$review_auth_path")"
+      ;;
+  esac
+  if [ -f "$fixture_dir/codex.rotate-auth" ]; then
+    printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"rotated-access","refresh_token":"rotated-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account"}' > "$review_auth_path"
+  fi
+  if [ -f "$fixture_dir/codex.change-source-auth" ]; then
+    rotating_auth_source="$(<"$fixture_dir/rotating-auth-source-path")"
+    printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"concurrent-access","refresh_token":"concurrent-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account","client_id":"preserve-this-metadata"}' > "$rotating_auth_source"
+  fi
+fi
+
 {
   printf 'decision: %s\n' "${JDSNACK_FAKE_DECISION:-PASS}"
   printf 'score: %s\n' "$fake_score"
@@ -319,6 +336,32 @@ run_review() {
 }
 
 run_review >/dev/null
+
+rotating_auth_source="$fake_root/rotating-auth.json"
+printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"initial-access","refresh_token":"initial-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account","client_id":"preserve-this-metadata"}' > "$rotating_auth_source"
+chmod 600 "$rotating_auth_source"
+printf '%s\n' "$rotating_auth_source" > "$fake_root/rotating-auth-source-path"
+touch "$fake_root/codex.rotate-auth"
+CODEX_AUTH_FILE="$rotating_auth_source" run_review >/dev/null
+rm -f "$fake_root/codex.rotate-auth"
+if ! jq -e '.tokens.access_token == "rotated-access" and .tokens.refresh_token == "rotated-refresh" and .client_id == "preserve-this-metadata"' "$rotating_auth_source" >/dev/null; then
+  fail 'Codex가 갱신한 토큰을 원본 인증 파일에 반영하거나 기존 메타데이터를 보존하지 못했습니다.'
+fi
+
+printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"initial-access","refresh_token":"initial-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account","client_id":"preserve-this-metadata"}' > "$rotating_auth_source"
+touch "$fake_root/codex.rotate-auth" "$fake_root/codex.change-source-auth"
+set +e
+concurrent_auth_output="$(CODEX_AUTH_FILE="$rotating_auth_source" run_review 2>&1)"
+concurrent_auth_status=$?
+set -e
+rm -f "$fake_root/codex.rotate-auth" "$fake_root/codex.change-source-auth"
+if [ "$concurrent_auth_status" -eq 0 ] || ! grep -Fq '인증 원본이 리뷰 도중 변경' <<< "$concurrent_auth_output"; then
+  printf '%s\n' "$concurrent_auth_output" >&2
+  fail '리뷰 중 동시에 변경된 Codex 원본 인증 정보를 덮어쓰기 전에 차단하지 못했습니다.'
+fi
+if ! jq -e '.tokens.access_token == "concurrent-access" and .tokens.refresh_token == "concurrent-refresh" and .client_id == "preserve-this-metadata"' "$rotating_auth_source" >/dev/null; then
+  fail '동시 로그인으로 변경된 원본 인증 정보가 보존되지 않았습니다.'
+fi
 
 mapfile -t reviewer_temp_values < "$fake_root/reviewer-temp-values"
 if [ "${#reviewer_temp_values[@]}" -ne 4 ] || [ "${reviewer_temp_values[0]}" != "${reviewer_temp_values[1]}" ] || [ "${reviewer_temp_values[1]}" != "${reviewer_temp_values[2]}" ]; then

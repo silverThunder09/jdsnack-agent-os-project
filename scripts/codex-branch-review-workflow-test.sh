@@ -130,7 +130,7 @@ grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-p
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
-grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 jq와 Codex CLI를 실행 전에 확인하지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp mv jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 인증 갱신에 필요한 도구를 실행 전에 확인하지 않습니다.'
 grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'require_tool codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex CLI 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'

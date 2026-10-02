@@ -18,7 +18,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm chmod jq codex; do
+for tool in env git grep tail sed head awk cmp rm chmod mktemp mv jq codex; do
   require_host_tool "$tool"
 done
 require_host_tool cat
@@ -111,6 +111,8 @@ umask 077
 tmp_dir="$(mktemp -d)"
 reviewer_pid=""
 codex_auth_path=""
+codex_auth_source_snapshot=""
+codex_auth_update_path=""
 cleanup() {
   local exit_code=$?
   trap - EXIT HUP INT TERM
@@ -121,6 +123,9 @@ cleanup() {
   fi
   if [ -n "$codex_auth_path" ]; then
     "$rm_bin" -f "$codex_auth_path" 2>/dev/null || true
+  fi
+  if [ -n "$codex_auth_update_path" ]; then
+    "$rm_bin" -f "$codex_auth_update_path" 2>/dev/null || true
   fi
   if [ -n "$tmp_dir" ]; then
     "$rm_bin" -rf "$tmp_dir" 2>/dev/null || exit_code=1
@@ -398,7 +403,20 @@ fi
 if [ -z "$codex_auth_source" ] && [ -n "${HOME-}" ]; then
   codex_auth_source="$HOME/.codex/auth.json"
 fi
+if [ -n "$codex_auth_source" ] && [ "${codex_auth_source:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
+  codex_auth_source="$(cygpath -u "$codex_auth_source")" || {
+    echo "ERROR: Codex reviewer의 원본 인증 경로를 확인할 수 없습니다." >&2
+    exit 1
+  }
+fi
 if [ -n "$codex_auth_source" ] && [ -f "$codex_auth_source" ]; then
+  codex_auth_source_snapshot="$tmp_dir/codex-auth-source.json"
+  "$cat_bin" "$codex_auth_source" > "$codex_auth_source_snapshot"
+  "$chmod_bin" 600 "$codex_auth_source_snapshot"
+  if command -v cygpath >/dev/null 2>&1 && ! secure_windows_temp_path "$codex_auth_source_snapshot"; then
+    echo "ERROR: Windows 임시 인증 원본 snapshot ACL을 제한할 수 없습니다." >&2
+    exit 1
+  fi
   if ! codex_auth_json="$($jq_bin -ce 'if .auth_mode == "chatgpt" and (.tokens.access_token | type) == "string" and (.tokens.refresh_token | type) == "string" and (.tokens.account_id | type) == "string" then { auth_mode: .auth_mode, tokens: .tokens, account_id: .account_id } elif (.OPENAI_API_KEY | type) == "string" then { auth_mode: .auth_mode, OPENAI_API_KEY: .OPENAI_API_KEY } else empty end' "$codex_auth_source")"; then
     echo "ERROR: Codex reviewer 인증 payload를 검증할 수 없습니다." >&2
     exit 1
@@ -414,6 +432,108 @@ if [ -n "$codex_auth_source" ] && [ -f "$codex_auth_source" ]; then
     fi
   fi
 fi
+
+sync_refreshed_codex_auth() {
+  local auth_mode
+  local original_tokens
+  local refreshed_tokens
+  local updated_source_json
+  local source_directory
+  local windows_auth_path
+  local windows_snapshot_path
+  local windows_replacement_path
+  local windows_updated_path
+  local windows_script_path
+  local updated_auth_path
+
+  if [ -z "$codex_auth_source_snapshot" ] || [ ! -f "$codex_auth_path" ]; then
+    return 0
+  fi
+  if ! auth_mode="$("$jq_bin" -r '.auth_mode // empty' "$codex_auth_source_snapshot")"; then
+    return 1
+  fi
+  if [ "$auth_mode" != 'chatgpt' ]; then
+    return 0
+  fi
+  if ! original_tokens="$("$jq_bin" -cSe '.tokens' "$codex_auth_source_snapshot")" || \
+    ! refreshed_tokens="$("$jq_bin" -cSe 'if .auth_mode == "chatgpt" and (.tokens.access_token | type) == "string" and (.tokens.refresh_token | type) == "string" and (.tokens.account_id | type) == "string" then .tokens else empty end' "$codex_auth_path")"; then
+    echo "ERROR: Codex reviewer가 갱신한 인증 토큰을 검증할 수 없습니다." >&2
+    return 1
+  fi
+  if [ "$original_tokens" = "$refreshed_tokens" ]; then
+    return 0
+  fi
+  if ! updated_source_json="$("$jq_bin" -cSe --argjson refreshed_tokens "$refreshed_tokens" '.tokens = $refreshed_tokens' "$codex_auth_source_snapshot")"; then
+    echo "ERROR: 갱신된 Codex 토큰을 원본 인증 정보에 반영할 수 없습니다." >&2
+    return 1
+  fi
+  if ! "$cmp_bin" -s "$codex_auth_source" "$codex_auth_source_snapshot"; then
+    echo "ERROR: Codex 인증 원본이 리뷰 도중 변경되어 덮어쓰지 않았습니다." >&2
+    return 1
+  fi
+
+  updated_auth_path="$tmp_dir/codex-auth-updated.json"
+  if ! printf '%s\n' "$updated_source_json" > "$updated_auth_path"; then
+    echo "ERROR: 임시 갱신 인증 파일을 기록할 수 없습니다." >&2
+    return 1
+  fi
+  if ! "$chmod_bin" 600 "$updated_auth_path"; then
+    echo "ERROR: 임시 갱신 인증 파일 권한을 제한할 수 없습니다." >&2
+    return 1
+  fi
+  if command -v cygpath >/dev/null 2>&1 && ! secure_windows_temp_path "$updated_auth_path"; then
+    echo "ERROR: Windows 임시 갱신 인증 ACL을 제한할 수 없습니다." >&2
+    return 1
+  fi
+
+  source_directory="${codex_auth_source%/*}"
+  if [ "$source_directory" = "$codex_auth_source" ]; then
+    source_directory='.'
+  fi
+  if ! codex_auth_update_path="$("$mktemp_bin" "$source_directory/.codex-auth-refresh.XXXXXX")"; then
+    echo "ERROR: Codex 인증 원본과 같은 디렉터리에 안전한 갱신 임시 파일을 만들 수 없습니다." >&2
+    return 1
+  fi
+  if ! "$chmod_bin" 600 "$codex_auth_update_path"; then
+    echo "ERROR: 원본 인증 갱신 파일 권한을 제한할 수 없습니다." >&2
+    return 1
+  fi
+
+  if command -v cygpath >/dev/null 2>&1; then
+    windows_auth_path="$(cygpath -w "$codex_auth_source")" || return 1
+    windows_snapshot_path="$(cygpath -w "$codex_auth_source_snapshot")" || return 1
+    windows_replacement_path="$(cygpath -w "$codex_auth_update_path")" || return 1
+    windows_updated_path="$(cygpath -w "$updated_auth_path")" || return 1
+    windows_script_path="$(cygpath -w "$ROOT_DIR/scripts/sync-review-auth.ps1")" || return 1
+    if ! MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" \
+      -AuthPath "$windows_auth_path" \
+      -SnapshotPath "$windows_snapshot_path" \
+      -ReplacementPath "$windows_replacement_path" \
+      -UpdatedAuthPath "$windows_updated_path"; then
+      return 1
+    fi
+  else
+    if ! "$cat_bin" "$updated_auth_path" > "$codex_auth_update_path"; then
+      echo "ERROR: 원본 인증 갱신 파일을 기록할 수 없습니다." >&2
+      return 1
+    fi
+    if ! "$chmod_bin" 600 "$codex_auth_update_path"; then
+      echo "ERROR: 원본 인증 갱신 파일 권한을 제한할 수 없습니다." >&2
+      return 1
+    fi
+    if ! "$cmp_bin" -s "$codex_auth_source" "$codex_auth_source_snapshot"; then
+      echo "ERROR: Codex 인증 원본이 갱신 직전에 변경되어 덮어쓰지 않았습니다." >&2
+      return 1
+    fi
+    if ! "$mv_bin" -f -- "$codex_auth_update_path" "$codex_auth_source"; then
+      echo "ERROR: 갱신된 Codex 토큰을 원본 인증 저장소에 반영하지 못했습니다." >&2
+      return 1
+    fi
+  fi
+
+  codex_auth_update_path=""
+}
+
 codex_home_arg="$codex_home_dir"
 if command -v cygpath >/dev/null 2>&1; then
   codex_tmp_dir="$(cygpath -w "$tmp_dir")"
@@ -496,6 +616,10 @@ else
   reviewer_status=$?
 fi
 reviewer_pid=""
+if ! sync_refreshed_codex_auth; then
+  echo "ERROR: 갱신된 Codex 토큰을 원본 인증 저장소에 안전하게 반영하지 못했습니다. push를 차단합니다." >&2
+  exit 1
+fi
 if [ "$reviewer_status" -ne 0 ]; then
   echo "ERROR: Codex pre-push 리뷰를 완료하지 못했습니다. push를 차단합니다." >&2
   "$tail_bin" -n 20 "$tmp_dir/codex.log" >&2 || true
