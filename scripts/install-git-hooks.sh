@@ -32,8 +32,23 @@ require_tool() {
   fi
 }
 
-require_tool jq
-require_tool codex
+for required_tool in bash dirname env git grep tail sed head awk cmp rm chmod mktemp stat jq codex cat; do
+  require_tool "$required_tool"
+done
+
+python_tool=""
+for candidate in python3 python; do
+  candidate_path="$(command -v "$candidate" || true)"
+  if [ -n "$candidate_path" ] && "$candidate_path" --version >/dev/null 2>&1; then
+    python_tool="$candidate"
+    break
+  fi
+done
+if [ -z "$python_tool" ]; then
+  echo "ERROR: Git hooks require Python (python3 or python) for AI readiness before core.hooksPath can be enabled." >&2
+  exit 1
+fi
+
 if command -v pwsh >/dev/null 2>&1; then
   powershell_tool="pwsh"
 elif command -v powershell.exe >/dev/null 2>&1; then
@@ -67,5 +82,5 @@ if [ "$configured_path" != "$hooks_path" ]; then
   exit 1
 fi
 
-echo "Git hook prerequisites verified: jq, $powershell_tool, codex"
+echo "Git hook prerequisites verified: Bash, $python_tool, jq, $powershell_tool, Codex CLI and required Git Bash tools"
 echo "Git hooks enabled: $configured_path (pre-commit, pre-push)"

@@ -1,7 +1,41 @@
 $ErrorActionPreference = 'Stop'
 
+function Resolve-PowerShellExecutable {
+    param(
+        [scriptblock]$CommandLookup = {
+            param([string]$Name)
+            Get-Command -Name $Name -ErrorAction SilentlyContinue
+        }
+    )
+
+    foreach ($candidateName in @('pwsh', 'powershell.exe')) {
+        $resolvedCommand = & $CommandLookup $candidateName | Select-Object -First 1
+        if ($null -eq $resolvedCommand) {
+            continue
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$resolvedCommand.Source)) {
+            return [string]$resolvedCommand.Source
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$resolvedCommand.Path)) {
+            return [string]$resolvedCommand.Path
+        }
+    }
+    throw 'Risk assessment tests require PowerShell (pwsh or powershell.exe).'
+}
+
+$powerShellOnlyPath = Resolve-PowerShellExecutable -CommandLookup {
+    param([string]$Name)
+    if ($Name -eq 'powershell.exe') {
+        return [pscustomobject]@{ Source = 'fixture-powershell.exe' }
+    }
+    return $null
+}
+if ($powerShellOnlyPath -ne 'fixture-powershell.exe') {
+    throw 'PowerShell-only fallback runtime was not selected when pwsh was unavailable.'
+}
+
 $scriptPath = Join-Path $PSScriptRoot 'review-risk.ps1'
-$powerShellPath = (Get-Command pwsh -ErrorAction Stop).Source
+$powerShellPath = Resolve-PowerShellExecutable
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("jdsnack-review-risk-test-" + [guid]::NewGuid().ToString('N'))
 
 function Invoke-RiskAssessmentProcess {
@@ -12,13 +46,20 @@ function Invoke-RiskAssessmentProcess {
         [string]$PolicyPath
     )
 
-    $processOutput = & $powerShellPath -NoLogo -NoProfile -File $scriptPath `
-        -Workspace $Workspace `
-        -BaseSha $BaseSha `
-        -HeadSha $HeadSha `
-        -PolicyPath $PolicyPath 2>&1 | Out-String
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $processOutput = & $powerShellPath -NoLogo -NoProfile -File $scriptPath `
+            -Workspace $Workspace `
+            -BaseSha $BaseSha `
+            -HeadSha $HeadSha `
+            -PolicyPath $PolicyPath 2>&1 | Out-String
+        $processExitCode = [int]$LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     return [pscustomobject]@{
-        ExitCode = [int]$LASTEXITCODE
+        ExitCode = $processExitCode
         Output = $processOutput
     }
 }

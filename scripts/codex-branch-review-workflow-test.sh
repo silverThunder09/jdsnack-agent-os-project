@@ -111,6 +111,8 @@ FALLBACK_SCRIPT="$ROOT_DIR/scripts/review-backend-fallback.ps1"
 [[ -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" ]] || fail "pre-push AI 리뷰 계약 테스트가 없습니다."
 grep -Fq -- 'bash "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"' "$ROOT_DIR/scripts/workflow-ci-test.sh" \
   || fail 'workflow CI가 실행 권한과 무관하게 pre-push 계약 테스트를 Bash로 실행해야 합니다.'
+grep -Fq -- 'Git passes the destination remote name and its location as arguments 1 and 2.' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook의 remote name과 destination URL 인자 계약이 명시되지 않았습니다.'
 [[ -f "$ROOT_DIR/.agent-os/operations/review-routing.md" ]] || fail "리뷰 라우팅 문서가 없습니다."
 [[ -f "$ROOT_DIR/.agent-os/operations/branch-protection-provisioning.md" ]] || fail "branch protection provisioning 문서가 없습니다."
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 전문 라우팅 정책을 읽지 않습니다.'
@@ -133,14 +135,20 @@ grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fai
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 실행에 필요한 host 도구를 확인하지 않습니다.'
-grep -Fq -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 jq 사전조건을 확인하지 않습니다.'
-grep -Fq -- 'require_tool codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex CLI 사전조건을 확인하지 않습니다.'
+grep -Fq -- 'for required_tool in bash dirname env git grep tail sed head awk cmp rm chmod mktemp stat jq codex cat; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 pre-push 실행에 필요한 전체 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'for candidate in python3 python; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 pre-commit readiness용 Python을 확인하지 않습니다.'
+grep -Fq -- 'PowerShell-only fallback runtime was not selected when pwsh was unavailable.' "$ROOT_DIR/scripts/review-risk-test.ps1" \
+  || fail '위험도 계약 테스트가 powershell.exe 대체 실행기를 검증하지 않습니다.'
+grep -Fq -- "Git Bash 도구, pre-commit readiness용 Python" "$ROOT_DIR/.agent-os/standards/git-hooks.md" \
+  || fail 'git-hooks 문서가 설치 시 검증하는 도구 의존성을 설명하지 않습니다.'
 grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'required_file' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 downstream 파일 의존성을 확인하지 않습니다.'
 grep -Fq -- 'scripts/check-ai-readiness.py' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 readiness 스크립트 의존성을 확인하지 않습니다.'
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 review policy 의존성을 확인하지 않습니다.'
 grep -Fq -- 'if ! codex exec' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex exec 호환성을 확인하지 않습니다.'
-install_prereq_line="$(grep -nF -- 'require_tool jq' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
+install_prereq_line="$(grep -nF -- 'for required_tool in bash dirname env git grep tail sed head awk cmp rm chmod mktemp stat jq codex cat; do' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
 install_chmod_line="$(grep -nF -- 'chmod +x "$repo_root/$hooks_path/$hook"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
 [[ -n "$install_prereq_line" && -n "$install_chmod_line" && "$install_prereq_line" -lt "$install_chmod_line" ]] \
     || fail 'Git hook 설치가 사전조건 검증 전에 tracked hook을 변경합니다.'

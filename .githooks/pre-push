@@ -9,4 +9,5 @@ if [ ! -f "$repo_root/scripts/pre-push-ai-review.sh" ]; then
   exit 1
 fi
 
+# Git passes the destination remote name and its location as arguments 1 and 2.
 exec bash "$repo_root/scripts/pre-push-ai-review.sh" "$@"
