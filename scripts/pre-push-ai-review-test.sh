@@ -44,10 +44,14 @@ expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
 expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
 test_cygpath_bin="$(command -v cygpath || true)"
+test_icacls_bin="$(command -v icacls.exe || command -v icacls || true)"
 test_sleep_bin="$(command -v sleep || true)"
 test_stat_bin="$(command -v stat || true)"
 [ -n "$test_sleep_bin" ] || fail 'sleep가 필요합니다.'
 [ -n "$test_stat_bin" ] || fail 'stat가 필요합니다.'
+if [ -n "$test_cygpath_bin" ] && [ -z "$test_icacls_bin" ]; then
+  fail 'Windows ACL 검증을 위해 icacls가 필요합니다.'
+fi
 interrupted_hook_pid=""
 export JDSNACK_TEST_SECRET_TOKEN='must-be-cleared-before-review'
 export JDSNACK_TEST_CUSTOM='must-be-cleared-by-allowlist'
@@ -366,7 +370,12 @@ codex_home_path="${copied_auth_path%/auth.json}"
 temp_dir_path="${codex_home_path%/codex-home}"
 codex_home_mode="$("$test_stat_bin" -c '%a' "$codex_home_path")"
 temp_dir_mode="$("$test_stat_bin" -c '%a' "$temp_dir_path")"
-if [ "$auth_file_mode" != '600' ] || [ "$codex_home_mode" != '700' ] || [ "$temp_dir_mode" != '700' ]; then
+if [ -n "$test_cygpath_bin" ]; then
+  auth_acl="$("$test_icacls_bin" "$copied_auth_path")"
+  if grep -Eiq 'Everyone|Authenticated Users|BUILTIN\\Users' <<< "$auth_acl"; then
+    fail "임시 인증 파일 ACL에 광범위한 사용자 권한이 남아 있습니다: $auth_acl"
+  fi
+elif [ "$auth_file_mode" != '600' ] || [ "$codex_home_mode" != '700' ] || [ "$temp_dir_mode" != '700' ]; then
   fail "임시 인증 파일/디렉터리 권한이 제한되지 않았습니다 (auth=$auth_file_mode codex_home=$codex_home_mode temp=$temp_dir_mode)."
 fi
 kill -TERM "$interrupted_hook_pid"

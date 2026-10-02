@@ -98,7 +98,6 @@ fi
 
 umask 077
 tmp_dir="$(mktemp -d)"
-"$chmod_bin" 700 "$tmp_dir"
 reviewer_pid=""
 codex_auth_path=""
 cleanup() {
@@ -130,6 +129,36 @@ handle_signal() {
 trap 'handle_signal 129' HUP
 trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
+
+"$chmod_bin" 700 "$tmp_dir"
+icacls_bin=""
+windows_identity=""
+if command -v cygpath >/dev/null 2>&1; then
+  icacls_bin="$(command -v icacls.exe || command -v icacls || true)"
+  whoami_bin="$(command -v whoami.exe || true)"
+  if [ -z "$icacls_bin" ] || [ -z "$whoami_bin" ]; then
+    echo "ERROR: Windows 임시 인증 디렉터리 ACL을 제한할 icacls/whoami 도구가 필요합니다." >&2
+    exit 1
+  fi
+  windows_identity="$("$whoami_bin" | "$sed_bin" 's/\r$//')"
+  if [ -z "$windows_identity" ]; then
+    echo "ERROR: Windows 임시 디렉터리 ACL용 사용자 SID를 확인할 수 없습니다." >&2
+    exit 1
+  fi
+fi
+secure_windows_temp_path() {
+  local path="$1"
+  local windows_path
+  windows_path="$(cygpath -w "$path")" || return 1
+  "$icacls_bin" "$windows_path" /inheritance:r /grant:r \
+    "${windows_identity}:(OI)(CI)F" \
+    '*S-1-5-18:(OI)(CI)F' \
+    '*S-1-5-32-544:(OI)(CI)F' >/dev/null
+}
+if [ -n "$icacls_bin" ] && ! secure_windows_temp_path "$tmp_dir"; then
+  echo "ERROR: Windows pre-push 임시 디렉터리 ACL을 사용자 전용으로 제한할 수 없습니다." >&2
+  exit 1
+fi
 
 base_ref="${JDSNACK_REVIEW_BASE_REF:-origin/main}"
 if [ "$base_ref" != "origin/main" ]; then
@@ -370,6 +399,10 @@ codex_answer_path="$answer_path"
 codex_home_dir="$tmp_dir/codex-home"
 mkdir -p "$codex_home_dir"
 "$chmod_bin" 700 "$codex_home_dir"
+if [ -n "$icacls_bin" ] && ! secure_windows_temp_path "$codex_home_dir"; then
+  echo "ERROR: Windows Codex 인증 디렉터리 ACL을 사용자 전용으로 제한할 수 없습니다." >&2
+  exit 1
+fi
 codex_auth_path="$codex_home_dir/auth.json"
 codex_auth_source="${CODEX_AUTH_FILE-}"
 if [ -z "$codex_auth_source" ] && [ -n "${CODEX_HOME-}" ]; then
