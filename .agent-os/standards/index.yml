@@ -28,6 +28,7 @@ documents:
     - .agent-os/standards/git-workflow.md
     - .agent-os/standards/git-hooks.md
     - .githooks/pre-commit
+    - .githooks/pre-push
     - .agent-os/standards/backend.md
     - .agent-os/standards/frontend.md
     - .agent-os/standards/api.md
@@ -48,6 +49,7 @@ documents:
     - .agent-os/operations/pr-rules.md
     - .agent-os/operations/pr-review-gate.md
     - .agent-os/operations/review-backend-fallback.md
+    - .agent-os/operations/review-routing.md
     - .agent-os/operations/merge-rules.md
     - .agent-os/operations/work-start-checkpoint.md
     - .agent-os/operations/agent-scan-policy.md
@@ -71,6 +73,11 @@ documents:
     - scripts/check-ai-readiness.py
     - scripts/README.md
     - scripts/install-git-hooks.sh
+    - scripts/pre-push-ai-review.sh
+    - scripts/pre-push-ai-review-test.sh
+    - scripts/review-policy.json
+    - scripts/review-risk.ps1
+    - scripts/review-risk-test.ps1
     - scripts/run-ai-readiness-evals.py
     - evals/context-tasks.json
     - evals/context-plan.schema.json
@@ -78,7 +85,7 @@ documents:
     - scripts/notify-needs-human-test.sh
     - scripts/backends-contract-test.sh
     - scripts/review-backend-fallback.ps1
-    - scripts/review-owner-signoff.ps1
+    - scripts/complete-review-approval.ps1
     - scripts/pr-contract-test.sh
     - scripts/pr-contract-test-test.sh
     - scripts/create-codex-worktree.sh

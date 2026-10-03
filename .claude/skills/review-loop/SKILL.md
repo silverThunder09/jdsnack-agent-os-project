@@ -1,12 +1,12 @@
 ---
 name: review-loop
-description: JDSnack 코드 리뷰 핸드오프 루프. Claude가 결정론 게이트(빌드/테스트/lint/diff 줄수/PR 계약)와 code-reviewer 서브에이전트로 5점 채점·판정만 하고, 4점 미만이면 구조화된 변경요청을 Codex에 넘긴다. Codex가 수정·푸시하면 Claude가 재리뷰하며, 4점 또는 최대 3회까지 반복한다. Claude는 코드를 직접 수정하지 않는다.
+description: JDSnack 코드 리뷰 핸드오프 루프. 설정된 reviewer가 결정론 게이트(빌드/테스트/lint/diff 줄수/PR 계약)와 고정 5점 루브릭으로 판정한다. 현재 기본 reviewer는 Codex이며, Claude 결과 unavailable·누락·오류 시 Codex read-only reviewer를 실행한다. PASS 4점과 모든 current-head required checks 통과 시 Squash auto-merge를 큐에 넣는다.
 ---
 
-# review-loop (Claude = 게이트키퍼)
+# review-loop (설정된 reviewer = 게이트키퍼)
 
-역할 분담: **Claude는 리뷰·판정·PR·merge만**, **Codex는 코딩·수정·푸시만** 담당합니다.
-이 스킬은 Claude 쪽 오케스트레이터입니다. **Claude는 소스 코드를 직접 수정하지 않습니다.** 4점 미만이면 변경요청을 만들어 Codex에 넘기고, 푸시되면 다시 리뷰합니다.
+역할 분담: **Codex는 구현·테스트와 현재 기본 PR 리뷰**, **Claude는 기획·검증·PR 관리**를 담당합니다. reviewer 선택은 `scripts/review-policy.json`의 `primaryReviewer`를 따릅니다.
+현재 primary reviewer는 Codex이므로 Claude 호출 없이 바로 읽기 전용 리뷰를 실행합니다. primary가 Claude이고 Claude가 unavailable이거나 구조화 결과를 반환하지 못하면 Codex read-only reviewer로 전환합니다. 유효한 Claude 판정은 Codex 결과로 덮어쓰지 않습니다. 어느 reviewer든 소스 코드를 수정하지 않습니다.
 규칙 정본은 `.agent-os/`이며 여기서 재서술하지 않습니다.
 
 ## 0. 전제
@@ -53,13 +53,13 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
 
 1. 현재 PR 번호와 저장소를 확인하고, 이미 MERGED 상태이면 종료합니다.
 2. 결과에 따라 review action을 한 번만 제출합니다.
-   - PASS와 score 4 이상이면 review report를 artifact로 넘깁니다. High-risk도 같은 리뷰 점수를 요구하며 소유자가 최신 head 이후 Squash auto-merge를 켜야 사람 확인을 통과합니다. 실제 auto-merge는 별도 approval job이 PR 계약, review gate, 모든 필수 check와 현재 base/head SHA를 재확인한 뒤 큐에 넣습니다.
+   - PASS와 score 4 이상이면 review report를 artifact로 넘깁니다. 별도 approval job은 보고서 SHA, PR 계약, PR CI Gate, review check, 모든 branch-required check와 미해결 변경요청 부재를 다시 확인한 뒤 Squash auto-merge를 큐에 넣습니다.
    - REQUEST_CHANGES는 GitHub review로 한 번 제출합니다. 제출을 시도한 뒤 추가 comment review를 만들지 않습니다.
-   - COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 승인을 중단합니다. High-risk라는 이유만으로 NEEDS_HUMAN을 반환하지 않습니다.
+   - COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 병합을 중단합니다. 위험도는 라벨일 뿐 PASS 기준이나 승인 수를 바꾸지 않습니다.
    - 본문에는 review-loop, attempt, 점수, 결정, findings를 포함합니다.
-3. score가 4 미만이거나 결정론 게이트가 실패하면 review job을 통과시키지 않습니다. 현재 실행 중인 review check는 완료 전에 IN_PROGRESS일 수 있으므로, 그 check가 완료되길 기다리는 무한 대기를 하지 않습니다.
-4. High-risk 변경은 scripts/pr-contract-test.sh, scripts/pr-review-gate.sh, merge-rules.md 조건을 적용합니다. 소유자의 현재 head Squash auto-merge 확인이 없으면 중단합니다.
-5. approval job은 report와 최신 PR이 리뷰한 base/head SHA가 일치하는지, Validate PR contract, PR CI Gate, review check 및 모든 branch-required check가 통과했는지 확인합니다. 별도 GitHub APPROVE 리뷰 없이 확인한 head의 squash auto-merge를 큐에 넣습니다.
+3. score가 4 미만이거나 결정론 게이트가 실패하면 review job을 통과시키지 않습니다. approval job은 현재 실행의 review check도 GitHub가 SUCCESS/pass로 완료한 경우에만 인정하며, IN_PROGRESS/pending은 통과로 취급하지 않습니다.
+4. 위험도 구간별 추가 사람 승인은 요구하지 않습니다. GitHub branch protection에 실제 승인 수가 설정되면 GitHub가 그대로 강제합니다.
+5. approval job은 report와 최신 PR이 리뷰한 base/head SHA, Validate PR contract, PR CI Gate, PR head에 게시된 review check, 모든 branch-required check와 미해결 변경요청 부재를 확인한 뒤 Squash auto-merge를 큐에 넣습니다.
 6. auto-merge 명령 성공만으로 머지 완료로 보고하지 않습니다.
    - gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.
    - state가 OPEN이면 autoMergeRequest가 존재하는 경우에만 큐에 등록된 상태로 기록합니다.

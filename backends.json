@@ -14,8 +14,9 @@
       },
       "review-fallback": {
         "provider": "openai",
-        "model": "gpt-5.6-luna",
-        "reason": "Claude review backend 장애 시 동일 루브릭의 읽기 전용 PR 리뷰를 대행합니다."
+        "model": "gpt-6-luna",
+        "effort": "max",
+        "reason": "Claude review backend 장애 시 gpt-6-luna 모델을 max 추론 강도로 사용해 동일 루브릭의 읽기 전용 PR 리뷰를 대행합니다."
       }
     },
     "claude": {

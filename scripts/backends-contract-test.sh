@@ -14,6 +14,8 @@ jq -e '
    .workers.claude["documentation-planning"],
     .workers.claude.review
   ] | all(.[]; (.provider | type == "string") and (.provider | length > 0) and (.model | type == "string") and (.model | length > 0) and (.reason | type == "string") and (.reason | length > 0)))
+  and .workers.codex["review-fallback"].model == "gpt-6-luna"
+  and .workers.codex["review-fallback"].effort == "max"
 ' "$BACKENDS_FILE" >/dev/null
 
 if rg -n -i '5\.6 luna|gpt-5\.6-luna|sonnet|opus' "$ROOT_DIR/AGENTS.md" "$ROOT_DIR/CLAUDE.md"; then

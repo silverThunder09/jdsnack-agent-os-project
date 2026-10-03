@@ -8,8 +8,8 @@ PR Review Gate는 PR을 바로 머지하지 않고, 변경 범위와 위험도�
 
 ## 실행 주체
 
-- PR Review Gate 실행, 리뷰 결정, approve, request changes, 실패 Issue 판단은 클로드가 담당합니다.
-- 코덱스는 리뷰 판단을 대신하지 않고, 클로드가 남긴 리뷰 결과를 기준으로 코드 수정과 테스트만 수행합니다.
+- PR 리뷰어는 `scripts/review-policy.json`의 `primaryReviewer`가 정합니다. 현재 Codex가 바로 실행되며, Claude가 primary일 때 실행 불가 또는 구조화 결과 누락·오류는 Codex read-only reviewer로 넘깁니다.
+- 리뷰어는 PR diff와 기준만 읽고 결과를 반환합니다. 구현 파일을 수정하지 않으며, GitHub의 별도 approval job이 현재 head와 필수 check를 다시 확인한 뒤 자동 병합을 큐에 넣습니다.
 - 자동 배포 검증은 사용자가 별도 지시한 경우에만 코덱스가 수행합니다.
 
 ## 후속 이슈 점검
@@ -33,11 +33,11 @@ bash scripts/pr-contract-test.sh <PR_NUMBER>
 - `COMMENT`: 머지는 가능하지만 후속 개선 필요
 - `REQUEST_CHANGES`: 머지 금지, 실패 Issue 생성 후 수정 필요
 
-`NEEDS_HUMAN`은 자동 루프의 내부 중단 사유이며 소유자 확인이 있어도 통과하지 않습니다. High-risk 변경도 안전하고 완결된 리뷰에서 `PASS`와 4점 이상을 받아야 합니다. 이 경우 저장소 소유자가 현재 head 커밋 이후 Squash auto-merge를 켜면 사람 확인 게이트를 통과합니다. 점수 미달·모호한 결과·서비스 장애는 그 확인으로 해제되지 않습니다.
+`NEEDS_HUMAN`은 자동 루프의 중단 사유입니다. 자동 병합 후보는 안전하고 완결된 리뷰에서 `PASS`와 4점 이상을 받아야 합니다. 위험도는 라벨만 정하며 위험도 구간별 사람 승인 조건은 없습니다. GitHub branch protection에 실제 설정된 승인 수가 있으면 그대로 존중합니다. 점수 미달·모호한 결과·서비스 장애는 자동 병합하지 않습니다.
 
 `REQUEST_CHANGES`가 하나라도 있으면 PR은 머지할 수 없습니다.
 
-리뷰 workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정을 사용합니다. 이 개인 저장소는 필수 승인 리뷰 수가 0이므로 자기 PR에 GitHub `APPROVE` 리뷰를 제출하지 않습니다. `REQUEST_CHANGES`는 한 번 제출하며, High-risk의 `PASS` 결과는 소유자가 최신 head 이후 Squash auto-merge를 켜야 사람 확인 게이트를 통과합니다. `NEEDS_HUMAN`은 항상 중단합니다.
+리뷰 workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정을 사용합니다. 기본 브랜치 보호 규칙은 `review`·`PR CI Gate`·`Validate PR contract`와 모든 설정된 필수 check를 요구합니다. approval job은 branch protection의 실제 승인 수만 추가로 적용하며, 현재 저장소 정책상 위험도별 사람 승인 수는 0입니다. `REQUEST_CHANGES`는 한 번 제출하며, `NEEDS_HUMAN`은 항상 중단합니다.
 
 ## 변경 범위별 확인 기준
 
@@ -52,9 +52,12 @@ bash scripts/pr-contract-test.sh <PR_NUMBER>
 
 ## 위험도 기준
 
-- `Light`: 기본적으로 Review Gate 대상이 아닙니다.
-- `Standard`: 필요 시 실행할 수 있지만 기본 강제 대상은 아닙니다.
-- `High-risk`: 반드시 실행합니다.
+- `Light`: 0~30점, 위험도 라벨입니다.
+- `Standard`: 31~60점, 위험도 라벨입니다.
+- `High-risk`: 61~100점, 위험도 라벨입니다. 위험 구간만으로 추가 승인을 요구하지 않습니다.
+- `dryRun=false`; PASS 4점 이상과 현재 head의 모든 필수 게이트가 통과하면 Squash auto-merge를 큐에 넣습니다.
+
+점수 항목과 경로 조건은 [review-routing.md](review-routing.md)와 `scripts/review-policy.json`에 고정합니다. `Security` 30점, `API/DB/환경변수` 20점, `PR 크기·범위` 15점, `테스트 공백` 15점, `마이그레이션` 20점으로 총 100점입니다.
 
 ## 리뷰 절차
 
@@ -62,14 +65,13 @@ bash scripts/pr-contract-test.sh <PR_NUMBER>
 2. 필요한 확인 범위를 결정합니다.
 3. PR 본문의 필수 섹션을 확인합니다.
 4. CI 상태를 확인합니다.
-5. PR 본문 또는 코멘트에 리뷰 결과를 작성합니다.
-6. `PASS`면 GitHub PR에 approve를 남깁니다.
+5. `PASS`면 요약·점수·위험도·head SHA를 PR 코멘트로 공개하고 전문 라벨을 붙입니다.
+6. approval job이 최신 base/head SHA, 현재 `review` check, PR 계약·CI Gate·branch-required check, branch protection이 실제 요구하는 승인만 재확인한 뒤 Squash auto-merge를 큐에 넣습니다.
 7. `REQUEST_CHANGES`면 GitHub PR에 request changes를 남기고 실패 Issue를 생성합니다.
 
 대표 명령:
 
 ```sh
-gh pr review <PR_NUMBER> --approve --body-file <review-report.md>
 gh pr review <PR_NUMBER> --request-changes --body-file <review-report.md>
 gh pr review <PR_NUMBER> --comment --body-file <review-report.md>
 ```

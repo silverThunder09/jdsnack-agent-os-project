@@ -119,6 +119,9 @@ grep -Fq -- 'name: Validate PR contract' "$PR_CI_ROUTER" \
   || { echo 'PR CI Router must run the PR contract job' >&2; exit 1; }
 grep -Fq -- 'bash scripts/pr-contract-test.sh' "$PR_CI_ROUTER" \
   || { echo 'PR CI Router must execute scripts/pr-contract-test.sh' >&2; exit 1; }
+workflow_ci_job="$(sed -n '/^  workflow:/,/^  gate:/p' "$PR_CI_ROUTER")"
+grep -Fq -- 'fetch-depth: 0' <<< "$workflow_ci_job" \
+  || { echo 'Workflow CI must fetch full history for origin/main and three-dot diff contracts' >&2; exit 1; }
 grep -Fq -- 'pr_contract' "$PR_CI_ROUTER" \
   || { echo 'PR CI Gate must include the PR contract result' >&2; exit 1; }
 test -f "$ROOT_DIR/scripts/pr-contract-test.sh" \
@@ -138,6 +141,36 @@ test -f "$ROOT_DIR/scripts/pr-review-gate-test.sh" \
   || { echo 'scripts/pr-review-gate-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pr-review-gate-test.sh"
 bash "$ROOT_DIR/scripts/pr-review-gate-test.sh"
+test -f "$ROOT_DIR/scripts/review-policy.json" \
+  || { echo 'scripts/review-policy.json is missing' >&2; exit 1; }
+test -f "$ROOT_DIR/scripts/review-risk.ps1" \
+  || { echo 'scripts/review-risk.ps1 is missing' >&2; exit 1; }
+test -f "$ROOT_DIR/.githooks/pre-push" \
+  || { echo '.githooks/pre-push is missing' >&2; exit 1; }
+test -f "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || { echo 'scripts/pre-push-ai-review.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pre-push-ai-review.sh"
+test -f "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
+  || { echo 'scripts/pre-push-ai-review-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"
+test -f "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh" \
+  || { echo 'scripts/pre-push-git-invocation-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"
+bash "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"
+bash -n "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
+bash "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
+pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
+test -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" \
+  || { echo 'scripts/secure-review-temp-acl-contract-test.ps1 is missing' >&2; exit 1; }
+pwsh -NoProfile -File "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" -Workspace "$ROOT_DIR"
+test -f "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" \
+  || { echo 'scripts/review-backend-fallback-contract-test.ps1 is missing' >&2; exit 1; }
+pwsh -NoProfile -File "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" -Workspace "$ROOT_DIR"
+test -f "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
+  || { echo 'scripts/complete-review-approval-contract-test.ps1 is missing' >&2; exit 1; }
+pwsh -NoProfile -File "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" -Workspace "$ROOT_DIR"
+bash "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"
+bash "$ROOT_DIR/scripts/backends-contract-test.sh"
 ./scripts/pr-ci-router-test.sh
 ./scripts/pr-feedback-workflow-test.sh
 ./scripts/codex-branch-review-workflow-test.sh

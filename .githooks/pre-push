@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+if [ ! -f "$repo_root/scripts/pre-push-ai-review.sh" ]; then
+  echo "ERROR: pre-push AI 리뷰 스크립트가 없습니다." >&2
+  exit 1
+fi
+
+# Git passes the destination remote name and its location as arguments 1 and 2.
+git_bash_path="$(git config --local --get jdsnack.hookBash || true)"
+if [ -z "$git_bash_path" ] || [ ! -x "$git_bash_path" ]; then
+  echo "ERROR: 검증된 Git Bash 경로가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+
+exec "$git_bash_path" "$repo_root/scripts/pre-push-ai-review.sh" "$@"

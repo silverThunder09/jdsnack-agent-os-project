@@ -12,4 +12,17 @@ case "$current_branch" in
     ;;
 esac
 
-python3 scripts/check-ai-readiness.py
+python_bin=""
+for candidate in python3 python; do
+  candidate_path="$(command -v "$candidate" || true)"
+  if [ -n "$candidate_path" ] && "$candidate_path" --version >/dev/null 2>&1; then
+    python_bin="$candidate_path"
+    break
+  fi
+done
+if [ -z "$python_bin" ]; then
+  echo "ERROR: AI readiness 검증을 실행할 Python이 없습니다." >&2
+  exit 1
+fi
+
+"$python_bin" scripts/check-ai-readiness.py

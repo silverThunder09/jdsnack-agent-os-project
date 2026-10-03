@@ -14,6 +14,14 @@ gh() {
     *"--json title,body --template"*)
       printf '%s\n' "$GH_FIXTURE_BODY"
       ;;
+    *"--json baseRefOid,headRefOid"*)
+      GH_REF_CALLS=$((GH_REF_CALLS + 1))
+      if [ "${GH_FIXTURE_DRIFT:-0}" = "1" ] && [ "$GH_REF_CALLS" -ge 2 ]; then
+        printf '%s\n' "{\"baseRefOid\":\"$GH_FIXTURE_BASE_SHA\",\"headRefOid\":\"$GH_FIXTURE_DRIFT_SHA\"}"
+      else
+        printf '%s\n' "{\"baseRefOid\":\"$GH_FIXTURE_BASE_SHA\",\"headRefOid\":\"$GH_FIXTURE_HEAD_SHA\"}"
+      fi
+      ;;
     *"--json title --template"*)
       printf '%s\n' "$GH_FIXTURE_TITLE"
       ;;
@@ -42,6 +50,11 @@ set_common_fixture() {
   GH_FIXTURE_TITLE="chore(harness): 리뷰 게이트 실행 테스트"
   GH_FIXTURE_COMMITS="chore(harness): 리뷰 게이트 실행 테스트"
   GH_FIXTURE_FILES="docs/harness.md"
+  GH_FIXTURE_BASE_SHA="$(git rev-parse origin/main)"
+  GH_FIXTURE_HEAD_SHA="$(git rev-parse HEAD)"
+  GH_FIXTURE_DRIFT_SHA='ffffffffffffffffffffffffffffffffffffffff'
+  GH_FIXTURE_DRIFT=0
+  GH_REF_CALLS=0
   GH_FIXTURE_BODY="$(cat <<'BODY'
 ## 배경 · 문제
 
@@ -109,12 +122,15 @@ run_case() {
       GH_FIXTURE_TITLE="fix(harness): recover Windows automation runtime"
       GH_FIXTURE_COMMITS="fix(harness): recover Windows automation runtime"
       ;;
+    sha_changed)
+      GH_FIXTURE_DRIFT=1
+      ;;
     *)
       fail "알 수 없는 fixture: $name"
       ;;
   esac
 
-  export GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY
+  export GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY GH_FIXTURE_BASE_SHA GH_FIXTURE_HEAD_SHA GH_FIXTURE_DRIFT_SHA GH_FIXTURE_DRIFT GH_REF_CALLS
   set +e
   output="$(bash "$GATE_SCRIPT" 999 2>&1)"
   actual_status=$?
@@ -133,5 +149,6 @@ run_case() {
 
 run_case valid 0 "- PASS: 제목·커밋·본문·범위 계약을 통과했습니다."
 run_case invalid_contract 1 "- FAIL: scripts/pr-contract-test.sh가 PR 계약 위반을 발견했습니다."
+run_case sha_changed 1 "PR base/head SHA가 위험도 계산 중 변경되어 평가를 중단합니다."
 
 echo "PR review gate execution tests passed"

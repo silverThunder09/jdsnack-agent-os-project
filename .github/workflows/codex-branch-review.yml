@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  review:
+  run_review:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
@@ -145,14 +145,6 @@ jobs:
             [System.Text.UTF8Encoding]::new($false)
           )
 
-      - name: Verify Claude review skill
-        shell: powershell
-        run: |
-          $skillPath = Join-Path $env:GITHUB_WORKSPACE '.claude/skills/review-loop/SKILL.md'
-          if (-not (Test-Path -LiteralPath $skillPath -PathType Leaf)) {
-            throw "Claude review skill not found in the trusted review base: $skillPath"
-          }
-
       - name: Verify GitHub review identity
         shell: powershell
         run: |
@@ -162,7 +154,7 @@ jobs:
             throw "Review runner identity mismatch: expected $expectedLogin, got $actualLogin"
           }
 
-      - name: Run Claude review loop with Codex fallback
+      - name: Run configured reviewer with Codex fallback
         shell: powershell
         env:
           CLAUDE_BIN: claude
@@ -191,13 +183,87 @@ jobs:
           path: ${{ runner.temp }}/jdsnack-review-backend-fallback/review-${{ steps.resolve.outputs.pr_number }}.md
           if-no-files-found: error
 
+  publish_review_check:
+    needs: [run_review]
+    if: always() && needs.run_review.outputs.head_sha != ''
+    runs-on: [self-hosted, jdsnack]
+    timeout-minutes: 5
+    permissions:
+      checks: write
+    steps:
+      - name: Publish required review check on the reviewed PR head
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_API_URL: ${{ github.api_url }}
+          REPOSITORY: ${{ github.repository }}
+          REVIEW_HEAD_SHA: ${{ needs.run_review.outputs.head_sha }}
+          REVIEW_JOB_RESULT: ${{ needs.run_review.result }}
+          REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if ($env:REVIEW_HEAD_SHA -notmatch '^[0-9a-fA-F]{40}$') {
+            throw 'A full reviewed PR head SHA is required to publish the review check.'
+          }
+          if ($env:REVIEW_JOB_RESULT -notin @('success', 'failure', 'cancelled', 'timed_out')) {
+            throw "The review job has an unsupported result: $env:REVIEW_JOB_RESULT"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+            throw 'The GitHub Actions token is unavailable for publishing the required review check.'
+          }
+
+          $apiRoot = $env:GH_API_URL.TrimEnd('/')
+          $headers = @{
+            Accept = 'application/vnd.github+json'
+            Authorization = "Bearer $env:GH_TOKEN"
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $externalId = "jdsnack-review:$($env:REPOSITORY):$($env:REVIEW_HEAD_SHA)"
+          $checkRunsUri = "$apiRoot/repos/$($env:REPOSITORY)/commits/$($env:REVIEW_HEAD_SHA)/check-runs?check_name=review&filter=latest&per_page=100"
+          $existingChecks = Invoke-RestMethod -Method Get -Uri $checkRunsUri -Headers $headers -TimeoutSec 30
+          $existingCheck = @($existingChecks.check_runs | Where-Object { $_.external_id -eq $externalId } | Sort-Object { [long]$_.id } -Descending | Select-Object -First 1)
+          $conclusion = if ($env:REVIEW_JOB_RESULT -eq 'success') { 'success' } elseif ($env:REVIEW_JOB_RESULT -eq 'cancelled') { 'cancelled' } else { 'failure' }
+          $title = if ($conclusion -eq 'success') { 'PASS review and required gates' } else { 'Review gate blocked' }
+          $summary = if ($conclusion -eq 'success') {
+            "The configured reviewer returned PASS with score at least 4/5. Required checks passed for head $($env:REVIEW_HEAD_SHA)."
+          } else {
+            "The trusted review job ended with result '$($env:REVIEW_JOB_RESULT)'. Automatic merge is blocked for head $($env:REVIEW_HEAD_SHA)."
+          }
+          $completedAt = [DateTimeOffset]::UtcNow
+          $startedAt = $completedAt.AddSeconds(-1).ToString('o')
+          $completedAt = $completedAt.ToString('o')
+          $body = @{
+            name = 'review'
+            head_sha = $env:REVIEW_HEAD_SHA
+            external_id = $externalId
+            status = 'completed'
+            conclusion = $conclusion
+            started_at = $startedAt
+            completed_at = $completedAt
+            details_url = $env:REVIEW_RUN_URL
+            output = @{ title = $title; summary = $summary }
+          }
+
+          if ($existingCheck.Count -gt 0) {
+            $updateUri = "$apiRoot/repos/$($env:REPOSITORY)/check-runs/$($existingCheck[0].id)"
+            $updateBody = @{}
+            foreach ($entry in $body.GetEnumerator()) {
+              if ($entry.Key -ne 'head_sha') {
+                $updateBody[$entry.Key] = $entry.Value
+              }
+            }
+            Invoke-RestMethod -Method Patch -Uri $updateUri -Headers $headers -ContentType 'application/json' -Body ($updateBody | ConvertTo-Json -Depth 6 -Compress) -TimeoutSec 30 | Out-Null
+          } else {
+            Invoke-RestMethod -Method Post -Uri "$apiRoot/repos/$($env:REPOSITORY)/check-runs" -Headers $headers -ContentType 'application/json' -Body ($body | ConvertTo-Json -Depth 6 -Compress) -TimeoutSec 30 | Out-Null
+          }
+
   queue_squash:
-    needs: [review]
-    if: needs.review.result == 'success'
+    needs: [run_review, publish_review_check]
+    if: needs.run_review.result == 'success' && needs.publish_review_check.result == 'success'
     runs-on: [self-hosted, jdsnack]
     timeout-minutes: 15
     permissions:
       contents: write
+      checks: read
       pull-requests: write
     steps:
       - name: Check out trusted approval base
@@ -224,9 +290,10 @@ jobs:
       - name: Recheck PR contract and review gates before Squash auto-merge
         shell: powershell
         env:
-          PR_NUMBER: ${{ needs.review.outputs.pr_number }}
-          REVIEW_BASE_SHA: ${{ needs.review.outputs.base_sha }}
-          REVIEW_HEAD_SHA: ${{ needs.review.outputs.head_sha }}
+          PR_NUMBER: ${{ needs.run_review.outputs.pr_number }}
+          REVIEW_BASE_SHA: ${{ needs.run_review.outputs.base_sha }}
+          REVIEW_HEAD_SHA: ${{ needs.run_review.outputs.head_sha }}
+          REVIEW_JOB_RESULT: ${{ needs.run_review.result }}
         run: |
           $approval = Join-Path $env:GITHUB_WORKSPACE 'scripts/complete-review-approval.ps1'
           if (-not (Test-Path -LiteralPath $approval -PathType Leaf)) {
@@ -238,5 +305,6 @@ jobs:
             -Repository '${{ github.repository }}' `
             -BaseSha $env:REVIEW_BASE_SHA `
             -HeadSha $env:REVIEW_HEAD_SHA `
+            -ReviewJobResult $env:REVIEW_JOB_RESULT `
             -Workspace $env:GITHUB_WORKSPACE `
             -ReportPath $report

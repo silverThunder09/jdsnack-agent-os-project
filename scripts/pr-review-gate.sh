@@ -40,6 +40,14 @@ trap cleanup EXIT
 files_path="$tmp_dir/files.txt"
 body_path="$tmp_dir/body.md"
 checks_path="$tmp_dir/checks.txt"
+refs_path="$tmp_dir/refs.json"
+gh pr view "$PR_NUMBER" --json baseRefOid,headRefOid > "$refs_path"
+base_sha="$(jq -r '.baseRefOid' "$refs_path")"
+head_sha="$(jq -r '.headRefOid' "$refs_path")"
+if ! [[ "$base_sha" =~ ^[0-9a-fA-F]{40}$ && "$head_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
+  echo "ERROR: PR base/head SHA를 확인할 수 없습니다." >&2
+  exit 1
+fi
 
 gh pr view "$PR_NUMBER" --json title,body --template '{{.body}}' > "$body_path"
 pr_title="$(gh pr view "$PR_NUMBER" --json title --template '{{.title}}')"
@@ -134,6 +142,44 @@ elif [ "$has_backend" -eq 1 ] || [ "$has_frontend" -eq 1 ] || [ "$has_specs" -eq
   risk_level="Standard"
 fi
 
+if git cat-file -e "$base_sha^{commit}" 2>/dev/null && git cat-file -e "$head_sha^{commit}" 2>/dev/null; then
+  :
+else
+  git fetch --no-tags origin "$base_sha" "$head_sha" >/dev/null
+fi
+
+pwsh_bin=""
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh_bin="$(command -v pwsh)"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  pwsh_bin="$(command -v powershell.exe)"
+fi
+if [ -z "$pwsh_bin" ]; then
+  echo "ERROR: 결정론적 위험도 계산을 위해 PowerShell이 필요합니다." >&2
+  exit 1
+fi
+workspace_arg="$ROOT_DIR"
+if command -v cygpath >/dev/null 2>&1; then
+  workspace_arg="$(cygpath -w "$ROOT_DIR")"
+fi
+risk_json="$($pwsh_bin -NoProfile -File "$workspace_arg/scripts/review-risk.ps1" -Workspace "$workspace_arg" -BaseSha "$base_sha" -HeadSha "$head_sha")"
+current_refs_path="$tmp_dir/current-refs.json"
+if ! gh pr view "$PR_NUMBER" --json baseRefOid,headRefOid > "$current_refs_path"; then
+  echo "ERROR: 위험도 계산 후 PR base/head SHA를 다시 확인하지 못했습니다." >&2
+  exit 1
+fi
+current_base_sha="$(jq -r '.baseRefOid // empty' "$current_refs_path")"
+current_head_sha="$(jq -r '.headRefOid // empty' "$current_refs_path")"
+if [ "$current_base_sha" != "$base_sha" ] || [ "$current_head_sha" != "$head_sha" ]; then
+  echo "ERROR: PR base/head SHA가 위험도 계산 중 변경되어 평가를 중단합니다." >&2
+  printf 'initial_base=%s current_base=%s initial_head=%s current_head=%s\n' \
+    "$base_sha" "$current_base_sha" "$head_sha" "$current_head_sha" >&2
+  exit 1
+fi
+risk_score="$(jq -r '.riskScore' <<< "$risk_json")"
+risk_level="$(jq -r '.riskBand' <<< "$risk_json")"
+risk_labels="$(jq -r '.reviewLabels[]' <<< "$risk_json")"
+
 if [ "$has_backend" -eq 1 ] && [ "$has_frontend" -eq 1 ]; then
   warnings+=("backend/** 와 frontend/** 변경이 같은 PR에 있습니다. PR 범위 예외 사유가 필요합니다.")
 fi
@@ -193,7 +239,13 @@ sed 's/^/- /' "$files_path"
 echo
 echo "## 위험도 추정"
 echo
-echo "- ${risk_level}"
+echo "- ${risk_level} (${risk_score}/100)"
+echo "- 용도: 라벨·설명 정보만 사용 (리뷰 점수·승인 수·병합 판단에는 영향 없음)"
+echo
+
+echo "## AI 리뷰 라우팅 라벨"
+echo
+printf '%s\n' "$risk_labels" | sed 's/^/- /'
 echo
 echo "## 필수 확인 범위"
 echo
