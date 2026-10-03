@@ -89,13 +89,15 @@ run_authenticated_session_check() {
 run_short_resume_check() {
   local http_code
 
+  # Stream UTF-8 bytes instead of passing Korean JSON through a Windows curl argument.
   http_code="$(
+    printf '{"resumeText":"%s"}' "${SHORT_RESUME_TEXT}" |
     curl -sS -o /tmp/jdsnack-short.json -w '%{http_code}' \
       -b "${SMOKE_COOKIE_JAR}" \
       -X POST "${FRONTEND_URL}/api/diagnose" \
       -H 'Content-Type: application/json' \
       -H 'Accept: application/json' \
-      -d "{\"resumeText\":\"${SHORT_RESUME_TEXT}\"}"
+      --data-binary @-
   )"
 
   if [[ "${http_code}" != "400" ]]; then
@@ -111,12 +113,13 @@ run_valid_resume_check() {
   local http_code
 
   http_code="$(
+    printf '{"resumeText":"%s"}' "${VALID_RESUME_TEXT}" |
     curl -sS -o /tmp/jdsnack-valid.json -w '%{http_code}' \
       -b "${SMOKE_COOKIE_JAR}" \
       -X POST "${FRONTEND_URL}/api/diagnose" \
       -H 'Content-Type: application/json' \
       -H 'Accept: application/json' \
-      -d "{\"resumeText\":\"${VALID_RESUME_TEXT}\"}"
+      --data-binary @-
   )"
 
   if [[ "${http_code}" != "200" ]]; then
