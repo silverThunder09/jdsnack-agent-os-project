@@ -492,7 +492,7 @@ if ($env:JDSNACK_FAKE_ZERO_APPROVALS -eq 'true') {
 $protection = [ordered]@{ required_pull_request_reviews = $requiredReviews }
 if ($env:JDSNACK_FAKE_STATUS_CHECKS -ne 'missing') {
     $protection['required_status_checks'] = [pscustomobject]@{
-        contexts = @('Validate PR contract', 'PR CI Gate')
+        contexts = @('Validate Agent OS docs', 'Test and build backend', 'Build backend container', 'Test and build frontend')
         checks = @([pscustomobject]@{ context = 'review'; app_id = 1 })
     }
 }
@@ -527,7 +527,13 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         throw "A slash-containing base branch was not encoded as one API path segment: $branchProtectionApiPath"
     }
     Remove-Item Env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE -ErrorAction SilentlyContinue
-    $expectedRequiredCheckContexts = @('Validate PR contract', 'PR CI Gate', 'review')
+    $expectedRequiredCheckContexts = @(
+        'Validate Agent OS docs'
+        'Build backend container'
+        'review'
+        'Test and build backend'
+        'Test and build frontend'
+    )
     if ($protection.RequiredCheckContexts.Count -ne $expectedRequiredCheckContexts.Count -or @($expectedRequiredCheckContexts | Where-Object { $_ -notin $protection.RequiredCheckContexts }).Count -gt 0) {
         throw 'Branch protection required check contexts were not returned completely.'
     }
@@ -545,7 +551,15 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     if (-not $missingRequiredCheckRejected) {
         throw 'A branch-protection required check missing from gh pr checks was accepted.'
     }
-    foreach ($nonPassingBucket in @('skipping', 'pending', 'fail', 'cancel')) {
+    $skippedOptionalRequiredChecks = @($matchingRequiredChecks | ForEach-Object {
+            if ($_.name -in @('Test and build backend', 'Test and build frontend')) {
+                [pscustomobject]@{ name = $_.name; bucket = 'skipping' }
+            } else {
+                $_
+            }
+        })
+    Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks $skippedOptionalRequiredChecks
+    foreach ($nonPassingBucket in @('pending', 'fail', 'cancel')) {
         $nonPassingChecks = @($matchingRequiredChecks | ForEach-Object {
                 if ($_.name -eq 'review') { [pscustomobject]@{ name = $_.name; bucket = $nonPassingBucket } }
                 else { $_ }
@@ -576,6 +590,7 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     foreach ($invalidCurrentReviewCheck in @(
             [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/987654321/job/100" },
             [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'skipping'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
             [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'fail'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
             [pscustomobject]@{ name = 'PR CI Gate'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
             [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = "https://evil.example/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },

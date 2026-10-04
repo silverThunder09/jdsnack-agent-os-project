@@ -348,7 +348,10 @@ function Assert-RequiredChecksMatchBranchProtection {
             Stop-NeedsHuman 'gh pr checks --required returned an empty or malformed check name.'
         }
         $reportedBucket = [string]$requiredCheck.bucket
-        if ($reportedBucket -ine 'pass') {
+        # GitHub considers a conditionally skipped job successful. The exact
+        # PR contract, router gate, and current-run review are verified below.
+        $successfulConditionalSkip = $reportedBucket -ieq 'skipping'
+        if ($reportedBucket -ine 'pass' -and -not $successfulConditionalSkip) {
             Stop-NeedsHuman "Branch-required check '$reportedName' is not passing (bucket=$reportedBucket)."
         }
         $reportedNames += $reportedName
@@ -706,7 +709,9 @@ if ($requiredChecks.Count -eq 0) {
     Stop-NeedsHuman 'No required PR checks were returned.'
 }
 Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $branchProtectionApproval.RequiredCheckContexts -RequiredChecks $requiredChecks
-$blockingChecks = @($requiredChecks | Where-Object { $_.bucket -ine 'pass' })
+$blockingChecks = @($requiredChecks | Where-Object {
+        $_.bucket -notin @('pass', 'skipping')
+    })
 if ($blockingChecks.Count -gt 0) {
     $blockingSummary = ($blockingChecks | ForEach-Object { '{0}={1}' -f $_.name, $_.bucket }) -join ', '
     Stop-NeedsHuman "Required checks are not passing: $blockingSummary"

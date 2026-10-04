@@ -296,8 +296,14 @@ function Get-BlockingRequiredChecks {
         )
         $deferredReviewCheck = $AllowReviewCheckPending -and
             $CurrentJob -ceq 'run_review' -and
-            $checkName -ceq 'review'
-        (-not $currentJobCheck) -and (-not $deferredReviewCheck) -and $_.bucket -ne 'pass'
+            $checkName -ceq 'review' -and
+            $_.bucket -ceq 'pending'
+        # GitHub treats conditionally skipped jobs as successful; the published
+        # review check and the PR contract/router gates are checked separately.
+        $successfulConditionalSkip = $_.bucket -ceq 'skipping' -and
+            $checkName -notin @('Validate PR contract', 'PR CI Gate', 'review')
+        (-not $currentJobCheck) -and (-not $deferredReviewCheck) -and
+            $_.bucket -ne 'pass' -and (-not $successfulConditionalSkip)
     })
 }
 

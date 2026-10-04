@@ -45,16 +45,41 @@ $pendingReviewChecks = @(
     [pscustomobject]@{ name = 'review'; bucket = 'pending' }
     [pscustomobject]@{ name = 'Codex Branch Review / run_review'; bucket = 'pending' }
     [pscustomobject]@{ name = 'Codex Branch Review / review'; bucket = 'pending' }
+    [pscustomobject]@{ name = 'Validate PR contract'; bucket = 'pass' }
     [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
 )
 $preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $pendingReviewChecks -CurrentJob 'run_review' -AllowReviewCheckPending)
 if ($preReviewBlockingChecks.Count -ne 0) {
     throw 'A pending PR-head review check blocked the reviewer job before it could publish its result.'
 }
+$skippedOptionalChecks = @($pendingReviewChecks + @(
+        [pscustomobject]@{ name = 'Test and build backend'; bucket = 'skipping' }
+        [pscustomobject]@{ name = 'Test and build frontend'; bucket = 'skipping' }
+    ))
+$preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $skippedOptionalChecks -CurrentJob 'run_review' -AllowReviewCheckPending)
+if ($preReviewBlockingChecks.Count -ne 0) {
+    throw 'Conditionally skipped path-selected jobs blocked review despite passing PR contract and CI gates.'
+}
 $unrelatedFailureChecks = @($pendingReviewChecks + [pscustomobject]@{ name = 'Backend tests'; bucket = 'fail' })
 $preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $unrelatedFailureChecks -CurrentJob 'run_review' -AllowReviewCheckPending)
 if ($preReviewBlockingChecks.Count -ne 1 -or $preReviewBlockingChecks[0].name -ne 'Backend tests') {
     throw 'Allowing the not-yet-published review check also bypassed an unrelated required failure.'
+}
+$skippedReviewCheck = @($pendingReviewChecks | ForEach-Object {
+        if ($_.name -eq 'review') { [pscustomobject]@{ name = $_.name; bucket = 'skipping' } }
+        else { $_ }
+    })
+$preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $skippedReviewCheck -CurrentJob 'run_review' -AllowReviewCheckPending)
+if ($preReviewBlockingChecks.Count -ne 1 -or $preReviewBlockingChecks[0].name -ne 'review') {
+    throw 'A skipped required review check was treated as a successful review.'
+}
+$skippedPrGate = @($pendingReviewChecks | ForEach-Object {
+        if ($_.name -eq 'PR CI Gate') { [pscustomobject]@{ name = $_.name; bucket = 'skipping' } }
+        else { $_ }
+    })
+$preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $skippedPrGate -CurrentJob 'run_review' -AllowReviewCheckPending)
+if ($preReviewBlockingChecks.Count -ne 1 -or $preReviewBlockingChecks[0].name -ne 'PR CI Gate') {
+    throw 'A skipped PR CI Gate was treated as a successful gate.'
 }
 $withoutReviewExemption = @(Get-BlockingRequiredChecks -Checks $pendingReviewChecks -CurrentJob 'run_review')
 if ($withoutReviewExemption.Count -ne 1 -or $withoutReviewExemption[0].name -ne 'review') {
