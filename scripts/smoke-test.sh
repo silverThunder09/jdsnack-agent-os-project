@@ -52,6 +52,37 @@ sys.stdout.buffer.write(payload.encode("utf-8"))
 '
 }
 
+test_resume_json_payload() {
+  local test_text
+  local expected_text_b64
+
+  test_text=$'한글 "제목"\n경로 \\workspace'
+  expected_text_b64="$(printf '%s' "$test_text" | base64 | tr -d '\r\n')"
+  if ! build_resume_json_payload "$test_text" |
+    EXPECTED_TEXT_B64="$expected_text_b64" python3 -c '
+import base64
+import json
+import os
+import sys
+
+expected = base64.b64decode(os.environ["EXPECTED_TEXT_B64"]).decode("utf-8")
+payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+if payload != {"resumeText": expected}:
+    raise SystemExit("resume JSON payload did not preserve quotes, backslashes, newlines, and UTF-8")
+'
+  then
+    echo "Smoke JSON payload encoding test failed"
+    return 1
+  fi
+
+  echo "Smoke JSON payload encoding passed"
+}
+
+if [[ "${1:-}" == "--test-resume-json-payload" ]]; then
+  test_resume_json_payload
+  exit 0
+fi
+
 run_frontend_root_check() {
   curl -fsS "${FRONTEND_URL}" >/tmp/jdsnack-frontend-root.html
   assert_contains \
@@ -314,6 +345,7 @@ run_protected_api_auth_check() {
 }
 
 main() {
+  test_resume_json_payload
   wait_for_url "${BACKEND_URL}/api/health" "backend health"
   wait_for_url "${FRONTEND_URL}" "frontend root"
 
