@@ -120,7 +120,7 @@ foreach ($checkName in $allowedConditionalPrChecks) {
         throw "Path-selected PR check '$checkName' was not recognized as conditionally skippable."
     }
 }
-foreach ($checkName in @('Validate PR contract', 'PR CI Gate', 'review', 'Unrecognized required check')) {
+foreach ($checkName in @('Validate PR contract', 'PR CI Gate', 'review', 'Unrecognized required check', 'test and build backend')) {
     if (Test-SuccessfulConditionalPrCheckSkip -CheckName $checkName -Bucket 'skipping') {
         throw "Non-optional PR check '$checkName' was recognized as conditionally skippable."
     }

@@ -360,7 +360,7 @@ function Assert-RequiredChecksMatchBranchProtection {
         [object[]]$RequiredChecks
     )
 
-    $expected = @($ExpectedContexts | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+    $expected = @($ExpectedContexts | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique -CaseSensitive)
     if ($expected.Count -eq 0) {
         Stop-NeedsHuman 'Branch protection did not provide any required check contexts.'
     }
@@ -384,9 +384,9 @@ function Assert-RequiredChecksMatchBranchProtection {
         }
         $reportedNames += $reportedName
     }
-    $reported = @($reportedNames | Sort-Object -Unique)
-    $missing = @($expected | Where-Object { $_ -notin $reported })
-    $unexpected = @($reported | Where-Object { $_ -notin $expected })
+    $reported = @($reportedNames | Sort-Object -Unique -CaseSensitive)
+    $missing = @($expected | Where-Object { $_ -cnotin $reported })
+    $unexpected = @($reported | Where-Object { $_ -cnotin $expected })
     if ($missing.Count -gt 0 -or $unexpected.Count -gt 0) {
         $missingSummary = if ($missing.Count -gt 0) { $missing -join ', ' } else { '<none>' }
         $unexpectedSummary = if ($unexpected.Count -gt 0) { $unexpected -join ', ' } else { '<none>' }
@@ -398,7 +398,7 @@ function Assert-RequiredPrGatesPassing {
     param([object[]]$Checks)
 
     foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
-        $gateChecks = @($Checks | Where-Object { $_.name -eq $gateName })
+        $gateChecks = @($Checks | Where-Object { [string]$_.name -ceq $gateName })
         if ($gateChecks.Count -ne 1 -or $gateChecks[0].bucket -ne 'pass') {
             Stop-NeedsHuman "PR gate '$gateName' is missing, ambiguous, or not passing."
         }

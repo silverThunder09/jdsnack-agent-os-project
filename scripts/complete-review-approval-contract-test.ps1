@@ -576,6 +576,25 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     if (-not $missingRequiredCheckRejected) {
         throw 'A branch-protection required check missing from gh pr checks was accepted.'
     }
+    $caseVariantRequiredChecks = @($matchingRequiredChecks | ForEach-Object {
+            if ($_.name -ceq 'Validate Agent OS docs') {
+                [pscustomobject]@{ name = 'validate Agent OS docs'; bucket = 'pass' }
+            } else {
+                $_
+            }
+        })
+    $caseVariantRequiredCheckRejected = $false
+    try {
+        Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks $caseVariantRequiredChecks
+    } catch {
+        $caseVariantRequiredCheckRejected = $true
+        if ($_.Exception.Message -notmatch 'does not match gh pr checks --required') {
+            throw
+        }
+    }
+    if (-not $caseVariantRequiredCheckRejected) {
+        throw 'A case-mismatched required check context was accepted as an exact match.'
+    }
     $skippedOptionalRequiredChecks = @($matchingRequiredChecks | ForEach-Object {
             if ($_.name -in @('Validate Agent OS docs', 'Test and build backend', 'Test and build frontend', 'Build backend container')) {
                 [pscustomobject]@{ name = $_.name; bucket = 'skipping' }
@@ -622,6 +641,19 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
     )
     Assert-RequiredPrGatesPassing -Checks $passingPrGates
+    $caseVariantPrGates = @(
+        [pscustomobject]@{ name = 'validate PR contract'; bucket = 'pass' }
+        [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
+    )
+    $caseVariantPrGateRejected = $false
+    try {
+        Assert-RequiredPrGatesPassing -Checks $caseVariantPrGates
+    } catch {
+        $caseVariantPrGateRejected = $true
+    }
+    if (-not $caseVariantPrGateRejected) {
+        throw 'A case-mismatched PR gate name was accepted.'
+    }
     foreach ($coreGateName in @('Validate PR contract', 'PR CI Gate')) {
         $skippedCoreGate = @($passingPrGates | ForEach-Object {
                 if ($_.name -eq $coreGateName) { [pscustomobject]@{ name = $_.name; bucket = 'skipping' } }
