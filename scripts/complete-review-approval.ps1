@@ -230,6 +230,32 @@ function Get-Checks {
     }
 }
 
+function Get-ReviewCheckRunsForHead {
+    param([string]$ExpectedHeadSha)
+
+    if ($ExpectedHeadSha -notmatch '^[0-9a-fA-F]{40}$') {
+        Stop-NeedsHuman 'A full current PR head SHA is required to verify the review check run.'
+    }
+    $apiPath = "repos/$Repository/commits/$ExpectedHeadSha/check-runs?check_name=review&per_page=100"
+    $checkRunsJson = & $script:ghPath api $apiPath 2>&1 | Out-String
+    if ([int]$LASTEXITCODE -ne 0) {
+        Stop-NeedsHuman "Could not read review check runs for the current PR head: $checkRunsJson"
+    }
+    try {
+        $checkRunsEnvelope = ConvertFrom-Json -InputObject $checkRunsJson
+    } catch {
+        Stop-NeedsHuman "Review check runs returned invalid JSON: $($_.Exception.Message)"
+    }
+    $checkRuns = @($checkRunsEnvelope.check_runs)
+    if ($null -eq $checkRunsEnvelope.total_count -or [int]$checkRunsEnvelope.total_count -ne $checkRuns.Count) {
+        Stop-NeedsHuman 'Review check run results were incomplete or malformed.'
+    }
+    if (@($checkRuns | Where-Object { [string]$_.head_sha -ine $ExpectedHeadSha }).Count -gt 0) {
+        Stop-NeedsHuman 'GitHub returned a review check run for a different PR head SHA.'
+    }
+    return ,@($checkRuns | Where-Object { [string]$_.name -ceq 'review' })
+}
+
 function Get-CanonicalReviewChecks {
     param([object[]]$Checks)
 
@@ -240,59 +266,93 @@ function Get-CanonicalReviewChecks {
 function Test-CurrentRunReviewCheck {
     param(
         [pscustomobject]$Check,
+        [pscustomobject]$ReviewCheckRun,
         [string]$ReviewJobResult,
-        [string]$WorkflowRunId,
         [string]$Repository,
-        [string]$ServerUrl
+        [string]$ServerUrl,
+        [string]$ExpectedHeadSha
     )
 
     if (
         $null -eq $Check -or
-        $ReviewJobResult -ine 'success' -or
-        [string]$Check.name -notmatch '(^| / )review$' -or
-        [string]$Check.state -ine 'SUCCESS' -or
-        [string]$Check.bucket -ine 'pass' -or
-        $WorkflowRunId -notmatch '^\d+$' -or
-        $Repository -notmatch '^[^/]+/[^/]+$'
+        $null -eq $ReviewCheckRun -or
+        $ReviewJobResult -cne 'success' -or
+        [string]$Check.name -cne 'review' -or
+        [string]$Check.state -cne 'SUCCESS' -or
+        [string]$Check.bucket -cne 'pass' -or
+        $Repository -notmatch '^[^/]+/[^/]+$' -or
+        $ExpectedHeadSha -notmatch '^[0-9a-fA-F]{40}$' -or
+        [string]$ReviewCheckRun.name -cne 'review' -or
+        [string]$ReviewCheckRun.head_sha -ine $ExpectedHeadSha -or
+        [string]$ReviewCheckRun.external_id -cne ('jdsnack-review:{0}:{1}' -f $Repository, $ExpectedHeadSha) -or
+        [string]$ReviewCheckRun.status -cne 'completed' -or
+        [string]$ReviewCheckRun.conclusion -cne 'success'
     ) {
         return $false
     }
 
     [uri]$serverUri = $null
     [uri]$checkUri = $null
+    [uri]$reviewCheckUri = $null
+    [uri]$reviewDetailsUri = $null
     if (
         -not [uri]::TryCreate($ServerUrl, [System.UriKind]::Absolute, [ref]$serverUri) -or
         -not [uri]::TryCreate([string]$Check.link, [System.UriKind]::Absolute, [ref]$checkUri) -or
+        -not [uri]::TryCreate([string]$ReviewCheckRun.html_url, [System.UriKind]::Absolute, [ref]$reviewCheckUri) -or
         $checkUri.Scheme -ine $serverUri.Scheme -or
-        $checkUri.Authority -ine $serverUri.Authority
+        $checkUri.Authority -ine $serverUri.Authority -or
+        $reviewCheckUri.Scheme -ine $serverUri.Scheme -or
+        $reviewCheckUri.Authority -ine $serverUri.Authority
     ) {
         return $false
     }
+    if (-not [string]::IsNullOrWhiteSpace([string]$ReviewCheckRun.details_url)) {
+        if (
+            -not [uri]::TryCreate([string]$ReviewCheckRun.details_url, [System.UriKind]::Absolute, [ref]$reviewDetailsUri) -or
+            $reviewDetailsUri.Scheme -ine $serverUri.Scheme -or
+            $reviewDetailsUri.Authority -ine $serverUri.Authority
+        ) {
+            return $false
+        }
+    }
 
     $serverPath = $serverUri.AbsolutePath.TrimEnd('/')
-    $expectedRunPath = '{0}/{1}/actions/runs/{2}' -f $serverPath, $Repository.Trim('/'), $WorkflowRunId
+    $expectedCheckPath = '{0}/{1}/runs/{2}' -f $serverPath, $Repository.Trim('/'), [string]$ReviewCheckRun.id
     $actualPath = [uri]::UnescapeDataString($checkUri.AbsolutePath)
-    return $actualPath.Equals($expectedRunPath, [System.StringComparison]::OrdinalIgnoreCase) -or
-        $actualPath.StartsWith($expectedRunPath + '/', [System.StringComparison]::OrdinalIgnoreCase)
+    $reviewCheckPath = [uri]::UnescapeDataString($reviewCheckUri.AbsolutePath)
+    $detailsPath = if ($null -ne $reviewDetailsUri) { [uri]::UnescapeDataString($reviewDetailsUri.AbsolutePath) } else { '' }
+    $checkLinkMatchesHtml = $actualPath.Equals($reviewCheckPath, [System.StringComparison]::OrdinalIgnoreCase)
+    $checkLinkMatchesDetails = -not [string]::IsNullOrWhiteSpace($detailsPath) -and
+        $actualPath.Equals($detailsPath, [System.StringComparison]::OrdinalIgnoreCase)
+    return $reviewCheckPath.Equals($expectedCheckPath, [System.StringComparison]::OrdinalIgnoreCase) -and
+        ($checkLinkMatchesHtml -or $checkLinkMatchesDetails)
 }
 
 function Assert-CurrentRunReviewGate {
     param(
         [object[]]$Checks,
+        [object[]]$ReviewCheckRuns,
         [string]$ReviewJobResult,
-        [string]$WorkflowRunId,
         [string]$Repository,
-        [string]$ServerUrl
+        [string]$ServerUrl,
+        [string]$ExpectedHeadSha
     )
 
     $reviewChecks = @(Get-CanonicalReviewChecks -Checks $Checks)
+    $expectedExternalId = 'jdsnack-review:{0}:{1}' -f $Repository, $ExpectedHeadSha
+    $reviewCheckRunsForHead = @($ReviewCheckRuns | Where-Object {
+            [string]$_.name -ceq 'review' -and
+            [string]$_.head_sha -ieq $ExpectedHeadSha -and
+            [string]$_.external_id -ceq $expectedExternalId
+        })
     if ($reviewChecks.Count -ne 1 -or -not (Test-CurrentRunReviewCheck `
                 -Check $reviewChecks[0] `
+                -ReviewCheckRun $(if ($reviewCheckRunsForHead.Count -eq 1) { $reviewCheckRunsForHead[0] } else { $null }) `
                 -ReviewJobResult $ReviewJobResult `
-                -WorkflowRunId $WorkflowRunId `
                 -Repository $Repository `
-                -ServerUrl $ServerUrl)) {
-        Stop-NeedsHuman 'The review job gate is missing, ambiguous, stale, or not passing.'
+                -ServerUrl $ServerUrl `
+                -ExpectedHeadSha $ExpectedHeadSha)) {
+        Stop-NeedsHuman 'The review job gate is missing, ambiguous, stale, for a different PR head, or not passing.'
     }
 }
 
@@ -343,7 +403,7 @@ function Get-BranchProtectionApprovalRequirement {
         }
         $requiredCheckContexts += $contextName
     }
-    $requiredCheckContexts = @($requiredCheckContexts | Sort-Object -Unique)
+    $requiredCheckContexts = @($requiredCheckContexts | Sort-Object -Unique -CaseSensitive)
     if ($requiredCheckContexts.Count -eq 0) {
         Stop-NeedsHuman "Branch '$BaseBranch' has an empty required status check set."
     }
@@ -379,7 +439,7 @@ function Assert-RequiredChecksMatchBranchProtection {
         $successfulConditionalSkip = Test-SuccessfulConditionalPrCheckSkip `
             -CheckName $reportedName `
             -Bucket $reportedBucket
-        if ($reportedBucket -ine 'pass' -and -not $successfulConditionalSkip) {
+        if ($reportedBucket -cne 'pass' -and -not $successfulConditionalSkip) {
             Stop-NeedsHuman "Branch-required check '$reportedName' is not passing (bucket=$reportedBucket)."
         }
         $reportedNames += $reportedName
@@ -399,7 +459,7 @@ function Assert-RequiredPrGatesPassing {
 
     foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
         $gateChecks = @($Checks | Where-Object { [string]$_.name -ceq $gateName })
-        if ($gateChecks.Count -ne 1 -or $gateChecks[0].bucket -ne 'pass') {
+        if ($gateChecks.Count -ne 1 -or $gateChecks[0].bucket -cne 'pass') {
             Stop-NeedsHuman "PR gate '$gateName' is missing, ambiguous, or not passing."
         }
     }
@@ -749,7 +809,7 @@ if ($requiredChecks.Count -eq 0) {
 }
 Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $branchProtectionApproval.RequiredCheckContexts -RequiredChecks $requiredChecks
 $blockingChecks = @($requiredChecks | Where-Object {
-        $_.bucket -notin @('pass', 'skipping')
+        [string]$_.bucket -cnotin @('pass', 'skipping')
     })
 if ($blockingChecks.Count -gt 0) {
     $blockingSummary = ($blockingChecks | ForEach-Object { '{0}={1}' -f $_.name, $_.bucket }) -join ', '
@@ -758,12 +818,14 @@ if ($blockingChecks.Count -gt 0) {
 
 $allChecks = Get-Checks
 Assert-RequiredPrGatesPassing -Checks $allChecks
+$reviewCheckRuns = Get-ReviewCheckRunsForHead -ExpectedHeadSha $HeadSha
 Assert-CurrentRunReviewGate `
     -Checks $allChecks `
+    -ReviewCheckRuns $reviewCheckRuns `
     -ReviewJobResult $ReviewJobResult `
-    -WorkflowRunId $env:GITHUB_RUN_ID `
     -Repository $Repository `
-    -ServerUrl $env:GITHUB_SERVER_URL
+    -ServerUrl $env:GITHUB_SERVER_URL `
+    -ExpectedHeadSha $HeadSha
 
 $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
 Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary

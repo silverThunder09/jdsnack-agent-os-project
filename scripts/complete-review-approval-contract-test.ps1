@@ -32,6 +32,7 @@ if ($humanApprovalOffset -lt 0 -or $minimumApprovalOffset -lt 0 -or
     $approvalSource.IndexOf('& $script:ghPath pr merge $PullRequestNumber --repo $Repository --squash --delete-branch --auto') -lt 0 -or
     -not $approvalSource.Contains('. $prCheckPolicyPath') -or
     -not $approvalSource.Contains('Test-SuccessfulConditionalPrCheckSkip') -or
+    -not $approvalSource.Contains('Get-ReviewCheckRunsForHead -ExpectedHeadSha $HeadSha') -or
     $approvalSource.Contains('if ([bool]$riskAssessment.dryRun)') -or
     $approvalSource.Contains('Get-OwnerAutoMergeSignoff') -or
     $approvalSource.Contains('Implementation and reviewer backend are both Codex fallback')) {
@@ -219,6 +220,15 @@ if ($null -eq $branchProtectionFunctionAst) {
     throw 'Get-BranchProtectionApprovalRequirement function was not found.'
 }
 . ([scriptblock]::Create($branchProtectionFunctionAst.Extent.Text))
+$reviewCheckRunsFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-ReviewCheckRunsForHead'
+    }, $true)
+if ($null -eq $reviewCheckRunsFunctionAst) {
+    throw 'Get-ReviewCheckRunsForHead function was not found.'
+}
+. ([scriptblock]::Create($reviewCheckRunsFunctionAst.Extent.Text))
 $requiredCheckMatchFunctionAst = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -500,6 +510,26 @@ if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments
     [pscustomobject]@{ permission = $env:JDSNACK_FAKE_REVIEWER_PERMISSION } | ConvertTo-Json -Compress
     exit 0
 }
+if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments[1]) -match '^repos/.+/commits/([0-9a-fA-F]{40})/check-runs\?check_name=review&per_page=100$') {
+    $requestedHeadSha = $Matches[1]
+    if (-not [string]::IsNullOrWhiteSpace($env:JDSNACK_FAKE_REVIEW_CHECK_RUNS_CAPTURE)) {
+        Set-Content -LiteralPath $env:JDSNACK_FAKE_REVIEW_CHECK_RUNS_CAPTURE -Value ([string]$Arguments[1]) -Encoding Ascii
+    }
+    $checkHeadSha = if ([string]::IsNullOrWhiteSpace($env:JDSNACK_FAKE_REVIEW_CHECK_HEAD_SHA)) { $requestedHeadSha } else { $env:JDSNACK_FAKE_REVIEW_CHECK_HEAD_SHA }
+    $checkRunId = if ([string]::IsNullOrWhiteSpace($env:JDSNACK_FAKE_REVIEW_CHECK_RUN_ID)) { '111111111' } else { $env:JDSNACK_FAKE_REVIEW_CHECK_RUN_ID }
+    $reviewCheckRun = [pscustomobject]@{
+        id = [long]$checkRunId
+        name = 'review'
+        head_sha = $checkHeadSha
+        external_id = "jdsnack-review:silverThunder09/jdsnack-agent-os-project:$checkHeadSha"
+        status = 'completed'
+        conclusion = 'success'
+        details_url = 'https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/123456789'
+        html_url = "https://github.com/silverThunder09/jdsnack-agent-os-project/runs/$checkRunId"
+    }
+    [pscustomobject]@{ total_count = 1; check_runs = @($reviewCheckRun) } | ConvertTo-Json -Depth 5 -Compress
+    exit 0
+}
 if ($Arguments.Count -ge 2 -and $Arguments[0] -eq 'api' -and ([string]$Arguments[1]) -match '^repos/.+/branches/.+/protection$' -and -not [string]::IsNullOrWhiteSpace($env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE)) {
     Set-Content -LiteralPath $env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE -Value ([string]$Arguments[1]) -Encoding Ascii
 }
@@ -516,8 +546,12 @@ if ($env:JDSNACK_FAKE_ZERO_APPROVALS -eq 'true') {
 }
 $protection = [ordered]@{ required_pull_request_reviews = $requiredReviews }
 if ($env:JDSNACK_FAKE_STATUS_CHECKS -ne 'missing') {
+    $requiredContexts = @('Validate Agent OS docs', 'Test and build backend', 'Build backend container', 'Test and build frontend')
+    if ($env:JDSNACK_FAKE_CASE_VARIANT_CONTEXTS -eq 'true') {
+        $requiredContexts += 'validate Agent OS docs'
+    }
     $protection['required_status_checks'] = [pscustomobject]@{
-        contexts = @('Validate Agent OS docs', 'Test and build backend', 'Build backend container', 'Test and build frontend')
+        contexts = $requiredContexts
         checks = @([pscustomobject]@{ context = 'review'; app_id = 1 })
     }
 }
@@ -552,6 +586,29 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         throw "A slash-containing base branch was not encoded as one API path segment: $branchProtectionApiPath"
     }
     Remove-Item Env:JDSNACK_FAKE_BRANCH_PROTECTION_CAPTURE -ErrorAction SilentlyContinue
+    $reviewCheckRunsCapturePath = Join-Path $tempRoot 'review-check-runs-api-path.txt'
+    $env:JDSNACK_FAKE_REVIEW_CHECK_RUNS_CAPTURE = $reviewCheckRunsCapturePath
+    $currentHeadReviewRuns = @(Get-ReviewCheckRunsForHead -ExpectedHeadSha $headSha)
+    $reviewCheckRunsApiPath = (Get-Content -LiteralPath $reviewCheckRunsCapturePath -Raw).Trim()
+    Remove-Item Env:JDSNACK_FAKE_REVIEW_CHECK_RUNS_CAPTURE -ErrorAction SilentlyContinue
+    $expectedReviewCheckRunsApiPath = "repos/silverThunder09/jdsnack-agent-os-project/commits/$headSha/check-runs?check_name=review&per_page=100"
+    if ($reviewCheckRunsApiPath -cne $expectedReviewCheckRunsApiPath -or $currentHeadReviewRuns.Count -ne 1 -or $currentHeadReviewRuns[0].head_sha -ine $headSha) {
+        throw 'Review check runs were not queried for the exact expected PR head SHA.'
+    }
+    $env:JDSNACK_FAKE_REVIEW_CHECK_HEAD_SHA = $staleSha
+    $staleHeadReviewRunsRejected = $false
+    try {
+        [void](Get-ReviewCheckRunsForHead -ExpectedHeadSha $headSha)
+    } catch {
+        $staleHeadReviewRunsRejected = $true
+        if ($_.Exception.Message -notmatch 'different PR head SHA') {
+            throw
+        }
+    }
+    Remove-Item Env:JDSNACK_FAKE_REVIEW_CHECK_HEAD_SHA -ErrorAction SilentlyContinue
+    if (-not $staleHeadReviewRunsRejected) {
+        throw 'A review check run for a different PR head SHA was returned as current.'
+    }
     $expectedRequiredCheckContexts = @(
         'Validate Agent OS docs'
         'Build backend container'
@@ -563,6 +620,28 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         throw 'Branch protection required check contexts were not returned completely.'
     }
     $matchingRequiredChecks = @($expectedRequiredCheckContexts | ForEach-Object { [pscustomobject]@{ name = $_; bucket = 'pass' } })
+    $env:JDSNACK_FAKE_CASE_VARIANT_CONTEXTS = 'true'
+    $caseVariantProtection = Get-BranchProtectionApprovalRequirement -BaseBranch 'main'
+    Remove-Item Env:JDSNACK_FAKE_CASE_VARIANT_CONTEXTS -ErrorAction SilentlyContinue
+    if ($caseVariantProtection.RequiredCheckContexts.Count -ne ($expectedRequiredCheckContexts.Count + 1) -or
+        @($caseVariantProtection.RequiredCheckContexts | Where-Object { $_ -ceq 'Validate Agent OS docs' }).Count -ne 1 -or
+        @($caseVariantProtection.RequiredCheckContexts | Where-Object { $_ -ceq 'validate Agent OS docs' }).Count -ne 1) {
+        throw 'Branch protection check contexts that differ only by case were collapsed.'
+    }
+    $caseVariantCompleteChecks = @($matchingRequiredChecks + [pscustomobject]@{ name = 'validate Agent OS docs'; bucket = 'pass' })
+    Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $caseVariantProtection.RequiredCheckContexts -RequiredChecks $caseVariantCompleteChecks
+    $missingCaseVariantRejected = $false
+    try {
+        Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $caseVariantProtection.RequiredCheckContexts -RequiredChecks $matchingRequiredChecks
+    } catch {
+        $missingCaseVariantRejected = $true
+        if ($_.Exception.Message -notmatch 'does not match gh pr checks --required') {
+            throw
+        }
+    }
+    if (-not $missingCaseVariantRejected) {
+        throw 'A required context that differs only by case and is absent from gh pr checks was accepted.'
+    }
     Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks $matchingRequiredChecks
     $missingRequiredCheckRejected = $false
     try {
@@ -636,6 +715,20 @@ $protection | ConvertTo-Json -Depth 10 -Compress
             throw "A required check with bucket '$nonPassingBucket' was accepted."
         }
     }
+    $uppercasePassRequiredChecks = @($matchingRequiredChecks | ForEach-Object {
+            if ($_.name -ceq 'Validate Agent OS docs') { [pscustomobject]@{ name = $_.name; bucket = 'PASS' } }
+            else { $_ }
+        })
+    $uppercasePassRequiredCheckRejected = $false
+    try {
+        Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks $uppercasePassRequiredChecks
+    } catch {
+        $uppercasePassRequiredCheckRejected = $true
+        if ($_.Exception.Message -notmatch 'not passing') { throw }
+    }
+    if (-not $uppercasePassRequiredCheckRejected) {
+        throw 'A required check with a non-canonical uppercase PASS bucket was accepted.'
+    }
     $passingPrGates = @(
         [pscustomobject]@{ name = 'Validate PR contract'; bucket = 'pass' }
         [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
@@ -653,6 +746,19 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     }
     if (-not $caseVariantPrGateRejected) {
         throw 'A case-mismatched PR gate name was accepted.'
+    }
+    $uppercasePassPrGates = @(
+        [pscustomobject]@{ name = 'Validate PR contract'; bucket = 'PASS' }
+        [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
+    )
+    $uppercasePassPrGateRejected = $false
+    try {
+        Assert-RequiredPrGatesPassing -Checks $uppercasePassPrGates
+    } catch {
+        $uppercasePassPrGateRejected = $true
+    }
+    if (-not $uppercasePassPrGateRejected) {
+        throw 'A PR gate with a non-canonical uppercase PASS bucket was accepted.'
     }
     foreach ($coreGateName in @('Validate PR contract', 'PR CI Gate')) {
         $skippedCoreGate = @($passingPrGates | ForEach-Object {
@@ -672,26 +778,55 @@ $protection | ConvertTo-Json -Depth 10 -Compress
             throw "A skipped core PR gate '$coreGateName' was accepted."
         }
     }
-    $workflowRunId = '123456789'
     $currentReviewCheck = [pscustomobject]@{
         name = 'review'
         state = 'SUCCESS'
         bucket = 'pass'
-        link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100"
+        link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/111111111'
     }
-    if (-not (Test-CurrentRunReviewCheck -Check $currentReviewCheck -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com')) {
+    $currentReviewCheckRun = $currentHeadReviewRuns[0]
+    if (-not (Test-CurrentRunReviewCheck -Check $currentReviewCheck -ReviewCheckRun $currentReviewCheckRun -ReviewJobResult 'success' -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com' -ExpectedHeadSha $headSha)) {
         throw 'A completed successful review check from this workflow run was not recognized.'
     }
-    Assert-CurrentRunReviewGate -Checks @($currentReviewCheck) -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com'
+    $detailsUrlReviewCheck = $currentReviewCheck | Select-Object *
+    $detailsUrlReviewCheck.link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/123456789'
+    if (-not (Test-CurrentRunReviewCheck -Check $detailsUrlReviewCheck -ReviewCheckRun $currentReviewCheckRun -ReviewJobResult 'success' -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com' -ExpectedHeadSha $headSha)) {
+        throw 'The current head review check details URL was not matched to its exact check-run metadata.'
+    }
+    Assert-CurrentRunReviewGate -Checks @($currentReviewCheck) -ReviewCheckRuns $currentHeadReviewRuns -ReviewJobResult 'success' -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com' -ExpectedHeadSha $headSha
+    $uppercaseConclusionReviewCheckRun = $currentReviewCheckRun | Select-Object *
+    $uppercaseConclusionReviewCheckRun.conclusion = 'SUCCESS'
+    if (Test-CurrentRunReviewCheck -Check $currentReviewCheck -ReviewCheckRun $uppercaseConclusionReviewCheckRun -ReviewJobResult 'success' -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com' -ExpectedHeadSha $headSha) {
+        throw 'A review check run with a non-canonical uppercase success conclusion was accepted.'
+    }
+    $previousHeadReviewCheckRun = [pscustomobject]@{
+        name = 'review'
+        head_sha = $staleSha
+        external_id = "jdsnack-review:silverThunder09/jdsnack-agent-os-project:$staleSha"
+        status = 'completed'
+        conclusion = 'success'
+    }
+    $previousHeadReviewRejected = $false
+    try {
+        Assert-CurrentRunReviewGate -Checks @($currentReviewCheck) -ReviewCheckRuns @($previousHeadReviewCheckRun) -ReviewJobResult 'success' -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com' -ExpectedHeadSha $headSha
+    } catch {
+        $previousHeadReviewRejected = $true
+        if ($_.Exception.Message -notmatch 'different PR head') {
+            throw
+        }
+    }
+    if (-not $previousHeadReviewRejected) {
+        throw 'A successful review check run for a previous PR head SHA was accepted.'
+    }
     $stalePassedReviewCheck = [pscustomobject]@{
         name = 'review'
         state = 'SUCCESS'
         bucket = 'pass'
-        link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/987654321/job/100'
+        link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/987654321'
     }
     $staleReviewRejected = $false
     try {
-        Assert-CurrentRunReviewGate -Checks @($stalePassedReviewCheck) -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com'
+        Assert-CurrentRunReviewGate -Checks @($stalePassedReviewCheck) -ReviewCheckRuns $currentHeadReviewRuns -ReviewJobResult 'success' -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com' -ExpectedHeadSha $headSha
     } catch {
         $staleReviewRejected = $true
         if ($_.Exception.Message -notmatch 'stale') {
@@ -702,21 +837,22 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         throw 'A successful review check from a previous workflow run was accepted.'
     }
     foreach ($invalidCurrentReviewCheck in @(
-            [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/987654321/job/100" },
-            [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'skipping'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'fail'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-            [pscustomobject]@{ name = 'PR CI Gate'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = "https://evil.example/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = "http://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" },
-            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = "https://github.com/other/repository/actions/runs/$workflowRunId/job/100" },
-            [pscustomobject]@{ name = 'review'; state = 'FAILURE'; bucket = 'fail'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/$workflowRunId/job/100" }
+            [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/987654321' },
+            [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/111111111' },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'skipping'; link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/111111111' },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'PASS'; link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/111111111' },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'fail'; link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/111111111' },
+            [pscustomobject]@{ name = 'PR CI Gate'; state = 'IN_PROGRESS'; bucket = 'pending'; link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/111111111' },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = "https://evil.example/silverThunder09/jdsnack-agent-os-project/runs/111111111" },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = 'http://github.com/silverThunder09/jdsnack-agent-os-project/runs/111111111' },
+            [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass'; link = 'https://github.com/other/repository/runs/111111111' },
+            [pscustomobject]@{ name = 'review'; state = 'FAILURE'; bucket = 'fail'; link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/runs/111111111' }
         )) {
-        if (Test-CurrentRunReviewCheck -Check $invalidCurrentReviewCheck -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com') {
+        if (Test-CurrentRunReviewCheck -Check $invalidCurrentReviewCheck -ReviewCheckRun $currentReviewCheckRun -ReviewJobResult 'success' -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com' -ExpectedHeadSha $headSha) {
             throw 'A pending, failed, unrelated host, repository, or run review check was accepted as the current workflow review.'
         }
     }
-    if (Test-CurrentRunReviewCheck -Check $currentReviewCheck -ReviewJobResult 'failure' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com') {
+    if (Test-CurrentRunReviewCheck -Check $currentReviewCheck -ReviewCheckRun $currentReviewCheckRun -ReviewJobResult 'failure' -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com' -ExpectedHeadSha $headSha) {
         throw 'A completed review check was accepted without a successful upstream review job.'
     }
     foreach ($malformedRequiredCheck in @(

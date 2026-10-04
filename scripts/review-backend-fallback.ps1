@@ -291,18 +291,17 @@ function Get-BlockingRequiredChecks {
         $checkName = [string]$_.name
         $currentJobCheck = $checkName -ceq $CurrentJob -or (
             $CurrentJob -ceq 'run_review' -and $checkName -ceq 'Codex Branch Review / run_review'
-        ) -or (
-            $CurrentJob -ceq 'run_review' -and $checkName -ceq 'Codex Branch Review / review'
         )
         $deferredReviewCheck = $AllowReviewCheckPending -and
             $CurrentJob -ceq 'run_review' -and
             $checkName -ceq 'review' -and
             $_.bucket -ceq 'pending'
+        $currentJobCheckPending = $currentJobCheck -and [string]$_.bucket -ceq 'pending'
         $successfulConditionalSkip = Test-SuccessfulConditionalPrCheckSkip `
             -CheckName $checkName `
             -Bucket ([string]$_.bucket)
-        (-not $currentJobCheck) -and (-not $deferredReviewCheck) -and
-            $_.bucket -ne 'pass' -and (-not $successfulConditionalSkip)
+        (-not $currentJobCheckPending) -and (-not $deferredReviewCheck) -and
+            [string]$_.bucket -cne 'pass' -and (-not $successfulConditionalSkip)
     })
 }
 
@@ -333,12 +332,22 @@ function Get-RequiredCheckFailure {
         $allChecksEnvelope = ConvertFrom-Json -InputObject $allChecksEnvelopeJson
         $allChecks = @($allChecksEnvelope.checks)
     } catch { return "PR gate checks returned invalid JSON: $($_.Exception.Message)" }
+    $prGateFailure = Get-PrGateFailure -Checks $allChecks
+    if (-not [string]::IsNullOrWhiteSpace($prGateFailure)) {
+        return $prGateFailure
+    }
+    return ''
+}
+
+function Get-PrGateFailure {
+    param([object[]]$Checks)
+
     foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
-        $gateChecks = @($allChecks | Where-Object { $_.name -eq $gateName })
+        $gateChecks = @($Checks | Where-Object { [string]$_.name -ceq $gateName })
         if ($gateChecks.Count -ne 1) {
             return "Expected exactly one '$gateName' check, found $($gateChecks.Count)."
         }
-        if ($gateChecks[0].bucket -ne 'pass') {
+        if ([string]$gateChecks[0].bucket -cne 'pass') {
             return "PR gate '$gateName' is not passing: $($gateChecks[0].bucket)."
         }
     }
@@ -556,7 +565,7 @@ function Test-StructuredReviewSummary {
     $assessmentLines = @($summaryLines | Where-Object { ([string]$_) -match '^\s*(?:-\s+)?(?:score rationale|conclusion):' })
     $assessmentText = $assessmentLines -join ' '
     foreach ($severity in @('P2', 'P3')) {
-        $findingPattern = '(?im)^\s*-\s*' + $severity + '(?:[ \t—]|$)'
+        $findingPattern = '(?im)^\s*-\s*' + $severity + '(?:[ \t]|\u2014|$)'
         if ([regex]::IsMatch($Findings, $findingPattern) -and $assessmentText -notmatch "(?i)\b$severity\b") {
             return $false
         }
@@ -793,7 +802,8 @@ $($Result.Findings)
         throw "Could not read existing PR comments before publishing PASS: $commentsJson"
     }
     try {
-        $existingComments = @(ConvertFrom-Json -InputObject $commentsJson)
+        $parsedComments = ConvertFrom-Json -InputObject $commentsJson
+        $existingComments = @($parsedComments | ForEach-Object { $_ })
     } catch {
         throw "PR comments returned invalid JSON before publishing PASS: $($_.Exception.Message)"
     }

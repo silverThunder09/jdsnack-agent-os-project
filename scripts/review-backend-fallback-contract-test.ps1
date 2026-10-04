@@ -39,7 +39,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -54,13 +54,46 @@ foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredFi
 $pendingReviewChecks = @(
     [pscustomobject]@{ name = 'review'; bucket = 'pending' }
     [pscustomobject]@{ name = 'Codex Branch Review / run_review'; bucket = 'pending' }
-    [pscustomobject]@{ name = 'Codex Branch Review / review'; bucket = 'pending' }
     [pscustomobject]@{ name = 'Validate PR contract'; bucket = 'pass' }
     [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
 )
+$validPrGateChecks = @(
+    [pscustomobject]@{ name = 'Validate PR contract'; bucket = 'pass' }
+    [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
+)
+if (-not [string]::IsNullOrWhiteSpace((Get-PrGateFailure -Checks $validPrGateChecks))) {
+    throw 'Exact passing PR gates were rejected before reviewer execution.'
+}
+$caseVariantPrGateFailure = Get-PrGateFailure -Checks @(
+    [pscustomobject]@{ name = 'validate PR contract'; bucket = 'pass' }
+    [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
+)
+if ($caseVariantPrGateFailure -notmatch 'Expected exactly one ''Validate PR contract'' check, found 0') {
+    throw 'A case-mismatched PR gate name was accepted before reviewer execution.'
+}
+$uppercasePrGateFailure = Get-PrGateFailure -Checks @(
+    [pscustomobject]@{ name = 'Validate PR contract'; bucket = 'PASS' }
+    [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
+)
+if ($uppercasePrGateFailure -notmatch 'PR gate ''Validate PR contract'' is not passing') {
+    throw 'A non-canonical uppercase PASS bucket was accepted before reviewer execution.'
+}
 $preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $pendingReviewChecks -CurrentJob 'run_review' -AllowReviewCheckPending)
 if ($preReviewBlockingChecks.Count -ne 0) {
     throw 'A pending PR-head review check blocked the reviewer job before it could publish its result.'
+}
+$skippedCurrentReviewJob = @($pendingReviewChecks | ForEach-Object {
+        if ($_.name -eq 'Codex Branch Review / run_review') { [pscustomobject]@{ name = $_.name; bucket = 'skipping' } }
+        else { $_ }
+    })
+$preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $skippedCurrentReviewJob -CurrentJob 'run_review' -AllowReviewCheckPending)
+if ($preReviewBlockingChecks.Count -ne 1 -or $preReviewBlockingChecks[0].name -ne 'Codex Branch Review / run_review') {
+    throw 'A skipped current reviewer job was ignored instead of blocking review approval.'
+}
+$obsoleteReviewJobAlias = @($pendingReviewChecks + [pscustomobject]@{ name = 'Codex Branch Review / review'; bucket = 'pending' })
+$preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $obsoleteReviewJobAlias -CurrentJob 'run_review' -AllowReviewCheckPending)
+if ($preReviewBlockingChecks.Count -ne 1 -or $preReviewBlockingChecks[0].name -ne 'Codex Branch Review / review') {
+    throw 'An obsolete review-job alias was exempted from pre-review checks.'
 }
 $skippedOptionalChecks = @($pendingReviewChecks + @(
         [pscustomobject]@{ name = 'Test and build backend'; bucket = 'skipping' }
@@ -124,6 +157,11 @@ foreach ($checkName in @('Validate PR contract', 'PR CI Gate', 'review', 'Unreco
     if (Test-SuccessfulConditionalPrCheckSkip -CheckName $checkName -Bucket 'skipping') {
         throw "Non-optional PR check '$checkName' was recognized as conditionally skippable."
     }
+}
+$uppercasePassingCheck = @([pscustomobject]@{ name = 'Unrecognized required check'; bucket = 'PASS' })
+$preReviewBlockingChecks = @(Get-BlockingRequiredChecks -Checks $uppercasePassingCheck -CurrentJob 'run_review')
+if ($preReviewBlockingChecks.Count -ne 1) {
+    throw 'A non-canonical uppercase PASS bucket was accepted as a successful required check.'
 }
 $withoutReviewExemption = @(Get-BlockingRequiredChecks -Checks $pendingReviewChecks -CurrentJob 'run_review')
 if ($withoutReviewExemption.Count -ne 1 -or $withoutReviewExemption[0].name -ne 'review') {

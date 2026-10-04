@@ -492,7 +492,7 @@ for approval_contract in \
     'Assert-RequiredChecksMatchBranchProtection' \
     'Get-CanonicalReviewChecks' \
     "[string]\$_.name -ceq 'review'" \
-    "reportedBucket -ine 'pass'" \
+    "reportedBucket -cne 'pass'" \
     'Branch-required check' \
     'Test-ReviewLabelsMatchAssessment' \
     "'review labels'" \
@@ -541,14 +541,23 @@ for approval_contract in \
     ' --auto' \
     "'--json', 'name,state,bucket,link'" \
     'Test-CurrentRunReviewCheck' \
-    "[string]\$Check.state -ine 'SUCCESS'" \
-    "[string]\$Check.bucket -ine 'pass'" \
+    "[string]\$Check.state -cne 'SUCCESS'" \
+    "[string]\$Check.bucket -cne 'pass'" \
+    "[string]\$ReviewCheckRun.conclusion -cne 'success'" \
     'ConvertFrom-Json -InputObject $checksEnvelopeJson' \
     '$checks = @($checksEnvelope.checks)' \
     'return ,$checks'; do
     grep -Fq -- "$approval_contract" "$APPROVAL_SCRIPT" \
         || fail "분리된 승인 게이트에 다음 계약이 없습니다: $approval_contract"
 done
+grep -Fq -- "currentJobCheckPending = \$currentJobCheck -and [string]\$_.bucket -ceq 'pending'" "$FALLBACK_SCRIPT" \
+    || fail 'The reviewer must exempt its own check only while it is pending.'
+grep -Fq -- "[string]\$_.bucket -cne 'pass'" "$FALLBACK_SCRIPT" \
+    || fail 'Only the canonical pass bucket may satisfy the reviewer precheck.'
+grep -Fq -- 'Get-PrGateFailure -Checks $allChecks' "$FALLBACK_SCRIPT" \
+    || fail 'Reviewer precheck must validate the exact required PR gate names.'
+grep -Fq -- '[string]$_.name -ceq $gateName' "$FALLBACK_SCRIPT" \
+    || fail 'Reviewer precheck must compare required PR gate names case-sensitively.'
 grep -Fq -- 'REVIEW_JOB_RESULT: ${{ needs.run_review.result }}' "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
     || fail '승인 job에 상위 review job의 검증된 결과가 전달되지 않습니다.'
 grep -Fq -- '-ReviewJobResult $env:REVIEW_JOB_RESULT' "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
@@ -627,6 +636,7 @@ for skill_contract in \
     'gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.' \
     'needs-human으로 멈춥니다.' \
     '현재 실행의 review check도 GitHub가 SUCCESS/pass로 완료한 경우에만 인정하며' \
+    'check-run의 `head_sha`·`external_id`가 현재 PR head와 일치하는지 확인합니다.' \
     'Codex는 구현·테스트와 현재 기본 PR 리뷰'; do
     grep -Fq -- "$skill_contract" "$CLAUDE_SKILL" \
         || fail "review-loop 스킬에 다음 리뷰·머지 계약이 없습니다: $skill_contract"
@@ -651,6 +661,12 @@ for review_check_contract in \
     grep -Fq -- "$review_check_contract" "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
         || fail "PR head review-check publisher contract is missing: $review_check_contract"
 done
+grep -Fq -- 'Get-ReviewCheckRunsForHead -ExpectedHeadSha $HeadSha' "$ROOT_DIR/scripts/complete-review-approval.ps1" \
+    || fail 'Approval must verify review check metadata on the exact current PR head SHA.'
+grep -Fq -- 'ReviewCheckRun.head_sha' "$ROOT_DIR/scripts/complete-review-approval.ps1" \
+    || fail 'Approval must compare the review check run head SHA with the current PR head.'
+grep -Fq -- 'approval job은 check-run의 `head_sha`·`external_id`와 PR check 목록의 URL을 대조하고' "$ROOT_DIR/.agent-os/operations/review-backend-fallback.md" \
+    || fail 'Review operations documentation must describe current-head and current-run check verification.'
 if grep -Fq -- 'Verify Claude review skill' "$ROOT_DIR/.github/workflows/codex-branch-review.yml"; then
     fail 'Codex-primary workflow must not require the unused Claude review skill.'
 fi
