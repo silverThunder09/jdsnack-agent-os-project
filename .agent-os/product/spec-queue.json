@@ -71,8 +71,8 @@
       "slug": "2026-09-18-jobkorea-jd-adapter",
       "title": "JobKorea JD adapter",
       "priority": 6,
-      "status": "active",
-      "spec_path": ".agent-os/specs/2026-09-18-jobkorea-jd-adapter",
+      "status": "completed",
+      "spec_path": ".agent-os/archive/specs/2026-09-18-jobkorea-jd-adapter",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:jobkorea"}
     },

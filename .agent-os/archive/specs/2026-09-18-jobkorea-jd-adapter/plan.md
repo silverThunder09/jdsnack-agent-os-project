@@ -1,4 +1,4 @@
-- 구현 상태: `in-progress`
+- 구현 상태: `completed`
 
 ### T1. 백엔드 JobKorea 수집 어댑터와 이미지 OCR fallback
 
