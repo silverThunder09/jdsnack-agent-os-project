@@ -41,6 +41,48 @@ assert_contains() {
   fi
 }
 
+build_resume_json_payload() {
+  printf '%s' "$1" | python3 -c '
+import json
+import sys
+
+resume_text = sys.stdin.buffer.read().decode("utf-8")
+payload = json.dumps({"resumeText": resume_text}, ensure_ascii=False)
+sys.stdout.buffer.write(payload.encode("utf-8"))
+'
+}
+
+test_resume_json_payload() {
+  local test_text
+  local expected_text_b64
+
+  test_text=$'한글 "제목"\n경로 \\workspace'
+  expected_text_b64="$(printf '%s' "$test_text" | base64 | tr -d '\r\n')"
+  if ! build_resume_json_payload "$test_text" |
+    EXPECTED_TEXT_B64="$expected_text_b64" python3 -c '
+import base64
+import json
+import os
+import sys
+
+expected = base64.b64decode(os.environ["EXPECTED_TEXT_B64"]).decode("utf-8")
+payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+if payload != {"resumeText": expected}:
+    raise SystemExit("resume JSON payload did not preserve quotes, backslashes, newlines, and UTF-8")
+'
+  then
+    echo "Smoke JSON payload encoding test failed"
+    return 1
+  fi
+
+  echo "Smoke JSON payload encoding passed"
+}
+
+if [[ "${1:-}" == "--test-resume-json-payload" ]]; then
+  test_resume_json_payload
+  exit 0
+fi
+
 run_frontend_root_check() {
   curl -fsS "${FRONTEND_URL}" >/tmp/jdsnack-frontend-root.html
   assert_contains \
@@ -89,13 +131,15 @@ run_authenticated_session_check() {
 run_short_resume_check() {
   local http_code
 
+  # Stream UTF-8 bytes instead of passing Korean JSON through a Windows curl argument.
   http_code="$(
+    build_resume_json_payload "${SHORT_RESUME_TEXT}" |
     curl -sS -o /tmp/jdsnack-short.json -w '%{http_code}' \
       -b "${SMOKE_COOKIE_JAR}" \
       -X POST "${FRONTEND_URL}/api/diagnose" \
       -H 'Content-Type: application/json' \
       -H 'Accept: application/json' \
-      -d "{\"resumeText\":\"${SHORT_RESUME_TEXT}\"}"
+      --data-binary @-
   )"
 
   if [[ "${http_code}" != "400" ]]; then
@@ -111,12 +155,13 @@ run_valid_resume_check() {
   local http_code
 
   http_code="$(
+    build_resume_json_payload "${VALID_RESUME_TEXT}" |
     curl -sS -o /tmp/jdsnack-valid.json -w '%{http_code}' \
       -b "${SMOKE_COOKIE_JAR}" \
       -X POST "${FRONTEND_URL}/api/diagnose" \
       -H 'Content-Type: application/json' \
       -H 'Accept: application/json' \
-      -d "{\"resumeText\":\"${VALID_RESUME_TEXT}\"}"
+      --data-binary @-
   )"
 
   if [[ "${http_code}" != "200" ]]; then
@@ -300,6 +345,7 @@ run_protected_api_auth_check() {
 }
 
 main() {
+  test_resume_json_payload
   wait_for_url "${BACKEND_URL}/api/health" "backend health"
   wait_for_url "${FRONTEND_URL}" "frontend root"
 

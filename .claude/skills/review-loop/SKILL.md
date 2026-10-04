@@ -57,9 +57,9 @@ Claude가 검증 목적으로 실행. 하나라도 실패하면 리뷰를 시작
    - REQUEST_CHANGES는 GitHub review로 한 번 제출합니다. 제출을 시도한 뒤 추가 comment review를 만들지 않습니다.
    - COMMENT, NEEDS_HUMAN, score 4 미만은 정식 comment review를 남기고 자동 병합을 중단합니다. 위험도는 라벨일 뿐 PASS 기준이나 승인 수를 바꾸지 않습니다.
    - 본문에는 review-loop, attempt, 점수, 결정, findings를 포함합니다.
-3. score가 4 미만이거나 결정론 게이트가 실패하면 review job을 통과시키지 않습니다. approval job은 현재 실행의 review check도 GitHub가 SUCCESS/pass로 완료한 경우에만 인정하며, IN_PROGRESS/pending은 통과로 취급하지 않습니다.
+3. score가 4 미만이거나 결정론 게이트가 실패하면 review job을 통과시키지 않습니다. approval job은 현재 실행의 review check도 GitHub가 SUCCESS/pass로 완료한 경우에만 인정하며, check-run의 `head_sha`·`external_id`가 현재 PR head와 일치하는지 확인합니다. approval은 같은 workflow run의 `publish_review_check` 성공에 종속되고, IN_PROGRESS/pending은 통과로 취급하지 않습니다.
 4. 위험도 구간별 추가 사람 승인은 요구하지 않습니다. GitHub branch protection에 실제 승인 수가 설정되면 GitHub가 그대로 강제합니다.
-5. approval job은 report와 최신 PR이 리뷰한 base/head SHA, Validate PR contract, PR CI Gate, PR head에 게시된 review check, 모든 branch-required check와 미해결 변경요청 부재를 확인한 뒤 Squash auto-merge를 큐에 넣습니다.
+5. approval job은 report와 최신 PR이 리뷰한 base/head SHA, Validate PR contract, PR CI Gate, PR head에 게시된 review check가 현재 실행에 속하는지, 모든 branch-required check와 미해결 변경요청 부재를 확인한 뒤 Squash auto-merge를 큐에 넣습니다.
 6. auto-merge 명령 성공만으로 머지 완료로 보고하지 않습니다.
    - gh pr view의 state가 MERGED이고 mergedAt이 있을 때만 완료로 보고합니다.
    - state가 OPEN이면 autoMergeRequest가 존재하는 경우에만 큐에 등록된 상태로 기록합니다.

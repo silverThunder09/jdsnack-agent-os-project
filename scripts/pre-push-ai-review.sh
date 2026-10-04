@@ -375,7 +375,7 @@ findings:
 - Use "- none" when there are no unresolved findings. Otherwise start every finding with exactly one severity prefix: "- P0", "- P1", "- P2", or "- P3". PASS is valid only when findings contains "- none" or P2/P3 findings and has no blocker or major finding.
 review_summary:
 
-The review_summary must contain exactly one concise evidence line for each rubric item and a conclusion:
+The review_summary must contain exactly one concise evidence line for each rubric item and a conclusion. Each summary line may be unbulleted or start with a hyphen followed by at least one space; if you use a bullet, do not attach it directly to the field name:
 - correctness: PASS — concrete evidence
 - contract: PASS — concrete evidence
 - tests: PASS — concrete evidence
@@ -775,16 +775,16 @@ has_auditable_review_summary() {
   local rubric_name
   local match_count
   for rubric_name in correctness contract tests security maintainability; do
-    match_count="$("$grep_bin" -Eic "^[[:space:]]*-[[:space:]]+$rubric_name:[[:space:]]+PASS[[:space:]]+.{10,}$" "$summary_path" || true)"
+    match_count="$("$grep_bin" -Eic "^[[:space:]]*(-[[:space:]]+)?$rubric_name:[[:space:]]+PASS[[:space:]]+.{10,}$" "$summary_path" || true)"
     if [ "$match_count" -ne 1 ]; then
       return 1
     fi
   done
-  match_count="$("$grep_bin" -Eic "^[[:space:]]*-[[:space:]]+score rationale:[[:space:]]+${expected_score}/5[[:space:]]+.{10,}$" "$summary_path" || true)"
+  match_count="$("$grep_bin" -Eic "^[[:space:]]*(-[[:space:]]+)?score rationale:[[:space:]]+${expected_score}/5[[:space:]]+.{10,}$" "$summary_path" || true)"
   if [ "$match_count" -ne 1 ]; then
     return 1
   fi
-  match_count="$("$grep_bin" -Eic '^[[:space:]]*-[[:space:]]+conclusion:[[:space:]].{20,}$' "$summary_path" || true)"
+  match_count="$("$grep_bin" -Eic '^[[:space:]]*(-[[:space:]]+)?conclusion:[[:space:]].{20,}$' "$summary_path" || true)"
   if [ "$match_count" -ne 1 ]; then
     return 1
   fi
