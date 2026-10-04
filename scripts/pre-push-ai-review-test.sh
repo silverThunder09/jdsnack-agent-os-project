@@ -292,6 +292,8 @@ fi
     summary_prefix='- '
     if [ -f "$fixture_dir/codex.unbulleted-summary" ]; then
       summary_prefix=''
+    elif [ -f "$fixture_dir/codex.no-space-bullet-summary" ]; then
+      summary_prefix='-'
     fi
     printf '%s\n' "${summary_prefix}correctness: ${fake_first_rubric_status} — the reviewed diff has a coherent implementation."
     printf '%s\n' "${summary_prefix}contract: PASS — the requested workflow contracts are covered."
@@ -498,6 +500,17 @@ rm -f "$fake_root/codex.unbulleted-summary"
 if [ "$unbulleted_summary_status" -ne 0 ] || ! grep -Fq 'Codex pre-push review passed' <<< "$unbulleted_summary_output"; then
   printf '%s\n' "$unbulleted_summary_output" >&2
   fail '5개 rubric과 구체적 근거가 있는 불릿 없는 review_summary를 pre-push가 허용하지 않았습니다.'
+fi
+
+touch "$fake_root/codex.no-space-bullet-summary"
+set +e
+no_space_bullet_summary_output="$(run_review 2>&1)"
+no_space_bullet_summary_status=$?
+set -e
+rm -f "$fake_root/codex.no-space-bullet-summary"
+if [ "$no_space_bullet_summary_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$no_space_bullet_summary_output"; then
+  printf '%s\n' "$no_space_bullet_summary_output" >&2
+  fail 'rubric 이름에 바로 붙은 하이픈 글머리표를 pre-push가 차단하지 않았습니다.'
 fi
 
 touch "$fake_root/codex.change-source-ref"

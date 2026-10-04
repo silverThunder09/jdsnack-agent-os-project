@@ -327,7 +327,7 @@ for fallback_contract in \
     'risk: Light | Standard | High-risk' \
     'Stop-NeedsHuman' \
     'Get-RequiredCheckFailure' \
-    'successfulConditionalSkip' \
+    'Test-SuccessfulConditionalPrCheckSkip' \
     '--required --json name,state,bucket' \
     "'--restricted'" \
     "'--tools', ''" \

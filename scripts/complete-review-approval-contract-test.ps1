@@ -4,6 +4,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$checkPolicyPath = Join-Path $Workspace 'scripts/pr-check-policy.ps1'
+if (-not (Test-Path -LiteralPath $checkPolicyPath -PathType Leaf)) {
+    throw "Conditional PR check policy not found: $checkPolicyPath"
+}
+. $checkPolicyPath
 $sourcePath = Join-Path $Workspace 'scripts/complete-review-approval.ps1'
 if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
     throw "Approval script not found: $sourcePath"
@@ -25,6 +30,8 @@ $humanApprovalOffset = $approvalSource.IndexOf('$approvalSummary = Get-HumanAppr
 $minimumApprovalOffset = $approvalSource.IndexOf('Assert-MinimumHumanApprovalCount `')
 if ($humanApprovalOffset -lt 0 -or $minimumApprovalOffset -lt 0 -or
     $approvalSource.IndexOf('& $script:ghPath pr merge $PullRequestNumber --repo $Repository --squash --delete-branch --auto') -lt 0 -or
+    -not $approvalSource.Contains('. $prCheckPolicyPath') -or
+    -not $approvalSource.Contains('Test-SuccessfulConditionalPrCheckSkip') -or
     $approvalSource.Contains('if ([bool]$riskAssessment.dryRun)') -or
     $approvalSource.Contains('Get-OwnerAutoMergeSignoff') -or
     $approvalSource.Contains('Implementation and reviewer backend are both Codex fallback')) {
@@ -221,6 +228,15 @@ if ($null -eq $requiredCheckMatchFunctionAst) {
     throw 'Assert-RequiredChecksMatchBranchProtection function was not found.'
 }
 . ([scriptblock]::Create($requiredCheckMatchFunctionAst.Extent.Text))
+$requiredPrGatesFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-RequiredPrGatesPassing'
+    }, $true)
+if ($null -eq $requiredPrGatesFunctionAst) {
+    throw 'Assert-RequiredPrGatesPassing function was not found.'
+}
+. ([scriptblock]::Create($requiredPrGatesFunctionAst.Extent.Text))
 $currentReviewCheckFunctionAst = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -239,6 +255,15 @@ if ($null -eq $canonicalReviewCheckFunctionAst) {
     throw 'Get-CanonicalReviewChecks function was not found.'
 }
 . ([scriptblock]::Create($canonicalReviewCheckFunctionAst.Extent.Text))
+$currentRunReviewGateFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Assert-CurrentRunReviewGate'
+    }, $true)
+if ($null -eq $currentRunReviewGateFunctionAst) {
+    throw 'Assert-CurrentRunReviewGate function was not found.'
+}
+. ([scriptblock]::Create($currentRunReviewGateFunctionAst.Extent.Text))
 $selectedReviewChecks = @(Get-CanonicalReviewChecks -Checks @(
         [pscustomobject]@{ name = 'review'; state = 'SUCCESS'; bucket = 'pass' }
         [pscustomobject]@{ name = 'Codex Branch Review / run_review'; state = 'SUCCESS'; bucket = 'pass' }
@@ -552,14 +577,29 @@ $protection | ConvertTo-Json -Depth 10 -Compress
         throw 'A branch-protection required check missing from gh pr checks was accepted.'
     }
     $skippedOptionalRequiredChecks = @($matchingRequiredChecks | ForEach-Object {
-            if ($_.name -in @('Test and build backend', 'Test and build frontend')) {
+            if ($_.name -in @('Validate Agent OS docs', 'Test and build backend', 'Test and build frontend', 'Build backend container')) {
                 [pscustomobject]@{ name = $_.name; bucket = 'skipping' }
             } else {
                 $_
             }
         })
     Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks $skippedOptionalRequiredChecks
-    foreach ($nonPassingBucket in @('pending', 'fail', 'cancel')) {
+    $unknownRequiredContext = 'Unrecognized path-selected job'
+    $unknownExpectedContexts = @($protection.RequiredCheckContexts + $unknownRequiredContext)
+    $unknownSkippedRequiredChecks = @($matchingRequiredChecks + [pscustomobject]@{ name = $unknownRequiredContext; bucket = 'skipping' })
+    $unknownSkipRejected = $false
+    try {
+        Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $unknownExpectedContexts -RequiredChecks $unknownSkippedRequiredChecks
+    } catch {
+        $unknownSkipRejected = $true
+        if ($_.Exception.Message -notmatch 'not passing') {
+            throw
+        }
+    }
+    if (-not $unknownSkipRejected) {
+        throw 'An unrecognized skipped required context was accepted.'
+    }
+    foreach ($nonPassingBucket in @('pending', 'fail', 'cancel', 'skipping')) {
         $nonPassingChecks = @($matchingRequiredChecks | ForEach-Object {
                 if ($_.name -eq 'review') { [pscustomobject]@{ name = $_.name; bucket = $nonPassingBucket } }
                 else { $_ }
@@ -569,12 +609,35 @@ $protection | ConvertTo-Json -Depth 10 -Compress
             Assert-RequiredChecksMatchBranchProtection -ExpectedContexts $protection.RequiredCheckContexts -RequiredChecks $nonPassingChecks
         } catch {
             $nonPassingCheckRejected = $true
-            if ($_.Exception.Message -notmatch 'is not passing') {
+            if ($_.Exception.Message -notmatch 'not passing') {
                 throw
             }
         }
         if (-not $nonPassingCheckRejected) {
             throw "A required check with bucket '$nonPassingBucket' was accepted."
+        }
+    }
+    $passingPrGates = @(
+        [pscustomobject]@{ name = 'Validate PR contract'; bucket = 'pass' }
+        [pscustomobject]@{ name = 'PR CI Gate'; bucket = 'pass' }
+    )
+    Assert-RequiredPrGatesPassing -Checks $passingPrGates
+    foreach ($coreGateName in @('Validate PR contract', 'PR CI Gate')) {
+        $skippedCoreGate = @($passingPrGates | ForEach-Object {
+                if ($_.name -eq $coreGateName) { [pscustomobject]@{ name = $_.name; bucket = 'skipping' } }
+                else { $_ }
+            })
+        $skippedCoreGateRejected = $false
+        try {
+            Assert-RequiredPrGatesPassing -Checks $skippedCoreGate
+        } catch {
+            $skippedCoreGateRejected = $true
+            if ($_.Exception.Message -notmatch 'not passing') {
+                throw
+            }
+        }
+        if (-not $skippedCoreGateRejected) {
+            throw "A skipped core PR gate '$coreGateName' was accepted."
         }
     }
     $workflowRunId = '123456789'
@@ -586,6 +649,25 @@ $protection | ConvertTo-Json -Depth 10 -Compress
     }
     if (-not (Test-CurrentRunReviewCheck -Check $currentReviewCheck -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com')) {
         throw 'A completed successful review check from this workflow run was not recognized.'
+    }
+    Assert-CurrentRunReviewGate -Checks @($currentReviewCheck) -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com'
+    $stalePassedReviewCheck = [pscustomobject]@{
+        name = 'review'
+        state = 'SUCCESS'
+        bucket = 'pass'
+        link = 'https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/987654321/job/100'
+    }
+    $staleReviewRejected = $false
+    try {
+        Assert-CurrentRunReviewGate -Checks @($stalePassedReviewCheck) -ReviewJobResult 'success' -WorkflowRunId $workflowRunId -Repository 'silverThunder09/jdsnack-agent-os-project' -ServerUrl 'https://github.com'
+    } catch {
+        $staleReviewRejected = $true
+        if ($_.Exception.Message -notmatch 'stale') {
+            throw
+        }
+    }
+    if (-not $staleReviewRejected) {
+        throw 'A successful review check from a previous workflow run was accepted.'
     }
     foreach ($invalidCurrentReviewCheck in @(
             [pscustomobject]@{ name = 'review'; state = 'IN_PROGRESS'; bucket = 'pending'; link = "https://github.com/silverThunder09/jdsnack-agent-os-project/actions/runs/987654321/job/100" },

@@ -12,6 +12,7 @@
 - 구조화 리뷰는 `decision`, `score`(0~5), `risk`, `findings`, `review_summary`를 반환합니다. 자동 병합에는 `PASS`와 4/5 이상이 모두 필요합니다. `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 4점 미만은 병합을 막습니다.
 - `review-risk.ps1`의 위험도 점수·구간은 표시 라벨과 검토 경로만 정합니다. 위험도 구간은 사람 승인 수, 점수 기준 또는 자동 병합 가능 여부를 바꾸지 않습니다.
 - `dryRun=false`입니다. 현재 PR의 base/head SHA가 리뷰 보고서와 일치하고, `Validate PR contract`, `PR CI Gate`, GitHub가 요구한 모든 check가 현재 head에서 통과하며, 미해결 `CHANGES_REQUESTED`가 없을 때 approval job이 Squash auto-merge를 큐에 넣습니다.
+- GitHub가 `skipping`으로 보고한 check는 [`scripts/pr-check-policy.ps1`](../../scripts/pr-check-policy.ps1)에 이름이 명시된 PR Router 경로 선택 job만 성공으로 인정합니다. PR 계약, `PR CI Gate`, `review`, 알 수 없는 필수 check의 skip은 계속 차단합니다.
 - 추가 사람 승인 수는 이 저장소의 자동화 정책에서 0입니다. GitHub branch protection에 실제로 설정된 필수 승인 수가 0보다 크면 GitHub 보호 규칙은 그대로 존중합니다. 위험도 라벨만으로 사람 승인을 추가하지 않습니다.
 - review workflow는 `workflow_run`의 기본 브랜치 SHA에서 실행되므로, job 완료 뒤 GitHub Actions `checks:write` 토큰으로 이름이 `review`인 check run을 정확한 PR head SHA에 게시·갱신합니다. 그 check와 필수 CI가 모두 통과해야 merge job이 계속됩니다.
 

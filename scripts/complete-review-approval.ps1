@@ -46,6 +46,12 @@ function Stop-NeedsHuman {
     exit 20
 }
 
+$prCheckPolicyPath = Join-Path $Workspace 'scripts/pr-check-policy.ps1'
+if (-not (Test-Path -LiteralPath $prCheckPolicyPath -PathType Leaf)) {
+    Stop-NeedsHuman "Conditional PR check policy is missing: $prCheckPolicyPath"
+}
+. $prCheckPolicyPath
+
 function Assert-UniqueReviewReportFields {
     param([string]$Report)
 
@@ -270,6 +276,26 @@ function Test-CurrentRunReviewCheck {
         $actualPath.StartsWith($expectedRunPath + '/', [System.StringComparison]::OrdinalIgnoreCase)
 }
 
+function Assert-CurrentRunReviewGate {
+    param(
+        [object[]]$Checks,
+        [string]$ReviewJobResult,
+        [string]$WorkflowRunId,
+        [string]$Repository,
+        [string]$ServerUrl
+    )
+
+    $reviewChecks = @(Get-CanonicalReviewChecks -Checks $Checks)
+    if ($reviewChecks.Count -ne 1 -or -not (Test-CurrentRunReviewCheck `
+                -Check $reviewChecks[0] `
+                -ReviewJobResult $ReviewJobResult `
+                -WorkflowRunId $WorkflowRunId `
+                -Repository $Repository `
+                -ServerUrl $ServerUrl)) {
+        Stop-NeedsHuman 'The review job gate is missing, ambiguous, stale, or not passing.'
+    }
+}
+
 function Get-BranchProtectionApprovalRequirement {
     param([string]$BaseBranch)
 
@@ -348,9 +374,11 @@ function Assert-RequiredChecksMatchBranchProtection {
             Stop-NeedsHuman 'gh pr checks --required returned an empty or malformed check name.'
         }
         $reportedBucket = [string]$requiredCheck.bucket
-        # GitHub considers a conditionally skipped job successful. The exact
-        # PR contract, router gate, and current-run review are verified below.
-        $successfulConditionalSkip = $reportedBucket -ieq 'skipping'
+        # GitHub considers path-selected jobs that are conditionally skipped
+        # successful, but the PR contract, router gate, and review must run.
+        $successfulConditionalSkip = Test-SuccessfulConditionalPrCheckSkip `
+            -CheckName $reportedName `
+            -Bucket $reportedBucket
         if ($reportedBucket -ine 'pass' -and -not $successfulConditionalSkip) {
             Stop-NeedsHuman "Branch-required check '$reportedName' is not passing (bucket=$reportedBucket)."
         }
@@ -363,6 +391,17 @@ function Assert-RequiredChecksMatchBranchProtection {
         $missingSummary = if ($missing.Count -gt 0) { $missing -join ', ' } else { '<none>' }
         $unexpectedSummary = if ($unexpected.Count -gt 0) { $unexpected -join ', ' } else { '<none>' }
         Stop-NeedsHuman "Branch protection required check set does not match gh pr checks --required (missing: $missingSummary; unexpected: $unexpectedSummary)."
+    }
+}
+
+function Assert-RequiredPrGatesPassing {
+    param([object[]]$Checks)
+
+    foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
+        $gateChecks = @($Checks | Where-Object { $_.name -eq $gateName })
+        if ($gateChecks.Count -ne 1 -or $gateChecks[0].bucket -ne 'pass') {
+            Stop-NeedsHuman "PR gate '$gateName' is missing, ambiguous, or not passing."
+        }
     }
 }
 
@@ -718,25 +757,13 @@ if ($blockingChecks.Count -gt 0) {
 }
 
 $allChecks = Get-Checks
-foreach ($gateName in @('Validate PR contract', 'PR CI Gate')) {
-    $gateChecks = @($allChecks | Where-Object { $_.name -eq $gateName })
-    if ($gateChecks.Count -ne 1 -or $gateChecks[0].bucket -ne 'pass') {
-        Stop-NeedsHuman "PR gate '$gateName' is missing, ambiguous, or not passing."
-    }
-}
-$reviewChecks = @(Get-CanonicalReviewChecks -Checks $allChecks)
-$reviewCheckAccepted = $reviewChecks.Count -eq 1 -and (
-    $reviewChecks[0].bucket -eq 'pass' -or
-    (Test-CurrentRunReviewCheck `
-        -Check $reviewChecks[0] `
-        -ReviewJobResult $ReviewJobResult `
-        -WorkflowRunId $env:GITHUB_RUN_ID `
-        -Repository $Repository `
-        -ServerUrl $env:GITHUB_SERVER_URL)
-)
-if (-not $reviewCheckAccepted) {
-    Stop-NeedsHuman 'The review job gate is missing, ambiguous, or not passing.'
-}
+Assert-RequiredPrGatesPassing -Checks $allChecks
+Assert-CurrentRunReviewGate `
+    -Checks $allChecks `
+    -ReviewJobResult $ReviewJobResult `
+    -WorkflowRunId $env:GITHUB_RUN_ID `
+    -Repository $Repository `
+    -ServerUrl $env:GITHUB_SERVER_URL
 
 $approvalSummary = Get-HumanApprovalSummary -ExpectedHeadSha $HeadSha
 Assert-NoUnresolvedChangeRequests -ApprovalSummary $approvalSummary
