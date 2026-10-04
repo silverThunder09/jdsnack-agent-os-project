@@ -201,7 +201,11 @@ if [ -f "$fixture_dir/codex.invalid-score" ]; then
   fake_score=6
 fi
 if [ -f "$fixture_dir/codex.bad-risk" ]; then
-  fake_risk='Light'
+  if [ "$fake_risk" = 'Light' ]; then
+    fake_risk='Standard'
+  else
+    fake_risk='Light'
+  fi
 fi
 case "$output_path" in
   *\\*)
@@ -285,13 +289,17 @@ fi
     elif [ -f "$fixture_dir/codex.satisfied-summary" ]; then
       fake_first_rubric_status='SATISFIED'
     fi
-    printf '%s\n' "- correctness: ${fake_first_rubric_status} — the reviewed diff has a coherent implementation."
-    printf '%s\n' '- contract: PASS — the requested workflow contracts are covered.'
-    printf '%s\n' '- tests: PASS — executable contract tests cover the changed paths.'
-    printf '%s\n' '- security: PASS — restricted execution and fail-closed checks are preserved.'
-    printf '%s\n' '- maintainability: PASS — the change keeps validation responsibilities explicit.'
-    printf '%s\n' "- score rationale: ${fake_score}/5 — all five rubric items have concrete passing evidence."
-    printf '%s\n' '- conclusion: the reviewed change is safe and complete for this push.'
+    summary_prefix='- '
+    if [ -f "$fixture_dir/codex.unbulleted-summary" ]; then
+      summary_prefix=''
+    fi
+    printf '%s\n' "${summary_prefix}correctness: ${fake_first_rubric_status} — the reviewed diff has a coherent implementation."
+    printf '%s\n' "${summary_prefix}contract: PASS — the requested workflow contracts are covered."
+    printf '%s\n' "${summary_prefix}tests: PASS — executable contract tests cover the changed paths."
+    printf '%s\n' "${summary_prefix}security: PASS — restricted execution and fail-closed checks are preserved."
+    printf '%s\n' "${summary_prefix}maintainability: PASS — the change keeps validation responsibilities explicit."
+    printf '%s\n' "${summary_prefix}score rationale: ${fake_score}/5 — all five rubric items have concrete passing evidence."
+    printf '%s\n' "${summary_prefix}conclusion: the reviewed change is safe and complete for this push."
   fi
 } >> "$output_path"
 if [ -f "$fixture_dir/codex.duplicate-summary" ]; then
@@ -480,6 +488,17 @@ for expected_reviewer_argument in \
     fail "pre-push가 backends.json의 모델/effort를 Codex에 전달하지 않았습니다: $expected_reviewer_argument"
   fi
 done
+
+touch "$fake_root/codex.unbulleted-summary"
+set +e
+unbulleted_summary_output="$(run_review 2>&1)"
+unbulleted_summary_status=$?
+set -e
+rm -f "$fake_root/codex.unbulleted-summary"
+if [ "$unbulleted_summary_status" -ne 0 ] || ! grep -Fq 'Codex pre-push review passed' <<< "$unbulleted_summary_output"; then
+  printf '%s\n' "$unbulleted_summary_output" >&2
+  fail '5개 rubric과 구체적 근거가 있는 불릿 없는 review_summary를 pre-push가 허용하지 않았습니다.'
+fi
 
 touch "$fake_root/codex.change-source-ref"
 set +e

@@ -775,16 +775,16 @@ has_auditable_review_summary() {
   local rubric_name
   local match_count
   for rubric_name in correctness contract tests security maintainability; do
-    match_count="$("$grep_bin" -Eic "^[[:space:]]*-[[:space:]]+$rubric_name:[[:space:]]+PASS[[:space:]]+.{10,}$" "$summary_path" || true)"
+    match_count="$("$grep_bin" -Eic "^[[:space:]]*(-[[:space:]]+)?$rubric_name:[[:space:]]+PASS[[:space:]]+.{10,}$" "$summary_path" || true)"
     if [ "$match_count" -ne 1 ]; then
       return 1
     fi
   done
-  match_count="$("$grep_bin" -Eic "^[[:space:]]*-[[:space:]]+score rationale:[[:space:]]+${expected_score}/5[[:space:]]+.{10,}$" "$summary_path" || true)"
+  match_count="$("$grep_bin" -Eic "^[[:space:]]*(-[[:space:]]+)?score rationale:[[:space:]]+${expected_score}/5[[:space:]]+.{10,}$" "$summary_path" || true)"
   if [ "$match_count" -ne 1 ]; then
     return 1
   fi
-  match_count="$("$grep_bin" -Eic '^[[:space:]]*-[[:space:]]+conclusion:[[:space:]].{20,}$' "$summary_path" || true)"
+  match_count="$("$grep_bin" -Eic '^[[:space:]]*(-[[:space:]]+)?conclusion:[[:space:]].{20,}$' "$summary_path" || true)"
   if [ "$match_count" -ne 1 ]; then
     return 1
   fi
