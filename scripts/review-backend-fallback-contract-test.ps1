@@ -39,7 +39,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -49,6 +49,22 @@ foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredFi
         throw "$functionName function was not found."
     }
     . ([scriptblock]::Create($dependencyAst.Extent.Text))
+}
+
+$paginatedComments = @(Get-PaginatedJsonItems -Json '[[{"id":101,"body":"first"}],[{"id":202,"body":"second"}]]')
+if ($paginatedComments.Count -ne 2 -or
+    [int]$paginatedComments[0].id -ne 101 -or
+    [int]$paginatedComments[1].id -ne 202) {
+    throw 'Paginated PR comments were not flattened into individual comments.'
+}
+$invalidCommentsRejected = $false
+try {
+    Get-PaginatedJsonItems -Json '{not-json}' | Out-Null
+} catch {
+    $invalidCommentsRejected = $_.Exception.Message -match 'invalid JSON'
+}
+if (-not $invalidCommentsRejected) {
+    throw 'Invalid paginated PR comment JSON was not rejected.'
 }
 
 $pendingReviewChecks = @(
