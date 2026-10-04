@@ -41,6 +41,17 @@ assert_contains() {
   fi
 }
 
+build_resume_json_payload() {
+  printf '%s' "$1" | python3 -c '
+import json
+import sys
+
+resume_text = sys.stdin.buffer.read().decode("utf-8")
+payload = json.dumps({"resumeText": resume_text}, ensure_ascii=False)
+sys.stdout.buffer.write(payload.encode("utf-8"))
+'
+}
+
 run_frontend_root_check() {
   curl -fsS "${FRONTEND_URL}" >/tmp/jdsnack-frontend-root.html
   assert_contains \
@@ -91,7 +102,7 @@ run_short_resume_check() {
 
   # Stream UTF-8 bytes instead of passing Korean JSON through a Windows curl argument.
   http_code="$(
-    printf '{"resumeText":"%s"}' "${SHORT_RESUME_TEXT}" |
+    build_resume_json_payload "${SHORT_RESUME_TEXT}" |
     curl -sS -o /tmp/jdsnack-short.json -w '%{http_code}' \
       -b "${SMOKE_COOKIE_JAR}" \
       -X POST "${FRONTEND_URL}/api/diagnose" \
@@ -113,7 +124,7 @@ run_valid_resume_check() {
   local http_code
 
   http_code="$(
-    printf '{"resumeText":"%s"}' "${VALID_RESUME_TEXT}" |
+    build_resume_json_payload "${VALID_RESUME_TEXT}" |
     curl -sS -o /tmp/jdsnack-valid.json -w '%{http_code}' \
       -b "${SMOKE_COOKIE_JAR}" \
       -X POST "${FRONTEND_URL}/api/diagnose" \
