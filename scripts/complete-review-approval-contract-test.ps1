@@ -24,6 +24,14 @@ $ast = [System.Management.Automation.Language.Parser]::ParseFile(
 if ($parseErrors.Count -gt 0) {
     throw "Approval script parse failed: $sourcePath"
 }
+$nativeCommandFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Invoke-NativeCommandWithExitCode'
+    }, $true)
+if ($null -eq $nativeCommandFunctionAst) {
+    throw 'Invoke-NativeCommandWithExitCode function was not found.'
+}
 
 $approvalSource = Get-Content -LiteralPath $sourcePath -Raw
 $humanApprovalOffset = $approvalSource.IndexOf('$approvalSummary = Get-HumanApprovalSummary')
@@ -336,6 +344,40 @@ if ($null -eq $unresolvedChangesFunctionAst) {
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-approval-contract-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 try {
+    $legacyPowerShell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    if (-not (Test-Path -LiteralPath $legacyPowerShell -PathType Leaf)) {
+        throw 'Windows PowerShell 5.1 is required to verify native stderr handling.'
+    }
+    $nativeCommandProbePath = Join-Path $tempRoot 'native-command-probe.ps1'
+    $nativeCommandProbeStdout = Join-Path $tempRoot 'native-command-probe.stdout.txt'
+    $nativeCommandProbeStderr = Join-Path $tempRoot 'native-command-probe.stderr.txt'
+    $python = (Get-Command python -ErrorAction Stop).Source
+    $escapedPythonPath = $python.Replace("'", "''")
+    $nativeCommandProbe = @"
+`$ErrorActionPreference = 'Stop'
+$($nativeCommandFunctionAst.Extent.Text)
+`$successfulStderrArguments = @('-c', 'import sys;sys.stderr.write(chr(70));sys.exit(0)')
+try {
+    `$successfulExitCode = Invoke-NativeCommandWithExitCode -ExecutablePath '$escapedPythonPath' -Arguments `$successfulStderrArguments
+} catch {
+    [Console]::Error.WriteLine("Unexpected error for a successful command with stderr: `$(`$_.FullyQualifiedErrorId)")
+    exit 41
+}
+if (`$successfulExitCode -ne 0) { exit 42 }
+`$failedStderrArguments = @('-c', 'import sys;sys.stderr.write(chr(70));sys.exit(19)')
+`$failedExitCode = Invoke-NativeCommandWithExitCode -ExecutablePath '$escapedPythonPath' -Arguments `$failedStderrArguments
+if (`$failedExitCode -ne 19 -or `$ErrorActionPreference -ne 'Stop') { exit 43 }
+exit 0
+"@
+    Set-Content -LiteralPath $nativeCommandProbePath -Value $nativeCommandProbe -Encoding ASCII
+    $probeArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ("`"{0}`"" -f $nativeCommandProbePath))
+    $probeProcess = Start-Process -FilePath $legacyPowerShell -ArgumentList $probeArguments -PassThru -Wait -WindowStyle Hidden `
+        -RedirectStandardOutput $nativeCommandProbeStdout -RedirectStandardError $nativeCommandProbeStderr
+    if ($probeProcess.ExitCode -ne 0) {
+        $probeError = if (Test-Path -LiteralPath $nativeCommandProbeStderr) { Get-Content -LiteralPath $nativeCommandProbeStderr -Raw } else { '' }
+        throw "Native command stderr contract failed in Windows PowerShell 5.1 (exit $($probeProcess.ExitCode)): $probeError"
+    }
+
     $fakeGhPath = Join-Path $tempRoot 'gh.ps1'
     @'
 param(
