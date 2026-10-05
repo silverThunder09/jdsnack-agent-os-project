@@ -748,6 +748,24 @@ function Get-ExistingPassComment {
     return $matches | Sort-Object { [long]$_.id } -Descending | Select-Object -First 1
 }
 
+function Get-PaginatedJsonItems {
+    param([Parameter(Mandatory)][string]$Json)
+
+    try {
+        $pages = @(ConvertFrom-Json -InputObject $Json)
+    } catch {
+        throw "PR comments returned invalid JSON before publishing PASS: $($_.Exception.Message)"
+    }
+
+    return @(
+        foreach ($page in $pages) {
+            foreach ($item in @($page)) {
+                $item
+            }
+        }
+    )
+}
+
 function Publish-PassComment {
     param(
         [pscustomobject]$Result,
@@ -797,16 +815,11 @@ $($Result.Findings)
     $reviewLogin = $reviewLogin.Trim()
 
     $commentsEndpoint = "repos/$Repository/issues/$PullRequestNumber/comments"
-    $commentsJson = & $ghPath api --paginate --slurp --jq 'flatten' $commentsEndpoint 2>&1 | Out-String
+    $commentsJson = & $ghPath api --paginate --slurp $commentsEndpoint 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0) {
         throw "Could not read existing PR comments before publishing PASS: $commentsJson"
     }
-    try {
-        $parsedComments = ConvertFrom-Json -InputObject $commentsJson
-        $existingComments = @($parsedComments | ForEach-Object { $_ })
-    } catch {
-        throw "PR comments returned invalid JSON before publishing PASS: $($_.Exception.Message)"
-    }
+    $existingComments = @(Get-PaginatedJsonItems -Json $commentsJson)
 
     $existingComment = Get-ExistingPassComment -Comments $existingComments -Login $reviewLogin -HeadSha $HeadSha
     if ($null -ne $existingComment) {
