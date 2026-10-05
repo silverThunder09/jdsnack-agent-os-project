@@ -75,6 +75,17 @@ function Assert-UniqueReviewReportFields {
     }
 }
 
+function Get-ReviewReportFieldMatch {
+    param(
+        [string]$Report,
+        [string]$FieldName,
+        [string]$ValuePattern
+    )
+
+    $fieldPattern = '(?im)^-\s*{0}:\s*{1}\s*$' -f [regex]::Escape($FieldName), $ValuePattern
+    return [regex]::Match($Report, $fieldPattern)
+}
+
 function Test-ReviewLabelsMatchAssessment {
     param(
         [string[]]$ReportedLabels,
@@ -740,15 +751,15 @@ $reviewPolicy = Get-ReviewPolicy $policyPath
 
 $report = Get-Content -LiteralPath $ReportPath -Raw
 Assert-UniqueReviewReportFields -Report $report
-$reviewerBackendMatch = [regex]::Match($report, '(?im)^-\s*reviewer backend:\s*([^\r\n]+)$')
-$decisionMatch = [regex]::Match($report, '(?im)^-\s*decision:\s*(PASS)\s*$')
-$scoreMatch = [regex]::Match($report, '(?im)^-\s*score:\s*([4-5])\s*/\s*5\s*$')
-$riskMatch = [regex]::Match($report, '(?im)^-\s*risk:\s*(Light|Standard|High-risk)\s*$')
-$riskScoreMatch = [regex]::Match($report, '(?im)^-\s*risk score:\s*(\d+)\s*/\s*100\s*$')
-$riskBandMatch = [regex]::Match($report, '(?im)^-\s*risk band:\s*(Light|Standard|High-risk)\s*$')
-$reviewLabelsMatch = [regex]::Match($report, '(?im)^-\s*review labels:\s*([^\r\n]+?)\s*$')
-$baseMatch = [regex]::Match($report, '(?im)^-\s*reviewed base SHA:\s*([0-9a-f]{40})\s*$')
-$headMatch = [regex]::Match($report, '(?im)^-\s*reviewed head SHA:\s*([0-9a-f]{40})\s*$')
+$reviewerBackendMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'reviewer backend' -ValuePattern '([^\r\n]+)'
+$decisionMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'decision' -ValuePattern '(PASS)'
+$scoreMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'score' -ValuePattern '([4-5])\s*/\s*5'
+$riskMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'risk' -ValuePattern '(Light|Standard|High-risk)'
+$riskScoreMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'risk score' -ValuePattern '(\d+)\s*/\s*100'
+$riskBandMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'risk band' -ValuePattern '(Light|Standard|High-risk)'
+$reviewLabelsMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'review labels' -ValuePattern '([^\r\n]+?)'
+$baseMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'reviewed base SHA' -ValuePattern '([0-9a-f]{40})'
+$headMatch = Get-ReviewReportFieldMatch -Report $report -FieldName 'reviewed head SHA' -ValuePattern '([0-9a-f]{40})'
 if (-not $reviewerBackendMatch.Success -or -not $decisionMatch.Success -or -not $scoreMatch.Success -or -not $riskMatch.Success) {
     Stop-NeedsHuman 'The review report must have a PASS result with score 4 or higher.'
 }
