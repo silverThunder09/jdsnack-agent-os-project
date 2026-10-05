@@ -24,4 +24,4 @@
 - 완료 조건: AC-11과 TC-13·TC-14·TC-18을 포함한 frontend lint·test·build 통과, 컴포넌트 직접 fetch 없음
 - 검증: `cd frontend && npm run lint` 통과, `npm test -- --run` 통과(9 files, 62 tests), `npm run build` 통과.
 
-Feature 전체 완료 시 이 Spec을 `.agent-os/archive/specs/`로 이동하고 `active_specs`를 비운다. 절차 정본은 [doc-lifecycle.md](../../standards/doc-lifecycle.md)다.
+Feature 전체 완료 시 이 Spec을 `.agent-os/archive/specs/`로 이동하고 `active_specs`를 비운다. 절차 정본은 [doc-lifecycle.md](../../../standards/doc-lifecycle.md)다.
