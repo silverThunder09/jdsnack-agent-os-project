@@ -123,6 +123,15 @@ if ($null -eq $reportFieldsFunctionAst) {
     throw 'Assert-UniqueReviewReportFields function was not found.'
 }
 . ([scriptblock]::Create($reportFieldsFunctionAst.Extent.Text))
+$reportMatchFunctionAst = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Get-ReviewReportFieldMatch'
+    }, $true)
+if ($null -eq $reportMatchFunctionAst) {
+    throw 'Get-ReviewReportFieldMatch function was not found.'
+}
+. ([scriptblock]::Create($reportMatchFunctionAst.Extent.Text))
 $reviewLabelsFunctionAst = $ast.Find({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -144,6 +153,14 @@ $validReport = @"
 - reviewed head SHA: $headSha
 "@
 Assert-UniqueReviewReportFields -Report $validReport
+$crlfReport = $validReport -replace "`r?`n", "`r`n"
+$crlfReviewerBackendMatch = Get-ReviewReportFieldMatch `
+    -Report $crlfReport `
+    -FieldName 'reviewer backend' `
+    -ValuePattern '([^\r\n]+)'
+if (-not $crlfReviewerBackendMatch.Success -or $crlfReviewerBackendMatch.Groups[1].Value -ne 'claude') {
+    throw 'A CRLF review report did not match the reviewer backend field.'
+}
 foreach ($duplicateField in @('risk', 'risk score', 'risk band', 'review labels')) {
     $duplicateReport = "$validReport`r`n- ${duplicateField}: conflicting value"
     $duplicateFieldRejected = $false
