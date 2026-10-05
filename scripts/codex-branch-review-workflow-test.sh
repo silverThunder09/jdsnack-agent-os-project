@@ -457,7 +457,11 @@ grep -Fq -- '$conclusionMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_
 grep -Fq -- '-Findings $findings' "$FALLBACK_SCRIPT" || fail 'review_summary 검증에 구조화 findings가 전달되지 않습니다.'
 grep -Fq -- 'When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion.' "$FALLBACK_SCRIPT" || fail 'review prompt가 P2/P3 finding의 summary 참조를 요구하지 않습니다.'
 grep -Fq -- 'A P2 finding without a summary reference was not isolated as a summary contract failure.' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" || fail 'P2 finding과 summary 불일치 회귀 테스트가 없습니다.'
-grep -Fq -- "api --paginate --slurp --jq 'flatten'" "$FALLBACK_SCRIPT" || fail 'PASS 댓글 중복 방지를 위해 모든 PR 댓글을 조회하지 않습니다.'
+grep -Fq -- 'api --paginate --slurp $commentsEndpoint' "$FALLBACK_SCRIPT" || fail 'PASS 댓글 중복 방지를 위해 모든 PR 댓글을 조회하지 않습니다.'
+if grep -Fq -- 'api --paginate --slurp --jq' "$FALLBACK_SCRIPT"; then
+    fail 'gh api --slurp와 --jq를 함께 사용하면 GitHub CLI가 댓글 조회를 거부합니다.'
+fi
+grep -Fq -- 'Get-PaginatedJsonItems -Json $commentsJson' "$FALLBACK_SCRIPT" || fail '페이지 단위 PR 댓글 JSON을 PowerShell에서 평탄화하지 않습니다.'
 grep -Fq -- 'Get-ExistingPassComment -Comments $existingComments -Login $reviewLogin -HeadSha $HeadSha' "$FALLBACK_SCRIPT" || fail 'PASS 댓글 조회가 작성자와 현재 head SHA에 결합되지 않습니다.'
 grep -Fq -- 'api -X PATCH "repos/$Repository/issues/comments/$($existingComment.id)" -F "body=@$commentPath"' "$FALLBACK_SCRIPT" || fail '기존 PASS 댓글을 갱신하는 경로가 없습니다.'
 grep -Fq -- 'same-author PASS comment for the current head was not updated in place.' "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" || fail '동일 head의 PASS 댓글 갱신 회귀 테스트가 없습니다.'
