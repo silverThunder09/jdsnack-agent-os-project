@@ -367,6 +367,10 @@ if (`$successfulExitCode -ne 0) { exit 42 }
 `$failedStderrArguments = @('-c', 'import sys;sys.stderr.write(chr(70));sys.exit(19)')
 `$failedExitCode = Invoke-NativeCommandWithExitCode -ExecutablePath '$escapedPythonPath' -Arguments `$failedStderrArguments
 if (`$failedExitCode -ne 19 -or `$ErrorActionPreference -ne 'Stop') { exit 43 }
+`$global:LASTEXITCODE = 0
+`$missingExecutablePath = Join-Path `$env:TEMP ('jdsnack-missing-native-' + [guid]::NewGuid().ToString('N') + '.exe')
+`$missingExecutableExitCode = Invoke-NativeCommandWithExitCode -ExecutablePath `$missingExecutablePath -Arguments @()
+if (`$missingExecutableExitCode -eq 0 -or `$global:LASTEXITCODE -ne 0 -or `$ErrorActionPreference -ne 'Stop') { exit 44 }
 exit 0
 "@
     Set-Content -LiteralPath $nativeCommandProbePath -Value $nativeCommandProbe -Encoding ASCII

@@ -53,12 +53,18 @@ function Invoke-NativeCommandWithExitCode {
     )
 
     $previousErrorActionPreference = $ErrorActionPreference
+    $previousLastExitCode = $global:LASTEXITCODE
+    $exitCode = 127
     try {
         $ErrorActionPreference = 'Continue'
+        $global:LASTEXITCODE = $exitCode
         & $ExecutablePath @Arguments 2>&1 | Out-Null
-        $exitCode = [int]$LASTEXITCODE
+        $exitCode = [int]$global:LASTEXITCODE
+    } catch {
+        $exitCode = 127
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
+        $global:LASTEXITCODE = $previousLastExitCode
     }
 
     return $exitCode
