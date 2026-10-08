@@ -39,7 +39,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-KoreanReviewText', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -218,13 +218,13 @@ try {
 }
 
 $validSummary = @(
-    '- correctness: PASS — concrete correctness evidence is present.'
-    '- contract: PASS — concrete contract evidence is present.'
-    '- tests: PASS — concrete test evidence is present.'
-    '- security: PASS — concrete security evidence is present.'
-    '- maintainability: PASS — concrete maintainability evidence is present.'
-    '- score rationale: 5/5 — all five rubric lines have concrete evidence.'
-    '- conclusion: the structured review is complete and auditable.'
+    '- correctness: PASS — 세 링크 경로가 각 문서 위치와 일치합니다.'
+    '- contract: PASS — 변경이 보관 요구사항 문서의 링크 수정으로 제한됩니다.'
+    '- tests: PASS — 문서 링크 검증과 diff 검사가 통과했습니다.'
+    '- security: PASS — 보안 동작과 설정에 영향이 없습니다.'
+    '- maintainability: PASS — 관련 문서로 이동하는 경로가 명확합니다.'
+    '- score rationale: 5/5 — 변경 범위가 명확하고 추가 문제가 없습니다.'
+    '- conclusion: 수정된 링크는 대상 문서를 가리키며 변경이 안전합니다.'
 )
 if (-not (Test-StructuredReviewSummary -Summary ($validSummary -join [Environment]::NewLine) -Score 5)) {
     throw 'A valid seven-line review summary was rejected.'
@@ -239,13 +239,13 @@ if (Test-StructuredReviewSummary -Summary ($noSpaceBulletSummary -join [Environm
 }
 
 foreach ($severity in @('P2', 'P3')) {
-    $finding = "- $severity — a non-blocking finding must be reflected in the review summary."
+    $finding = "- $severity — 경미한 발견사항은 리뷰 요약에도 반영해야 합니다."
     if (Test-StructuredReviewSummary -Summary ($validSummary -join [Environment]::NewLine) -Score 5 -Findings $finding) {
         throw "A $severity finding was accepted without a matching summary reference."
     }
 
     $referencedSummary = @($validSummary)
-    $referencedSummary[6] = "- conclusion: the $severity finding is retained and the review remains auditable."
+    $referencedSummary[6] = "- conclusion: $severity 발견사항을 유지하고 검토 근거를 기록했습니다."
     if (-not (Test-StructuredReviewSummary -Summary ($referencedSummary -join [Environment]::NewLine) -Score 5 -Findings $finding)) {
         throw "A $severity finding referenced in the conclusion was rejected."
     }
@@ -273,6 +273,16 @@ $extraLine = @($validSummary + '- unrelated extra evidence must be rejected.')
 if (Test-StructuredReviewSummary -Summary ($extraLine -join [Environment]::NewLine) -Score 5) {
     throw 'An extra summary line was accepted.'
 }
+$englishOnlySummary = @($validSummary)
+$englishOnlySummary[0] = '- correctness: PASS — all three links reach their intended documents.'
+if (Test-StructuredReviewSummary -Summary ($englishOnlySummary -join [Environment]::NewLine) -Score 5) {
+    throw 'An English-only review explanation was accepted.'
+}
+$garbledSummary = @($validSummary)
+$garbledSummary[0] = '- correctness: PASS — 寃쎈맂 링크 경로는 정상입니다.'
+if (Test-StructuredReviewSummary -Summary ($garbledSummary -join [Environment]::NewLine) -Score 5) {
+    throw 'A mixed CJK and Hangul review explanation was accepted.'
+}
 
 $validReview = @(
     'decision: PASS'
@@ -297,7 +307,7 @@ $conflictingDecisionResult = Get-StructuredReviewResult -Text $conflictingDecisi
 if ($conflictingDecisionResult.DecisionMatch.Success) {
     throw 'Conflicting decision headers were accepted as a valid structured result.'
 }
-$unreferencedFindingReview = $validReview.Replace('- none', '- P2 — the unresolved minor issue remains.')
+$unreferencedFindingReview = $validReview.Replace('- none', '- P2 — 보관 요구사항 문서의 링크 한 곳이 여전히 잘못된 경로를 가리킵니다.')
 $unreferencedFindingResult = Get-StructuredReviewResult -Text $unreferencedFindingReview -ReviewerBackend 'claude' -FallbackReason 'none'
 if (-not $unreferencedFindingResult.FindingsContractValid -or $unreferencedFindingResult.ReviewSummaryContractValid) {
     throw 'A P2 finding without a summary reference was not isolated as a summary contract failure.'
@@ -307,7 +317,7 @@ $malformedFindingsResult = Get-StructuredReviewResult -Text $malformedFindingsRe
 if ($malformedFindingsResult.FindingsContractValid) {
     throw 'Malformed findings were marked contract-valid.'
 }
-$malformedSummaryReview = $validReview.Replace('- conclusion: the structured review is complete and auditable.', '- conclusion: the structured review is complete and auditable.' + [Environment]::NewLine + '- conclusion: duplicate')
+$malformedSummaryReview = $validReview.Replace('- conclusion: 수정된 링크는 대상 문서를 가리키며 변경이 안전합니다.', '- conclusion: 수정된 링크는 대상 문서를 가리키며 변경이 안전합니다.' + [Environment]::NewLine + '- conclusion: 중복 결론')
 $malformedSummaryResult = Get-StructuredReviewResult -Text $malformedSummaryReview -ReviewerBackend 'claude' -FallbackReason 'none'
 if ($malformedSummaryResult.ReviewSummaryContractValid) {
     throw 'Malformed review_summary was marked contract-valid.'
@@ -349,7 +359,14 @@ New-Item -ItemType Directory -Path $ioTempRoot -Force | Out-Null
 $ioFixturePath = Join-Path $ioTempRoot 'native-stream-fixture.ps1'
 $ioOutputPath = Join-Path $ioTempRoot 'native-stream.stdout.log'
 $ioErrorPath = Join-Path $ioTempRoot 'native-stream.stderr.log'
+$utf8ReviewPath = Join-Path $ioTempRoot 'review-no-bom.md'
 try {
+$utf8ReviewText = "review_summary:`n- correctness: PASS — 한글 검토 결과가 UTF-8로 유지됩니다."
+[System.IO.File]::WriteAllText($utf8ReviewPath, $utf8ReviewText, [System.Text.UTF8Encoding]::new($false))
+$decodedReviewText = Read-ToolOutput -Path $utf8ReviewPath
+if ($decodedReviewText -cne $utf8ReviewText) {
+    throw 'UTF-8 reviewer output without a BOM was not read without character corruption.'
+}
 @'
 [System.Console]::Out.WriteLine('review text mentions a timeout, but is standard output')
 [System.Console]::Error.WriteLine('ERROR: Claude subscription access is disabled.')

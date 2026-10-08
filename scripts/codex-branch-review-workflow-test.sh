@@ -339,6 +339,7 @@ for fallback_contract in \
     'Configured primary reviewer is Codex; skipping Claude and starting the read-only review' \
     "\$codexFallbackReason = if (\$claudeFallbackReason -eq 'configured-primary') { 'none' } else { \$claudeFallbackReason }" \
     'Risk must not change the review score or merge decision.' \
+    'Write all human-readable findings and review_summary explanations in clear Korean.' \
     'claude-invalid-structured-result' \
     'BaseSha' \
     'HeadSha' \
