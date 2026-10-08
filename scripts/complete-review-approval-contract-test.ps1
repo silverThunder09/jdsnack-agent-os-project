@@ -344,16 +344,19 @@ if ($null -eq $unresolvedChangesFunctionAst) {
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-approval-contract-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 try {
-    $legacyPowerShell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
-    if (-not (Test-Path -LiteralPath $legacyPowerShell -PathType Leaf)) {
-        throw 'Windows PowerShell 5.1 is required to verify native stderr handling.'
-    }
-    $nativeCommandProbePath = Join-Path $tempRoot 'native-command-probe.ps1'
-    $nativeCommandProbeStdout = Join-Path $tempRoot 'native-command-probe.stdout.txt'
-    $nativeCommandProbeStderr = Join-Path $tempRoot 'native-command-probe.stderr.txt'
-    $python = (Get-Command python -ErrorAction Stop).Source
-    $escapedPythonPath = $python.Replace("'", "''")
-    $nativeCommandProbe = @"
+    if ([string]::IsNullOrWhiteSpace($env:SystemRoot)) {
+        Write-Output 'Skipping the Windows PowerShell 5.1 stderr probe on a non-Windows host.'
+    } else {
+        $legacyPowerShell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+        if (-not (Test-Path -LiteralPath $legacyPowerShell -PathType Leaf)) {
+            throw 'Windows PowerShell 5.1 is required to verify native stderr handling on Windows.'
+        }
+        $nativeCommandProbePath = Join-Path $tempRoot 'native-command-probe.ps1'
+        $nativeCommandProbeStdout = Join-Path $tempRoot 'native-command-probe.stdout.txt'
+        $nativeCommandProbeStderr = Join-Path $tempRoot 'native-command-probe.stderr.txt'
+        $python = (Get-Command python -ErrorAction Stop).Source
+        $escapedPythonPath = $python.Replace("'", "''")
+        $nativeCommandProbe = @"
 `$ErrorActionPreference = 'Stop'
 $($nativeCommandFunctionAst.Extent.Text)
 `$successfulStderrArguments = @('-c', 'import sys;sys.stderr.write(chr(70));sys.exit(0)')
@@ -373,13 +376,14 @@ if (`$failedExitCode -ne 19 -or `$ErrorActionPreference -ne 'Stop') { exit 43 }
 if (`$missingExecutableExitCode -eq 0 -or `$global:LASTEXITCODE -ne 0 -or `$ErrorActionPreference -ne 'Stop') { exit 44 }
 exit 0
 "@
-    Set-Content -LiteralPath $nativeCommandProbePath -Value $nativeCommandProbe -Encoding ASCII
-    $probeArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ("`"{0}`"" -f $nativeCommandProbePath))
-    $probeProcess = Start-Process -FilePath $legacyPowerShell -ArgumentList $probeArguments -PassThru -Wait -WindowStyle Hidden `
-        -RedirectStandardOutput $nativeCommandProbeStdout -RedirectStandardError $nativeCommandProbeStderr
-    if ($probeProcess.ExitCode -ne 0) {
-        $probeError = if (Test-Path -LiteralPath $nativeCommandProbeStderr) { Get-Content -LiteralPath $nativeCommandProbeStderr -Raw } else { '' }
-        throw "Native command stderr contract failed in Windows PowerShell 5.1 (exit $($probeProcess.ExitCode)): $probeError"
+        Set-Content -LiteralPath $nativeCommandProbePath -Value $nativeCommandProbe -Encoding ASCII
+        $probeArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ("`"{0}`"" -f $nativeCommandProbePath))
+        $probeProcess = Start-Process -FilePath $legacyPowerShell -ArgumentList $probeArguments -PassThru -Wait -WindowStyle Hidden `
+            -RedirectStandardOutput $nativeCommandProbeStdout -RedirectStandardError $nativeCommandProbeStderr
+        if ($probeProcess.ExitCode -ne 0) {
+            $probeError = if (Test-Path -LiteralPath $nativeCommandProbeStderr) { Get-Content -LiteralPath $nativeCommandProbeStderr -Raw } else { '' }
+            throw "Native command stderr contract failed in Windows PowerShell 5.1 (exit $($probeProcess.ExitCode)): $probeError"
+        }
     }
 
     $fakeGhPath = Join-Path $tempRoot 'gh.ps1'
