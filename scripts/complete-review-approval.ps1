@@ -46,6 +46,30 @@ function Stop-NeedsHuman {
     exit 20
 }
 
+function Invoke-NativeCommandWithExitCode {
+    param(
+        [string]$ExecutablePath,
+        [string[]]$Arguments
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $previousLastExitCode = $global:LASTEXITCODE
+    $exitCode = 127
+    try {
+        $ErrorActionPreference = 'Continue'
+        $global:LASTEXITCODE = $exitCode
+        & $ExecutablePath @Arguments 2>&1 | Out-Null
+        $exitCode = [int]$global:LASTEXITCODE
+    } catch {
+        $exitCode = 127
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        $global:LASTEXITCODE = $previousLastExitCode
+    }
+
+    return $exitCode
+}
+
 $prCheckPolicyPath = Join-Path $Workspace 'scripts/pr-check-policy.ps1'
 if (-not (Test-Path -LiteralPath $prCheckPolicyPath -PathType Leaf)) {
     Stop-NeedsHuman "Conditional PR check policy is missing: $prCheckPolicyPath"
@@ -782,8 +806,14 @@ if ([string]::IsNullOrWhiteSpace($gitPath)) {
     Stop-NeedsHuman 'Git is unavailable for deterministic risk verification.'
 }
 foreach ($sha in @($BaseSha, $HeadSha)) {
-    & $gitPath -C $Workspace fetch --no-tags origin $sha 2>&1 | Out-Null
-    if ([int]$LASTEXITCODE -ne 0) {
+    $fetchExitCode = Invoke-NativeCommandWithExitCode -ExecutablePath $gitPath -Arguments @(
+        '-C', $Workspace,
+        'fetch',
+        '--no-tags',
+        'origin',
+        $sha
+    )
+    if ($fetchExitCode -ne 0) {
         Stop-NeedsHuman "Could not fetch reviewed commit $sha for risk verification."
     }
 }
