@@ -499,9 +499,18 @@ function New-CodexReviewInputs {
 function Test-KoreanReviewText {
     param([string]$Text)
 
-    $hasHangul = [regex]::IsMatch($Text, '[\uAC00-\uD7A3]')
-    $hasCjkIdeographs = [regex]::IsMatch($Text, '[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]')
-    return $hasHangul -and -not $hasCjkIdeographs
+    $prose = $Text.Trim()
+    $prose = $prose -replace '^\s*(?:-\s*)?(?:correctness|contract|tests|security|maintainability):\s*PASS\s*', ''
+    $prose = $prose -replace '^\s*(?:-\s*)?score rationale:\s*[0-5]/5\s*', ''
+    $prose = $prose -replace '^\s*(?:-\s*)?conclusion:\s*', ''
+    $prose = $prose -replace '^\s*-\s*P[0-3]\s*', ''
+    $prose = $prose -replace '`[^`]*`', ''
+    $prose = $prose -replace '\b(?:UTF-?8|PowerShell|Codex|Claude|GitHub|Windows|Linux|API|CI|PR|BOM|JSON|stderr|stdout)\b', ''
+
+    $hangulCount = [regex]::Matches($prose, '[\uAC00-\uD7A3]').Count
+    $latinLetterCount = [regex]::Matches($prose, '[A-Za-z]').Count
+    $hasCjkIdeographs = [regex]::IsMatch($prose, '[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]')
+    return $hangulCount -gt 0 -and $hangulCount -ge $latinLetterCount -and -not $hasCjkIdeographs
 }
 
 function Test-StructuredFindings {

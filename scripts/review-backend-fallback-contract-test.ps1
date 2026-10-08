@@ -283,6 +283,24 @@ $garbledSummary[0] = '- correctness: PASS — 寃쎈맂 링크 경로는 정상�
 if (Test-StructuredReviewSummary -Summary ($garbledSummary -join [Environment]::NewLine) -Score 5) {
     throw 'A mixed CJK and Hangul review explanation was accepted.'
 }
+$englishHeavySummary = @($validSummary)
+$englishHeavySummary[0] = '- correctness: PASS — The output is valid and all checks passed. 한글.'
+if (Test-StructuredReviewSummary -Summary ($englishHeavySummary -join [Environment]::NewLine) -Score 5) {
+    throw 'An English-dominant review explanation with a Hangul suffix was accepted.'
+}
+
+$validKoreanFinding = '- P2 — UTF-8 결과가 정상적으로 저장됩니다.'
+if (-not (Test-StructuredFindings -Findings $validKoreanFinding -Decision 'COMMENT')) {
+    throw 'A Korean finding with a supported technical term was rejected.'
+}
+$englishHeavyFinding = '- P2 — The output is valid and all checks passed. 한글.'
+if (Test-StructuredFindings -Findings $englishHeavyFinding -Decision 'COMMENT') {
+    throw 'An English-dominant finding with a Hangul suffix was accepted.'
+}
+$garbledFinding = '- P2 — 寃쎈맂 경로가 수정되었습니다.'
+if (Test-StructuredFindings -Findings $garbledFinding -Decision 'COMMENT') {
+    throw 'A mixed CJK and Hangul finding was accepted.'
+}
 
 $validReview = @(
     'decision: PASS'
