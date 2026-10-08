@@ -1,6 +1,6 @@
 ## 요구사항
 
-JobKorea 공고 링크를 기존 공통 JD fetch 경계(`POST /api/jd/fetch` → `JdFetchService` → `JdHtmlExtractor`/`JdCandidateSelector`)에 두 번째 출처로 얹는다. 새 추상화·새 endpoint·새 error code는 만들지 않고 사람인 어댑터와 같은 계약을 따른다. 출처별 격리 근거는 [ADR-016](../../adr/adr-016-jd-source-adapter.md)이다.
+JobKorea 공고 링크를 기존 공통 JD fetch 경계(`POST /api/jd/fetch` → `JdFetchService` → `JdHtmlExtractor`/`JdCandidateSelector`)에 두 번째 출처로 얹는다. 새 추상화·새 endpoint·새 error code는 만들지 않고 사람인 어댑터와 같은 계약을 따른다. 출처별 격리 근거는 [ADR-016](../../../adr/adr-016-jd-source-adapter.md)이다.
 
 - REQ-01: 호스트 allowlist에 `www.jobkorea.co.kr`와 `jobkorea.co.kr`를 추가한다. 사람인과 동일하게 host 기준으로만 판정하고 path·query 형태는 전제하지 않는다. 그 외 호스트는 기존 `JD_FETCH_UNSUPPORTED_SOURCE` 계약을 유지한다.
 - REQ-02: JobKorea 정적 HTML 성공 응답은 `sourceSite`를 `jobkorea`, `fetchMode`를 `static-html`로 반환하고, 이미지 OCR 성공 응답은 `fetchMode`를 `image-ocr`로 반환한다. 두 경로 모두 `sourceUrl`은 요청 URL을 그대로 보존하며 `JdFetchResponse` 필드 구성은 변경하지 않는다.
@@ -27,4 +27,4 @@ JobKorea 공고 링크를 기존 공통 JD fetch 경계(`POST /api/jd/fetch` →
 - 결제·요금제 기능
 - OCR 공급자 교체·모델 품질 개선·사용자 업로드 이미지 직접 분석
 
-Controller → Service → Repository/External API 경계와 [완료 정의](../../standards/definition-of-done.md)를 지키며, 수집 흐름 전제는 [통합 아키텍처](../../../docs/architecture/integration-architecture.md)를 따른다.
+Controller → Service → Repository/External API 경계와 [완료 정의](../../../standards/definition-of-done.md)를 지키며, 수집 흐름 전제는 [통합 아키텍처](../../../../docs/architecture/integration-architecture.md)를 따른다.
