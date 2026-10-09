@@ -243,6 +243,15 @@ $validSummary = @(
 if (-not (Test-StructuredReviewSummary -Summary ($validSummary -join [Environment]::NewLine) -Score 5)) {
     throw 'A valid seven-line review summary was rejected.'
 }
+$emDash = [string][char]0x2014
+$colonSummary = @($validSummary | ForEach-Object { ([string]$_).Replace(" $emDash ", ': ') })
+if (-not (Test-StructuredReviewSummary -Summary ($colonSummary -join [Environment]::NewLine) -Score 5)) {
+    throw 'A valid seven-line review summary using ASCII colon separators was rejected.'
+}
+$questionMarkSummary = @($validSummary | ForEach-Object { ([string]$_).Replace(" $emDash ", ' ? ') })
+if (-not $questionMarkSummary[0].Contains('?') -or (Test-StructuredReviewSummary -Summary ($questionMarkSummary -join [Environment]::NewLine) -Score 5)) {
+    throw 'A review summary using question-mark separators was accepted.'
+}
 $unbulletedSummary = @($validSummary | ForEach-Object { ([string]$_) -replace '^\s*-\s*', '' })
 if (-not (Test-StructuredReviewSummary -Summary ($unbulletedSummary -join [Environment]::NewLine) -Score 5)) {
     throw 'A valid seven-line review summary without bullet prefixes was rejected.'
