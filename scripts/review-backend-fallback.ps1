@@ -571,14 +571,15 @@ function Test-StructuredReviewSummary {
     if (@($summaryLines | Where-Object { -not (Test-KoreanReviewText -Text ([string]$_)) }).Count -gt 0) {
         return $false
     }
+    $summarySeparatorPattern = '(?:\u2014|:)'
     foreach ($rubricName in @('correctness', 'contract', 'tests', 'security', 'maintainability')) {
-        $rubricPattern = "^\s*(?:-\s+)?$($rubricName):\s+PASS\s+.{10,}$"
+        $rubricPattern = "^\s*(?:-\s+)?$($rubricName):\s+PASS\s*$summarySeparatorPattern\s+.{10,}$"
         $rubricMatches = @($summaryLines | Where-Object { ([string]$_) -match $rubricPattern })
         if ($rubricMatches.Count -ne 1) {
             return $false
         }
     }
-    $scorePattern = "^\s*(?:-\s+)?score rationale:\s+$($Score)/5\s+.{10,}$"
+    $scorePattern = "^\s*(?:-\s+)?score rationale:\s+$($Score)/5\s*$summarySeparatorPattern\s+.{10,}$"
     $scoreMatches = @($summaryLines | Where-Object { ([string]$_) -match $scorePattern })
     if ($scoreMatches.Count -ne 1) {
         return $false
