@@ -306,7 +306,13 @@ fi
     printf '%s\n' "${summary_prefix}security: PASS — restricted execution and fail-closed checks are preserved."
     printf '%s\n' "${summary_prefix}maintainability: PASS — the change keeps validation responsibilities explicit."
     printf '%s\n' "${summary_prefix}score rationale: ${fake_score}/5 — all five rubric items have concrete passing evidence."
-    printf '%s\n' "${summary_prefix}conclusion: the reviewed change is safe and complete for this push."
+    if [ -f "$fixture_dir/codex.concise-korean-conclusion" ]; then
+      printf '%s\n' "${summary_prefix}conclusion: 검토 기준을 충족합니다."
+    elif [ -f "$fixture_dir/codex.too-short-conclusion" ]; then
+      printf '%s\n' "${summary_prefix}conclusion: OK."
+    else
+      printf '%s\n' "${summary_prefix}conclusion: the reviewed change is safe and complete for this push."
+    fi
   fi
 } >> "$output_path"
 if [ -f "$fixture_dir/codex.duplicate-summary" ]; then
@@ -513,6 +519,28 @@ rm -f "$fake_root/codex.unbulleted-summary"
 if [ "$unbulleted_summary_status" -ne 0 ] || ! grep -Fq 'Codex pre-push review passed' <<< "$unbulleted_summary_output"; then
   printf '%s\n' "$unbulleted_summary_output" >&2
   fail '5개 rubric과 구체적 근거가 있는 불릿 없는 review_summary를 pre-push가 허용하지 않았습니다.'
+fi
+
+touch "$fake_root/codex.concise-korean-conclusion"
+set +e
+concise_korean_conclusion_output="$(run_review 2>&1)"
+concise_korean_conclusion_status=$?
+set -e
+rm -f "$fake_root/codex.concise-korean-conclusion"
+if [ "$concise_korean_conclusion_status" -ne 0 ] || ! grep -Fq 'Codex pre-push review passed' <<< "$concise_korean_conclusion_output"; then
+  printf '%s\n' "$concise_korean_conclusion_output" >&2
+  fail '의미가 완결된 짧은 한국어 conclusion을 pre-push가 허용하지 않았습니다.'
+fi
+
+touch "$fake_root/codex.too-short-conclusion"
+set +e
+too_short_conclusion_output="$(run_review 2>&1)"
+too_short_conclusion_status=$?
+set -e
+rm -f "$fake_root/codex.too-short-conclusion"
+if [ "$too_short_conclusion_status" -eq 0 ] || ! grep -Fq '5개 rubric' <<< "$too_short_conclusion_output"; then
+  printf '%s\n' "$too_short_conclusion_output" >&2
+  fail '근거가 되지 않는 지나치게 짧은 conclusion을 pre-push가 차단하지 않았습니다.'
 fi
 
 touch "$fake_root/codex.no-space-bullet-summary"

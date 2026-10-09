@@ -31,8 +31,16 @@ gh() {
     *"--json files --jq"*)
       printf '%s\n' "$GH_FIXTURE_FILES"
       ;;
-    *"--json commits --jq"*)
-      printf '%s\n' "$GH_FIXTURE_COMMITS"
+    *"repos/{owner}/{repo}/pulls/"*"/commits --paginate --jq"*)
+      case "$*" in
+        *"select((.parents | length) < 2)"*)
+          printf '%s\n' "$GH_FIXTURE_API_COMMITS"
+          ;;
+        *)
+          echo "PR commit query must exclude Git-generated merge commits: $*" >&2
+          return 2
+          ;;
+      esac
       ;;
     *"pr checks"*)
       printf '%s\n' 'PR CI Gate\tpass'
@@ -130,7 +138,8 @@ run_case() {
       ;;
   esac
 
-  export GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY GH_FIXTURE_BASE_SHA GH_FIXTURE_HEAD_SHA GH_FIXTURE_DRIFT_SHA GH_FIXTURE_DRIFT GH_REF_CALLS
+  GH_FIXTURE_API_COMMITS="$GH_FIXTURE_COMMITS"
+  export GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_API_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY GH_FIXTURE_BASE_SHA GH_FIXTURE_HEAD_SHA GH_FIXTURE_DRIFT_SHA GH_FIXTURE_DRIFT GH_REF_CALLS
   set +e
   output="$(bash "$GATE_SCRIPT" 999 2>&1)"
   actual_status=$?
