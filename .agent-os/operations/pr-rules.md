@@ -134,6 +134,8 @@ docs(pr): PR 범위 규칙 강화
 
 커밋 메시지와 같은 Conventional Commits 형식을 사용합니다.
 
+PR 계약 검사는 작성자가 만든 커밋 제목을 모두 검증합니다. GitHub 커밋 API에서 부모가 2개 이상인 자동 merge 커밋만 생성된 제목이므로 검사 대상에서 제외합니다.
+
 ```text
 <type>(<scope>): <summary>
 ```
@@ -188,7 +190,7 @@ PR 본문은 [`.github/pull_request_template.md`](../../.github/pull_request_tem
 - PR 주 목적이 한 문장으로 설명된다.
 - 변경 파일이 `PR 범위 경계`의 같은 PR 허용 조건 안에 있다.
 - CI/운영/템플릿/광범위한 문서 정리는 기능 PR과 분리되어 있다.
-- PR 제목과 커밋 summary가 Conventional Commits 형식이며 한국어이다.
+- PR 제목과 작성자 커밋 summary가 Conventional Commits 형식이며 한국어이다. 자동 merge 커밋은 검사 대상에서 제외한다.
 - PR 본문·제목·커밋·범위 계약 검증이 `pr-contract-test.sh`에서 통과했다.
 - `requirements.md`에 `REQ`가 존재한다.
 - `acceptance-criteria.md`에 `AC`가 존재한다.

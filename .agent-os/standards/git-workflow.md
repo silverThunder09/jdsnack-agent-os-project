@@ -43,6 +43,8 @@ Git 기록을 “작업 일기”가 아니라 **요구사항, 문서, 테스트
 
 커밋 메시지는 Conventional Commits를 기본으로 사용합니다.
 
+PR 계약 검사는 작성자가 만든 커밋 제목을 모두 검증합니다. GitHub 커밋 API에서 부모가 2개 이상인 자동 merge 커밋은 생성된 제목이므로 검사 대상에서 제외합니다. 일반 커밋 제목은 `Merge`로 시작하더라도 동일하게 검증합니다.
+
 ```text
 <type>(<scope>): <summary>
 ```
@@ -101,7 +103,7 @@ Docs: specs/2026-05-21-0943-ai-resume-diagnoser/api-spec.md
 ## 금지
 
 - `wip`, `temp`, `fix stuff`, `update` 같은 의미 없는 커밋 메시지
-- Conventional Commits 형식을 따르지 않는 PR 제목 또는 커밋 메시지
+- Conventional Commits 형식을 따르지 않는 PR 제목 또는 작성자 커밋 메시지
 - 문서 계약 변경 없는 API 변경
 - 테스트 시나리오 없는 수용 기준 변경
 - 여러 기능을 한 PR에 섞는 변경

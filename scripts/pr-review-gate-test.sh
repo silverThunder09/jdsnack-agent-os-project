@@ -31,8 +31,8 @@ gh() {
     *"--json files --jq"*)
       printf '%s\n' "$GH_FIXTURE_FILES"
       ;;
-    *"--json commits --jq"*)
-      printf '%s\n' "$GH_FIXTURE_COMMITS"
+    *"repos/{owner}/{repo}/pulls/"*"/commits --paginate --slurp"*)
+      printf '%s\n' "$GH_FIXTURE_COMMIT_PAGES"
       ;;
     *"pr checks"*)
       printf '%s\n' 'PR CI Gate\tpass'
@@ -49,6 +49,7 @@ export -f gh
 set_common_fixture() {
   GH_FIXTURE_TITLE="chore(harness): 리뷰 게이트 실행 테스트"
   GH_FIXTURE_COMMITS="chore(harness): 리뷰 게이트 실행 테스트"
+  GH_FIXTURE_COMMIT_PAGES="$(jq -cn --arg message "$GH_FIXTURE_COMMITS" '[[{commit:{message:$message},parents:[{sha:"parent"}]}]]')"
   GH_FIXTURE_FILES="docs/harness.md"
   GH_FIXTURE_BASE_SHA="$(git rev-parse origin/main)"
   GH_FIXTURE_HEAD_SHA="$(git rev-parse HEAD)"
@@ -130,7 +131,7 @@ run_case() {
       ;;
   esac
 
-  export GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY GH_FIXTURE_BASE_SHA GH_FIXTURE_HEAD_SHA GH_FIXTURE_DRIFT_SHA GH_FIXTURE_DRIFT GH_REF_CALLS
+  export GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_COMMIT_PAGES GH_FIXTURE_FILES GH_FIXTURE_BODY GH_FIXTURE_BASE_SHA GH_FIXTURE_HEAD_SHA GH_FIXTURE_DRIFT_SHA GH_FIXTURE_DRIFT GH_REF_CALLS
   set +e
   output="$(bash "$GATE_SCRIPT" 999 2>&1)"
   actual_status=$?

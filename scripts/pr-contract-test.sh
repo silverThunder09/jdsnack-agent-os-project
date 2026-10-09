@@ -33,6 +33,19 @@ gh_pr_view() {
   printf '%s\n' "$output"
 }
 
+gh_api() {
+  local label="$1"
+  shift
+  local output
+
+  if ! output="$(gh api "$@" 2>&1)"; then
+    echo "ERROR: PR #$PR_NUMBER API 조회 실패 ($label): $output" >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$output"
+}
+
 PYTHON_BIN=""
 if command -v python3 >/dev/null 2>&1 && python3 -c 'import re' >/dev/null 2>&1; then
   PYTHON_BIN="python3"
@@ -46,7 +59,8 @@ fi
 pr_title="$(gh_pr_view "title" --json title --template '{{.title}}')"
 pr_body="$(gh_pr_view "body" --json body --template '{{.body}}')"
 files="$(gh_pr_view "files" --json files --jq '.files[].path')"
-commits="$(gh_pr_view "commits" --json commits --jq '.commits[].messageHeadline')"
+commit_pages="$(gh_api "commit metadata" "repos/{owner}/{repo}/pulls/$PR_NUMBER/commits" --paginate --slurp)"
+commits="$(jq -r '.[] | .[] | select((.parents | length) < 2) | .commit.message | split("\n")[0]' <<< "$commit_pages")"
 
 errors=()
 warnings=()

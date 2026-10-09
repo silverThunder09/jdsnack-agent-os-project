@@ -25,8 +25,8 @@ gh() {
     *"--json files --jq"*)
       printf '%s\n' "$GH_FIXTURE_FILES"
       ;;
-    *"--json commits --jq"*)
-      printf '%s\n' "$GH_FIXTURE_COMMITS"
+    *"repos/{owner}/{repo}/pulls/"*"/commits --paginate --slurp"*)
+      printf '%s\n' "$GH_FIXTURE_COMMIT_PAGES"
       ;;
     *)
       echo "unexpected fake gh call: $*" >&2
@@ -105,6 +105,10 @@ run_case() {
   case "$name" in
     valid)
       ;;
+    merge_commit)
+      GH_FIXTURE_COMMITS=$'feat(harness): 계약 검사 실행 테스트\nMerge remote-tracking branch origin/main into codex/harness'
+      GH_FIXTURE_COMMIT_PAGES="$(jq -cn --arg message 'feat(harness): 계약 검사 실행 테스트' '[[{commit:{message:$message},parents:[{sha:"parent"}]},{commit:{message:"Merge remote-tracking branch origin/main into codex/harness"},parents:[{sha:"parent-a"},{sha:"parent-b"}]}]]')"
+      ;;
     prose_tbd)
       GH_FIXTURE_BODY="$GH_FIXTURE_BODY
 
@@ -171,7 +175,11 @@ run_case() {
       ;;
   esac
 
-  export GH_FIXTURE_MODE GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY
+  if [ "$name" != "merge_commit" ]; then
+    GH_FIXTURE_COMMIT_PAGES="$(jq -cn --arg message "$GH_FIXTURE_COMMITS" '[[{commit:{message:$message},parents:[{sha:"parent"}]}]]')"
+  fi
+
+  export GH_FIXTURE_MODE GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_COMMIT_PAGES GH_FIXTURE_FILES GH_FIXTURE_BODY
   set +e
   output="$(bash "$CONTRACT_SCRIPT" 999 2>&1)"
   actual_status=$?
@@ -189,6 +197,7 @@ run_case() {
 }
 
 run_case valid 0 "PR contract passed"
+run_case merge_commit 0 "PR contract passed"
 run_case prose_tbd 0 "PR contract passed"
 run_case placeholder_tbd 1 "미완성 placeholder 값"
 run_case placeholder_bullet 1 "미완성 placeholder 값"
