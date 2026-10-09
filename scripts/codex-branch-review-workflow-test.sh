@@ -510,6 +510,8 @@ grep -Fq -- '$rubricMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summ
 grep -Fq -- "summarySeparatorPattern = '(?:\\u2014|:)'" "$FALLBACK_SCRIPT" || fail 'review_summary must accept only the current and transition separators.'
 grep -Fq -- 'PASS\s*$summarySeparatorPattern\s+.{10,}$' "$FALLBACK_SCRIPT" || fail 'review_summary rubric은 지원하는 구분자로 PASS를 제한해야 합니다.'
 grep -Fq -- 'score rationale:\s+$($Score)/5\s*$summarySeparatorPattern\s+.{10,}$' "$FALLBACK_SCRIPT" || fail 'review_summary 점수 설명도 지원하는 구분자로 제한해야 합니다.'
+grep -Fq -- '"<rubric>: PASS: ..."' "$FALLBACK_SCRIPT" || fail 'trusted review prompt는 ASCII colon 구분자를 요청해야 합니다.'
+grep -Fq -- '"score rationale: <reported score>/5: ..."' "$FALLBACK_SCRIPT" || fail 'trusted score prompt는 ASCII colon 구분자를 요청해야 합니다.'
 grep -Fq -- '$conclusionMatches.Count -ne 1' "$FALLBACK_SCRIPT" || fail 'review_summary conclusion 중복을 차단하지 않습니다.'
 grep -Fq -- '-Findings $findings' "$FALLBACK_SCRIPT" || fail 'review_summary 검증에 구조화 findings가 전달되지 않습니다.'
 grep -Fq -- 'When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion.' "$FALLBACK_SCRIPT" || fail 'review prompt가 P2/P3 finding의 summary 참조를 요구하지 않습니다.'

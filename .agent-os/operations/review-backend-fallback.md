@@ -7,6 +7,12 @@
 3. 기본 리뷰어가 Claude로 설정된 경우 유효한 구조화 결과는 그대로 사용합니다. Claude 실행 불가·구독/인증/쿼터 오류·timeout 또는 결과 누락/형식 오류는 Codex 읽기 전용 리뷰로 넘깁니다. 유효한 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달은 backend 장애가 아니므로 Codex로 덮어쓰지 않습니다.
 4. Codex 입력은 PR diff와 review 기준뿐입니다. Codex는 checkout 밖의 빈 임시 작업공간에서 도구 없이 실행하며 diff에 포함된 지시문을 따르지 않습니다. Codex 실행 실패나 Codex의 누락·잘못된 구조화 결과는 `needs-human`으로 중단합니다.
 
+## 구조화 요약 형식
+
+- Codex와 Claude 프롬프트는 rubric과 score rationale의 구분자로 ASCII colon을 요청합니다. review_summary는 rubric 5줄, score rationale 1줄, conclusion 1줄로 구성합니다.
+- parser는 전환 중 기존 em dash와 ASCII colon을 허용하고, 물음표 등 다른 구분자는 잘못된 구조화 결과로 처리합니다.
+- workflow_run은 trusted main의 스크립트를 실행합니다. 리뷰 프롬프트 변경은 main에 반영된 뒤 실행되는 후속 PR부터 적용됩니다.
+
 ## 점수와 병합
 
 - 구조화 리뷰는 `decision`, `score`(0~5), `risk`, `findings`, `review_summary`를 반환합니다. 자동 병합에는 `PASS`와 4/5 이상이 모두 필요합니다. `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 4점 미만은 병합을 막습니다.
