@@ -831,8 +831,8 @@ $($Result.ReviewSummary)
 
 $($Result.Findings)
 "@
-    $commentBody = [regex]::Replace($commentBody, '\r\n?|\n', "`r`n")
-    Set-Content -LiteralPath $commentPath -Value $commentBody -Encoding utf8
+    $commentBody = [regex]::Replace($commentBody, '\r\n?|\n', "`n")
+    [System.IO.File]::WriteAllText($commentPath, $commentBody, [System.Text.UTF8Encoding]::new($false))
 
     $reviewLogin = & $ghPath api user --jq '.login' 2>&1 | Out-String
     if ([int]$LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($reviewLogin)) {

@@ -548,8 +548,8 @@ $global:LASTEXITCODE = 0
     Publish-PassComment -Result $reviewResult -ReviewInputs $reviewInputs -BaseSha 'base-sha' -HeadSha $headSha
     $publishedCommentPath = Join-Path $passCommentTempRoot 'pass-comment-220.md'
     $publishedComment = [System.IO.File]::ReadAllText($publishedCommentPath, [System.Text.Encoding]::UTF8)
-    if ([regex]::IsMatch($publishedComment, '(?<!\r)\n|\r(?!\n)')) {
-        throw 'Published PASS comment contains mixed or non-Windows line endings.'
+    if ($publishedComment.Contains("`r") -or -not $publishedComment.Contains("`n")) {
+        throw 'Published PASS comment does not use canonical LF line endings.'
     }
     if ($publishedComment -notmatch 'correctness: PASS: 코드 경로와 동작이 일치합니다\.' -or
         $publishedComment -match 'PASS \?') {
