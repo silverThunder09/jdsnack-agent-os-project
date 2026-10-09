@@ -43,6 +43,11 @@ if (-not $fallbackSource.Contains('. $prCheckPolicyPath') -or
     -not $fallbackSource.Contains('Test-SuccessfulConditionalPrCheckSkip')) {
     throw 'Fallback script does not load and use the shared conditional PR check policy.'
 }
+if (-not $fallbackSource.Contains('<rubric>: PASS: ...') -or
+    -not $fallbackSource.Contains('score rationale: <reported score>/5: ...') -or
+    $fallbackSource.Contains('<rubric>: PASS — ...')) {
+    throw 'Reviewer prompts do not require the stable ASCII review-summary separators.'
+}
 
 $functionAst = $ast.Find({
         param($node)
@@ -232,12 +237,12 @@ try {
 }
 
 $validSummary = @(
-    '- correctness: PASS — 세 링크 경로가 각 문서 위치와 일치합니다.'
-    '- contract: PASS — 변경이 보관 요구사항 문서의 링크 수정으로 제한됩니다.'
-    '- tests: PASS — 문서 링크 검증과 diff 검사가 통과했습니다.'
-    '- security: PASS — 보안 동작과 설정에 영향이 없습니다.'
-    '- maintainability: PASS — 관련 문서로 이동하는 경로가 명확합니다.'
-    '- score rationale: 5/5 — 변경 범위가 명확하고 추가 문제가 없습니다.'
+    '- correctness: PASS: 세 링크 경로가 각 문서 위치와 일치합니다.'
+    '- contract: PASS: 변경이 보관 요구사항 문서의 링크 수정으로 제한됩니다.'
+    '- tests: PASS: 문서 링크 검증과 diff 검사가 통과했습니다.'
+    '- security: PASS: 보안 동작과 설정에 영향이 없습니다.'
+    '- maintainability: PASS: 관련 문서로 이동하는 경로가 명확합니다.'
+    '- score rationale: 5/5: 변경 범위가 명확하고 추가 문제가 없습니다.'
     '- conclusion: 수정된 링크는 대상 문서를 가리키며 변경이 안전합니다.'
 )
 if (-not (Test-StructuredReviewSummary -Summary ($validSummary -join [Environment]::NewLine) -Score 5)) {
@@ -267,10 +272,26 @@ foreach ($severity in @('P2', 'P3')) {
 
 foreach ($nonPassStatus in @('OK', 'SATISFIED')) {
     $weakerRubricSummary = @($validSummary)
-    $weakerRubricSummary[0] = $weakerRubricSummary[0].Replace(': PASS ', ": $nonPassStatus ")
+    $weakerRubricSummary[0] = $weakerRubricSummary[0].Replace(': PASS:', ": ${nonPassStatus}:")
     if (Test-StructuredReviewSummary -Summary ($weakerRubricSummary -join [Environment]::NewLine) -Score 5) {
         throw "A rubric line using $nonPassStatus instead of PASS was accepted."
     }
+}
+
+$questionMarkSeparatorSummary = @($validSummary)
+$questionMarkSeparatorSummary[0] = $questionMarkSeparatorSummary[0].Replace('PASS:', 'PASS ?')
+if (Test-StructuredReviewSummary -Summary ($questionMarkSeparatorSummary -join [Environment]::NewLine) -Score 5) {
+    throw 'A rubric line with a question-mark separator was accepted.'
+}
+$emDashSeparatorSummary = @($validSummary)
+$emDashSeparatorSummary[0] = $emDashSeparatorSummary[0].Replace('PASS:', 'PASS —')
+if (Test-StructuredReviewSummary -Summary ($emDashSeparatorSummary -join [Environment]::NewLine) -Score 5) {
+    throw 'A rubric line with a non-contract separator was accepted.'
+}
+$questionMarkScoreSeparatorSummary = @($validSummary)
+$questionMarkScoreSeparatorSummary[5] = $questionMarkScoreSeparatorSummary[5].Replace('5/5:', '5/5 ?')
+if (Test-StructuredReviewSummary -Summary ($questionMarkScoreSeparatorSummary -join [Environment]::NewLine) -Score 5) {
+    throw 'A score rationale with a question-mark separator was accepted.'
 }
 
 $duplicateRubric = @($validSummary[0..4] + $validSummary[0] + $validSummary[5..6])
@@ -288,17 +309,17 @@ if (Test-StructuredReviewSummary -Summary ($extraLine -join [Environment]::NewLi
     throw 'An extra summary line was accepted.'
 }
 $englishOnlySummary = @($validSummary)
-$englishOnlySummary[0] = '- correctness: PASS — all three links reach their intended documents.'
+$englishOnlySummary[0] = '- correctness: PASS: all three links reach their intended documents.'
 if (Test-StructuredReviewSummary -Summary ($englishOnlySummary -join [Environment]::NewLine) -Score 5) {
     throw 'An English-only review explanation was accepted.'
 }
 $garbledSummary = @($validSummary)
-$garbledSummary[0] = '- correctness: PASS — 寃쎈맂 링크 경로는 정상입니다.'
+$garbledSummary[0] = '- correctness: PASS: 寃쎈맂 링크 경로는 정상입니다.'
 if (Test-StructuredReviewSummary -Summary ($garbledSummary -join [Environment]::NewLine) -Score 5) {
     throw 'A mixed CJK and Hangul review explanation was accepted.'
 }
 $englishHeavySummary = @($validSummary)
-$englishHeavySummary[0] = '- correctness: PASS — The output is valid and all checks passed. 한글.'
+$englishHeavySummary[0] = '- correctness: PASS: The output is valid and all checks passed. 한글.'
 if (Test-StructuredReviewSummary -Summary ($englishHeavySummary -join [Environment]::NewLine) -Score 5) {
     throw 'An English-dominant review explanation with a Hangul suffix was accepted.'
 }
@@ -324,12 +345,12 @@ if (Test-StructuredFindings -Findings $garbledFinding -Decision 'COMMENT') {
     throw 'A mixed CJK and Hangul finding was accepted.'
 }
 $koreanTechnicalSummary = @($validSummary)
-$koreanTechnicalSummary[0] = '- correctness: PASS — Controller에서 DTO mapping을 수행합니다.'
+$koreanTechnicalSummary[0] = '- correctness: PASS: Controller에서 DTO mapping을 수행합니다.'
 if (-not (Test-StructuredReviewSummary -Summary ($koreanTechnicalSummary -join [Environment]::NewLine) -Score 5)) {
     throw 'A Korean summary line with ordinary English technical terms was rejected.'
 }
 $shortEnglishSummary = @($validSummary)
-$shortEnglishSummary[0] = '- correctness: PASS — No error. 한글.'
+$shortEnglishSummary[0] = '- correctness: PASS: No error. 한글.'
 if (Test-StructuredReviewSummary -Summary ($shortEnglishSummary -join [Environment]::NewLine) -Score 5) {
     throw 'A short English summary with a two-syllable Hangul suffix was accepted.'
 }
@@ -411,7 +432,7 @@ $ioOutputPath = Join-Path $ioTempRoot 'native-stream.stdout.log'
 $ioErrorPath = Join-Path $ioTempRoot 'native-stream.stderr.log'
 $utf8ReviewPath = Join-Path $ioTempRoot 'review-no-bom.md'
 try {
-$utf8ReviewText = "review_summary:`n- correctness: PASS — 한글 검토 결과가 UTF-8로 유지됩니다."
+$utf8ReviewText = "review_summary:`n- correctness: PASS: 한글 검토 결과가 UTF-8로 유지됩니다."
 [System.IO.File]::WriteAllText($utf8ReviewPath, $utf8ReviewText, [System.Text.UTF8Encoding]::new($false))
 $decodedReviewText = Read-ToolOutput -Path $utf8ReviewPath
 if ($decodedReviewText -cne $utf8ReviewText) {
@@ -503,9 +524,19 @@ $global:LASTEXITCODE = 0
         FallbackReason = 'none'
         DecisionLabel = 'PASS'
         ScoreLabel = '5/5'
-        ReviewSummary = 'All required review checks passed.'
+        ReviewSummary = ''
         Findings = '- none'
     }
+    $reviewSummaryLines = @(
+        '- correctness: PASS: 코드 경로와 동작이 일치합니다.'
+        '- contract: PASS: 기존 API 계약을 유지합니다.'
+        '- tests: PASS: 변경 범위의 검증이 완료됐습니다.'
+        '- security: PASS: 보안 경계를 바꾸지 않습니다.'
+        '- maintainability: PASS: 책임이 명확하게 유지됩니다.'
+        '- score rationale: 5/5: 모든 항목에 구체적인 근거가 있습니다.'
+        '- conclusion: 변경은 검토 기준을 충족합니다.'
+    )
+    $reviewResult.ReviewSummary = $reviewSummaryLines[0] + "`r`n" + $reviewSummaryLines[1] + "`n" + $reviewSummaryLines[2] + "`r" + $reviewSummaryLines[3] + "`n" + $reviewSummaryLines[4] + "`r`n" + $reviewSummaryLines[5] + "`n" + $reviewSummaryLines[6]
 
     $matchingMarker = "<!-- jdsnack-review-result head:$headSha -->`n## JDSnack 리뷰 PASS"
     @(
@@ -515,6 +546,15 @@ $global:LASTEXITCODE = 0
         [pscustomobject]@{ id = 131; user = [pscustomobject]@{ login = 'silverThunder09' }; body = $matchingMarker }
     ) | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $passCommentFixture -Encoding utf8
     Publish-PassComment -Result $reviewResult -ReviewInputs $reviewInputs -BaseSha 'base-sha' -HeadSha $headSha
+    $publishedCommentPath = Join-Path $passCommentTempRoot 'pass-comment-220.md'
+    $publishedComment = [System.IO.File]::ReadAllText($publishedCommentPath, [System.Text.Encoding]::UTF8)
+    if ([regex]::IsMatch($publishedComment, '(?<!\r)\n|\r(?!\n)')) {
+        throw 'Published PASS comment contains mixed or non-Windows line endings.'
+    }
+    if ($publishedComment -notmatch 'correctness: PASS: 코드 경로와 동작이 일치합니다\.' -or
+        $publishedComment -match 'PASS \?') {
+        throw 'Published PASS comment did not preserve the canonical ASCII review-summary separator.'
+    }
     $updateCommands = @(Get-Content -LiteralPath $passCommentLog)
     if (-not ($updateCommands | Where-Object { $_ -match 'api\|-X\|PATCH\|repos/silverThunder09/jdsnack-agent-os-project/issues/comments/131\|-F\|body=@' })) {
         throw 'A same-author PASS comment for the current head was not updated in place.'

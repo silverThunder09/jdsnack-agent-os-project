@@ -572,13 +572,13 @@ function Test-StructuredReviewSummary {
         return $false
     }
     foreach ($rubricName in @('correctness', 'contract', 'tests', 'security', 'maintainability')) {
-        $rubricPattern = "^\s*(?:-\s+)?$($rubricName):\s+PASS\s+.{10,}$"
+        $rubricPattern = "^\s*(?:-\s+)?$($rubricName):\s+PASS:\s+.{10,}$"
         $rubricMatches = @($summaryLines | Where-Object { ([string]$_) -match $rubricPattern })
         if ($rubricMatches.Count -ne 1) {
             return $false
         }
     }
-    $scorePattern = "^\s*(?:-\s+)?score rationale:\s+$($Score)/5\s+.{10,}$"
+    $scorePattern = "^\s*(?:-\s+)?score rationale:\s+$($Score)/5:\s+.{10,}$"
     $scoreMatches = @($summaryLines | Where-Object { ([string]$_) -match $scorePattern })
     if ($scoreMatches.Count -ne 1) {
         return $false
@@ -831,6 +831,7 @@ $($Result.ReviewSummary)
 
 $($Result.Findings)
 "@
+    $commentBody = [regex]::Replace($commentBody, '\r\n?|\n', "`r`n")
     Set-Content -LiteralPath $commentPath -Value $commentBody -Encoding utf8
 
     $reviewLogin = & $ghPath api user --jq '.login' 2>&1 | Out-String
@@ -950,7 +951,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
-Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly seven non-empty lines: one line per rubric with "<rubric>: PASS — ..." for correctness, contract, tests, security, and maintainability, one "score rationale: <reported score>/5 — ..." line, and one "conclusion: ..." line. Each of these lines may be unbulleted or use a list marker consisting of a hyphen followed by at least one space; do not omit required fields or evidence. When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion. Do not repeat any scalar field or structured header.
+Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly seven non-empty lines: one line per rubric with "<rubric>: PASS: ..." for correctness, contract, tests, security, and maintainability, one "score rationale: <reported score>/5: ..." line, and one "conclusion: ..." line. Each of these lines may be unbulleted or use a list marker consisting of a hyphen followed by at least one space; do not omit required fields or evidence. When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion. Do not repeat any scalar field or structured header.
 
 The deterministic risk score and risk band are informational labels only. Review each supplied Security, Performance, Test Coverage, and Architecture label's matched paths. Risk must not change the review score or merge decision.
 Use PASS only when the change is safe and complete at score 4 or higher. Use COMMENT or REQUEST_CHANGES for unresolved findings, and NEEDS_HUMAN for ambiguous output, missing required evidence, or a service/permission boundary. A valid PASS with score 4 or higher is eligible for Squash auto-merge only after the current-head review and every required PR check pass.
@@ -1044,7 +1045,7 @@ risk: Light | Standard | High-risk
 findings:
 review_summary:
 
-Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly seven non-empty lines: one line per rubric with "<rubric>: PASS — ..." for correctness, contract, tests, security, and maintainability, one "score rationale: <reported score>/5 — ..." line, and one "conclusion: ..." line. Each of these lines may be unbulleted or use a list marker consisting of a hyphen followed by at least one space; do not omit required fields or evidence. When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion. Do not repeat any scalar field or structured header.
+Output contract: the findings body must be non-empty; use exactly "- none" or one or more lines beginning with exactly "- P0", "- P1", "- P2", or "- P3". For PASS, findings must be exactly "- none" or contain only P2/P3 items. For other decisions, P0/P1 items are allowed. The review_summary must contain exactly seven non-empty lines: one line per rubric with "<rubric>: PASS: ..." for correctness, contract, tests, security, and maintainability, one "score rationale: <reported score>/5: ..." line, and one "conclusion: ..." line. Each of these lines may be unbulleted or use a list marker consisting of a hyphen followed by at least one space; do not omit required fields or evidence. When findings contain P2 or P3 items, mention every present severity in the score rationale or conclusion. Do not repeat any scalar field or structured header.
 
 Reviewer model: $codexReviewModel
 Reviewer effort: $codexReviewEffort
