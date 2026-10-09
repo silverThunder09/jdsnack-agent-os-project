@@ -7,8 +7,8 @@ JDSnack에서 완료는 **문서, 테스트, 구현, 검증이 서로 맞물린 
 
 ## 역할 기준
 
-- 완료 판단, PR 리뷰, 머지 가능 여부 판단은 클로드가 담당합니다.
-- 코덱스는 구현 완료, 테스트 실행, 리뷰 기반 코드 수정 결과를 클로드가 판단할 수 있게 정리합니다.
+- Codex는 구현·테스트·리뷰 기반 수정 결과와 문서 연결을 정리하고, configured reviewer는 격리된 읽기 전용 환경에서 PR을 평가합니다.
+- 리뷰어 선택은 `scripts/review-policy.json`, 리뷰·병합 조건은 [리뷰 실행 규칙](../operations/review-backend-fallback.md)을 따릅니다. trusted approval job이 최신 SHA와 필수 게이트를 재확인한 뒤 Squash auto-merge를 큐에 넣습니다.
 
 ## 완료 체크리스트
 

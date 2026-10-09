@@ -7,8 +7,8 @@ PR은 코드 리뷰 요청이 아니라 **문서, 테스트, 구현이 일치하
 ## 실행 주체
 
 - PR 계획, 생성, 본문 작성, 리뷰 대응 판단은 클로드가 담당합니다.
-- 코덱스는 PR 규칙을 참고하되 PR 생성과 리뷰 판단을 직접 수행하지 않습니다.
-- 코덱스는 클로드 리뷰 결과를 바탕으로 코드 수정, 테스트, 자동 배포 지시가 있을 때만 실행합니다.
+- 코덱스는 구현·테스트·수정을 수행하며, 사용자가 PR 생성을 직접 요청한 경우 검증한 변경을 PR로 올릴 수 있습니다.
+- PR 리뷰는 `scripts/review-policy.json`의 configured reviewer가 격리된 읽기 전용 환경에서 수행합니다. 자동 병합은 [리뷰 실행 규칙](review-backend-fallback.md)의 trusted approval job이 담당합니다.
 
 ## 시작 분기
 
@@ -182,7 +182,7 @@ PR 본문은 [`.github/pull_request_template.md`](../../.github/pull_request_tem
 - CI 기준은 [ci-checklist.md](ci-checklist.md)를 따름
 - PR 자동 운영 루프는 [pr-automation-loop.md](pr-automation-loop.md)를 따름
 - PR 생성 후 자체 리뷰는 [pr-review-gate.md](pr-review-gate.md)를 따름
-- PR 생성 전 `bash scripts/pr-contract-test.sh <PR_NUMBER>`로 제목·커밋·본문·범위 계약을 통과시킴
+- PR 생성 후 `bash scripts/pr-contract-test.sh <PR_NUMBER>`로 제목·커밋·본문·범위 계약을 통과시킴
 
 ## PR 전 필수 검증 기준
 
@@ -191,7 +191,7 @@ PR 본문은 [`.github/pull_request_template.md`](../../.github/pull_request_tem
 - 변경 파일이 `PR 범위 경계`의 같은 PR 허용 조건 안에 있다.
 - CI/운영/템플릿/광범위한 문서 정리는 기능 PR과 분리되어 있다.
 - PR 제목과 작성자 커밋 summary가 Conventional Commits 형식이며 한국어이다. 자동 merge 커밋은 검사 대상에서 제외한다.
-- PR 본문·제목·커밋·범위 계약 검증이 `pr-contract-test.sh`에서 통과했다.
+- PR 본문·제목·커밋·범위 계약을 준비하고, 생성 후 `pr-contract-test.sh`를 통과시킨다.
 - `requirements.md`에 `REQ`가 존재한다.
 - `acceptance-criteria.md`에 `AC`가 존재한다.
 - `test-scenarios.md`에 `TC`가 존재한다.
@@ -199,7 +199,8 @@ PR 본문은 [`.github/pull_request_template.md`](../../.github/pull_request_tem
 - API 변경이 있으면 `api-spec.md`가 갱신되어 있다.
 - UI 변경이 있으면 `ui-spec.md` 또는 `test-scenarios.md`가 갱신되어 있다.
 - 문서/백엔드/프론트 변경 범위에 맞는 CI 체크리스트가 확인되어 있다.
-- `Light`는 작성자 확인과 관련 CI만 통과하면 된다.
+- 모든 위험도에서 configured reviewer의 PASS 4점 이상과 [리뷰 실행 규칙](review-backend-fallback.md)의 필수 게이트를 통과해야 자동 병합한다.
+- `Light`는 작성자 확인과 관련 CI를 수행한다.
 - `Standard`는 관련 테스트와 CI 검증이 완료되어야 한다.
 - `High-risk`는 `scripts/pr-review-gate.sh <PR_NUMBER>` 실행 계획이 있다.
 - Gemini API 또는 외부 API 사용 시 보안 영향이 확인되어 있다.

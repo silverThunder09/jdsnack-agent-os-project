@@ -203,6 +203,20 @@ case "$status" in
   needs_human)
     reason="$(printf '%s' "$decision_json" | "$JQ_BIN" -r '.reason // "unknown"')"
     notify_failure "$reason"
+    if [ "$reason" = "no_candidate_start_condition_satisfied" ]; then
+      printf '%s\n' '::notice title=JDSnack product decision required::No candidate start condition is satisfied. Work is stopped until an approved product signal arrives.'
+      if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+### JDSnack autonomous loop: product decision required
+
+- Status: `needs_human`
+- Reason: `no_candidate_start_condition_satisfied`
+- No Spec was promoted and no implementation was dispatched.
+- Resume through an approved product-signal Issue or a manual run after the queue conditions are satisfied.
+SUMMARY
+      fi
+      exit 0
+    fi
     exit 20
     ;;
 esac

@@ -22,7 +22,7 @@
 - `workflow-ci-test.sh`: GitHub Actions YAML과 PR Router·Feedback Detector 계약을 검사합니다.
 - `pr-feedback-workflow-test.sh`: repair 잡의 동시성 그룹 키와 `cancel-in-progress` 계약을 고정합니다.
 - `autonomous_spec_loop.py`: Spec 완료·승격·티켓 디스패치 결정을 결정론적으로 계산합니다.
-- `autonomous-spec-loop.sh`: GitHub 이벤트를 Spec 큐와 Claude/Codex 실행기로 연결합니다.
+- `autonomous-spec-loop.sh`: GitHub 이벤트를 Spec 큐와 Claude/Codex 실행기로 연결합니다. 후보 시작 조건 대기는 `needs_human`·notice·step summary와 종료 코드 0으로 보고하고 작업을 중단합니다. 나머지 차단·실행 오류는 종료 코드 20입니다.
 - `create-codex-worktree.sh`: 최신 `origin/main`에서 Codex worktree를 생성합니다.
 - `publish-codex-branch.sh`: stale `origin/main` 기준과 원격 SHA를 검증한 뒤 Codex 브랜치를 publish합니다.
 - `sync-main-checkout.sh`: 머지 후 변경 없는 primary `main` checkout만 `origin/main`으로 fast-forward합니다.

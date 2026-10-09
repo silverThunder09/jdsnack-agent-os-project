@@ -70,7 +70,7 @@ fallback_reason: codex-auth | codex-quota | null
 fallback_since: <ISO8601> | null
 fallback_approved: true | false
 active_reviewer: claude | codex-fallback
-review_fallback_reason: claude-auth | claude-subscription | claude-quota | claude-unavailable | null
+review_fallback_reason: claude-auth | claude-subscription | claude-quota | claude-unavailable | claude-invalid-structured-result | null
 ```
 
-`claude-invalid-output`과 분류되지 않은 실행 오류는 fallback reason이 아니라 `needs-human` 사유입니다.
+Claude의 실행 오류·구조화 결과 누락/오류는 Codex 리뷰 fallback 사유입니다. Codex의 실행 실패·구조화 결과 오류는 `needs-human` 사유입니다. 실제 reviewer와 전환 사유를 함께 기록합니다.

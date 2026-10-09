@@ -46,6 +46,8 @@ grep -Fq -- 'Convert-ToWslPath' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must validate WSL path conversion results' >&2; exit 1; }
 grep -Fq -- 'wsl.exe bash -lc' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must invoke Bash through WSL explicitly' >&2; exit 1; }
+grep -Fq -- 'GITHUB_STEP_SUMMARY/p' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must translate the step summary path into WSL' >&2; exit 1; }
 grep -Fq -- 'bash scripts/autonomous-spec-loop.sh' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must invoke the coordinator script' >&2; exit 1; }
 if grep -Fq -- '        shell: bash' "$AUTONOMOUS_WORKFLOW"; then
