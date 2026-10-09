@@ -284,7 +284,12 @@ if (Test-StructuredReviewSummary -Summary ($questionMarkSeparatorSummary -join [
     throw 'A rubric line with a question-mark separator was accepted.'
 }
 $emDashSeparatorSummary = @($validSummary)
-$emDashSeparatorSummary[0] = $emDashSeparatorSummary[0].Replace('PASS:', 'PASS —')
+$emDashSeparator = [string][char]0x2014
+$emDashSeparatorSummary[0] = $emDashSeparatorSummary[0].Replace('PASS:', "PASS $emDashSeparator")
+if (-not $emDashSeparatorSummary[0].Contains("PASS $emDashSeparator ") -or
+    $emDashSeparatorSummary[0].Contains('PASS ?')) {
+    throw 'The em-dash separator fixture did not contain U+2014.'
+}
 if (Test-StructuredReviewSummary -Summary ($emDashSeparatorSummary -join [Environment]::NewLine) -Score 5) {
     throw 'A rubric line with a non-contract separator was accepted.'
 }
