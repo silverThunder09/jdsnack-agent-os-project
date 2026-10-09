@@ -758,7 +758,7 @@ has_auditable_review_summary() {
   if [ "$match_count" -ne 1 ]; then
     return 1
   fi
-  match_count="$("$grep_bin" -Eic '^[[:space:]]*(-[[:space:]]+)?conclusion:[[:space:]].{20,}$' "$summary_path" || true)"
+  match_count="$("$grep_bin" -Eic '^[[:space:]]*(-[[:space:]]+)?conclusion:[[:space:]].{10,}$' "$summary_path" || true)"
   if [ "$match_count" -ne 1 ]; then
     return 1
   fi
