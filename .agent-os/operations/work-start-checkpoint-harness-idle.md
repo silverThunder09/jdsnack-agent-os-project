@@ -8,7 +8,7 @@
 - 판단 이유: 자동 디스패치 허용 조건과 리뷰·병합 게이트는 유지합니다.
 
 ## Change Scope
-- 이번 작업에서 바꾸는 것: 기본 리뷰어·위험도·PR 역할의 문서 드리프트, 정상 제품 판단 대기의 CI 결과와 표시, 회귀 테스트.
+- 이번 작업에서 바꾸는 것: 기본 리뷰어·위험도·PR 역할의 문서 드리프트, 정상 제품 판단 대기의 CI 결과와 표시, 실제 publish/pre-push 브랜치 ref 계약, 회귀 테스트.
 - 이번 작업에서 바꾸지 않는 것: 서비스 API/UI, 제품 큐 조건, branch protection, reviewer 모델 배정.
 
 ## Read Scope
@@ -20,7 +20,7 @@
 - 예외적으로만 확인할 범위: 실패 원인과 연결된 특정 로그.
 
 ## Test Plan
-- 로컬 테스트: 정상 대기 exit 20 재현 후 exit 0·notice·summary·무디스패치 확인, 오류 exit 20 유지, Docs Harness·Workflow CI.
+- 로컬 테스트: 정상 대기 exit 20 재현 후 exit 0·notice·summary·무디스패치 확인, 오류 exit 20 유지, 실제 Git pre-push 브랜치 ref 전달·대상 브랜치 불일치 차단·원격 SHA 확인, Docs Harness·Workflow CI.
 - 수동 검증: 최신 main의 실제 GitHub 보호 규칙·runner·최근 실패 원인 확인.
 - CI 기대 항목: Validate PR contract, Validate Agent OS docs, Workflow CI contract, PR CI Gate, Codex review.
 

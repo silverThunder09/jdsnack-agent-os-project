@@ -49,6 +49,18 @@ esac
 printf 'published change\n' >> "$TEST_ROOT/work/state.txt"
 git -C "$TEST_ROOT/work" add state.txt
 git -C "$TEST_ROOT/work" commit -qm published
+mkdir -p "$TEST_ROOT/hooks"
+cat > "$TEST_ROOT/hooks/pre-push" <<'EOF'
+#!/bin/sh
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$local_ref" in
+        refs/heads/*) ;;
+        *) echo "ERROR: branch push requires a local branch ref: $local_ref" >&2; exit 1 ;;
+    esac
+done
+EOF
+chmod +x "$TEST_ROOT/hooks/pre-push"
+git -C "$TEST_ROOT/work" config core.hooksPath "$TEST_ROOT/hooks"
 output="$(CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/example --base-sha "$base_sha")"
 assert_eq 0 "$?" "publish exit code"
 case "$output" in
@@ -62,6 +74,17 @@ esac
 remote_sha="$(git -C "$TEST_ROOT/work" ls-remote origin refs/heads/codex/example | awk 'NR == 1 { print $1 }')"
 local_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
 assert_eq "$local_sha" "$remote_sha" "remote SHA"
+
+set +e
+mismatched_output="$(CODEX_PUSH_ATTEMPTS=1 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/other 2>&1)"
+mismatched_code=$?
+set -e
+assert_eq 20 "$mismatched_code" "mismatched branch exit code"
+case "$mismatched_output" in
+    *"worktree branch does not match publish branch"*) ;;
+    *) printf 'FAIL: mismatched branch output (%s)\n' "$mismatched_output" >&2; exit 1 ;;
+esac
+test -z "$(git -C "$TEST_ROOT/work" ls-remote origin refs/heads/codex/other)"
 
 git -C "$TEST_ROOT/work" switch -q -c main
 printf 'remote main advanced\n' >> "$TEST_ROOT/work/state.txt"
