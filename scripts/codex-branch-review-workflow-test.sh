@@ -196,12 +196,12 @@ grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-p
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
-grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 실행에 필요한 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 로그인 캐시 권한 검증을 위한 host 도구를 확인하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push에서 사용할 Git Bash 실행 경로를 명시적으로 확인하지 않습니다.'
 grep -Fq -- 'git config --local jdsnack.hookBash "$git_bash_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 검증한 Bash 실행 경로를 로컬 설정에 고정하지 않습니다.'
-grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat jq codex cat; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex cat; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push 실행에 필요한 전체 host 도구를 확인하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(git config --local --get jdsnack.hookBash || true)"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 설치 시 검증된 Git Bash 경로를 읽지 않습니다.'
@@ -213,6 +213,14 @@ grep -Fq -- 'PowerShell-only fallback runtime was not selected when pwsh was una
   || fail '위험도 계약 테스트가 powershell.exe 대체 실행기를 검증하지 않습니다.'
 [[ -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" ]] \
   || fail '임시 ACL 재분석 지점 계약 테스트가 없습니다.'
+[[ -f "$ROOT_DIR/scripts/verify-codex-auth-permissions-test.ps1" ]] \
+  || fail 'Codex 로그인 캐시 ACL 회귀 테스트가 없습니다.'
+[[ -f "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" ]] \
+  || fail 'Codex 로그인 캐시 ACL 검증기가 없습니다.'
+[[ -f "$ROOT_DIR/scripts/codex-auth-permissions.ps1" ]] \
+  || fail 'Codex 로그인 캐시 ACL 규칙 모듈이 없습니다.'
+grep -Fq -- 'verify-codex-auth-permissions.ps1' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'Windows pre-push가 Codex 로그인 캐시 ACL을 검사하지 않습니다.'
 [[ -f "$ROOT_DIR/scripts/review-path-safety.ps1" ]] \
   || fail '공유 경로 안전성 검증기가 없습니다.'
 grep -Fq -- "(Join-Path \$PSScriptRoot 'review-path-safety.ps1')" "$ROOT_DIR/scripts/secure-review-temp-acl.ps1" \
@@ -278,6 +286,10 @@ grep -Fq -- '--ignore-user-config' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || 
 grep -Fq -- 'CODEX_HOME= HOME="$implicit_user_home" run_review >/dev/null' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
   || fail 'pre-push 계약 테스트가 기존 사용자 로그인 캐시의 자동 재사용을 검증하지 않습니다.'
 grep -Fq -- 'review_lock_dir="$codex_home_dir/.review-lock"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 동시 reviewer 실행을 직렬화하지 않습니다.'
+grep -Fq -- 'CODEX_HOME 소유자나 권한이 사용자 전용이 아닙니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'POSIX pre-push가 Codex 로그인 캐시의 과도한 접근 권한을 거부하지 않습니다.'
+grep -Fq -- 'Codex auth.json 소유자나 권한이 사용자 전용이 아닙니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'POSIX pre-push가 auth.json의 과도한 접근 권한을 거부하지 않습니다.'
 if grep -Eq -- 'CODEX_AUTH_FILE|codex_auth_source|review-fallback/auth.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push가 별도 인증 파일이나 stale reviewer 인증 복사본을 사용합니다.'
 fi

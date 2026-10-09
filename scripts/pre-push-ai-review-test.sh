@@ -33,10 +33,14 @@ git_bash_path="$(command -v bash)"
 [ -n "$git_bash_path" ] || fail 'hook entrypoint 검증에 사용할 Bash를 찾지 못했습니다.'
 git -C "$test_worktree" config --local jdsnack.hookBash "$git_bash_path"
 # git clone intentionally excludes uncommitted source edits, so include the
-# current hook implementation and reviewer settings in the disposable fixture.
+# current hook implementation, auth ACL verifier, and reviewer settings in the disposable fixture.
 cp "$ROOT_DIR/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
+cp "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" "$test_worktree/scripts/verify-codex-auth-permissions.ps1"
+cp "$ROOT_DIR/scripts/codex-auth-permissions.ps1" "$test_worktree/scripts/codex-auth-permissions.ps1"
+cp "$ROOT_DIR/scripts/review-path-safety.ps1" "$test_worktree/scripts/review-path-safety.ps1"
 cp "$ROOT_DIR/backends.json" "$test_worktree/backends.json"
-git -C "$test_worktree" add scripts/pre-push-ai-review.sh backends.json
+git -C "$test_worktree" add scripts/pre-push-ai-review.sh scripts/verify-codex-auth-permissions.ps1 \
+  scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1 backends.json
 if ! git -C "$test_worktree" diff --cached --quiet; then
   git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com \
     commit --quiet -m 'test: isolate current pre-push hook fixture'
@@ -420,6 +424,37 @@ assert_malformed_duplicate_scalar_headers_rejected
 if [ "${JDSNACK_PRE_PUSH_TEST_CASE-}" = 'malformed-duplicate-headers' ]; then
   echo 'Malformed duplicate scalar headers are rejected'
   exit 0
+fi
+
+assert_unsafe_codex_home_rejected() {
+  local unsafe_home="$1"
+  local expected_error="$2"
+  local output
+  local status
+
+  rm -f "$fake_root/codex.invoked"
+  set +e
+  output="$(CODEX_HOME="$unsafe_home" run_review 2>&1)"
+  status=$?
+  set -e
+  if [ "$status" -eq 0 ] || ! grep -Fq "$expected_error" <<< "$output" || [ -e "$fake_root/codex.invoked" ]; then
+    printf '%s\n' "$output" >&2
+    fail 'Codex 로그인 캐시 또는 auth.json 권한이 느슨한 경우 pre-push가 reviewer 실행 전에 차단하지 않았습니다.'
+  fi
+}
+
+if [ -z "$test_cygpath_bin" ]; then
+  insecure_home="$fake_root/insecure-codex-home"
+  mkdir -p "$insecure_home"
+  chmod 755 "$insecure_home"
+  assert_unsafe_codex_home_rejected "$insecure_home" 'CODEX_HOME 소유자나 권한이 사용자 전용이 아닙니다.'
+
+  insecure_auth_home="$fake_root/insecure-auth-home"
+  mkdir -p "$insecure_auth_home"
+  chmod 700 "$insecure_auth_home"
+  printf '%s\n' 'test fixture only' > "$insecure_auth_home/auth.json"
+  chmod 644 "$insecure_auth_home/auth.json"
+  assert_unsafe_codex_home_rejected "$insecure_auth_home" 'Codex auth.json 소유자나 권한이 사용자 전용이 아닙니다.'
 fi
 
 ancestor_codex_home="$fixture_root"

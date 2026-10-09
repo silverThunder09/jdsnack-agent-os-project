@@ -18,7 +18,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm chmod mktemp jq codex; do
+for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex; do
   require_host_tool "$tool"
 done
 require_host_tool cat
@@ -164,6 +164,47 @@ if command -v cygpath >/dev/null 2>&1; then
     exit 1
   fi
 fi
+
+verify_codex_auth_permissions() {
+  local auth_path="$codex_home_dir/auth.json"
+  if command -v cygpath >/dev/null 2>&1; then
+    local windows_home_path
+    local windows_script_path
+    windows_home_path="$(cygpath -w "$codex_home_base")" || return 1
+    windows_script_path="$(cygpath -w "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1")" || return 1
+    MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_home_path"
+    return $?
+  fi
+
+  local current_uid
+  local home_owner
+  local home_mode
+  local auth_owner
+  local auth_mode
+  local auth_links
+  current_uid="$("$id_bin" -u)" || return 1
+  home_owner="$("$stat_bin" -c '%u' -- "$codex_home_dir")" || return 1
+  home_mode="$("$stat_bin" -c '%a' -- "$codex_home_dir")" || return 1
+  if [ "$home_owner" != "$current_uid" ] || [[ ! "$home_mode" =~ ^[0-7]+$ ]] || (( (8#$home_mode & 077) != 0 )); then
+    echo "ERROR: CODEX_HOME 소유자나 권한이 사용자 전용이 아닙니다. 다른 사용자 접근 권한을 제거한 뒤 재시도하세요." >&2
+    return 1
+  fi
+
+  if [ -e "$auth_path" ] || [ -L "$auth_path" ]; then
+    if [ -L "$auth_path" ] || [ ! -f "$auth_path" ]; then
+      echo "ERROR: Codex auth.json은 심볼릭 링크가 아닌 일반 파일이어야 합니다." >&2
+      return 1
+    fi
+    auth_owner="$("$stat_bin" -c '%u' -- "$auth_path")" || return 1
+    auth_mode="$("$stat_bin" -c '%a' -- "$auth_path")" || return 1
+    auth_links="$("$stat_bin" -c '%h' -- "$auth_path")" || return 1
+    if [ "$auth_owner" != "$current_uid" ] || [ "$auth_links" != '1' ] ||
+      [[ ! "$auth_mode" =~ ^[0-7]+$ ]] || (( (8#$auth_mode & 077) != 0 )); then
+      echo "ERROR: Codex auth.json 소유자나 권한이 사용자 전용이 아닙니다. 다른 사용자 접근 권한을 제거한 뒤 재시도하세요." >&2
+      return 1
+    fi
+  fi
+}
 
 base_ref="${JDSNACK_REVIEW_BASE_REF:-origin/main}"
 if [ "$base_ref" != "origin/main" ]; then
@@ -416,6 +457,10 @@ if [ -z "$codex_home_base" ] || [ ! -d "$codex_home_base" ]; then
   echo "ERROR: Codex CLI 홈 디렉터리가 없습니다." >&2
   exit 1
 fi
+if ! command -v cygpath >/dev/null 2>&1 && [ -L "$codex_home_base" ]; then
+  echo "ERROR: Codex CLI 홈 디렉터리는 심볼릭 링크일 수 없습니다." >&2
+  exit 1
+fi
 codex_auth_home_root="$(cd "$codex_home_base" && pwd -P)"
 repo_root_real="$(cd "$ROOT_DIR" && pwd -P)"
 codex_auth_home_comparison="$codex_auth_home_root"
@@ -449,8 +494,13 @@ if path_is_within_or_equal "$codex_auth_home_comparison" "$repo_root_comparison"
   exit 1
 fi
 
-# Reuse the login cache shared by the Codex app and CLI.
 codex_home_dir="$codex_auth_home_root"
+if ! verify_codex_auth_permissions; then
+  echo "ERROR: Codex 로그인 캐시 권한 검증에 실패해 pre-push 리뷰를 중단합니다." >&2
+  exit 1
+fi
+
+# Reuse the login cache shared by the Codex app and CLI.
 review_lock_dir="$codex_home_dir/.review-lock"
 if ! mkdir "$review_lock_dir" 2>/dev/null; then
   echo "ERROR: Codex reviewer가 다른 리뷰에서 사용 중이거나 이전 실행의 lock이 남았습니다: $review_lock_dir" >&2
