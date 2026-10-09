@@ -196,7 +196,7 @@ grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-p
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
-grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 실행에 필요한 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 실행에 필요한 host 도구를 확인하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push에서 사용할 Git Bash 실행 경로를 명시적으로 확인하지 않습니다.'
 grep -Fq -- 'git config --local jdsnack.hookBash "$git_bash_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
@@ -272,21 +272,16 @@ grep -Fq -- 'reviewer_entry="$codex_bin"' "$ROOT_DIR/scripts/pre-push-ai-review.
 grep -Fq -- 'runtime_dependency="${0%/*}/codex-runtime.sh"' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" || fail 'pre-push fixture가 Codex sibling runtime 의존성을 검증하지 않습니다.'
 grep -Fq -- 'reviewer_entry="$codex_bin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 Codex 실행 파일의 설치 경로를 보존하지 않습니다.'
 grep -Fq -- 'review_env_args=(' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
-grep -Fq -- '"CODEX_HOME=$codex_home_arg"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 전용 CODEX_HOME을 고정하지 않습니다.'
-grep -Fq -- 'codex_home_dir="$codex_auth_home_root/review-fallback"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 사용자 설정과 분리된 reviewer 인증 홈을 사용하지 않습니다.'
-if grep -Fq -- 'codex_auth_source="$HOME/.codex/auth.json"' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
-    fail 'pre-push가 명시적 CODEX_HOME/CODEX_AUTH_FILE 없이 기본 사용자 auth를 암묵적으로 복사합니다.'
+grep -Fq -- '"CODEX_HOME=$codex_home_arg"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 Codex 로그인 캐시를 고정하지 않습니다.'
+grep -Fq -- 'codex_home_dir="$codex_auth_home_root"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 Codex 앱과 공유하는 로그인 캐시를 사용하지 않습니다.'
+grep -Fq -- '--ignore-user-config' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 사용자 설정을 무시하지 않습니다.'
+grep -Fq -- 'CODEX_HOME= HOME="$implicit_user_home" run_review >/dev/null' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
+  || fail 'pre-push 계약 테스트가 기존 사용자 로그인 캐시의 자동 재사용을 검증하지 않습니다.'
+grep -Fq -- 'review_lock_dir="$codex_home_dir/.review-lock"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 동시 reviewer 실행을 직렬화하지 않습니다.'
+if grep -Eq -- 'CODEX_AUTH_FILE|codex_auth_source|review-fallback/auth.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
+    fail 'pre-push가 별도 인증 파일이나 stale reviewer 인증 복사본을 사용합니다.'
 fi
-grep -Fq -- 'set CODEX_HOME or CODEX_AUTH_FILE once to seed' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
-  || fail 'pre-push가 reviewer sidecar 최초 seed 경로를 명시적으로 요구하지 않습니다.'
-grep -Fq -- '명시적 인증 seed 없이 Codex reviewer 인증 홈을 만들거나 실행했습니다.' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
-  || fail 'pre-push 계약 테스트가 암묵적 사용자 인증 seed를 차단하지 않습니다.'
-grep -Fq -- 'codex_auth_lock_dir="$codex_home_dir/.review-lock"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 동시 reviewer 인증 갱신을 직렬화하지 않습니다.'
-grep -Fq -- "codex_auth_link_count=" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 인증 파일의 hard link를 차단하지 않습니다.'
 grep -Fq -- 'current_source_ref_sha=' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 리뷰 후 push source ref를 재검증하지 않습니다.'
-if grep -Fq -- 'sync_refreshed_codex_auth' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
-    fail 'pre-push가 갱신 토큰을 사용자 원본 인증 파일에 되쓰는 경로를 유지합니다.'
-fi
 grep -Fq -- '"TMPDIR=$codex_tmp_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 임시 디렉터리 기반 환경을 고정하지 않습니다.'
 grep -Fq -- 'windows_root=' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 Windows 런타임 루트를 확인하지 않습니다.'
 grep -Fq -- 'SystemRoot=$windows_root' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 SystemRoot를 격리 환경에 전달하지 않습니다.'

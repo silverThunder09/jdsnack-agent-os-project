@@ -19,10 +19,6 @@ git clone --quiet --no-checkout "$ROOT_DIR" "$test_repo"
 git -C "$test_repo" checkout --quiet -B codex/pre-push-empty-diff "$base_sha"
 git -C "$test_repo" remote set-url origin "$canonical_origin_url"
 git -C "$test_repo" update-ref refs/remotes/origin/main "$base_sha"
-printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"synthetic-access","refresh_token":"synthetic-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account"}' \
-  > "$fake_codex_home/auth.json"
-chmod 600 "$fake_codex_home/auth.json"
-
 cat > "$fake_bin/codex" <<'FAKE_CODEX'
 #!/bin/sh
 printf '%s\n' invoked > "${0%/*}/invoked"
@@ -37,7 +33,6 @@ empty_diff_output="$(
     "$base_sha" '0000000000000000000000000000000000000000' \
     | PATH="$fake_bin:$PATH" \
       CODEX_HOME="$fake_codex_home" \
-      CODEX_AUTH_FILE="$fake_codex_home/auth.json" \
       JDSNACK_REVIEW_BASE_REF=origin/main \
       bash "$ROOT_DIR/scripts/pre-push-ai-review.sh" origin "$canonical_origin_url" 2>&1
 )"
