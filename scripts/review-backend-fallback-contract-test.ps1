@@ -293,13 +293,31 @@ $validKoreanFinding = '- P2 — UTF-8 결과가 정상적으로 저장됩니다.
 if (-not (Test-StructuredFindings -Findings $validKoreanFinding -Decision 'COMMENT')) {
     throw 'A Korean finding with a supported technical term was rejected.'
 }
+$validKoreanTechnicalFinding = '- P2 — Controller에서 DTO mapping을 수행합니다.'
+if (-not (Test-StructuredFindings -Findings $validKoreanTechnicalFinding -Decision 'COMMENT')) {
+    throw 'A Korean finding with ordinary English technical terms was rejected.'
+}
 $englishHeavyFinding = '- P2 — The output is valid and all checks passed. 한글.'
 if (Test-StructuredFindings -Findings $englishHeavyFinding -Decision 'COMMENT') {
     throw 'An English-dominant finding with a Hangul suffix was accepted.'
 }
+$shortEnglishFinding = '- P2 — No error. 한글.'
+if (Test-StructuredFindings -Findings $shortEnglishFinding -Decision 'COMMENT') {
+    throw 'A short English finding with a two-syllable Hangul suffix was accepted.'
+}
 $garbledFinding = '- P2 — 寃쎈맂 경로가 수정되었습니다.'
 if (Test-StructuredFindings -Findings $garbledFinding -Decision 'COMMENT') {
     throw 'A mixed CJK and Hangul finding was accepted.'
+}
+$koreanTechnicalSummary = @($validSummary)
+$koreanTechnicalSummary[0] = '- correctness: PASS — Controller에서 DTO mapping을 수행합니다.'
+if (-not (Test-StructuredReviewSummary -Summary ($koreanTechnicalSummary -join [Environment]::NewLine) -Score 5)) {
+    throw 'A Korean summary line with ordinary English technical terms was rejected.'
+}
+$shortEnglishSummary = @($validSummary)
+$shortEnglishSummary[0] = '- correctness: PASS — No error. 한글.'
+if (Test-StructuredReviewSummary -Summary ($shortEnglishSummary -join [Environment]::NewLine) -Score 5) {
+    throw 'A short English summary with a two-syllable Hangul suffix was accepted.'
 }
 
 $validReview = @(
