@@ -59,8 +59,7 @@ fi
 pr_title="$(gh_pr_view "title" --json title --template '{{.title}}')"
 pr_body="$(gh_pr_view "body" --json body --template '{{.body}}')"
 files="$(gh_pr_view "files" --json files --jq '.files[].path')"
-commit_pages="$(gh_api "commit metadata" "repos/{owner}/{repo}/pulls/$PR_NUMBER/commits" --paginate --slurp)"
-commits="$(jq -r '.[] | .[] | select((.parents | length) < 2) | .commit.message | split("\n")[0]' <<< "$commit_pages")"
+commits="$(gh_api "commit metadata" "repos/{owner}/{repo}/pulls/$PR_NUMBER/commits" --paginate --jq '.[] | select((.parents | length) < 2) | .commit.message | split("\n")[0]')"
 
 errors=()
 warnings=()

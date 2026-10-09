@@ -25,8 +25,16 @@ gh() {
     *"--json files --jq"*)
       printf '%s\n' "$GH_FIXTURE_FILES"
       ;;
-    *"repos/{owner}/{repo}/pulls/"*"/commits --paginate --slurp"*)
-      printf '%s\n' "$GH_FIXTURE_COMMIT_PAGES"
+    *"repos/{owner}/{repo}/pulls/"*"/commits --paginate --jq"*)
+      case "$*" in
+        *"select((.parents | length) < 2)"*)
+          printf '%s\n' "$GH_FIXTURE_API_COMMITS"
+          ;;
+        *)
+          echo "PR commit query must exclude Git-generated merge commits: $*" >&2
+          return 2
+          ;;
+      esac
       ;;
     *)
       echo "unexpected fake gh call: $*" >&2
@@ -41,6 +49,7 @@ set_common_fixture() {
   GH_FIXTURE_MODE=""
   GH_FIXTURE_TITLE="feat(harness): 계약 검사 실행 테스트"
   GH_FIXTURE_COMMITS="feat(harness): 계약 검사 실행 테스트"
+  GH_FIXTURE_API_COMMITS="$GH_FIXTURE_COMMITS"
   GH_FIXTURE_FILES="docs/harness.md"
   GH_FIXTURE_BODY="$(cat <<'BODY'
 ## 배경 · 문제
@@ -107,7 +116,7 @@ run_case() {
       ;;
     merge_commit)
       GH_FIXTURE_COMMITS=$'feat(harness): 계약 검사 실행 테스트\nMerge remote-tracking branch origin/main into codex/harness'
-      GH_FIXTURE_COMMIT_PAGES="$(jq -cn --arg message 'feat(harness): 계약 검사 실행 테스트' '[[{commit:{message:$message},parents:[{sha:"parent"}]},{commit:{message:"Merge remote-tracking branch origin/main into codex/harness"},parents:[{sha:"parent-a"},{sha:"parent-b"}]}]]')"
+      GH_FIXTURE_API_COMMITS="feat(harness): 계약 검사 실행 테스트"
       ;;
     prose_tbd)
       GH_FIXTURE_BODY="$GH_FIXTURE_BODY
@@ -176,10 +185,10 @@ run_case() {
   esac
 
   if [ "$name" != "merge_commit" ]; then
-    GH_FIXTURE_COMMIT_PAGES="$(jq -cn --arg message "$GH_FIXTURE_COMMITS" '[[{commit:{message:$message},parents:[{sha:"parent"}]}]]')"
+    GH_FIXTURE_API_COMMITS="$GH_FIXTURE_COMMITS"
   fi
 
-  export GH_FIXTURE_MODE GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_COMMIT_PAGES GH_FIXTURE_FILES GH_FIXTURE_BODY
+  export GH_FIXTURE_MODE GH_FIXTURE_TITLE GH_FIXTURE_COMMITS GH_FIXTURE_API_COMMITS GH_FIXTURE_FILES GH_FIXTURE_BODY
   set +e
   output="$(bash "$CONTRACT_SCRIPT" 999 2>&1)"
   actual_status=$?
