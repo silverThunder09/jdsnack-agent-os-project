@@ -11,10 +11,53 @@ fail() {
     exit 1
 }
 
+contract_failures=()
+
+record_contract_failure() {
+    contract_failures+=("$1")
+}
+
+assert_file_contains() {
+    local file="$1"
+    local expected="$2"
+    local description="$3"
+
+    if ! grep -Fq -- "$expected" "$file"; then
+        record_contract_failure "$description: $expected ($file)"
+    fi
+}
+
+report_contract_failures() {
+    if ((${#contract_failures[@]} == 0)); then
+        return 0
+    fi
+
+    printf 'FAIL: %d CI contract assertion(s) failed:\n' "${#contract_failures[@]}" >&2
+    printf '  - %s\n' "${contract_failures[@]}" >&2
+    return 1
+}
+
+test_contract_failure_aggregation() {
+    contract_failures=()
+    assert_file_contains '/dev/null' 'first missing contract' 'fixture'
+    assert_file_contains '/dev/null' 'second missing contract' 'fixture'
+
+    local report
+    if report="$(report_contract_failures 2>&1)"; then
+        fail 'CI contract diagnostics unexpectedly passed with missing contracts.'
+    fi
+    [[ "$report" == *'2 CI contract assertion(s) failed'* ]] \
+        || fail 'CI contract diagnostics did not report the total missing assertion count.'
+    [[ "$report" == *'first missing contract'* && "$report" == *'second missing contract'* ]] \
+        || fail 'CI contract diagnostics did not include every missing assertion.'
+
+    contract_failures=()
+}
+
+test_contract_failure_aggregation
+
 assert_contains() {
-    local expected="$1"
-    grep -Fq -- "$expected" "$WORKFLOW" \
-        || fail "codex branch review workflow에 다음 계약이 없습니다: $expected"
+    assert_file_contains "$WORKFLOW" "$1" 'Codex branch review workflow contract is missing'
 }
 
 assert_not_contains() {
@@ -49,6 +92,7 @@ assert_contains "    needs: [run_review]"
 assert_contains "    if: needs.run_review.result == 'success'"
 assert_contains "      contents: write"
 assert_contains "      pull-requests: write"
+# Keep GitHub `${{ ... }}` expressions single-quoted so Bash does not expand them.
 assert_contains '      pr_number: ${{ steps.resolve.outputs.pr_number }}'
 assert_contains '      base_sha: ${{ steps.resolve.outputs.base_sha }}'
 assert_contains '      head_sha: ${{ steps.resolve.outputs.head_sha }}'
@@ -399,8 +443,7 @@ for fallback_contract in \
     'ReviewSubmissionAttempted' \
     'Complete-ReviewDecision' \
     'Claude invocation failed:'; do
-    grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
-        || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
+    assert_file_contains "$FALLBACK_SCRIPT" "$fallback_contract" 'Codex review fallback script contract is missing'
 done
 fallback_classifier_line="$(grep -nF -- 'function Get-ClaudeFallbackReason' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" | cut -d: -f1)"
@@ -643,8 +686,7 @@ for skill_contract in \
     '현재 실행의 review check도 GitHub가 SUCCESS/pass로 완료한 경우에만 인정하며' \
     'check-run의 `head_sha`·`external_id`가 현재 PR head와 일치하는지 확인합니다.' \
     'Codex는 구현·테스트와 현재 기본 PR 리뷰'; do
-    grep -Fq -- "$skill_contract" "$CLAUDE_SKILL" \
-        || fail "review-loop 스킬에 다음 리뷰·머지 계약이 없습니다: $skill_contract"
+    assert_file_contains "$CLAUDE_SKILL" "$skill_contract" 'review-loop skill contract is missing'
 done
 if grep -Fq -- 'gh pr review <N> --approve' "$CLAUDE_SKILL" || grep -Fq -- 'gh pr merge <N>' "$CLAUDE_SKILL"; then
     fail 'The review skill must defer automatic approval to its gated dependent job.'
@@ -663,8 +705,7 @@ for review_check_contract in \
     'name = '\''review'\''' \
     'needs: [run_review, publish_review_check]' \
     "if: needs.run_review.result == 'success' && needs.publish_review_check.result == 'success'"; do
-    grep -Fq -- "$review_check_contract" "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
-        || fail "PR head review-check publisher contract is missing: $review_check_contract"
+    assert_file_contains "$ROOT_DIR/.github/workflows/codex-branch-review.yml" "$review_check_contract" 'PR head review-check publisher contract is missing'
 done
 grep -Fq -- 'Get-ReviewCheckRunsForHead -ExpectedHeadSha $HeadSha' "$ROOT_DIR/scripts/complete-review-approval.ps1" \
     || fail 'Approval must verify review check metadata on the exact current PR head SHA.'
@@ -679,4 +720,5 @@ if grep -Eq '^  review:$' "$ROOT_DIR/.github/workflows/codex-branch-review.yml";
     fail 'The reviewer job must not share the required review check name with the PR-head check publisher.'
 fi
 
+report_contract_failures || exit 1
 printf 'Codex branch review workflow contract passed\n'
