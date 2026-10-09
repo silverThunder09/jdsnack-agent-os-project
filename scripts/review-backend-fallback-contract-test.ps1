@@ -248,6 +248,15 @@ $validSummary = @(
 if (-not (Test-StructuredReviewSummary -Summary ($validSummary -join [Environment]::NewLine) -Score 5)) {
     throw 'A valid seven-line review summary was rejected.'
 }
+$emDash = [string][char]0x2014
+$colonSummary = @($validSummary)
+if (-not (Test-StructuredReviewSummary -Summary ($colonSummary -join [Environment]::NewLine) -Score 5)) {
+    throw 'A valid seven-line review summary using ASCII colon separators was rejected.'
+}
+$questionMarkSummary = @($validSummary | ForEach-Object { ([string]$_).Replace('PASS:', 'PASS ?').Replace('/5:', '/5 ?') })
+if (-not $questionMarkSummary[0].Contains('?') -or (Test-StructuredReviewSummary -Summary ($questionMarkSummary -join [Environment]::NewLine) -Score 5)) {
+    throw 'A review summary using question-mark separators was accepted.'
+}
 $unbulletedSummary = @($validSummary | ForEach-Object { ([string]$_) -replace '^\s*-\s*', '' })
 if (-not (Test-StructuredReviewSummary -Summary ($unbulletedSummary -join [Environment]::NewLine) -Score 5)) {
     throw 'A valid seven-line review summary without bullet prefixes was rejected.'
@@ -283,15 +292,14 @@ $questionMarkSeparatorSummary[0] = $questionMarkSeparatorSummary[0].Replace('PAS
 if (Test-StructuredReviewSummary -Summary ($questionMarkSeparatorSummary -join [Environment]::NewLine) -Score 5) {
     throw 'A rubric line with a question-mark separator was accepted.'
 }
-$emDashSeparatorSummary = @($validSummary)
+$emDashSeparatorSummary = @($validSummary | ForEach-Object { ([string]$_).Replace('PASS:', "PASS $emDash").Replace('/5:', "/5 $emDash") })
 $emDashSeparator = [string][char]0x2014
-$emDashSeparatorSummary[0] = $emDashSeparatorSummary[0].Replace('PASS:', "PASS $emDashSeparator")
 if (-not $emDashSeparatorSummary[0].Contains("PASS $emDashSeparator ") -or
-    $emDashSeparatorSummary[0].Contains('PASS ?')) {
+    -not $emDashSeparatorSummary[5].Contains("/5 $emDashSeparator ")) {
     throw 'The em-dash separator fixture did not contain U+2014.'
 }
-if (Test-StructuredReviewSummary -Summary ($emDashSeparatorSummary -join [Environment]::NewLine) -Score 5) {
-    throw 'A rubric line with a non-contract separator was accepted.'
+if (-not (Test-StructuredReviewSummary -Summary ($emDashSeparatorSummary -join [Environment]::NewLine) -Score 5)) {
+    throw 'A valid review summary using em-dash separators was rejected.'
 }
 $questionMarkScoreSeparatorSummary = @($validSummary)
 $questionMarkScoreSeparatorSummary[5] = $questionMarkScoreSeparatorSummary[5].Replace('5/5:', '5/5 ?')
