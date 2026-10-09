@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Workspace = (Split-Path -Parent $PSScriptRoot)
 )
@@ -12,6 +12,20 @@ if (-not (Test-Path -LiteralPath $checkPolicyPath -PathType Leaf)) {
 $sourcePath = Join-Path $Workspace 'scripts/review-backend-fallback.ps1'
 if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
     throw "Fallback script not found: $sourcePath"
+}
+$scriptSourcePaths = @(
+    $sourcePath
+    (Join-Path $Workspace 'scripts/review-backend-fallback-contract-test.ps1')
+)
+foreach ($scriptSourcePath in $scriptSourcePaths) {
+    $scriptBytes = [System.IO.File]::ReadAllBytes($scriptSourcePath)
+    $hasUtf8Bom = $scriptBytes.Length -ge 3 -and
+        $scriptBytes[0] -eq 0xEF -and
+        $scriptBytes[1] -eq 0xBB -and
+        $scriptBytes[2] -eq 0xBF
+    if (-not $hasUtf8Bom) {
+        throw "Windows PowerShell 5.1 requires a UTF-8 BOM on script source: $scriptSourcePath"
+    }
 }
 
 $tokens = $null
