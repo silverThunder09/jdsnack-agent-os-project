@@ -43,6 +43,13 @@ if (-not $fallbackSource.Contains('. $prCheckPolicyPath') -or
     -not $fallbackSource.Contains('Test-SuccessfulConditionalPrCheckSkip')) {
     throw 'Fallback script does not load and use the shared conditional PR check policy.'
 }
+$rubricPrompt = '<rubric>: PASS: ...'
+$scorePrompt = 'score rationale: <reported score>/5: ...'
+$rubricPromptCount = [regex]::Matches($fallbackSource, [regex]::Escape($rubricPrompt)).Count
+$scorePromptCount = [regex]::Matches($fallbackSource, [regex]::Escape($scorePrompt)).Count
+if ($rubricPromptCount -ne 2 -or $scorePromptCount -ne 2) {
+    throw 'Both trusted review prompts must require ASCII colon separators.'
+}
 
 $functionAst = $ast.Find({
         param($node)
