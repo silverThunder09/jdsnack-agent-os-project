@@ -33,10 +33,14 @@ git_bash_path="$(command -v bash)"
 [ -n "$git_bash_path" ] || fail 'hook entrypoint 검증에 사용할 Bash를 찾지 못했습니다.'
 git -C "$test_worktree" config --local jdsnack.hookBash "$git_bash_path"
 # git clone intentionally excludes uncommitted source edits, so include the
-# current hook implementation and reviewer settings in the disposable fixture.
+# current hook implementation, auth ACL verifier, and reviewer settings in the disposable fixture.
 cp "$ROOT_DIR/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
+cp "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" "$test_worktree/scripts/verify-codex-auth-permissions.ps1"
+cp "$ROOT_DIR/scripts/codex-auth-permissions.ps1" "$test_worktree/scripts/codex-auth-permissions.ps1"
+cp "$ROOT_DIR/scripts/review-path-safety.ps1" "$test_worktree/scripts/review-path-safety.ps1"
 cp "$ROOT_DIR/backends.json" "$test_worktree/backends.json"
-git -C "$test_worktree" add scripts/pre-push-ai-review.sh backends.json
+git -C "$test_worktree" add scripts/pre-push-ai-review.sh scripts/verify-codex-auth-permissions.ps1 \
+  scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1 backends.json
 if ! git -C "$test_worktree" diff --cached --quiet; then
   git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com \
     commit --quiet -m 'test: isolate current pre-push hook fixture'
@@ -61,16 +65,28 @@ expected_risk="$(jq -r '.riskBand' <<< "$risk_json")"
 expected_score="$(jq -r '.riskScore' <<< "$risk_json")"
 expected_labels="$(jq -r '.reviewLabels | join(", ")' <<< "$risk_json")"
 test_cygpath_bin="$(command -v cygpath || true)"
-test_icacls_bin="$(command -v icacls.exe || command -v icacls || true)"
 test_sleep_bin="$(command -v sleep || true)"
 test_stat_bin="$(command -v stat || true)"
 test_tail_bin="$(command -v tail || true)"
 [ -n "$test_sleep_bin" ] || fail 'sleep가 필요합니다.'
 [ -n "$test_stat_bin" ] || fail 'stat가 필요합니다.'
 [ -n "$test_tail_bin" ] || fail 'tail가 필요합니다.'
-if [ -n "$test_cygpath_bin" ] && [ -z "$test_icacls_bin" ]; then
-  fail 'Windows ACL 검증을 위해 icacls가 필요합니다.'
-fi
+secure_test_path() {
+  local path="$1"
+  local windows_path
+  local windows_script_path
+  [ -n "$test_cygpath_bin" ] || return 0
+  windows_path="$("$test_cygpath_bin" -w "$path")"
+  windows_script_path="$("$test_cygpath_bin" -w "$ROOT_DIR/scripts/secure-review-temp-acl.ps1")"
+  if ! MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path" >/dev/null; then
+    fail 'Codex auth fixture 경로 ACL을 제한하지 못했습니다.'
+  fi
+}
+prepare_test_codex_home() {
+  local codex_home="$1"
+  chmod 700 "$codex_home"
+  secure_test_path "$codex_home"
+}
 interrupted_hook_pid=""
 export JDSNACK_TEST_SECRET_TOKEN='must-be-cleared-before-review'
 export JDSNACK_TEST_CUSTOM='must-be-cleared-by-allowlist'
@@ -110,6 +126,8 @@ output_path=""
 help_requested=0
 read_only_sandbox_seen=0
 workspace_write_network_config_seen=0
+ignore_user_config_seen=0
+strict_config_seen=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help)
@@ -126,6 +144,12 @@ while [ "$#" -gt 0 ]; do
       if [ "${1:-}" = 'read-only' ]; then
         read_only_sandbox_seen=1
       fi
+      ;;
+    --ignore-user-config)
+      ignore_user_config_seen=1
+      ;;
+    --strict-config)
+      strict_config_seen=1
       ;;
     --output-last-message)
       shift
@@ -147,6 +171,8 @@ esac
 [ "$help_requested" -eq 1 ] && exit 0
 [ -n "$output_path" ] || exit 2
 [ "$read_only_sandbox_seen" -eq 1 ] || exit 9
+[ "$ignore_user_config_seen" -eq 1 ] || exit 21
+[ "$strict_config_seen" -eq 1 ] || exit 22
 [ "$workspace_write_network_config_seen" -eq 0 ] || exit 16
 case "${PATH-}" in
   */reviewer-bin) ;;
@@ -182,12 +208,12 @@ case "${PWD-}" in
   *test-worktree*) exit 12 ;;
 esac
 case "${CODEX_HOME-}" in
-  *review-fallback*) ;;
-  *) exit 10 ;;
+  *review-fallback*) exit 10 ;;
 esac
+[ -d "$CODEX_HOME" ] || exit 20
 printf '%s\n' "${TEMP-}" "${TMP-}" "${TMPDIR-}" "$CODEX_HOME" > "$fixture_dir/reviewer-temp-values"
 if [ -f "$fixture_dir/codex.wait-for-signal" ]; then
-  printf '%s\n' "$CODEX_HOME/auth.json" > "$fixture_dir/copied-auth-path"
+  printf '%s\n' "$CODEX_HOME" > "$fixture_dir/reviewer-home-path"
   : > "$fixture_dir/codex.waiting"
   while [ -f "$fixture_dir/codex.wait-for-signal" ]; do
     "$fixture_dir/sleep-one-second"
@@ -214,27 +240,6 @@ case "$output_path" in
     ;;
 esac
 
-if [ -f "$fixture_dir/codex.rotate-auth" ] || [ -f "$fixture_dir/codex.change-source-auth" ] || [ -f "$fixture_dir/codex.record-auth" ]; then
-  review_auth_path="$CODEX_HOME/auth.json"
-  case "$review_auth_path" in
-    *\\*)
-      [ -x "$fixture_dir/cygpath" ] || exit 19
-      review_auth_path="$("$fixture_dir/cygpath" -u "$review_auth_path")"
-      ;;
-  esac
-  if [ -f "$fixture_dir/codex.rotate-auth" ]; then
-    printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"rotated-access","refresh_token":"rotated-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account"}' > "$review_auth_path"
-  fi
-  if [ -f "$fixture_dir/codex.change-source-auth" ]; then
-    IFS= read -r rotating_auth_source < "$fixture_dir/rotating-auth-source-path"
-    printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"concurrent-access","refresh_token":"concurrent-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account","client_id":"preserve-this-metadata"}' > "$rotating_auth_source"
-  fi
-  if [ -f "$fixture_dir/codex.record-auth" ]; then
-    while IFS= read -r auth_line; do
-      printf '%s\n' "$auth_line" >> "$fixture_dir/recorded-reviewer-auth.json"
-    done < "$review_auth_path"
-  fi
-fi
 if [ -f "$fixture_dir/codex.change-source-ref" ]; then
   "$fixture_dir/mutate-source-ref"
 fi
@@ -398,10 +403,8 @@ assert_malformed_duplicate_scalar_headers_rejected() {
 
 default_codex_home="$fake_root/user-codex"
 mkdir -p "$default_codex_home"
-printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"default-access","refresh_token":"default-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account"}' > "$default_codex_home/auth.json"
-chmod 600 "$default_codex_home/auth.json"
+prepare_test_codex_home "$default_codex_home"
 export CODEX_HOME="$default_codex_home"
-export CODEX_AUTH_FILE="$default_codex_home/auth.json"
 
 if [ "${JDSNACK_PRE_PUSH_TEST_CASE-}" = 'workflow-linux-runtime' ]; then
   SystemRoot=''
@@ -423,49 +426,59 @@ if [ "${JDSNACK_PRE_PUSH_TEST_CASE-}" = 'malformed-duplicate-headers' ]; then
   exit 0
 fi
 
+assert_unsafe_codex_home_rejected() {
+  local unsafe_home="$1"
+  local expected_error="$2"
+  local output
+  local status
+
+  rm -f "$fake_root/codex.invoked"
+  set +e
+  output="$(CODEX_HOME="$unsafe_home" run_review 2>&1)"
+  status=$?
+  set -e
+  if [ "$status" -eq 0 ] || ! grep -Fq "$expected_error" <<< "$output" || [ -e "$fake_root/codex.invoked" ]; then
+    printf '%s\n' "$output" >&2
+    fail 'Codex 로그인 캐시 또는 auth.json 권한이 느슨한 경우 pre-push가 reviewer 실행 전에 차단하지 않았습니다.'
+  fi
+}
+
+if [ -z "$test_cygpath_bin" ]; then
+  insecure_home="$fake_root/insecure-codex-home"
+  mkdir -p "$insecure_home"
+  chmod 755 "$insecure_home"
+  assert_unsafe_codex_home_rejected "$insecure_home" 'CODEX_HOME 소유자나 권한이 사용자 전용이 아닙니다.'
+
+  insecure_auth_home="$fake_root/insecure-auth-home"
+  mkdir -p "$insecure_auth_home"
+  chmod 700 "$insecure_auth_home"
+  printf '%s\n' 'test fixture only' > "$insecure_auth_home/auth.json"
+  chmod 644 "$insecure_auth_home/auth.json"
+  assert_unsafe_codex_home_rejected "$insecure_auth_home" 'Codex auth.json 소유자나 권한이 사용자 전용이 아닙니다.'
+fi
+
 ancestor_codex_home="$fixture_root"
 rm -f "$fake_root/codex.invoked"
 set +e
-ancestor_codex_home_output="$(CODEX_HOME="$ancestor_codex_home" CODEX_AUTH_FILE="$default_codex_home/auth.json" run_review 2>&1)"
+ancestor_codex_home_output="$(CODEX_HOME="$ancestor_codex_home" run_review 2>&1)"
 ancestor_codex_home_status=$?
 set -e
 if [ "$ancestor_codex_home_status" -eq 0 ] || ! grep -Fq 'repository 외부에 있어야 합니다' <<< "$ancestor_codex_home_output"; then
   printf '%s\n' "$ancestor_codex_home_output" >&2
   fail 'pre-push가 repository 상위 경로의 CODEX_HOME을 차단하지 않았습니다.'
 fi
-if [ -e "$ancestor_codex_home/review-fallback" ] || [ -e "$fake_root/codex.invoked" ]; then
-  fail 'repository 상위 경로 CODEX_HOME 차단 전에 reviewer 인증 홈을 만들거나 Codex를 실행했습니다.'
+if [ -e "$ancestor_codex_home/.review-lock" ] || [ -e "$fake_root/codex.invoked" ]; then
+  fail 'repository 상위 경로 CODEX_HOME 차단 전에 reviewer lock을 만들거나 Codex를 실행했습니다.'
 fi
 
 implicit_user_home="$fake_root/implicit-user-home"
 mkdir -p "$implicit_user_home/.codex"
-printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"implicit-access","refresh_token":"implicit-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account","client_id":"preserve-source-metadata"}' > "$implicit_user_home/.codex/auth.json"
-chmod 600 "$implicit_user_home/.codex/auth.json"
+prepare_test_codex_home "$implicit_user_home/.codex"
 rm -f "$fake_root/codex.invoked"
-set +e
-implicit_auth_output="$(CODEX_HOME= CODEX_AUTH_FILE= HOME="$implicit_user_home" run_review 2>&1)"
-implicit_auth_status=$?
-set -e
-if [ "$implicit_auth_status" -eq 0 ] || ! grep -Fq 'set CODEX_HOME or CODEX_AUTH_FILE once to seed' <<< "$implicit_auth_output"; then
-  printf '%s\n' "$implicit_auth_output" >&2
-  fail 'pre-push가 명시적 seed 설정 없이 일반 사용자 Codex 로그인을 암묵적으로 사용했습니다.'
+CODEX_HOME= HOME="$implicit_user_home" run_review >/dev/null
+if [ ! -e "$fake_root/codex.invoked" ] || [ -e "$implicit_user_home/.codex/review-fallback/auth.json" ]; then
+  fail 'pre-push가 Codex 앱과 공유하는 기본 사용자 로그인 캐시를 사용하지 않았습니다.'
 fi
-if [ -e "$fake_root/codex.invoked" ] || [ -e "$implicit_user_home/.codex/review-fallback/auth.json" ]; then
-  fail '명시적 인증 seed 없이 Codex reviewer 인증 홈을 만들거나 실행했습니다.'
-fi
-CODEX_HOME= CODEX_AUTH_FILE="$implicit_user_home/.codex/auth.json" HOME="$implicit_user_home" run_review >/dev/null
-implicit_reviewer_auth="$implicit_user_home/.codex/review-fallback/auth.json"
-if ! jq -e 'keys | sort == ["account_id", "auth_mode", "tokens"]' "$implicit_reviewer_auth" >/dev/null; then
-  fail '명시적 초기 seed가 최소 Codex 인증 payload만 reviewer 홈에 저장하지 않았습니다.'
-fi
-if ! jq -e '.client_id == "preserve-source-metadata"' "$implicit_user_home/.codex/auth.json" >/dev/null; then
-  fail '명시적 초기 seed가 원본 Codex 인증 파일의 메타데이터를 변경했습니다.'
-fi
-CODEX_HOME= CODEX_AUTH_FILE= HOME="$implicit_user_home" run_review >/dev/null
-if ! jq -e '.tokens.access_token == "implicit-access"' "$implicit_reviewer_auth" >/dev/null; then
-  fail '후속 리뷰가 사용자 원본 없이 영속 reviewer 인증 사본을 재사용하지 못했습니다.'
-fi
-
 cat > "$fake_root/mutate-source-ref" <<'MUTATE_SOURCE_REF'
 #!/bin/sh
 set -eu
@@ -529,44 +542,12 @@ if [ "$source_ref_changed_status" -eq 0 ] || ! grep -Fq 'push source ref가 바�
   fail '리뷰 중 HEAD는 유지한 채 push source ref가 바뀐 상황을 pre-push가 차단하지 못했습니다.'
 fi
 
-rotating_auth_source="$fake_root/rotating-auth.json"
 rotating_user_home="$fake_root/rotating-user-home"
 mkdir -p "$rotating_user_home"
-printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"initial-access","refresh_token":"initial-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account","client_id":"preserve-this-metadata"}' > "$rotating_auth_source"
-chmod 600 "$rotating_auth_source"
-printf '%s\n' "$rotating_auth_source" > "$fake_root/rotating-auth-source-path"
-touch "$fake_root/codex.rotate-auth" "$fake_root/codex.change-source-auth"
-CODEX_HOME="$rotating_user_home" CODEX_AUTH_FILE="$rotating_auth_source" run_review >/dev/null
-rm -f "$fake_root/codex.rotate-auth" "$fake_root/codex.change-source-auth"
-if ! jq -e '.tokens.access_token == "concurrent-access" and .tokens.refresh_token == "concurrent-refresh" and .client_id == "preserve-this-metadata"' "$rotating_auth_source" >/dev/null; then
-  fail 'Codex 리뷰가 동시 로그인으로 변경된 원본 인증 정보를 덮어썼습니다.'
-fi
-rotating_reviewer_auth="$rotating_user_home/review-fallback/auth.json"
-if ! jq -e '.tokens.access_token == "rotated-access" and .tokens.refresh_token == "rotated-refresh"' "$rotating_reviewer_auth" >/dev/null; then
-  fail 'Codex가 갱신한 토큰을 전용 reviewer 인증 홈에 보존하지 못했습니다.'
-fi
-touch "$fake_root/codex.record-auth"
-CODEX_HOME="$rotating_user_home" CODEX_AUTH_FILE="$rotating_auth_source" run_review >/dev/null
-rm -f "$fake_root/codex.record-auth"
-if ! jq -e '.tokens.access_token == "rotated-access" and .tokens.refresh_token == "rotated-refresh"' "$fake_root/recorded-reviewer-auth.json" >/dev/null; then
-  fail '후속 리뷰가 영속 reviewer 인증 홈의 갱신 토큰을 재사용하지 못했습니다.'
-fi
-
-linked_user_home="$fake_root/linked-user-home"
-mkdir -p "$linked_user_home/review-fallback"
-printf '%s\n' '{"auth_mode":"chatgpt","tokens":{"access_token":"linked-access","refresh_token":"linked-refresh","account_id":"synthetic-account"},"account_id":"synthetic-account"}' > "$linked_user_home/auth.json"
-chmod 600 "$linked_user_home/auth.json"
-ln "$linked_user_home/auth.json" "$linked_user_home/review-fallback/auth.json"
-set +e
-linked_auth_output="$(CODEX_HOME="$linked_user_home" CODEX_AUTH_FILE="$linked_user_home/auth.json" run_review 2>&1)"
-linked_auth_status=$?
-set -e
-if [ "$linked_auth_status" -eq 0 ] || ! grep -Fq '단일 링크 regular file' <<< "$linked_auth_output"; then
-  printf '%s\n' "$linked_auth_output" >&2
-  fail 'pre-push가 사용자 원본과 hard link된 reviewer 인증 파일을 차단하지 않았습니다.'
-fi
-if ! jq -e '.tokens.access_token == "linked-access" and .tokens.refresh_token == "linked-refresh"' "$linked_user_home/auth.json" >/dev/null; then
-  fail 'hard link 차단 과정에서 사용자 원본 인증 파일이 변경되었습니다.'
+prepare_test_codex_home "$rotating_user_home"
+CODEX_HOME="$rotating_user_home" run_review >/dev/null
+if [ -e "$rotating_user_home/auth.json" ]; then
+  fail 'pre-push fixture가 Codex CLI 대신 별도 auth.json을 만들었습니다.'
 fi
 
 mapfile -t reviewer_temp_values < "$fake_root/reviewer-temp-values"
@@ -574,16 +555,16 @@ if [ "${#reviewer_temp_values[@]}" -ne 4 ] || [ "${reviewer_temp_values[0]}" != 
   fail '리뷰어 TEMP/TMP/TMPDIR이 같은 격리 디렉터리를 가리키지 않습니다.'
 fi
 if [ -n "$test_cygpath_bin" ]; then
-  expected_codex_home_path="$("$test_cygpath_bin" -w "$rotating_user_home/review-fallback")"
+  expected_codex_home_path="$("$test_cygpath_bin" -w "$rotating_user_home")"
 else
-  expected_codex_home_path="$rotating_user_home/review-fallback"
+  expected_codex_home_path="$rotating_user_home"
 fi
 if [ "${reviewer_temp_values[3]}" != "$expected_codex_home_path" ]; then
-  fail 'Codex reviewer가 전용 영속 CODEX_HOME을 사용하지 않습니다.'
+  fail 'Codex reviewer가 Codex 앱과 공유하는 CODEX_HOME을 사용하지 않습니다.'
 fi
-
-printf '%s\n' '{"OPENAI_API_KEY":"synthetic-test-key"}' > "$fake_root/synthetic-auth.json"
-chmod 600 "$fake_root/synthetic-auth.json"
+interrupted_user_home="$fake_root/interrupted-user-home"
+mkdir -p "$interrupted_user_home"
+prepare_test_codex_home "$interrupted_user_home"
 touch "$fake_root/codex.wait-for-signal"
 printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$base_sha" > "$fake_root/interrupted-push-input"
 canonical_origin_url='https://github.com/silverThunder09/jdsnack-agent-os-project'
@@ -591,9 +572,7 @@ canonical_origin_url='https://github.com/silverThunder09/jdsnack-agent-os-projec
   cd "$test_worktree"
   export PATH="$fake_root:$PATH"
   export JDSNACK_REVIEW_BASE_REF="$base_ref"
-  export CODEX_AUTH_FILE="$fake_root/synthetic-auth.json"
-  export CODEX_HOME="$fake_root/interrupted-user-home"
-  mkdir -p "$CODEX_HOME"
+  export CODEX_HOME="$interrupted_user_home"
   exec bash "$test_worktree/scripts/pre-push-ai-review.sh" origin "$canonical_origin_url" < "$fake_root/interrupted-push-input"
 ) > "$fake_root/interrupted-hook.log" 2>&1 &
 interrupted_hook_pid=$!
@@ -609,15 +588,14 @@ if [ ! -e "$fake_root/codex.waiting" ]; then
   "$test_tail_bin" -n 20 "$fake_root/interrupted-hook.log" >&2 || true
   fail 'signal 정리 fixture가 Codex 리뷰 단계에 도달하지 않았습니다.'
 fi
-copied_auth_path="$(<"$fake_root/copied-auth-path")"
+reviewer_home_path="$(<"$fake_root/reviewer-home-path")"
 if [ -n "$test_cygpath_bin" ]; then
-  copied_auth_path="$("$test_cygpath_bin" -u "$copied_auth_path")"
+  reviewer_home_path="$("$test_cygpath_bin" -u "$reviewer_home_path")"
 fi
-if [ ! -f "$copied_auth_path" ]; then
-  fail 'signal fixture에서 임시 인증 사본을 찾을 수 없습니다.'
+if [ ! -d "$reviewer_home_path" ]; then
+  fail 'signal fixture에서 Codex 앱과 공유하는 로그인 홈을 찾을 수 없습니다.'
 fi
-auth_file_mode="$("$test_stat_bin" -c '%a' "$copied_auth_path")"
-codex_home_path="${copied_auth_path%/auth.json}"
+codex_home_path="$reviewer_home_path"
 review_lock_dir_path="$codex_home_path/.review-lock"
 IFS= read -r temp_dir_path < "$fake_root/reviewer-temp-values"
 case "$temp_dir_path" in
@@ -626,21 +604,18 @@ case "$temp_dir_path" in
     ;;
 esac
 codex_home_mode="$("$test_stat_bin" -c '%a' "$codex_home_path")"
+review_lock_mode="$("$test_stat_bin" -c '%a' "$review_lock_dir_path")"
 temp_dir_mode="$("$test_stat_bin" -c '%a' "$temp_dir_path")"
 if [ -n "$test_cygpath_bin" ]; then
-  auth_acl="$("$test_icacls_bin" "$copied_auth_path")"
-  if grep -Eiq 'Everyone|Authenticated Users|BUILTIN\\Users' <<< "$auth_acl"; then
-    fail '임시 인증 파일 ACL에 광범위한 사용자 권한이 남아 있습니다.'
-  fi
-  for protected_path in "$temp_dir_path" "$codex_home_path" "$copied_auth_path"; do
+  for protected_path in "$temp_dir_path" "$codex_home_path" "$review_lock_dir_path"; do
     protected_windows_path="$("$test_cygpath_bin" -w "$protected_path")"
     if ! "$pwsh_bin" -NoProfile -File "$test_worktree/scripts/secure-review-temp-acl.ps1" \
       -Path "$protected_windows_path" -VerifyOnly >/dev/null; then
       fail '임시 리뷰 경로 ACL이 현재 제한 실행 환경의 허용 목록과 다릅니다.'
     fi
   done
-elif [ "$auth_file_mode" != '600' ] || [ "$codex_home_mode" != '700' ] || [ "$temp_dir_mode" != '700' ]; then
-  fail "임시 인증 파일/디렉터리 권한이 제한되지 않았습니다 (auth=$auth_file_mode codex_home=$codex_home_mode temp=$temp_dir_mode)."
+elif [ "$codex_home_mode" != '700' ] || [ "$review_lock_mode" != '700' ] || [ "$temp_dir_mode" != '700' ]; then
+  fail "Codex 사용자 홈과 reviewer 임시 경로 권한이 제한되지 않았습니다 (codex_home=$codex_home_mode lock=$review_lock_mode temp=$temp_dir_mode)."
 fi
 kill -TERM "$interrupted_hook_pid"
 set +e
@@ -651,10 +626,10 @@ interrupted_hook_pid=""
 rm -f "$fake_root/codex.wait-for-signal"
 if [ "$interrupted_hook_status" -ne 143 ] || [ -e "$temp_dir_path" ]; then
   "$test_tail_bin" -n 20 "$fake_root/interrupted-hook.log" >&2 || true
-  fail 'TERM 중단 시 임시 디렉터리가 정리되지 않았거나 전용 reviewer 인증 홈이 삭제되었습니다.'
+  fail "TERM cleanup 결과가 예상과 다릅니다 (status=$interrupted_hook_status temp_exists=$([ -e "$temp_dir_path" ] && echo true || echo false))."
 fi
-if [ ! -f "$copied_auth_path" ] || [ -e "$review_lock_dir_path" ]; then
-  fail 'TERM 중단 시 영속 reviewer 인증 정보가 보존되지 않았거나 사용 lock이 정리되지 않았습니다.'
+if [ ! -d "$reviewer_home_path" ] || [ -e "$review_lock_dir_path" ]; then
+  fail 'TERM 중단 시 공유 Codex 로그인 홈이 보존되지 않았거나 reviewer lock이 정리되지 않았습니다.'
 fi
 
 for risk_failure in invalid-json stderr-zero-exit; do

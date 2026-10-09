@@ -11,10 +11,53 @@ fail() {
     exit 1
 }
 
+contract_failures=()
+
+record_contract_failure() {
+    contract_failures+=("$1")
+}
+
+assert_file_contains() {
+    local file="$1"
+    local expected="$2"
+    local description="$3"
+
+    if ! grep -Fq -- "$expected" "$file"; then
+        record_contract_failure "$description: $expected ($file)"
+    fi
+}
+
+report_contract_failures() {
+    if ((${#contract_failures[@]} == 0)); then
+        return 0
+    fi
+
+    printf 'FAIL: %d CI contract assertion(s) failed:\n' "${#contract_failures[@]}" >&2
+    printf '  - %s\n' "${contract_failures[@]}" >&2
+    return 1
+}
+
+test_contract_failure_aggregation() {
+    contract_failures=()
+    assert_file_contains '/dev/null' 'first missing contract' 'fixture'
+    assert_file_contains '/dev/null' 'second missing contract' 'fixture'
+
+    local report
+    if report="$(report_contract_failures 2>&1)"; then
+        fail 'CI contract diagnostics unexpectedly passed with missing contracts.'
+    fi
+    [[ "$report" == *'2 CI contract assertion(s) failed'* ]] \
+        || fail 'CI contract diagnostics did not report the total missing assertion count.'
+    [[ "$report" == *'first missing contract'* && "$report" == *'second missing contract'* ]] \
+        || fail 'CI contract diagnostics did not include every missing assertion.'
+
+    contract_failures=()
+}
+
+test_contract_failure_aggregation
+
 assert_contains() {
-    local expected="$1"
-    grep -Fq -- "$expected" "$WORKFLOW" \
-        || fail "codex branch review workflow에 다음 계약이 없습니다: $expected"
+    assert_file_contains "$WORKFLOW" "$1" 'Codex branch review workflow contract is missing'
 }
 
 assert_not_contains() {
@@ -49,6 +92,7 @@ assert_contains "    needs: [run_review]"
 assert_contains "    if: needs.run_review.result == 'success'"
 assert_contains "      contents: write"
 assert_contains "      pull-requests: write"
+# Keep GitHub `${{ ... }}` expressions single-quoted so Bash does not expand them.
 assert_contains '      pr_number: ${{ steps.resolve.outputs.pr_number }}'
 assert_contains '      base_sha: ${{ steps.resolve.outputs.base_sha }}'
 assert_contains '      head_sha: ${{ steps.resolve.outputs.head_sha }}'
@@ -152,12 +196,12 @@ grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-p
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
-grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 실행에 필요한 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 로그인 캐시 권한 검증을 위한 host 도구를 확인하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push에서 사용할 Git Bash 실행 경로를 명시적으로 확인하지 않습니다.'
 grep -Fq -- 'git config --local jdsnack.hookBash "$git_bash_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 검증한 Bash 실행 경로를 로컬 설정에 고정하지 않습니다.'
-grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat jq codex cat; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex cat; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push 실행에 필요한 전체 host 도구를 확인하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(git config --local --get jdsnack.hookBash || true)"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 설치 시 검증된 Git Bash 경로를 읽지 않습니다.'
@@ -169,6 +213,14 @@ grep -Fq -- 'PowerShell-only fallback runtime was not selected when pwsh was una
   || fail '위험도 계약 테스트가 powershell.exe 대체 실행기를 검증하지 않습니다.'
 [[ -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" ]] \
   || fail '임시 ACL 재분석 지점 계약 테스트가 없습니다.'
+[[ -f "$ROOT_DIR/scripts/verify-codex-auth-permissions-test.ps1" ]] \
+  || fail 'Codex 로그인 캐시 ACL 회귀 테스트가 없습니다.'
+[[ -f "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" ]] \
+  || fail 'Codex 로그인 캐시 ACL 검증기가 없습니다.'
+[[ -f "$ROOT_DIR/scripts/codex-auth-permissions.ps1" ]] \
+  || fail 'Codex 로그인 캐시 ACL 규칙 모듈이 없습니다.'
+grep -Fq -- 'verify-codex-auth-permissions.ps1' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'Windows pre-push가 Codex 로그인 캐시 ACL을 검사하지 않습니다.'
 [[ -f "$ROOT_DIR/scripts/review-path-safety.ps1" ]] \
   || fail '공유 경로 안전성 검증기가 없습니다.'
 grep -Fq -- "(Join-Path \$PSScriptRoot 'review-path-safety.ps1')" "$ROOT_DIR/scripts/secure-review-temp-acl.ps1" \
@@ -228,21 +280,24 @@ grep -Fq -- 'reviewer_entry="$codex_bin"' "$ROOT_DIR/scripts/pre-push-ai-review.
 grep -Fq -- 'runtime_dependency="${0%/*}/codex-runtime.sh"' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" || fail 'pre-push fixture가 Codex sibling runtime 의존성을 검증하지 않습니다.'
 grep -Fq -- 'reviewer_entry="$codex_bin"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 Codex 실행 파일의 설치 경로를 보존하지 않습니다.'
 grep -Fq -- 'review_env_args=(' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 허용 환경변수를 명시적으로 구성하지 않습니다.'
-grep -Fq -- '"CODEX_HOME=$codex_home_arg"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 전용 CODEX_HOME을 고정하지 않습니다.'
-grep -Fq -- 'codex_home_dir="$codex_auth_home_root/review-fallback"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 사용자 설정과 분리된 reviewer 인증 홈을 사용하지 않습니다.'
-if grep -Fq -- 'codex_auth_source="$HOME/.codex/auth.json"' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
-    fail 'pre-push가 명시적 CODEX_HOME/CODEX_AUTH_FILE 없이 기본 사용자 auth를 암묵적으로 복사합니다.'
+grep -Fq -- '"CODEX_HOME=$codex_home_arg"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 Codex 로그인 캐시를 고정하지 않습니다.'
+grep -Fq -- 'codex_home_dir="$codex_auth_home_root"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 Codex 앱과 공유하는 로그인 캐시를 사용하지 않습니다.'
+grep -Fq -- '--ignore-user-config' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 사용자 설정을 무시하지 않습니다.'
+grep -Fq -- 'CODEX_HOME= HOME="$implicit_user_home" run_review >/dev/null' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
+  || fail 'pre-push 계약 테스트가 기존 사용자 로그인 캐시의 자동 재사용을 검증하지 않습니다.'
+grep -Fq -- 'review_lock_dir="$codex_home_dir/.review-lock"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 동시 reviewer 실행을 직렬화하지 않습니다.'
+grep -Fq -- 'CODEX_HOME 소유자나 권한이 사용자 전용이 아닙니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'POSIX pre-push가 Codex 로그인 캐시의 과도한 접근 권한을 거부하지 않습니다.'
+grep -Fq -- 'Codex auth.json 소유자나 권한이 사용자 전용이 아닙니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'POSIX pre-push가 auth.json의 과도한 접근 권한을 거부하지 않습니다.'
+grep -Fq -- 'GetOwner([System.Security.Principal.SecurityIdentifier])' "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" \
+  || fail 'Windows pre-push가 CODEX_HOME과 auth.json의 소유자 SID를 검사하지 않습니다.'
+grep -Fq -- '다른 사용자가 소유한 인증 경로를 거부하지 않았습니다.' "$ROOT_DIR/scripts/verify-codex-auth-permissions-test.ps1" \
+  || fail 'Windows ACL 회귀 테스트가 다른 소유자의 경로를 거부하지 않습니다.'
+if grep -Eq -- 'CODEX_AUTH_FILE|codex_auth_source|review-fallback/auth.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
+    fail 'pre-push가 별도 인증 파일이나 stale reviewer 인증 복사본을 사용합니다.'
 fi
-grep -Fq -- 'set CODEX_HOME or CODEX_AUTH_FILE once to seed' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
-  || fail 'pre-push가 reviewer sidecar 최초 seed 경로를 명시적으로 요구하지 않습니다.'
-grep -Fq -- '명시적 인증 seed 없이 Codex reviewer 인증 홈을 만들거나 실행했습니다.' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
-  || fail 'pre-push 계약 테스트가 암묵적 사용자 인증 seed를 차단하지 않습니다.'
-grep -Fq -- 'codex_auth_lock_dir="$codex_home_dir/.review-lock"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 동시 reviewer 인증 갱신을 직렬화하지 않습니다.'
-grep -Fq -- "codex_auth_link_count=" "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 reviewer 인증 파일의 hard link를 차단하지 않습니다.'
 grep -Fq -- 'current_source_ref_sha=' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 리뷰 후 push source ref를 재검증하지 않습니다.'
-if grep -Fq -- 'sync_refreshed_codex_auth' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
-    fail 'pre-push가 갱신 토큰을 사용자 원본 인증 파일에 되쓰는 경로를 유지합니다.'
-fi
 grep -Fq -- '"TMPDIR=$codex_tmp_dir"' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 임시 디렉터리 기반 환경을 고정하지 않습니다.'
 grep -Fq -- 'windows_root=' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 Windows 런타임 루트를 확인하지 않습니다.'
 grep -Fq -- 'SystemRoot=$windows_root' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push reviewer가 SystemRoot를 격리 환경에 전달하지 않습니다.'
@@ -399,8 +454,7 @@ for fallback_contract in \
     'ReviewSubmissionAttempted' \
     'Complete-ReviewDecision' \
     'Claude invocation failed:'; do
-    grep -Fq -- "$fallback_contract" "$FALLBACK_SCRIPT" \
-        || fail "Codex review fallback 스크립트에 다음 계약이 없습니다: $fallback_contract"
+    assert_file_contains "$FALLBACK_SCRIPT" "$fallback_contract" 'Codex review fallback script contract is missing'
 done
 fallback_classifier_line="$(grep -nF -- 'function Get-ClaudeFallbackReason' "$FALLBACK_SCRIPT" | cut -d: -f1)"
 structured_result_line="$(grep -nF -- '$claudeHasStructuredResult = $claudeResult.DecisionMatch.Success -and $claudeResult.ScoreMatch.Success -and $claudeResult.RiskMatch.Success -and $claudeResult.HasStructuredBody -and $claudeResult.FindingsContractValid -and $claudeResult.ReviewSummaryContractValid' "$FALLBACK_SCRIPT" | cut -d: -f1)"
@@ -643,8 +697,7 @@ for skill_contract in \
     '현재 실행의 review check도 GitHub가 SUCCESS/pass로 완료한 경우에만 인정하며' \
     'check-run의 `head_sha`·`external_id`가 현재 PR head와 일치하는지 확인합니다.' \
     'Codex는 구현·테스트와 현재 기본 PR 리뷰'; do
-    grep -Fq -- "$skill_contract" "$CLAUDE_SKILL" \
-        || fail "review-loop 스킬에 다음 리뷰·머지 계약이 없습니다: $skill_contract"
+    assert_file_contains "$CLAUDE_SKILL" "$skill_contract" 'review-loop skill contract is missing'
 done
 if grep -Fq -- 'gh pr review <N> --approve' "$CLAUDE_SKILL" || grep -Fq -- 'gh pr merge <N>' "$CLAUDE_SKILL"; then
     fail 'The review skill must defer automatic approval to its gated dependent job.'
@@ -663,8 +716,7 @@ for review_check_contract in \
     'name = '\''review'\''' \
     'needs: [run_review, publish_review_check]' \
     "if: needs.run_review.result == 'success' && needs.publish_review_check.result == 'success'"; do
-    grep -Fq -- "$review_check_contract" "$ROOT_DIR/.github/workflows/codex-branch-review.yml" \
-        || fail "PR head review-check publisher contract is missing: $review_check_contract"
+    assert_file_contains "$ROOT_DIR/.github/workflows/codex-branch-review.yml" "$review_check_contract" 'PR head review-check publisher contract is missing'
 done
 grep -Fq -- 'Get-ReviewCheckRunsForHead -ExpectedHeadSha $HeadSha' "$ROOT_DIR/scripts/complete-review-approval.ps1" \
     || fail 'Approval must verify review check metadata on the exact current PR head SHA.'
@@ -679,4 +731,5 @@ if grep -Eq '^  review:$' "$ROOT_DIR/.github/workflows/codex-branch-review.yml";
     fail 'The reviewer job must not share the required review check name with the PR-head check publisher.'
 fi
 
+report_contract_failures || exit 1
 printf 'Codex branch review workflow contract passed\n'

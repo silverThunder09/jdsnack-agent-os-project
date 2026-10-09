@@ -1,0 +1,61 @@
+function Assert-CodexAuthAclRules {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$AccessRules,
+        [Parameter(Mandatory = $true)]
+        [string]$OwnerSid,
+        [Parameter(Mandatory = $true)]
+        [string]$CurrentUserSid,
+        [Parameter(Mandatory = $true)]
+        [string]$TargetName,
+        [switch]$AllowReadOnlyPrincipals
+    )
+
+    $allowedSids = @($CurrentUserSid, 'S-1-5-18', 'S-1-5-32-544')
+    if ($allowedSids -notcontains $OwnerSid) {
+        throw "$TargetName 소유자가 현재 사용자 또는 신뢰된 시스템 계정이 아닙니다."
+    }
+    $writeRights = [int](
+        [System.Security.AccessControl.FileSystemRights]::WriteData -bor
+        [System.Security.AccessControl.FileSystemRights]::AppendData -bor
+        [System.Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor
+        [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+        [System.Security.AccessControl.FileSystemRights]::Delete -bor
+        [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+        [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+        [System.Security.AccessControl.FileSystemRights]::TakeOwnership)
+    $requiredRights = [int](
+        [System.Security.AccessControl.FileSystemRights]::ReadData -bor
+        [System.Security.AccessControl.FileSystemRights]::WriteData -bor
+        [System.Security.AccessControl.FileSystemRights]::AppendData -bor
+        [System.Security.AccessControl.FileSystemRights]::ReadAttributes -bor
+        [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+        [System.Security.AccessControl.FileSystemRights]::ReadPermissions -bor
+        [System.Security.AccessControl.FileSystemRights]::Synchronize)
+    $userGrantedRights = 0
+
+    foreach ($rule in $AccessRules) {
+        if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow -or
+            (($rule.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly) -ne 0)) {
+            continue
+        }
+
+        $sid = $rule.IdentityReference.Value
+        if ($allowedSids -notcontains $sid) {
+            $grantedRights = [int]$rule.FileSystemRights
+            if (-not $AllowReadOnlyPrincipals -or ($grantedRights -band $writeRights) -ne 0) {
+                throw "$TargetName ACL에 허용되지 않은 사용자 또는 그룹이 있습니다."
+            }
+            continue
+        }
+
+        if ($sid -eq $CurrentUserSid) {
+            $userGrantedRights = $userGrantedRights -bor [int]$rule.FileSystemRights
+        }
+    }
+
+    if (($userGrantedRights -band $requiredRights) -ne $requiredRights) {
+        throw "$TargetName ACL에 현재 사용자 읽기·쓰기 권한이 충분하지 않습니다."
+    }
+}

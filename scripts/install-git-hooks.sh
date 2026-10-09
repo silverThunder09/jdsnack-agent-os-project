@@ -17,6 +17,8 @@ for required_file in \
   "scripts/pre-push-ai-review.sh" \
   "scripts/review-policy.json" \
   "scripts/review-risk.ps1" \
+  "scripts/codex-auth-permissions.ps1" \
+  "scripts/verify-codex-auth-permissions.ps1" \
   "backends.json"; do
   if [ ! -f "$repo_root/$required_file" ]; then
     echo "ERROR: Git hook dependency is missing: $required_file" >&2
@@ -32,7 +34,7 @@ require_tool() {
   fi
 }
 
-for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat jq codex cat; do
+for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex cat; do
   require_tool "$required_tool"
 done
 

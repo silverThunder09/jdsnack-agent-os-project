@@ -163,6 +163,15 @@ pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
 test -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" \
   || { echo 'scripts/secure-review-temp-acl-contract-test.ps1 is missing' >&2; exit 1; }
 pwsh -NoProfile -File "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" -Workspace "$ROOT_DIR"
+test -f "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" \
+  || { echo 'scripts/verify-codex-auth-permissions.ps1 is missing' >&2; exit 1; }
+test -f "$ROOT_DIR/scripts/codex-auth-permissions.ps1" \
+  || { echo 'scripts/codex-auth-permissions.ps1 is missing' >&2; exit 1; }
+if command -v cygpath >/dev/null 2>&1; then
+  test -f "$ROOT_DIR/scripts/verify-codex-auth-permissions-test.ps1" \
+    || { echo 'scripts/verify-codex-auth-permissions-test.ps1 is missing' >&2; exit 1; }
+  pwsh -NoProfile -File "$ROOT_DIR/scripts/verify-codex-auth-permissions-test.ps1" -Workspace "$ROOT_DIR"
+fi
 test -f "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" \
   || { echo 'scripts/review-backend-fallback-contract-test.ps1 is missing' >&2; exit 1; }
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-backend-fallback-contract-test.ps1" -Workspace "$ROOT_DIR"
