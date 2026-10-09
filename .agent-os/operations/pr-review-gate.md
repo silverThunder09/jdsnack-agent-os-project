@@ -37,7 +37,7 @@ bash scripts/pr-contract-test.sh <PR_NUMBER>
 
 `REQUEST_CHANGES`가 하나라도 있으면 PR은 머지할 수 없습니다.
 
-리뷰 workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정을 사용합니다. 기본 브랜치 보호 규칙은 `review`·`PR CI Gate`·`Validate PR contract`와 모든 설정된 필수 check를 요구합니다. approval job은 branch protection의 실제 승인 수만 추가로 적용하며, 현재 저장소 정책상 위험도별 사람 승인 수는 0입니다. `REQUEST_CHANGES`는 한 번 제출하며, `NEEDS_HUMAN`은 항상 중단합니다.
+리뷰 workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정을 사용합니다. approval job은 `review`·`PR CI Gate`·`Validate PR contract`를 자체 게이트로 요구하며, GitHub branch protection에 실제 설정된 모든 필수 check와 승인 수를 별도로 확인합니다. 보호 규칙과 approval job의 게이트 목록은 동일하다고 가정하지 않습니다. 현재 저장소 정책상 위험도별 추가 사람 승인 수는 0입니다. `REQUEST_CHANGES`는 한 번 제출하며, `NEEDS_HUMAN`은 자동 병합을 막습니다.
 
 ## 변경 범위별 확인 기준
 

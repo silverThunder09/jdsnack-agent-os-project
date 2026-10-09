@@ -40,6 +40,61 @@ test "$missing_jq_code" -eq 20
 grep -q '"status":"needs_human"' <<<"$missing_jq_output"
 grep -q '"reason":"jq_unavailable"' <<<"$missing_jq_output"
 
+# A queue awaiting a product signal must stop work without failing CI.
+printf 'active_specs: []\n' > "$TEST_ROOT/.agent-os/standards/index.yml"
+cat > "$TEST_ROOT/.agent-os/product/spec-queue.json" <<'EOF'
+{"version":1,"candidates":[{
+  "id":"next-feature","slug":"next-feature","title":"Next Feature",
+  "priority":1,"status":"candidate","auto_promote":true,
+  "start_condition":{"type":"issue_label","label":"product-signal:next"}
+}]}
+EOF
+summary_path="$TEST_ROOT/step-summary.md"
+set +e
+waiting_output="$(SECURITY_BIN=missing-security GITHUB_STEP_SUMMARY="$summary_path" \
+  JDSNACK_LOOP_EXECUTOR=fixture bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+    --repo "$TEST_ROOT" --event push --event-key waiting:fixture --apply)"
+waiting_code=$?
+set -e
+printf 'Product-signal wait exit code: %s\n' "$waiting_code"
+test "$waiting_code" -eq 0
+grep -q '"status": "needs_human"' <<<"$waiting_output"
+grep -q '"reason": "no_candidate_start_condition_satisfied"' <<<"$waiting_output"
+grep -q '^::notice ' <<<"$waiting_output"
+grep -q 'no_candidate_start_condition_satisfied' "$summary_path"
+test ! -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
+test ! -f "$TEST_ROOT/.agent-os/runtime/autonomous-loop-state.json"
+test ! -d "$TEST_ROOT/.agent-os/runtime/.autonomous-loop.lock"
+
+# A malformed state remains a failure rather than becoming an idle success.
+printf 'invalid json\n' > "$TEST_ROOT/.agent-os/runtime/autonomous-loop-state.json"
+set +e
+invalid_output="$(SECURITY_BIN=missing-security JDSNACK_LOOP_EXECUTOR=fixture \
+  bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+    --repo "$TEST_ROOT" --event push --event-key invalid:fixture --apply)"
+invalid_code=$?
+set -e
+test "$invalid_code" -eq 20
+grep -q '"reason":"loop_decision_failed"' <<<"$invalid_output"
+test ! -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
+rm "$TEST_ROOT/.agent-os/runtime/autonomous-loop-state.json"
+
+# An unfinished active Feature with no ready ticket remains blocked.
+printf 'active_specs:\n  - .agent-os/specs/current\n' > "$TEST_ROOT/.agent-os/standards/index.yml"
+cp "$TEST_ROOT/.agent-os/specs/current/plan.md" "$TEST_ROOT/completed-plan.md"
+sed 's/구현 상태: `completed`/구현 상태: `in-progress`/' \
+  "$TEST_ROOT/completed-plan.md" > "$TEST_ROOT/.agent-os/specs/current/plan.md"
+set +e
+blocked_output="$(SECURITY_BIN=missing-security JDSNACK_LOOP_EXECUTOR=fixture \
+  bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+    --repo "$TEST_ROOT" --event push --event-key blocked:fixture --apply)"
+blocked_code=$?
+set -e
+test "$blocked_code" -eq 20
+grep -q '"reason": "active_spec_has_no_ready_ticket"' <<<"$blocked_output"
+test ! -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
+cp "$TEST_ROOT/completed-plan.md" "$TEST_ROOT/.agent-os/specs/current/plan.md"
+
 # Replace the production queue with a minimal deterministic fixture.
 python3 - "$TEST_ROOT/.agent-os/product/spec-queue.json" <<'PY'
 import json

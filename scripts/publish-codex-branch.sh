@@ -59,6 +59,9 @@ case "$MAX_ATTEMPTS" in
     ''|*[!0-9]*|0) fail "CODEX_PUSH_ATTEMPTS must be a positive integer" ;;
 esac
 
+current_branch="$(git -C "$WORKTREE" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+[ "$current_branch" = "$BRANCH" ] || fail "worktree branch does not match publish branch"
+
 if ! git -C "$WORKTREE" fetch origin main --prune >/dev/null 2>&1; then
     fail "could not refresh origin/main before publishing"
 fi
@@ -81,7 +84,7 @@ last_error=""
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     push_output=""
-    if push_output="$(git -C "$WORKTREE" push origin "$local_sha:refs/heads/$BRANCH" 2>&1)"; then
+    if push_output="$(git -C "$WORKTREE" push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" 2>&1)"; then
         printf '%s\n' "$push_output" >&2
         remote_payload=""
         if remote_payload="$(git -C "$WORKTREE" ls-remote --exit-code origin "refs/heads/$BRANCH" 2>&1)"; then

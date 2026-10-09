@@ -24,7 +24,7 @@ JDSnack 기능 구현 해줘.
 - Codex 담당: 구현, 테스트, 커밋, origin push.
 - Claude 담당: 문서 계획, 결정론 게이트 검증, 필요 시 리뷰, PR 관리. trusted approval job이 검증 완료 뒤 Squash auto-merge를 큐에 넣습니다.
 - 모델 정책은 [Worker 모델 배정](worker-backends.md), `scripts/review-policy.json`의 기본 리뷰어, 루트 [backends.json](../../backends.json)을 따릅니다. 현재 기본 PR reviewer는 Codex이며 Claude를 기본으로 설정한 경우 실행 불가·구조화 결과 오류 시 Codex read-only 리뷰로 전환합니다. 빌드·lint·test·E2E 명령 실행 자체에는 모델을 지정하지 않습니다.
-- 구현 대상은 `index.yml`의 `active_specs`(정확히 1개) 안에서 준비된 티켓 하나입니다. `plan.md`가 없는 레거시 active Spec은 Spec 전체를 한 작업으로 취급합니다.
+- 구현 대상은 `index.yml`의 `active_specs`(최대 1개) 안에서 준비된 티켓 하나입니다. 다음 후보의 시작 조건을 기다릴 때는 active Spec을 비워 둡니다. 자율 dispatcher는 활성 Spec의 `plan.md`가 있어야 티켓을 선택할 수 있으며, 누락은 `needs-human`입니다.
 - 티켓 브랜치는 `codex/<active-spec-slug>-<ticket-id>`로 만들고, 티켓별 구현·테스트·PR·리뷰·머지를 독립적으로 수행합니다.
 - **티켓 전진(원자적)**: 티켓 PR에는 코드뿐 아니라 `plan.md`의 티켓 상태와 관련 traceability·테스트 결과 갱신을 포함합니다. 머지 후 active Spec은 유지한 채 다음 준비 티켓을 claim합니다.
 - **Feature 완료**: 마지막 티켓과 전체 수용 기준이 통과한 PR을 main에 반영하면 `autonomous-loop.yml`이 완료 Spec을 archive하고 `active_specs`를 비운 뒤 `spec-queue.json`의 첫 eligible 후보를 자동 승격합니다. Windows self-hosted runner에서는 checkout 직후 추적된 `.sh` 파일 목록을 NUL 구분으로 읽어 PowerShell로 LF로 정규화하고, PowerShell이 Windows 경로 구분자를 정규화하고 `wsl.exe wslpath`로 runner 경로를 변환한 뒤 Bash coordinator를 호출합니다. 이 워크플로의 `main` push trigger는 `.agent-os/standards/index.yml`, `.agent-os/product/spec-queue.json`, `.agent-os/specs/**/plan.md` 변경 경로로 한정해 Feature 티켓 진행과 큐 상태 변경만 확인합니다. 자동 판정 가능한 후보가 없을 때는 정책대로 `needs-human`으로 중단합니다.
@@ -47,14 +47,21 @@ JDSnack 기능 구현 해줘.
 - 문서 없는 API/UI 계약 변경은 하지 않습니다.
 - 작업 범위 밖 파일은 스테이징하지 않습니다.
 - 할 일이 없으면 수정하지 않고 대기합니다.
-- 컨텍스트가 70% 이상이면 `fork_thread`가 아니라 `create_thread`로 새 세션을 만들고 요약만 전달합니다.
-- 새 세션을 만들면 `jdsnack-5` 자동화 target도 새 세션으로 옮깁니다.
+- 기획 스레드에서 문맥을 요약해 이어갑니다. 새 세션은 사용자가 요청한 경우에만 생성하며, 별도 작업 스레드를 자동으로 만들지 않습니다.
+- 프로젝트 자동화의 실행 정본은 GitHub 이벤트 workflow입니다. 로컬 예약 자동화 이름이나 target thread가 존재한다고 가정하지 않습니다.
+
+## 제품 신호 대기와 실행 오류
+
+- `no_candidate_start_condition_satisfied`는 큐를 정상적으로 확인했지만 제품 판단이 필요한 대기 상태입니다. 구조화 결과는 `needs_human`을 유지하고 Spec 승격·Codex 디스패치·완료 기록을 수행하지 않습니다.
+- 이 사유만 coordinator가 종료 코드 0으로 반환합니다. GitHub notice와 step summary에 중단 사유·재개 방법을 남기고 기존 needs-human 알림을 best-effort로 호출합니다. CI 성공은 다음 Feature의 구현 완료를 뜻하지 않습니다.
+- 잘못된 큐·runtime 상태, 활성 Feature에 준비 티켓이 없는 상태, 런타임 의존성 누락 등 나머지 `needs_human`은 종료 코드 20으로 계속 실패합니다.
+- Windows runner는 `GITHUB_STEP_SUMMARY/p`를 WSL에 전달해 summary 파일 경로를 변환합니다. 승인된 제품 신호 Issue 또는 조건 충족 후 수동 실행으로 큐를 다시 판단합니다.
 
 ## 실행 호스트 중단과 재개
 
 Codex 루프는 실행 호스트가 살아 있을 때만 진행됩니다.
 
-- Mac이 잠자기 또는 종료 상태이면 Codex 구현, `cron`·`launchd` 감지, Claude 리뷰 호출을 중단합니다.
+- self-hosted runner 호스트가 잠자기 또는 종료 상태이면 Codex 구현과 리뷰 호출이 진행되지 않습니다. GitHub 이벤트와 runner의 가용성을 확인한 뒤 재개합니다.
 - 잠자기·종료 자체를 작업 실패로 기록하거나 재시도 횟수로 계산하지 않습니다.
 - 호스트가 깨어나거나 다시 시작되면 오케스트레이터가 영속적인 `run-state`를 먼저 읽습니다.
 - `run-state`의 `spec_id`, 브랜치, 현재 단계, 마지막 완료 단계와 외부 리소스 상태를 확인한 뒤 중단된 지점에서 재개합니다.
@@ -101,7 +108,7 @@ resume_phase: test
 ```
 
 - 의존성 복구 확인과 재시도는 코드 수정·리뷰 재시도 횟수에 포함하지 않습니다.
-- 로컬에서는 Docker Desktop 또는 Compose를 사용자 동의 없이 자동으로 시작하지 않습니다.
+- Docker daemon이 준비된 경우 승인된 코드 변경의 완료 검증으로 Compose 재빌드·재실행을 수행합니다. Docker Desktop daemon이 중단돼 필수 의존성이 준비되지 않은 경우에는 차단 상태와 복구 방법을 알립니다.
 - 의존성이 복구되면 저장된 `resume_phase`부터 테스트를 다시 실행합니다. 복구 전 테스트 결과는 최종 통과 근거로 재사용하지 않습니다.
 - 필수 의존성이 복구되지 않으면 자동화 루프는 현재 spec에서 멈추며, 다음 spec으로 넘어가지 않습니다.
 
@@ -124,7 +131,7 @@ resume_phase: test
 4. 관련 테스트 또는 관련 CI만 확인합니다.
 5. 커밋합니다.
 6. PR을 생성합니다.
-7. 작성자 확인과 CI 통과 후 머지합니다.
+7. 작성자 확인, configured reviewer의 PASS 4점 이상과 필수 게이트를 통과하면 trusted approval job이 자동 병합을 큐에 넣습니다.
 
 ## `Standard` 흐름
 
@@ -134,7 +141,7 @@ resume_phase: test
 4. 관련 로컬 테스트를 통과시킵니다.
 5. 현재 기획 스레드에서 변경 범위와 테스트 결과를 확인합니다.
 6. 커밋 후 PR을 생성합니다.
-7. 관련 CI가 통과하면 머지합니다.
+7. configured reviewer의 PASS 4점 이상과 필수 게이트를 통과하면 trusted approval job이 자동 병합을 큐에 넣습니다.
 
 ## `High-risk` 흐름
 
@@ -147,7 +154,7 @@ resume_phase: test
 7. PR 검사 또는 리뷰가 실패하면 GitHub Issue를 생성합니다.
 8. Issue를 기준으로 같은 브랜치에서 수정합니다.
 9. 다시 테스트하고 자체 리뷰를 반복합니다.
-10. PR이 통과하면 `Squash and merge`로 `main`에 합칩니다.
+10. PASS 4점 이상과 필수 게이트가 통과하면 trusted approval job이 Squash auto-merge를 큐에 넣습니다. 위험도만으로 사람 승인을 추가하지 않습니다.
 11. `main`에 반영되면 GitHub Actions가 최종 워크플로우를 실행합니다.
 
 ## 변경 범위별 확인 기준
@@ -158,7 +165,7 @@ resume_phase: test
 
 PR 생성 전 검증 기준의 정본은 [pr-rules.md](pr-rules.md)의 "PR 전 필수 검증 기준"입니다.
 
-PR 생성 전 `bash scripts/pr-contract-test.sh <PR_NUMBER>`가 제목·커밋·본문·기능/운영 범위를 통과해야 합니다. High-risk PR은 이 계약 검증 뒤 `scripts/pr-review-gate.sh <PR_NUMBER>`를 실행합니다. 리뷰 결과는 문서 기준에 따라 `gh pr review --approve`, `--request-changes`, `--comment` 중 하나로 정식 제출합니다.
+PR 생성 전 제목·커밋·본문·기능/운영 범위를 준비하고, PR 생성 후 `bash scripts/pr-contract-test.sh <PR_NUMBER>`로 원격 PR 계약을 검증합니다. High-risk PR은 이 계약 검증 뒤 `scripts/pr-review-gate.sh <PR_NUMBER>`를 실행합니다. reviewer는 구조화 결과를 반환하고, PASS는 별도 approval job에 전달합니다. 반려·중단 결과의 정식 제출은 [리뷰 실행 규칙](review-backend-fallback.md)을 따릅니다.
 
 ## PR 실패 처리
 
