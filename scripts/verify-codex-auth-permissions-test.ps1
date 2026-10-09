@@ -42,6 +42,29 @@ if (-not $unsafeAclRejected) {
     throw '다른 사용자 읽기 권한이 있는 ACL을 거부하지 않았습니다.'
 }
 
+Assert-CodexAuthAclRules -AccessRules $unsafeRules -CurrentUserSid $userSid.Value -TargetName 'CODEX_HOME' -AllowReadOnlyPrincipals
+
+$writeAccessRules = $safeRules + @(
+    [System.Security.AccessControl.FileSystemAccessRule]::new(
+        $usersSid,
+        [System.Security.AccessControl.FileSystemRights]::Modify,
+        $noInheritance,
+        $noPropagation,
+        $allow))
+$writeAclRejected = $false
+try {
+    Assert-CodexAuthAclRules -AccessRules $writeAccessRules -CurrentUserSid $userSid.Value -TargetName 'CODEX_HOME' -AllowReadOnlyPrincipals
+}
+catch {
+    $writeAclRejected = $_.Exception.Message -match '허용되지 않은 사용자 또는 그룹'
+    if (-not $writeAclRejected) {
+        throw
+    }
+}
+if (-not $writeAclRejected) {
+    throw 'CODEX_HOME에 다른 사용자 쓰기 권한이 있어도 검증이 통과했습니다.'
+}
+
 $readOnlyRule = [System.Security.AccessControl.FileSystemAccessRule]::new(
     $userSid,
     [System.Security.AccessControl.FileSystemRights]::Read,

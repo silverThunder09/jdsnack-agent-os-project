@@ -6,10 +6,20 @@ function Assert-CodexAuthAclRules {
         [Parameter(Mandatory = $true)]
         [string]$CurrentUserSid,
         [Parameter(Mandatory = $true)]
-        [string]$TargetName
+        [string]$TargetName,
+        [switch]$AllowReadOnlyPrincipals
     )
 
     $allowedSids = @($CurrentUserSid, 'S-1-5-18', 'S-1-5-32-544')
+    $writeRights = [int](
+        [System.Security.AccessControl.FileSystemRights]::WriteData -bor
+        [System.Security.AccessControl.FileSystemRights]::AppendData -bor
+        [System.Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor
+        [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+        [System.Security.AccessControl.FileSystemRights]::Delete -bor
+        [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+        [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+        [System.Security.AccessControl.FileSystemRights]::TakeOwnership)
     $requiredRights = [int](
         [System.Security.AccessControl.FileSystemRights]::ReadData -bor
         [System.Security.AccessControl.FileSystemRights]::WriteData -bor
@@ -28,7 +38,11 @@ function Assert-CodexAuthAclRules {
 
         $sid = $rule.IdentityReference.Value
         if ($allowedSids -notcontains $sid) {
-            throw "$TargetName ACL에 허용되지 않은 사용자 또는 그룹이 있습니다."
+            $grantedRights = [int]$rule.FileSystemRights
+            if (-not $AllowReadOnlyPrincipals -or ($grantedRights -band $writeRights) -ne 0) {
+                throw "$TargetName ACL에 허용되지 않은 사용자 또는 그룹이 있습니다."
+            }
+            continue
         }
 
         if ($sid -eq $CurrentUserSid) {

@@ -36,7 +36,15 @@ function Assert-RestrictedAuthAcl {
         $true,
         $true,
         [System.Security.Principal.SecurityIdentifier]))
-    Assert-CodexAuthAclRules -AccessRules $rules -CurrentUserSid $currentUserSid -TargetName $TargetName
+    $checkArguments = @{
+        AccessRules = $rules
+        CurrentUserSid = $currentUserSid
+        TargetName = $TargetName
+    }
+    if ($TargetName -eq 'CODEX_HOME') {
+        $checkArguments.AllowReadOnlyPrincipals = $true
+    }
+    Assert-CodexAuthAclRules @checkArguments
 }
 
 Assert-RestrictedAuthAcl -TargetPath $fullPath -TargetName 'CODEX_HOME'
