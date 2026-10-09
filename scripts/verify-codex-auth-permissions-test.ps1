@@ -19,7 +19,21 @@ $safeRules = @(
     [System.Security.AccessControl.FileSystemAccessRule]::new($userSid, $fullControl, $noInheritance, $noPropagation, $allow),
     [System.Security.AccessControl.FileSystemAccessRule]::new($systemSid, $fullControl, $noInheritance, $noPropagation, $allow),
     [System.Security.AccessControl.FileSystemAccessRule]::new($administratorsSid, $fullControl, $noInheritance, $noPropagation, $allow))
-Assert-CodexAuthAclRules -AccessRules $safeRules -CurrentUserSid $userSid.Value -TargetName 'fixture'
+Assert-CodexAuthAclRules -AccessRules $safeRules -OwnerSid $userSid.Value -CurrentUserSid $userSid.Value -TargetName 'fixture'
+
+$ownerRejected = $false
+try {
+    Assert-CodexAuthAclRules -AccessRules $safeRules -OwnerSid $usersSid.Value -CurrentUserSid $userSid.Value -TargetName 'fixture'
+}
+catch {
+    $ownerRejected = $_.Exception.Message -match '소유자가 현재 사용자 또는 신뢰된 시스템 계정이 아닙니다'
+    if (-not $ownerRejected) {
+        throw
+    }
+}
+if (-not $ownerRejected) {
+    throw '다른 사용자가 소유한 인증 경로를 거부하지 않았습니다.'
+}
 
 $unsafeRules = $safeRules + @(
     [System.Security.AccessControl.FileSystemAccessRule]::new(
@@ -30,7 +44,7 @@ $unsafeRules = $safeRules + @(
         $allow))
 $unsafeAclRejected = $false
 try {
-    Assert-CodexAuthAclRules -AccessRules $unsafeRules -CurrentUserSid $userSid.Value -TargetName 'fixture'
+    Assert-CodexAuthAclRules -AccessRules $unsafeRules -OwnerSid $userSid.Value -CurrentUserSid $userSid.Value -TargetName 'fixture'
 }
 catch {
     $unsafeAclRejected = $_.Exception.Message -match '허용되지 않은 사용자 또는 그룹'
@@ -42,7 +56,7 @@ if (-not $unsafeAclRejected) {
     throw '다른 사용자 읽기 권한이 있는 ACL을 거부하지 않았습니다.'
 }
 
-Assert-CodexAuthAclRules -AccessRules $unsafeRules -CurrentUserSid $userSid.Value -TargetName 'CODEX_HOME' -AllowReadOnlyPrincipals
+Assert-CodexAuthAclRules -AccessRules $unsafeRules -OwnerSid $userSid.Value -CurrentUserSid $userSid.Value -TargetName 'CODEX_HOME' -AllowReadOnlyPrincipals
 
 $writeAccessRules = $safeRules + @(
     [System.Security.AccessControl.FileSystemAccessRule]::new(
@@ -53,7 +67,7 @@ $writeAccessRules = $safeRules + @(
         $allow))
 $writeAclRejected = $false
 try {
-    Assert-CodexAuthAclRules -AccessRules $writeAccessRules -CurrentUserSid $userSid.Value -TargetName 'CODEX_HOME' -AllowReadOnlyPrincipals
+    Assert-CodexAuthAclRules -AccessRules $writeAccessRules -OwnerSid $userSid.Value -CurrentUserSid $userSid.Value -TargetName 'CODEX_HOME' -AllowReadOnlyPrincipals
 }
 catch {
     $writeAclRejected = $_.Exception.Message -match '허용되지 않은 사용자 또는 그룹'
@@ -73,7 +87,7 @@ $readOnlyRule = [System.Security.AccessControl.FileSystemAccessRule]::new(
     $allow)
 $readOnlyRejected = $false
 try {
-    Assert-CodexAuthAclRules -AccessRules @($readOnlyRule) -CurrentUserSid $userSid.Value -TargetName 'fixture'
+    Assert-CodexAuthAclRules -AccessRules @($readOnlyRule) -OwnerSid $userSid.Value -CurrentUserSid $userSid.Value -TargetName 'fixture'
 }
 catch {
     $readOnlyRejected = $_.Exception.Message -match '읽기·쓰기 권한이 충분하지 않습니다'

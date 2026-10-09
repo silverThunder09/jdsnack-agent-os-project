@@ -4,6 +4,8 @@ function Assert-CodexAuthAclRules {
         [Parameter(Mandatory = $true)]
         [object[]]$AccessRules,
         [Parameter(Mandatory = $true)]
+        [string]$OwnerSid,
+        [Parameter(Mandatory = $true)]
         [string]$CurrentUserSid,
         [Parameter(Mandatory = $true)]
         [string]$TargetName,
@@ -11,6 +13,9 @@ function Assert-CodexAuthAclRules {
     )
 
     $allowedSids = @($CurrentUserSid, 'S-1-5-18', 'S-1-5-32-544')
+    if ($allowedSids -notcontains $OwnerSid) {
+        throw "$TargetName 소유자가 현재 사용자 또는 신뢰된 시스템 계정이 아닙니다."
+    }
     $writeRights = [int](
         [System.Security.AccessControl.FileSystemRights]::WriteData -bor
         [System.Security.AccessControl.FileSystemRights]::AppendData -bor

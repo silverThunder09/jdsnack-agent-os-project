@@ -32,12 +32,14 @@ function Assert-RestrictedAuthAcl {
 
     Assert-NoReparsePointsInPath -Path $TargetPath
     $acl = Get-Acl -LiteralPath $TargetPath
+    $ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
     $rules = @($acl.GetAccessRules(
         $true,
         $true,
         [System.Security.Principal.SecurityIdentifier]))
     $checkArguments = @{
         AccessRules = $rules
+        OwnerSid = $ownerSid
         CurrentUserSid = $currentUserSid
         TargetName = $TargetName
     }

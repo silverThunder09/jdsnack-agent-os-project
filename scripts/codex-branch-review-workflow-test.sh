@@ -290,6 +290,10 @@ grep -Fq -- 'CODEX_HOME 소유자나 권한이 사용자 전용이 아닙니다.
   || fail 'POSIX pre-push가 Codex 로그인 캐시의 과도한 접근 권한을 거부하지 않습니다.'
 grep -Fq -- 'Codex auth.json 소유자나 권한이 사용자 전용이 아닙니다.' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
   || fail 'POSIX pre-push가 auth.json의 과도한 접근 권한을 거부하지 않습니다.'
+grep -Fq -- 'GetOwner([System.Security.Principal.SecurityIdentifier])' "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" \
+  || fail 'Windows pre-push가 CODEX_HOME과 auth.json의 소유자 SID를 검사하지 않습니다.'
+grep -Fq -- '다른 사용자가 소유한 인증 경로를 거부하지 않았습니다.' "$ROOT_DIR/scripts/verify-codex-auth-permissions-test.ps1" \
+  || fail 'Windows ACL 회귀 테스트가 다른 소유자의 경로를 거부하지 않습니다.'
 if grep -Eq -- 'CODEX_AUTH_FILE|codex_auth_source|review-fallback/auth.json' "$ROOT_DIR/scripts/pre-push-ai-review.sh"; then
     fail 'pre-push가 별도 인증 파일이나 stale reviewer 인증 복사본을 사용합니다.'
 fi
