@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '.agent-os/standards/index.yml'
+      - '.agent-os/product/spec-queue.json'
+      - '.agent-os/specs/**/plan.md'
   issues:
     types: [opened, edited, labeled]
   issue_comment:

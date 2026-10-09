@@ -5,7 +5,26 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 AUTONOMOUS_WORKFLOW="$ROOT_DIR/.github/workflows/autonomous-loop.yml"
 PR_CI_ROUTER="$ROOT_DIR/.github/workflows/pr-ci-router.yml"
-
+PUSH_PATH_FILTER="$(awk '
+  { sub(/\r$/, "") }
+  /^  push:$/ { in_push=1; next }
+  in_push && /^  issues:$/ { exit }
+  in_push && /^    paths:$/ { in_paths=1; next }
+  in_paths && /^      - / {
+    line=$0
+    sub(/^      - /, "", line)
+    print line
+  }
+' "$AUTONOMOUS_WORKFLOW")"
+EXPECTED_PUSH_PATH_FILTER="$(printf '%s\n' \
+  "'.agent-os/standards/index.yml'" \
+  "'.agent-os/product/spec-queue.json'" \
+  "'.agent-os/specs/**/plan.md'")"
+if [[ "$PUSH_PATH_FILTER" != "$EXPECTED_PUSH_PATH_FILTER" ]]; then
+  echo 'autonomous loop push must be limited to Spec selection state changes' >&2
+  printf 'expected:\n%s\nactual:\n%s\n' "$EXPECTED_PUSH_PATH_FILTER" "$PUSH_PATH_FILTER" >&2
+  exit 1
+fi
 grep -Fxq -- '*.sh text eol=lf' "$ROOT_DIR/.gitattributes" \
   || { echo '.gitattributes must force tracked shell scripts to LF' >&2; exit 1; }
 
