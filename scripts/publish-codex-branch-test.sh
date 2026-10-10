@@ -52,29 +52,35 @@ git -C "$TEST_ROOT/work" commit -qm published
 mkdir -p "$TEST_ROOT/hooks"
 cat > "$TEST_ROOT/hooks/pre-push" <<'EOF'
 #!/bin/sh
-unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR
-for variable in $(env | sed -n 's/^\(GIT_CONFIG_[A-Za-z0-9_]*\)=.*$/\1/p'); do
-    unset "$variable"
-done
-if [ -n "${GIT_AUTH_HOOK_LOG:-}" ]; then
-    if env | grep -Eq '^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+|PARAMETERS)=' ||
-        [ -n "${GH_TOKEN-}" ] || [ -n "${GITHUB_TOKEN-}" ] ||
-        [ -n "${GH_BIN-}" ] || [ -n "${GH_CONFIG_DIR-}" ]; then
-        printf 'token-in-hook\n' > "$GIT_AUTH_HOOK_LOG"
-        exit 1
-    fi
-    : > "$GIT_AUTH_HOOK_LOG"
+if [ -n "${MALICIOUS_HOOK_LOG:-}" ]; then
+    printf 'malicious hook received token=%s\n' "${GH_TOKEN-}" > "$MALICIOUS_HOOK_LOG"
 fi
-while read -r local_ref local_sha remote_ref remote_sha; do
-    case "$local_ref" in
-        refs/heads/*) ;;
-        *) echo "ERROR: branch push requires a local branch ref: $local_ref" >&2; exit 1 ;;
-    esac
-done
+exit 91
 EOF
 chmod +x "$TEST_ROOT/hooks/pre-push"
 git -C "$TEST_ROOT/work" config core.hooksPath "$TEST_ROOT/hooks"
-output="$(CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/example --base-sha "$base_sha")"
+malicious_hook_log="$TEST_ROOT/malicious-hook.log"
+trusted_hook_log="$TEST_ROOT/trusted-hook.log"
+mkdir -p "$TEST_ROOT/bin"
+real_bash="$(command -v bash)"
+cat > "$TEST_ROOT/bin/bash" <<'EOF'
+#!/bin/sh
+set -eu
+case "${1-}" in
+    */pre-push-ai-review.sh)
+        if [ -n "${GH_TOKEN-}" ] || [ -n "${GITHUB_TOKEN-}" ] ||
+            env | grep -Eq '^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+|PARAMETERS)='; then
+            printf 'trusted-hook-received-secret\n' > "$TRUSTED_HOOK_LOG"
+            exit 1
+        fi
+        : > "$TRUSTED_HOOK_LOG"
+        exit 0
+        ;;
+esac
+exec "$REAL_BASH" "$@"
+EOF
+chmod +x "$TEST_ROOT/bin/bash"
+output="$(PATH="$TEST_ROOT/bin:$PATH" REAL_BASH="$real_bash" TRUSTED_HOOK_LOG="$trusted_hook_log" MALICIOUS_HOOK_LOG="$malicious_hook_log" CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/example --base-sha "$base_sha")"
 assert_eq 0 "$?" "publish exit code"
 case "$output" in
     *"codex push verified"*) ;;
@@ -83,6 +89,8 @@ case "$output" in
         exit 1
         ;;
 esac
+test ! -e "$malicious_hook_log"
+test -f "$trusted_hook_log"
 
 remote_sha="$(git -C "$TEST_ROOT/work" ls-remote origin refs/heads/codex/example | awk 'NR == 1 { print $1 }')"
 local_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
@@ -112,7 +120,7 @@ EOF
 chmod +x "$TEST_ROOT/bin/git"
 auth_log="$TEST_ROOT/git-auth.log"
 hook_auth_log="$TEST_ROOT/hook-auth.log"
-auth_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$auth_log" GIT_AUTH_HOOK_LOG="$hook_auth_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$auth_base_sha")"
+auth_output="$(PATH="$TEST_ROOT/bin:$PATH" REAL_BASH="$real_bash" TRUSTED_HOOK_LOG="$hook_auth_log" MALICIOUS_HOOK_LOG="$malicious_hook_log" GIT_AUTH_LOG="$auth_log" GIT_AUTH_HOOK_LOG="$hook_auth_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$auth_base_sha")"
 case "$auth_output" in
     *"codex push verified"*) ;;
     *)
@@ -125,10 +133,11 @@ if grep -Fq "fixture-token" "$auth_log"; then
     printf 'FAIL: authenticated Git command arguments contained the token\n' >&2
     exit 1
 fi
-if grep -Fq "token-in-hook" "$hook_auth_log"; then
-    printf 'FAIL: authenticated push exposed its token to the pre-push hook\n' >&2
+if grep -Fq "trusted-hook-received-secret" "$hook_auth_log"; then
+    printf 'FAIL: authenticated push exposed its token to the trusted pre-push hook\n' >&2
     exit 1
 fi
+test ! -e "$malicious_hook_log"
 
 git -C "$TEST_ROOT/work" config http.https://github.com/.extraheader 'AUTHORIZATION: bearer existing-fixture'
 existing_header_base_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
@@ -137,7 +146,11 @@ git -C "$TEST_ROOT/work" add state.txt
 git -C "$TEST_ROOT/work" commit -qm 'reuse existing checkout header'
 existing_header_log="$TEST_ROOT/existing-header-auth.log"
 : > "$existing_header_log"
-existing_header_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$existing_header_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$existing_header_base_sha")"
+set +e
+existing_header_output="$(PATH="$TEST_ROOT/bin:$PATH" REAL_BASH="$real_bash" TRUSTED_HOOK_LOG="$hook_auth_log" MALICIOUS_HOOK_LOG="$malicious_hook_log" GIT_AUTH_LOG="$existing_header_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$existing_header_base_sha" 2>&1)"
+existing_header_code=$?
+set -e
+assert_eq 0 "$existing_header_code" "existing-header publish exit code"
 case "$existing_header_output" in
     *"codex push verified"*) ;;
     *)
@@ -161,7 +174,11 @@ case "$mismatched_output" in
 esac
 test -z "$(git -C "$TEST_ROOT/work" ls-remote origin refs/heads/codex/other)"
 
-git -C "$TEST_ROOT/work" switch -q -c main
+restored_hook_path="$(git -C "$TEST_ROOT/work" config --local --get core.hooksPath)"
+test -n "$restored_hook_path"
+git -C "$TEST_ROOT/work" config --local --unset core.hooksPath
+git -C "$TEST_ROOT/work" fetch -q origin main
+git -C "$TEST_ROOT/work" switch -q -c main refs/remotes/origin/main
 printf 'remote main advanced\n' >> "$TEST_ROOT/work/state.txt"
 git -C "$TEST_ROOT/work" add state.txt
 git -C "$TEST_ROOT/work" commit -qm 'advance remote main'

@@ -113,6 +113,10 @@ grep -Fq -- 'unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR' "$ROOT_DIR/.githo
   || { echo 'pre-push hooks must remove GitHub CLI binary and config paths before launching the reviewer' >&2; exit 1; }
 grep -Fq -- 'credential.helper=$credential_helper' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must use a token-free Git credential helper argument' >&2; exit 1; }
+grep -Fq -- 'git -C "$WORKTREE" config --local core.hooksPath "$config_hook_dir"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must override a worktree-controlled hook with a trusted hook path' >&2; exit 1; }
+grep -Fq -- 'restore_push_hook' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must restore the original worktree hook path' >&2; exit 1; }
 grep -Fq -- 'git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must reuse an existing checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'publish-codex-branch.sh" --worktree "$worktree" --branch "$branch" --base-sha "$base_sha"' "$AUTONOMOUS_LOOP" \
