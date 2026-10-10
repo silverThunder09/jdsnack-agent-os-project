@@ -22,7 +22,37 @@ fail() {
 }
 
 git_with_github_auth() {
-    if [ -n "${GH_TOKEN:-}" ]; then
+    local auth_repo=""
+    local expect_repo=false
+    local arg
+    for arg in "$@"; do
+        if [ "$expect_repo" = true ]; then
+            auth_repo="$arg"
+            break
+        fi
+        case "$arg" in
+            -C)
+                expect_repo=true
+                ;;
+            -C*)
+                auth_repo="${arg#-C}"
+                break
+                ;;
+        esac
+    done
+
+    local has_existing_header=false
+    if [ -n "$auth_repo" ]; then
+        if git -C "$auth_repo" config --local --get-all http.extraheader >/dev/null 2>&1 \
+            || git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+            has_existing_header=true
+        fi
+    elif git config --local --get-all http.extraheader >/dev/null 2>&1 \
+        || git config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+        has_existing_header=true
+    fi
+
+    if [ -n "${GH_TOKEN:-}" ] && [ "$has_existing_header" = false ]; then
         GIT_CONFIG_COUNT=1 \
         GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
         GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer $GH_TOKEN" \

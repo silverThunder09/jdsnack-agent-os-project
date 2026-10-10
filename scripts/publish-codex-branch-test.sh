@@ -99,6 +99,26 @@ case "$auth_output" in
 esac
 grep -Fq "http.https://github.com/.extraheader|AUTHORIZATION: bearer fixture-token" "$auth_log"
 
+git -C "$TEST_ROOT/work" config http.https://github.com/.extraheader 'AUTHORIZATION: bearer existing-fixture'
+existing_header_base_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
+printf 'existing checkout header\n' >> "$TEST_ROOT/work/state.txt"
+git -C "$TEST_ROOT/work" add state.txt
+git -C "$TEST_ROOT/work" commit -qm 'reuse existing checkout header'
+existing_header_log="$TEST_ROOT/existing-header-auth.log"
+: > "$existing_header_log"
+existing_header_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$existing_header_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$existing_header_base_sha")"
+case "$existing_header_output" in
+    *"codex push verified"*) ;;
+    *)
+        printf 'FAIL: existing-header publish output (%s)\n' "$existing_header_output" >&2
+        exit 1
+        ;;
+esac
+if grep -Fq "AUTHORIZATION: bearer fixture-token" "$existing_header_log"; then
+    printf 'FAIL: existing checkout header was duplicated\n' >&2
+    exit 1
+fi
+
 set +e
 mismatched_output="$(CODEX_PUSH_ATTEMPTS=1 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/other 2>&1)"
 mismatched_code=$?
