@@ -194,7 +194,10 @@ RUNNER_BLOCK="$(awk '
 ' "$AUTONOMOUS_WORKFLOW")"
 test -n "$RUNNER_BLOCK" \
   || { echo 'failed to extract autonomous runner block' >&2; exit 1; }
-RUNNER_BLOCK="$RUNNER_BLOCK" pwsh -NoLogo -NoProfile -NonInteractive -Command "$POWERSHELL_FUNCTION
+RUNNER_BLOCK="$RUNNER_BLOCK" pwsh -NoLogo -NoProfile -NonInteractive -Command "function Convert-ToWslPath([string] \$windowsPath) {
+  \$normalizedPath = \$windowsPath.Replace([char]92, '/')
+  return '/mnt/' + \$normalizedPath.Substring(0, 1).ToLowerInvariant() + \$normalizedPath.Substring(2)
+}
 function Get-Command {
   [CmdletBinding()]
   param([string] \$Name, [object] \$CommandType)
