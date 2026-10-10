@@ -21,6 +21,7 @@ git -C "$TEST_ROOT/work" commit -qm initial
 git -C "$TEST_ROOT/work" branch -M main
 git -C "$TEST_ROOT/work" remote add origin "$TEST_ROOT/remote.git"
 git -C "$TEST_ROOT/work" push -q -u origin main
+expected_origin_url="$(git -C "$TEST_ROOT/work" remote get-url origin)"
 
 old_main_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
 printf 'remote main advanced\n' >> "$TEST_ROOT/work/state.txt"
@@ -45,4 +46,18 @@ if [ "$actual_sha" != "$remote_main_sha" ]; then
     exit 1
 fi
 
+windows_output="$(CODEX_WINDOWS_WORKTREE=true REPO_ROOT="$TEST_ROOT/work" "$CREATE" --branch codex/windows-example --worktree "$TEST_ROOT/feature-windows")"
+case "$windows_output" in
+    *"created codex/windows-example from origin/main at $remote_main_sha"*) ;;
+    *)
+        printf 'FAIL: unexpected standalone clone output (%s)\n' "$windows_output" >&2
+        exit 1
+        ;;
+esac
+test -d "$TEST_ROOT/feature-windows/.git"
+test "$(git -C "$TEST_ROOT/feature-windows" rev-parse HEAD)" = "$remote_main_sha"
+test "$(git -C "$TEST_ROOT/feature-windows" branch --show-current)" = codex/windows-example
+test "$(git -C "$TEST_ROOT/feature-windows" remote get-url origin)" = "$expected_origin_url"
+
 printf 'Codex worktree creation tests passed\n'
+printf 'Windows-compatible standalone clone contract passed\n'

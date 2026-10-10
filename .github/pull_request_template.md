@@ -1,5 +1,5 @@
 <!-- PR 제목은 Conventional Commits 형식(type(scope): summary)을 사용하고, type(scope)는 영어·summary는 한국어로 작성합니다. -->
-<!-- Claude는 문서 계획·PR 관리를, Codex는 구현·테스트·수정을 담당합니다. 사용자 요청 시 Codex도 PR을 생성할 수 있습니다. 리뷰는 configured reviewer, 자동 병합 게이트는 trusted approval job이 담당합니다. -->
+<!-- Codex는 문서 계획·구현·테스트·수정과 기본 PR 리뷰를 담당합니다. Claude는 명시적으로 선택된 리뷰 또는 사용자 승인 폴백에서만 사용합니다. PR 생성·자동 병합 게이트는 trusted workflow가 담당합니다. -->
 <!-- 아래 "구현한 기능"과 "수행한 테스트"는 리뷰어가 이 PR만 읽고 기능을 판단하는 근거입니다. 한국어로 구체적으로 작성하세요. TBD 금지. -->
 
 ## 배경 · 문제 (Why)

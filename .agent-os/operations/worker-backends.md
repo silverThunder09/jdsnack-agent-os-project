@@ -13,10 +13,10 @@ Worker의 역할·권한·작업 경계와 모델 배정을 분리합니다.
 
 | Worker 역할 | 책임 | 배정 키 |
 |---|---|---|
+| Codex 문서 계획 | Spec·계약·운영 문서 설계, 자동 Spec 승격 | `workers.codex.documentation-planning` |
 | Codex 구현 | 기능 구현, 관련 테스트, 커밋, push | `workers.codex.implementation` |
 | Codex 테스트 | 테스트 코드 작성, 실패 결과 분석 | `workers.codex.test-authoring-and-analysis` |
 | Codex PR 리뷰 | 기본 PR reviewer 또는 Claude 리뷰의 읽기 전용 대체 reviewer | `workers.codex.review-fallback` |
-| Claude 문서 계획 | spec·계약·운영 문서 설계 | `workers.claude.documentation-planning` |
 | Claude 리뷰 | 독립 리뷰, 변경 범위·품질 판정 | `workers.claude.review` |
 | Claude 구현 폴백 | Codex outage 시 구현·테스트 대행 | `workers.claude.implementation-fallback` |
 
@@ -25,7 +25,7 @@ Worker의 역할·권한·작업 경계와 모델 배정을 분리합니다.
 - 배정에는 `provider`, `model`, `reason`을 모두 둡니다.
 - 모델명 변경은 `backends.json`만 수정하고, 역할·권한 변경은 이 문서와 `AGENTS.md` 또는 `CLAUDE.md`를 함께 수정합니다.
 - 빌드·lint·test·E2E 명령 실행 자체에는 모델 배정을 적용하지 않습니다.
-- Claude 문서 계획에는 자동 폴백을 두지 않습니다. 현재 PR review 기본값은 Codex이며, Claude를 reviewer로 선택한 때에는 unavailable 또는 구조화 결과 누락·오류 시 Codex 읽기 전용 리뷰를 실행합니다. 유효한 리뷰의 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달은 Codex 결과로 덮어쓰지 않습니다.
+- Codex 문서 계획은 자동 Spec 승격의 기본 경로이며 자동화 러너가 동일한 `CODEX_BIN`과 `backends.json`의 `documentation-planning.model`로 계획을 실행합니다. 활성 Spec 티켓과 신뢰된 버그 구현은 `implementation.model`을 사용합니다. Codex가 실행되지 않거나 모델 배정이 없거나 출력 형식이 깨지면 Spec 승격을 진행하지 않고 `needs-human`으로 중단합니다. 현재 PR review 기본값도 Codex이며, Claude를 reviewer로 선택한 때에만 unavailable 또는 구조화 결과 누락·오류 시 Codex 읽기 전용 리뷰를 실행합니다. 유효한 리뷰의 `REQUEST_CHANGES`, `COMMENT`, `NEEDS_HUMAN`, 점수 미달은 Codex 결과로 덮어쓰지 않습니다.
 
 ## 리뷰 폴백 전환 조건
 

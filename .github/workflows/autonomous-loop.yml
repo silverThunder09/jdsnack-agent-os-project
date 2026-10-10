@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write # Coordinator fetches and publishes Codex branches.
   issues: write
   pull-requests: write
   checks: read
@@ -97,8 +97,16 @@ jobs:
           if (-not [string]::IsNullOrWhiteSpace($ghPath)) {
             $wslGhPath = Convert-ToWslPath $ghPath
           }
+          # Codex handles Spec planning and ticket implementation in the WSL coordinator.
+          # Pass its exact Windows-installed path for the same reason as GitHub CLI.
+          $codexPath = (Get-Command codex.exe -CommandType Application -ErrorAction SilentlyContinue).Source
+          $wslCodexPath = ''
+          if (-not [string]::IsNullOrWhiteSpace($codexPath)) {
+            $wslCodexPath = Convert-ToWslPath $codexPath
+          }
           $env:GH_BIN = $wslGhPath
-          $env:WSLENV = 'GH_TOKEN/u:GITHUB_REPOSITORY/u:GITHUB_STEP_SUMMARY/p:GH_BIN/u'
+          $env:CODEX_BIN = $wslCodexPath
+          $env:WSLENV = 'GH_TOKEN/u:GITHUB_REPOSITORY/u:GITHUB_STEP_SUMMARY/p:GH_BIN/u:CODEX_BIN/u'
           $eventSha = if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) { 'none' } else { $env:GITHUB_SHA }
           $eventKey = '{0}:{1}:{2}' -f $env:GITHUB_EVENT_NAME, $env:GITHUB_RUN_ID, $eventSha
           $command = "cd '$wslWorkspace' && bash scripts/autonomous-spec-loop.sh --event '$($env:GITHUB_EVENT_NAME)' --event-key '$eventKey' --event-path '$wslEventPath' --apply"

@@ -6,10 +6,10 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 
 ## 코덱스와 분업 운영
 
-클로드는 **기획·검증·PR 관리**를 맡고, **기능 구현·테스트와 기본 PR 리뷰는 코덱스**가 맡습니다. 현재 리뷰 정책은 Claude 구독이 비활성화되어 Codex 리뷰를 바로 시작합니다. 기본 리뷰어를 Claude로 바꾸더라도 Claude 실행 불가 또는 구조화 결과 누락·오류는 [`review-backend-fallback.md`](./.agent-os/operations/review-backend-fallback.md)의 절차에 따라 Codex 읽기 전용 리뷰로 넘깁니다. Codex 리뷰가 실행되지 않거나 유효한 결과를 내지 못하면 `needs-human`으로 중단합니다.
+코덱스는 **Spec 기획·문서 계획·기능 구현·테스트와 기본 PR 리뷰**를 맡고, Claude는 명시적으로 선택된 리뷰 backend 또는 사용자 승인 폴백에서만 사용합니다. 현재 리뷰 정책은 Codex 리뷰를 바로 시작합니다. 기본 리뷰어를 Claude로 바꾸더라도 Claude 실행 불가 또는 구조화 결과 누락·오류는 [`review-backend-fallback.md`](./.agent-os/operations/review-backend-fallback.md)의 절차에 따라 Codex 읽기 전용 리뷰로 넘깁니다. Codex 리뷰가 실행되지 않거나 유효한 결과를 내지 못하면 `needs-human`으로 중단합니다.
 
-- 클로드: 문서 계획(spec), 결정론 게이트 검증, 필요 시 기본 리뷰, PR 관리. `backend`/`frontend` 소스는 직접 수정하지 않습니다.
-- 코덱스: 활성 spec 기준 기능 **구현 + 기능 테스트 작성**과 현재 기본 PR 리뷰를 담당합니다. PR 리뷰에서는 diff와 검토 기준만 받는 격리된 읽기 전용 경로를 사용합니다.
+- 코덱스: 문서 계획(spec), 활성 spec 기준 기능 **구현 + 기능 테스트 작성**과 현재 기본 PR 리뷰를 담당합니다. PR 리뷰에서는 diff와 검토 기준만 받는 격리된 읽기 전용 경로를 사용합니다.
+- 클로드: 명시적으로 선택된 리뷰 backend 또는 사용자 승인 폴백을 담당합니다. `backend`/`frontend` 소스는 직접 수정하지 않습니다.
 - PR 리뷰·자동 병합: PASS 4/5 이상, 현재 base/head SHA, PR 계약, PR CI Gate, 모든 branch-required check, 미해결 변경요청 부재를 별도 approval job이 다시 확인한 뒤 Squash auto-merge를 큐에 넣습니다. 위험도 점수는 라벨에만 사용하고 자동화 정책의 추가 사람 승인 수는 0입니다. GitHub에 실제 설정된 필수 승인 규칙은 그대로 존중합니다. 세부 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
 - clone 직후 `sh scripts/install-git-hooks.sh`로 `core.hooksPath=.githooks`와 pre-commit/pre-push 설치를 검증합니다. pre-push는 staged/working-tree/branch diff를 Codex 읽기 전용 리뷰어에게 전달하고 PASS 4점 미만이면 push를 차단합니다.
 - 리뷰는 [review-routing.md](./.agent-os/operations/review-routing.md)의 고정 위험도 산식과 Security·Performance·Test Coverage·Architecture 라벨을 사용합니다. `scripts/review-policy.json`은 `dryRun=false`이며, 점수·현재 SHA·필수 check를 검증한 뒤 자동 Squash 병합을 허용합니다.
