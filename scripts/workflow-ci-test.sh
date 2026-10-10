@@ -65,6 +65,10 @@ grep -Fq -- 'require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"' 
   || { echo 'autonomous loop must use Codex for Spec planning' >&2; exit 1; }
 grep -Fq -- '"$CODEX_BIN" exec --cd "$worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must run the Spec planner in the Codex workspace sandbox' >&2; exit 1; }
+grep -Fq -- '.workers.codex["documentation-planning"].model // empty' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must read the configured Codex Spec planner model' >&2; exit 1; }
+grep -Fq -- '--model "$spec_planner_model"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must pass the configured Spec planner model to Codex' >&2; exit 1; }
 if grep -Fq -- 'CLAUDE_BIN' "$AUTONOMOUS_LOOP"; then
   echo 'autonomous loop must not require Claude for Spec planning' >&2
   exit 1
