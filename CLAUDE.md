@@ -14,7 +14,7 @@ JDSnack(이력서↔JD AI 매칭) 작업 규칙·계약·탐색정책·Git 규�
 - ❌ **기능 구현 + 기능 테스트 작성, 리뷰 기반 코드 수정·커밋·푸시 → Codex 담당.**
 - ❌ CI/CD 배포(GHCR publish, `compose.prod.yaml`, 배포 워크플로/런북, 자동 배포·검증) → Codex 담당(사용자 지시 시).
 
-**Claude는 `backend/src`, `frontend/src` 등 소스 코드를 직접 수정하지 않습니다.** 자동 리뷰에서 문제를 찾으면 구조화 findings를 Codex에 넘겨 수정하도록 합니다. 단, 이미 리뷰를 통과한 변경을 PR로 마무리하는 커밋·푸시는 Claude가 할 수 있습니다(PR 관리 범위).
+**Claude는 `backend/src`, `frontend/src` 등 소스 코드를 직접 수정하지 않습니다.** 자동 리뷰에서 문제를 찾으면 구조화 findings를 Codex에 넘겨 수정하도록 합니다. 구현·테스트·커밋·푸시는 Codex가 수행하고, Claude는 PR 상태 관리와 명시적으로 선택된 리뷰만 담당합니다.
 
 ### 폴백: Codex 토큰 부재 시 Claude 직접 구현
 

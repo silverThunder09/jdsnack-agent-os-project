@@ -81,6 +81,14 @@ grep -Fq -- '--cd "$codex_worktree"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must pass the Codex-compatible worktree path' >&2; exit 1; }
 grep -Fq -- 'WORKTREE_TMP_ROOT="${JDSNACK_WORKTREE_TMPDIR:-$REPO/.agent-os/runtime}"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must keep temporary worktrees on the repository filesystem' >&2; exit 1; }
+grep -Fq -- 'CODEX_WINDOWS_WORKTREE=true' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must select a Windows-compatible worktree for Codex.exe' >&2; exit 1; }
+grep -Fq -- 'git clone --no-hardlinks --no-checkout' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'Codex.exe worktrees must use standalone Git metadata' >&2; exit 1; }
+grep -Fq -- 'remote set-url origin' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'standalone Codex clones must retain the real origin URL' >&2; exit 1; }
+grep -Fq -- 'CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must pass the Windows-compatible worktree mode to the creator' >&2; exit 1; }
 codex_worktree_path_fixture="$(
   CODEX_BIN='/mnt/c/Users/runner/AppData/Local/Programs/OpenAI/Codex/bin/codex.exe'
   require_binary() { command -v "$1" >/dev/null 2>&1; }

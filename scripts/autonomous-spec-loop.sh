@@ -9,6 +9,10 @@ GH_BIN="${GH_BIN:-gh}"
 JQ_BIN="${JQ_BIN:-jq}"
 CODEX_BIN="${CODEX_BIN:-codex}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+CODEX_WINDOWS_WORKTREE="${CODEX_WINDOWS_WORKTREE:-false}"
+case "$CODEX_BIN" in
+  *.exe) CODEX_WINDOWS_WORKTREE=true ;;
+esac
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$ROOT_DIR"
@@ -114,7 +118,11 @@ on_exit() {
     notify_failure "autonomous_loop_execution_failed"
   fi
   if [ -n "$WORKTREE" ]; then
-    git -C "$REPO" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+    if [ "$CODEX_WINDOWS_WORKTREE" = true ]; then
+      rm -rf -- "$WORKTREE"
+    else
+      git -C "$REPO" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+    fi
   fi
   rmdir "$LOCK" 2>/dev/null || true
   exit "$exit_code"
@@ -277,9 +285,8 @@ if [ "$status" = "promote_spec" ]; then
   "$PYTHON_BIN" "$ENGINE" claim --repo "$REPO" --event-key "$EVENT_KEY" --status "$status" --branch "$branch"
   worktree="$(mktemp -d "$WORKTREE_TMP_ROOT/jdsnack-spec.XXXXXX")"
   WORKTREE="$worktree"
-  git -C "$REPO" fetch origin main --prune
-  git -C "$REPO" worktree add --detach "$worktree" origin/main
-  git -C "$worktree" switch -c "$branch"
+  REPO_ROOT="$REPO" CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE" \
+    "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
 
   require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"
   if ! spec_planner_model="$("$JQ_BIN" -r '.workers.codex["documentation-planning"].model // empty' "$REPO/backends.json")"; then
@@ -341,7 +348,8 @@ if [ "$status" = "dispatch_codex" ]; then
   "$PYTHON_BIN" "$ENGINE" claim --repo "$REPO" --event-key "$EVENT_KEY" --status "$status" --branch "$branch"
   worktree="$(mktemp -d "$WORKTREE_TMP_ROOT/jdsnack-ticket.XXXXXX")"
   WORKTREE="$worktree"
-  REPO_ROOT="$REPO" "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
+  REPO_ROOT="$REPO" CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE" \
+    "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
   base_sha="$(git -C "$worktree" rev-parse HEAD)"
   require_binary "$CODEX_BIN" "codex_unavailable_for_ticket"
   if ! implementation_model="$("$JQ_BIN" -r '.workers.codex.implementation.model // empty' "$REPO/backends.json")"; then
@@ -364,7 +372,8 @@ if [ "$status" = "dispatch_issue" ]; then
   "$PYTHON_BIN" "$ENGINE" claim --repo "$REPO" --event-key "$EVENT_KEY" --status "$status" --branch "$branch"
   worktree="$(mktemp -d "$WORKTREE_TMP_ROOT/jdsnack-issue.XXXXXX")"
   WORKTREE="$worktree"
-  REPO_ROOT="$REPO" "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
+  REPO_ROOT="$REPO" CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE" \
+    "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
   base_sha="$(git -C "$worktree" rev-parse HEAD)"
   require_binary "$CODEX_BIN" "codex_unavailable_for_issue"
   if ! implementation_model="$("$JQ_BIN" -r '.workers.codex.implementation.model // empty' "$REPO/backends.json")"; then
