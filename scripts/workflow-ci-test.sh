@@ -69,8 +69,14 @@ grep -Fq -- 'require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"' 
   || { echo 'autonomous loop must use Codex for Spec planning' >&2; exit 1; }
 grep -Fq -- 'run_codex exec --cd "$codex_worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must run the Spec planner in the Codex workspace sandbox' >&2; exit 1; }
-grep -Fq -- 'env -u GH_TOKEN -u GITHUB_TOKEN "$CODEX_BIN"' "$AUTONOMOUS_LOOP" \
-  || { echo 'autonomous loop must remove GitHub tokens before invoking Codex' >&2; exit 1; }
+grep -Fq -- 'env -u GH_TOKEN -u GITHUB_TOKEN -u GH_BIN' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must remove GitHub CLI and GitHub tokens before invoking Codex' >&2; exit 1; }
+grep -Fq -- 'GH_CONFIG_DIR="$CODEX_GH_CONFIG_DIR"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must isolate GitHub CLI config before invoking Codex' >&2; exit 1; }
+if grep -Fq -- 'Read the issue with gh issue view' "$AUTONOMOUS_LOOP"; then
+  echo 'Codex planner must receive coordinator-fetched issue content instead of invoking gh' >&2
+  exit 1
+fi
 grep -Fq -- '.workers.codex["documentation-planning"].model // empty' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must read the configured Codex Spec planner model' >&2; exit 1; }
 grep -Fq -- '--model "$spec_planner_model"' "$AUTONOMOUS_LOOP" \
