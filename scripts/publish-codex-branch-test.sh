@@ -75,6 +75,30 @@ remote_sha="$(git -C "$TEST_ROOT/work" ls-remote origin refs/heads/codex/example
 local_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
 assert_eq "$local_sha" "$remote_sha" "remote SHA"
 
+git -C "$TEST_ROOT/work" switch -q -c codex/auth
+auth_base_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
+printf 'authenticated publish\n' >> "$TEST_ROOT/work/state.txt"
+git -C "$TEST_ROOT/work" add state.txt
+git -C "$TEST_ROOT/work" commit -qm 'authenticated publish'
+mkdir -p "$TEST_ROOT/bin"
+real_git="$(command -v git)"
+cat > "$TEST_ROOT/bin/git" <<'EOF'
+#!/bin/sh
+printf '%s|%s\n' "${GIT_CONFIG_KEY_0-}" "${GIT_CONFIG_VALUE_0-}" >> "$GIT_AUTH_LOG"
+exec "$GIT_REAL_BIN" "$@"
+EOF
+chmod +x "$TEST_ROOT/bin/git"
+auth_log="$TEST_ROOT/git-auth.log"
+auth_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$auth_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$auth_base_sha")"
+case "$auth_output" in
+    *"codex push verified"*) ;;
+    *)
+        printf 'FAIL: authenticated publish output (%s)\n' "$auth_output" >&2
+        exit 1
+        ;;
+esac
+grep -Fq "http.https://github.com/.extraheader|AUTHORIZATION: bearer fixture-token" "$auth_log"
+
 set +e
 mismatched_output="$(CODEX_PUSH_ATTEMPTS=1 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/other 2>&1)"
 mismatched_code=$?

@@ -21,6 +21,17 @@ fail() {
     exit 20
 }
 
+git_with_github_auth() {
+    if [ -n "${GH_TOKEN:-}" ]; then
+        GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
+        GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer $GH_TOKEN" \
+        git "$@"
+    else
+        git "$@"
+    fi
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --branch)
@@ -53,7 +64,7 @@ case "$BRANCH" in
 esac
 [ "$WORKTREE" != "$REPO_ROOT" ] || fail "worktree must be separate from the repository root"
 
-git -C "$REPO_ROOT" fetch origin main --prune >&2 || fail "could not fetch origin/main"
+git_with_github_auth -C "$REPO_ROOT" fetch origin main --prune >&2 || fail "could not fetch origin/main"
 git -C "$REPO_ROOT" show-ref --verify --quiet refs/remotes/origin/main || fail "origin/main is unavailable"
 
 if [ -e "$WORKTREE" ] && [ "$(find "$WORKTREE" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then

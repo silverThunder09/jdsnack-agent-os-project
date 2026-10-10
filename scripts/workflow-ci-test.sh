@@ -87,6 +87,12 @@ grep -Fq -- 'git clone --no-hardlinks --no-checkout' "$ROOT_DIR/scripts/create-c
   || { echo 'Codex.exe worktrees must use standalone Git metadata' >&2; exit 1; }
 grep -Fq -- 'remote set-url origin' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex clones must retain the real origin URL' >&2; exit 1; }
+grep -Fq -- "GIT_CONFIG_KEY_0='http.https://github.com/.extraheader'" "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'standalone Codex creation must provide GitHub authentication without writing a token to config' >&2; exit 1; }
+grep -Fq -- "GIT_CONFIG_KEY_0='http.https://github.com/.extraheader'" "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must provide GitHub authentication without writing a token to config' >&2; exit 1; }
+grep -Fq -- 'publish-codex-branch.sh" --worktree "$worktree" --branch "$branch" --base-sha "$base_sha"' "$AUTONOMOUS_LOOP" \
+  || { echo 'Spec promotion must use the authenticated Codex branch publisher' >&2; exit 1; }
 grep -Fq -- 'CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must pass the Windows-compatible worktree mode to the creator' >&2; exit 1; }
 grep -Fq -- 'candidate_title_invalid' "$AUTONOMOUS_LOOP" \

@@ -293,6 +293,7 @@ if [ "$status" = "promote_spec" ]; then
   WORKTREE="$worktree"
   REPO_ROOT="$REPO" CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE" \
     "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
+  base_sha="$(git -C "$worktree" rev-parse HEAD)"
 
   require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"
   if ! spec_planner_model="$("$JQ_BIN" -r '.workers.codex["documentation-planning"].model // empty' "$REPO/backends.json")"; then
@@ -337,7 +338,7 @@ PROMPT
     exit 20
   }
   git -C "$worktree" commit -m "docs(spec): activate ${candidate_slug}"
-  git -C "$worktree" push origin "HEAD:refs/heads/$branch"
+  "$REPO/scripts/publish-codex-branch.sh" --worktree "$worktree" --branch "$branch" --base-sha "$base_sha"
   repository="${GITHUB_REPOSITORY:-$("$GH_BIN" repo view --json nameWithOwner --jq .nameWithOwner)}"
   pr_url="$("$GH_BIN" pr create --repo "$repository" --base main --head "$branch" --title "docs(spec): activate $candidate_title" --body "Automated Spec promotion for '$candidate_id'. Docs harness and traceability checks passed before push.")"
   pr_number="$("$GH_BIN" pr view "$pr_url" --repo "$repository" --json number --jq .number)"

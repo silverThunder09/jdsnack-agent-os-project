@@ -24,6 +24,17 @@ fail() {
     exit 20
 }
 
+git_with_github_auth() {
+    if [ -n "${GH_TOKEN:-}" ]; then
+        GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
+        GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer $GH_TOKEN" \
+        git "$@"
+    else
+        git "$@"
+    fi
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --worktree)
@@ -62,7 +73,7 @@ esac
 current_branch="$(git -C "$WORKTREE" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 [ "$current_branch" = "$BRANCH" ] || fail "worktree branch does not match publish branch"
 
-if ! git -C "$WORKTREE" fetch origin main --prune >/dev/null 2>&1; then
+if ! git_with_github_auth -C "$WORKTREE" fetch origin main --prune >/dev/null 2>&1; then
     fail "could not refresh origin/main before publishing"
 fi
 
@@ -84,10 +95,10 @@ last_error=""
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     push_output=""
-    if push_output="$(git -C "$WORKTREE" push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" 2>&1)"; then
+    if push_output="$(git_with_github_auth -C "$WORKTREE" push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" 2>&1)"; then
         printf '%s\n' "$push_output" >&2
         remote_payload=""
-        if remote_payload="$(git -C "$WORKTREE" ls-remote --exit-code origin "refs/heads/$BRANCH" 2>&1)"; then
+        if remote_payload="$(git_with_github_auth -C "$WORKTREE" ls-remote --exit-code origin "refs/heads/$BRANCH" 2>&1)"; then
             remote_sha="$(printf '%s\n' "$remote_payload" | awk 'NR == 1 { print $1 }')"
             if [ "$remote_sha" = "$local_sha" ]; then
                 printf 'codex push verified: %s -> origin/%s\n' "$local_sha" "$BRANCH"
