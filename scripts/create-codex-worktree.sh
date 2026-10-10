@@ -110,9 +110,14 @@ if [ "$CODEX_WINDOWS_WORKTREE" = true ]; then
     if [ -n "$origin_push_url" ]; then
         git -C "$WORKTREE" remote set-url --push origin "$origin_push_url" || fail "could not set standalone clone push URL"
     fi
+    hook_bash_path="$(command -v bash 2>/dev/null || true)"
+    [ -n "$hook_bash_path" ] || fail "Git Bash is unavailable for the standalone clone hook"
+    git -C "$WORKTREE" config --local core.hooksPath .githooks || fail "could not configure standalone clone hooks"
+    git -C "$WORKTREE" config --local jdsnack.hookBash "$hook_bash_path" || fail "could not configure standalone clone hook Bash"
     base_sha="$(git -C "$REPO_ROOT" rev-parse refs/remotes/origin/main)"
     git -C "$WORKTREE" update-ref refs/remotes/origin/main "$base_sha" || fail "could not copy origin/main to standalone clone"
     git -C "$WORKTREE" switch -c "$BRANCH" "$base_sha" >&2 || fail "standalone Codex branch creation failed"
+    [ -f "$WORKTREE/.githooks/pre-push" ] || fail "standalone clone is missing the pre-push hook"
 else
     git -C "$REPO_ROOT" worktree add -b "$BRANCH" "$WORKTREE" refs/remotes/origin/main >&2 || fail "git worktree add failed"
 fi
