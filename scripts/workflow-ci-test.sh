@@ -154,6 +154,61 @@ try {
   Remove-Item -LiteralPath $workspace -Recurse -Force
 }'
 
+RUNNER_BLOCK="$(awk '
+  { sub(/\r$/, "") }
+  /^          \$wslWorkspace =/ { capture=1 }
+  capture {
+    line = $0
+    sub(/^          /, "", line)
+    print line
+  }
+  capture && /^$/ { exit }
+' "$AUTONOMOUS_WORKFLOW")"
+test -n "$RUNNER_BLOCK" \
+  || { echo 'failed to extract autonomous runner block' >&2; exit 1; }
+RUNNER_BLOCK="$RUNNER_BLOCK" pwsh -NoLogo -NoProfile -NonInteractive -Command "$POWERSHELL_FUNCTION
+function Get-Command {
+  [CmdletBinding()]
+  param([string] \$Name, [object] \$CommandType)
+  if (\$Name -eq \"gh.exe\") {
+    return [pscustomobject]@{ Source = \"C:\\Program Files\\GitHub CLI\\gh.exe\" }
+  }
+  if (\$Name -eq \"codex.exe\") {
+    return [pscustomobject]@{ Source = \"C:\\Users\\runner\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe\" }
+  }
+  return \$null
+}
+function wsl.exe {
+  param([Parameter(ValueFromRemainingArguments=\$true)][string[]] \$Arguments)
+  if (\$Arguments[0] -eq \"wslpath\") {
+    \$path = [string]\$Arguments[-1]
+    \$global:LASTEXITCODE = 0
+    return \"/mnt/\" + \$path.Substring(0, 1).ToLowerInvariant() + \$path.Substring(2)
+  }
+  \$global:CapturedWslCommand = [string]\$Arguments[-1]
+  \$global:CapturedCodexBin = [string]\$env:CODEX_BIN
+  \$global:CapturedWslEnv = [string]\$env:WSLENV
+  \$global:LASTEXITCODE = 0
+}
+\$env:GITHUB_WORKSPACE = \"C:\\runner\\workspace\"
+\$env:GITHUB_EVENT_PATH = \"C:\\runner\\event.json\"
+\$env:GITHUB_EVENT_NAME = \"issues\"
+\$env:GITHUB_RUN_ID = \"123\"
+\$env:GITHUB_SHA = \"abc\"
+\$env:GITHUB_REPOSITORY = \"fixture/repo\"
+\$env:GH_TOKEN = \"fixture-token\"
+Invoke-Expression \$env:RUNNER_BLOCK
+if (\$global:CapturedCodexBin -ne \"/mnt/c/Users/runner/AppData/Local/Programs/OpenAI/Codex/bin/codex.exe\") {
+  throw \"CODEX_BIN WSL path was not passed: \$global:CapturedCodexBin\"
+}
+if (\$global:CapturedWslEnv -notmatch \"CODEX_BIN/u\") {
+  throw \"WSLENV does not translate CODEX_BIN: \$global:CapturedWslEnv\"
+}
+if (\$global:CapturedWslCommand -notmatch \"bash scripts/autonomous-spec-loop\\.sh --event 'issues' --event-key 'issues:123:abc' --event-path '/mnt/c/runner/event.json' --apply\") {
+  throw \"autonomous loop arguments were not passed correctly: \$global:CapturedWslCommand\"
+}
+Write-Output \"Codex WSL runner handoff contract passed\""
+
 ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].each { |file| YAML.load_file(file) }'
 grep -Fq -- 'pull-requests: read' "$PR_CI_ROUTER" \
   || { echo 'PR CI Router must have pull-requests read permission for PR contract validation' >&2; exit 1; }
