@@ -52,6 +52,18 @@ git -C "$TEST_ROOT/work" commit -qm published
 mkdir -p "$TEST_ROOT/hooks"
 cat > "$TEST_ROOT/hooks/pre-push" <<'EOF'
 #!/bin/sh
+unset GH_TOKEN GITHUB_TOKEN GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
+if [ -n "${GIT_AUTH_HOOK_LOG:-}" ]; then
+    case "${GH_TOKEN-}|${GITHUB_TOKEN-}|${GIT_CONFIG_PARAMETERS-}|${GIT_CONFIG_VALUE_0-}" in
+        *fixture-token*)
+            printf 'token-in-hook\n' > "$GIT_AUTH_HOOK_LOG"
+            exit 1
+            ;;
+        *)
+            : > "$GIT_AUTH_HOOK_LOG"
+            ;;
+    esac
+fi
 while read -r local_ref local_sha remote_ref remote_sha; do
     case "$local_ref" in
         refs/heads/*) ;;
@@ -84,12 +96,13 @@ mkdir -p "$TEST_ROOT/bin"
 real_git="$(command -v git)"
 cat > "$TEST_ROOT/bin/git" <<'EOF'
 #!/bin/sh
-printf '%s|%s\n' "${GIT_CONFIG_KEY_0-}" "${GIT_CONFIG_VALUE_0-}" >> "$GIT_AUTH_LOG"
+printf '%s\n' "$*" >> "$GIT_AUTH_LOG"
 exec "$GIT_REAL_BIN" "$@"
 EOF
 chmod +x "$TEST_ROOT/bin/git"
 auth_log="$TEST_ROOT/git-auth.log"
-auth_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$auth_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$auth_base_sha")"
+hook_auth_log="$TEST_ROOT/hook-auth.log"
+auth_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$auth_log" GIT_AUTH_HOOK_LOG="$hook_auth_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$auth_base_sha")"
 case "$auth_output" in
     *"codex push verified"*) ;;
     *)
@@ -97,7 +110,11 @@ case "$auth_output" in
         exit 1
         ;;
 esac
-grep -Fq "http.https://github.com/.extraheader|AUTHORIZATION: bearer fixture-token" "$auth_log"
+grep -Fq "http.https://github.com/.extraheader=AUTHORIZATION: bearer fixture-token" "$auth_log"
+if grep -Fq "token-in-hook" "$hook_auth_log"; then
+    printf 'FAIL: authenticated push exposed its token to the pre-push hook\n' >&2
+    exit 1
+fi
 
 git -C "$TEST_ROOT/work" config http.https://github.com/.extraheader 'AUTHORIZATION: bearer existing-fixture'
 existing_header_base_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"

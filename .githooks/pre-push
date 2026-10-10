@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+unset GH_TOKEN GITHUB_TOKEN GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
+
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 

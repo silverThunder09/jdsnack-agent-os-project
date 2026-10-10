@@ -53,10 +53,8 @@ git_with_github_auth() {
     fi
 
     if [ -n "${GH_TOKEN:-}" ] && [ "$has_existing_header" = false ]; then
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
-        GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer $GH_TOKEN" \
-        git "$@"
+        env -u GH_TOKEN -u GITHUB_TOKEN \
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer $GH_TOKEN" "$@"
     else
         git "$@"
     fi
