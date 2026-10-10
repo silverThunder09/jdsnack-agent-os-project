@@ -63,7 +63,7 @@ grep -Fq -- 'CODEX_BIN/u' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass CODEX_BIN into WSL' >&2; exit 1; }
 grep -Fq -- 'require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must use Codex for Spec planning' >&2; exit 1; }
-grep -Fq -- '"$CODEX_BIN" exec --cd "$worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
+grep -Fq -- '"$CODEX_BIN" exec --cd "$codex_worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must run the Spec planner in the Codex workspace sandbox' >&2; exit 1; }
 grep -Fq -- '.workers.codex["documentation-planning"].model // empty' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must read the configured Codex Spec planner model' >&2; exit 1; }
@@ -73,6 +73,26 @@ grep -Fq -- '.workers.codex.implementation.model // empty' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must read the configured Codex implementation model' >&2; exit 1; }
 grep -Fq -- '--model "$implementation_model"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must pass the configured implementation model to Codex' >&2; exit 1; }
+grep -Fq -- 'codex_worktree_path()' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must normalize the worktree path for the Codex executable' >&2; exit 1; }
+grep -Fq -- 'wslpath -w "$worktree_path"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must convert WSL worktree paths before invoking Windows Codex' >&2; exit 1; }
+grep -Fq -- '--cd "$codex_worktree"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must pass the Codex-compatible worktree path' >&2; exit 1; }
+grep -Fq -- 'WORKTREE_TMP_ROOT="${JDSNACK_WORKTREE_TMPDIR:-$REPO/.agent-os/runtime}"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must keep temporary worktrees on the repository filesystem' >&2; exit 1; }
+codex_worktree_path_fixture="$(
+  CODEX_BIN='/mnt/c/Users/runner/AppData/Local/Programs/OpenAI/Codex/bin/codex.exe'
+  require_binary() { command -v "$1" >/dev/null 2>&1; }
+  wslpath() {
+    [ "$1" = '-w' ] || return 1
+    printf '%s\n' 'D:/runner/worktree'
+  }
+  eval "$(sed -n '/^codex_worktree_path() {/,/^}/p' "$AUTONOMOUS_LOOP")"
+  codex_worktree_path '/mnt/d/runner/worktree'
+)"
+[ "$codex_worktree_path_fixture" = 'D:/runner/worktree' ] \
+  || { echo 'autonomous loop must convert the WSL worktree to a Windows Codex path' >&2; exit 1; }
 if grep -Fq -- 'CLAUDE_BIN' "$AUTONOMOUS_LOOP"; then
   echo 'autonomous loop must not require Claude for Spec planning' >&2
   exit 1
