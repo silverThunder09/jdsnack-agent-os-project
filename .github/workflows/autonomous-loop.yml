@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write # Coordinator fetches and publishes Codex branches.
   issues: write
   pull-requests: write
   checks: read

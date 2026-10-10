@@ -57,14 +57,18 @@ grep -Fq -- 'GH_BIN/u' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass GH_BIN into WSL' >&2; exit 1; }
 grep -Fq -- 'Get-Command codex.exe -CommandType Application' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must resolve the Windows Codex CLI explicitly' >&2; exit 1; }
+grep -Fq -- '  contents: write' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must retain contents write permission for Codex branch publishing' >&2; exit 1; }
 grep -Fq -- '$wslCodexPath = Convert-ToWslPath $codexPath' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must convert the Codex CLI path before invoking WSL' >&2; exit 1; }
 grep -Fq -- 'CODEX_BIN/u' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass CODEX_BIN into WSL' >&2; exit 1; }
 grep -Fq -- 'require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must use Codex for Spec planning' >&2; exit 1; }
-grep -Fq -- '"$CODEX_BIN" exec --cd "$codex_worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
+grep -Fq -- 'run_codex exec --cd "$codex_worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must run the Spec planner in the Codex workspace sandbox' >&2; exit 1; }
+grep -Fq -- 'env -u GH_TOKEN -u GITHUB_TOKEN "$CODEX_BIN"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must remove GitHub tokens before invoking Codex' >&2; exit 1; }
 grep -Fq -- '.workers.codex["documentation-planning"].model // empty' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must read the configured Codex Spec planner model' >&2; exit 1; }
 grep -Fq -- '--model "$spec_planner_model"' "$AUTONOMOUS_LOOP" \
