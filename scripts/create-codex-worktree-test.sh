@@ -15,7 +15,11 @@ git init --bare -q "$TEST_ROOT/remote.git"
 git init -q "$TEST_ROOT/work"
 git -C "$TEST_ROOT/work" config user.name test
 git -C "$TEST_ROOT/work" config user.email test@example.com
+mkdir -p "$TEST_ROOT/work/.githooks"
+printf '#!/bin/sh\nexit 0\n' > "$TEST_ROOT/work/.githooks/pre-push"
+chmod +x "$TEST_ROOT/work/.githooks/pre-push"
 printf 'initial\n' > "$TEST_ROOT/work/state.txt"
+git -C "$TEST_ROOT/work" add .githooks/pre-push
 git -C "$TEST_ROOT/work" add state.txt
 git -C "$TEST_ROOT/work" commit -qm initial
 git -C "$TEST_ROOT/work" branch -M main
@@ -58,6 +62,9 @@ test -d "$TEST_ROOT/feature-windows/.git"
 test "$(git -C "$TEST_ROOT/feature-windows" rev-parse HEAD)" = "$remote_main_sha"
 test "$(git -C "$TEST_ROOT/feature-windows" branch --show-current)" = codex/windows-example
 test "$(git -C "$TEST_ROOT/feature-windows" remote get-url origin)" = "$expected_origin_url"
+test "$(git -C "$TEST_ROOT/feature-windows" config --local --get core.hooksPath)" = .githooks
+test -n "$(git -C "$TEST_ROOT/feature-windows" config --local --get jdsnack.hookBash)"
+test -f "$TEST_ROOT/feature-windows/.githooks/pre-push"
 
 printf 'Codex worktree creation tests passed\n'
 printf 'Windows-compatible standalone clone contract passed\n'

@@ -22,11 +22,40 @@ fail() {
 }
 
 git_with_github_auth() {
-    if [ -n "${GH_TOKEN:-}" ]; then
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
-        GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer $GH_TOKEN" \
-        git "$@"
+    local auth_repo=""
+    local expect_repo=false
+    local arg
+    for arg in "$@"; do
+        if [ "$expect_repo" = true ]; then
+            auth_repo="$arg"
+            break
+        fi
+        case "$arg" in
+            -C)
+                expect_repo=true
+                ;;
+            -C*)
+                auth_repo="${arg#-C}"
+                break
+                ;;
+        esac
+    done
+
+    local has_existing_header=false
+    if [ -n "$auth_repo" ]; then
+        if git -C "$auth_repo" config --local --get-all http.extraheader >/dev/null 2>&1 \
+            || git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+            has_existing_header=true
+        fi
+    elif git config --local --get-all http.extraheader >/dev/null 2>&1 \
+        || git config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+        has_existing_header=true
+    fi
+
+    if [ -n "${GH_TOKEN:-}" ] && [ "$has_existing_header" = false ]; then
+        local credential_helper='!f() { case "$1" in get) printf "protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n" "$GH_TOKEN";; esac; }; f'
+        env -u GITHUB_TOKEN \
+            git -c "credential.helper=$credential_helper" "$@"
     else
         git "$@"
     fi
@@ -80,9 +109,14 @@ if [ "$CODEX_WINDOWS_WORKTREE" = true ]; then
     if [ -n "$origin_push_url" ]; then
         git -C "$WORKTREE" remote set-url --push origin "$origin_push_url" || fail "could not set standalone clone push URL"
     fi
+    hook_bash_path="$(command -v bash 2>/dev/null || true)"
+    [ -n "$hook_bash_path" ] || fail "Git Bash is unavailable for the standalone clone hook"
+    git -C "$WORKTREE" config --local core.hooksPath .githooks || fail "could not configure standalone clone hooks"
+    git -C "$WORKTREE" config --local jdsnack.hookBash "$hook_bash_path" || fail "could not configure standalone clone hook Bash"
     base_sha="$(git -C "$REPO_ROOT" rev-parse refs/remotes/origin/main)"
     git -C "$WORKTREE" update-ref refs/remotes/origin/main "$base_sha" || fail "could not copy origin/main to standalone clone"
     git -C "$WORKTREE" switch -c "$BRANCH" "$base_sha" >&2 || fail "standalone Codex branch creation failed"
+    [ -f "$WORKTREE/.githooks/pre-push" ] || fail "standalone clone is missing the pre-push hook"
 else
     git -C "$REPO_ROOT" worktree add -b "$BRANCH" "$WORKTREE" refs/remotes/origin/main >&2 || fail "git worktree add failed"
 fi

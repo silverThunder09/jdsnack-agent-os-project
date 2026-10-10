@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKTREE=""
 BRANCH=""
 BASE_SHA=""
 MAX_ATTEMPTS="${CODEX_PUSH_ATTEMPTS:-3}"
 RETRY_DELAY="${CODEX_PUSH_RETRY_DELAY_SECONDS:-5}"
+PUBLISH_TMP_ROOT=""
+TRUSTED_HOOK_DIR=""
+HOOK_CONFIG_REPO=""
+ORIGINAL_HOOK_PATH=""
+ORIGINAL_HOOK_PATH_SET=false
 
 usage() {
     cat <<'USAGE'
@@ -24,12 +30,114 @@ fail() {
     exit 20
 }
 
+shell_quote() {
+    local value="$1"
+    value="${value//\'/\'\\\'\'}"
+    printf "'%s'" "$value"
+}
+
+restore_push_hook() {
+    [ -n "$HOOK_CONFIG_REPO" ] || return 0
+    if [ "$ORIGINAL_HOOK_PATH_SET" = true ]; then
+        git -C "$HOOK_CONFIG_REPO" config --local core.hooksPath "$ORIGINAL_HOOK_PATH"
+    else
+        git -C "$HOOK_CONFIG_REPO" config --local --unset core.hooksPath >/dev/null 2>&1 || true
+    fi
+    HOOK_CONFIG_REPO=""
+}
+
+cleanup() {
+    local exit_code=$?
+    if ! restore_push_hook; then
+        printf 'codex push failed: could not restore the worktree core.hooksPath\n' >&2
+        exit_code=20
+    fi
+    if [ -n "$PUBLISH_TMP_ROOT" ]; then
+        rm -rf -- "$PUBLISH_TMP_ROOT"
+    fi
+    exit "$exit_code"
+}
+trap cleanup EXIT HUP INT TERM
+
+prepare_trusted_push_hook() {
+    local trusted_bash
+    local trusted_review_script
+    local trusted_bash_literal
+    local trusted_review_literal
+    local trusted_hook
+    local config_hook_dir
+
+    trusted_bash="$(command -v bash 2>/dev/null || true)"
+    [ -n "$trusted_bash" ] || fail "trusted Git Bash is unavailable"
+    trusted_review_script="$ROOT_DIR/scripts/pre-push-ai-review.sh"
+    [ -f "$trusted_review_script" ] || fail "trusted pre-push reviewer is unavailable"
+
+    PUBLISH_TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-publish.XXXXXX")" \
+        || fail "could not create trusted push hook directory"
+    TRUSTED_HOOK_DIR="$PUBLISH_TMP_ROOT/hooks"
+    mkdir "$TRUSTED_HOOK_DIR" || fail "could not create trusted push hook directory"
+    chmod 700 "$TRUSTED_HOOK_DIR" || fail "could not secure trusted push hook directory"
+    trusted_hook="$TRUSTED_HOOK_DIR/pre-push"
+    trusted_bash_literal="$(shell_quote "$trusted_bash")"
+    trusted_review_literal="$(shell_quote "$trusted_review_script")"
+    {
+        printf '%s\n' '#!/bin/sh' 'set -eu'
+        printf '%s\n' 'unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR'
+        printf '%s\n' 'for variable in $(env | sed -n '\''s/^\(GIT_CONFIG_[A-Za-z0-9_]*\)=.*$/\1/p'\''); do unset "$variable"; done'
+        printf 'exec %s %s "$@"\n' "$trusted_bash_literal" "$trusted_review_literal"
+    } > "$trusted_hook"
+    chmod 700 "$trusted_hook" || fail "could not secure trusted push hook"
+
+    HOOK_CONFIG_REPO="$WORKTREE"
+    if ORIGINAL_HOOK_PATH="$(git -C "$WORKTREE" config --local --get core.hooksPath 2>/dev/null)"; then
+        ORIGINAL_HOOK_PATH_SET=true
+    fi
+    config_hook_dir="$TRUSTED_HOOK_DIR"
+    if command -v cygpath >/dev/null 2>&1; then
+        config_hook_dir="$(cygpath -m "$TRUSTED_HOOK_DIR")"
+    fi
+    git -C "$WORKTREE" config --local core.hooksPath "$config_hook_dir" \
+        || fail "could not install trusted push hook"
+    if [ "$(git -C "$WORKTREE" config --local --get core.hooksPath)" != "$config_hook_dir" ]; then
+        fail "trusted push hook was not installed"
+    fi
+}
+
 git_with_github_auth() {
-    if [ -n "${GH_TOKEN:-}" ]; then
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
-        GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer $GH_TOKEN" \
-        git "$@"
+    local auth_repo=""
+    local expect_repo=false
+    local arg
+    for arg in "$@"; do
+        if [ "$expect_repo" = true ]; then
+            auth_repo="$arg"
+            break
+        fi
+        case "$arg" in
+            -C)
+                expect_repo=true
+                ;;
+            -C*)
+                auth_repo="${arg#-C}"
+                break
+                ;;
+        esac
+    done
+
+    local has_existing_header=false
+    if [ -n "$auth_repo" ]; then
+        if git -C "$auth_repo" config --local --get-all http.extraheader >/dev/null 2>&1 \
+            || git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+            has_existing_header=true
+        fi
+    elif git config --local --get-all http.extraheader >/dev/null 2>&1 \
+        || git config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+        has_existing_header=true
+    fi
+
+    if [ -n "${GH_TOKEN:-}" ] && [ "$has_existing_header" = false ]; then
+        local credential_helper='!f() { case "$1" in get) printf "protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n" "$GH_TOKEN";; esac; }; f'
+        env -u GITHUB_TOKEN \
+            git -c "credential.helper=$credential_helper" "$@"
     else
         git "$@"
     fi
@@ -90,6 +198,8 @@ fi
 if ! git -C "$WORKTREE" merge-base --is-ancestor refs/remotes/origin/main "$local_sha"; then
     fail "origin/main advanced; rebase the branch before publishing"
 fi
+
+prepare_trusted_push_hook
 
 last_error=""
 attempt=1

@@ -59,16 +59,26 @@ grep -Fq -- 'Get-Command codex.exe -CommandType Application' "$AUTONOMOUS_WORKFL
   || { echo 'autonomous loop must resolve the Windows Codex CLI explicitly' >&2; exit 1; }
 grep -Fq -- '  contents: write' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must retain contents write permission for Codex branch publishing' >&2; exit 1; }
+grep -Fq -- '          persist-credentials: false' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop checkout must not persist a write-capable GitHub token' >&2; exit 1; }
 grep -Fq -- '$wslCodexPath = Convert-ToWslPath $codexPath' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must convert the Codex CLI path before invoking WSL' >&2; exit 1; }
 grep -Fq -- 'CODEX_BIN/u' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass CODEX_BIN into WSL' >&2; exit 1; }
+grep -Fq -- 'GH_CONFIG_DIR/wp' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must pass the isolated GitHub CLI config path into WSL' >&2; exit 1; }
 grep -Fq -- 'require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must use Codex for Spec planning' >&2; exit 1; }
 grep -Fq -- 'run_codex exec --cd "$codex_worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must run the Spec planner in the Codex workspace sandbox' >&2; exit 1; }
-grep -Fq -- 'env -u GH_TOKEN -u GITHUB_TOKEN "$CODEX_BIN"' "$AUTONOMOUS_LOOP" \
-  || { echo 'autonomous loop must remove GitHub tokens before invoking Codex' >&2; exit 1; }
+grep -Fq -- 'env -u GH_TOKEN -u GITHUB_TOKEN -u GH_BIN' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must remove GitHub CLI and GitHub tokens before invoking Codex' >&2; exit 1; }
+grep -Fq -- 'GH_CONFIG_DIR="$CODEX_GH_CONFIG_DIR"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must isolate GitHub CLI config before invoking Codex' >&2; exit 1; }
+if grep -Fq -- 'Read the issue with gh issue view' "$AUTONOMOUS_LOOP"; then
+  echo 'Codex planner must receive coordinator-fetched issue content instead of invoking gh' >&2
+  exit 1
+fi
 grep -Fq -- '.workers.codex["documentation-planning"].model // empty' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must read the configured Codex Spec planner model' >&2; exit 1; }
 grep -Fq -- '--model "$spec_planner_model"' "$AUTONOMOUS_LOOP" \
@@ -91,10 +101,24 @@ grep -Fq -- 'git clone --no-hardlinks --no-checkout' "$ROOT_DIR/scripts/create-c
   || { echo 'Codex.exe worktrees must use standalone Git metadata' >&2; exit 1; }
 grep -Fq -- 'remote set-url origin' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex clones must retain the real origin URL' >&2; exit 1; }
-grep -Fq -- "GIT_CONFIG_KEY_0='http.https://github.com/.extraheader'" "$ROOT_DIR/scripts/create-codex-worktree.sh" \
-  || { echo 'standalone Codex creation must provide GitHub authentication without writing a token to config' >&2; exit 1; }
-grep -Fq -- "GIT_CONFIG_KEY_0='http.https://github.com/.extraheader'" "$ROOT_DIR/scripts/publish-codex-branch.sh" \
-  || { echo 'Codex branch publishing must provide GitHub authentication without writing a token to config' >&2; exit 1; }
+grep -Fq -- 'credential.helper=$credential_helper' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'standalone Codex creation must use a token-free Git credential helper argument' >&2; exit 1; }
+grep -Fq -- 'git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'standalone Codex creation must reuse an existing checkout Authorization header' >&2; exit 1; }
+grep -Fq -- 'git -C "$WORKTREE" config --local core.hooksPath .githooks' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'standalone Codex clones must retain the repository pre-push hook path' >&2; exit 1; }
+grep -Fq -- 'for variable in $(env | sed' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must sanitize all coordinator Git config variables before launching the reviewer' >&2; exit 1; }
+grep -Fq -- 'unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must remove GitHub CLI binary and config paths before launching the reviewer' >&2; exit 1; }
+grep -Fq -- 'credential.helper=$credential_helper' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must use a token-free Git credential helper argument' >&2; exit 1; }
+grep -Fq -- 'git -C "$WORKTREE" config --local core.hooksPath "$config_hook_dir"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must override a worktree-controlled hook with a trusted hook path' >&2; exit 1; }
+grep -Fq -- 'restore_push_hook' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must restore the original worktree hook path' >&2; exit 1; }
+grep -Fq -- 'git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must reuse an existing checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'publish-codex-branch.sh" --worktree "$worktree" --branch "$branch" --base-sha "$base_sha"' "$AUTONOMOUS_LOOP" \
   || { echo 'Spec promotion must use the authenticated Codex branch publisher' >&2; exit 1; }
 grep -Fq -- 'CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE"' "$AUTONOMOUS_LOOP" \
@@ -258,6 +282,9 @@ if (\$global:CapturedCodexBin -ne \"/mnt/c/Users/runner/AppData/Local/Programs/O
 }
 if (\$global:CapturedWslEnv -notmatch \"CODEX_BIN/u\") {
   throw \"WSLENV does not translate CODEX_BIN: \$global:CapturedWslEnv\"
+}
+if (\$global:CapturedWslEnv -notmatch \"GH_CONFIG_DIR/wp\") {
+  throw \"WSLENV does not translate GH_CONFIG_DIR: \$global:CapturedWslEnv\"
 }
 if (\$global:CapturedWslCommand -notmatch \"bash scripts/autonomous-spec-loop\\.sh --event 'issues' --event-key 'issues:123:abc' --event-path '/mnt/c/runner/event.json' --apply\") {
   throw \"autonomous loop arguments were not passed correctly: \$global:CapturedWslCommand\"
