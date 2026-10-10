@@ -65,6 +65,8 @@ grep -Fq -- '$wslCodexPath = Convert-ToWslPath $codexPath' "$AUTONOMOUS_WORKFLOW
   || { echo 'autonomous loop must convert the Codex CLI path before invoking WSL' >&2; exit 1; }
 grep -Fq -- 'CODEX_BIN/u' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass CODEX_BIN into WSL' >&2; exit 1; }
+grep -Fq -- 'GH_CONFIG_DIR/u' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must pass the isolated GitHub CLI config path into WSL' >&2; exit 1; }
 grep -Fq -- 'require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must use Codex for Spec planning' >&2; exit 1; }
 grep -Fq -- 'run_codex exec --cd "$codex_worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
@@ -272,6 +274,9 @@ if (\$global:CapturedCodexBin -ne \"/mnt/c/Users/runner/AppData/Local/Programs/O
 }
 if (\$global:CapturedWslEnv -notmatch \"CODEX_BIN/u\") {
   throw \"WSLENV does not translate CODEX_BIN: \$global:CapturedWslEnv\"
+}
+if (\$global:CapturedWslEnv -notmatch \"GH_CONFIG_DIR/u\") {
+  throw \"WSLENV does not translate GH_CONFIG_DIR: \$global:CapturedWslEnv\"
 }
 if (\$global:CapturedWslCommand -notmatch \"bash scripts/autonomous-spec-loop\\.sh --event 'issues' --event-key 'issues:123:abc' --event-path '/mnt/c/runner/event.json' --apply\") {
   throw \"autonomous loop arguments were not passed correctly: \$global:CapturedWslCommand\"
