@@ -52,13 +52,14 @@ git -C "$TEST_ROOT/work" commit -qm published
 mkdir -p "$TEST_ROOT/hooks"
 cat > "$TEST_ROOT/hooks/pre-push" <<'EOF'
 #!/bin/sh
-unset GH_TOKEN GITHUB_TOKEN
+unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR
 for variable in $(env | sed -n 's/^\(GIT_CONFIG_[A-Za-z0-9_]*\)=.*$/\1/p'); do
     unset "$variable"
 done
 if [ -n "${GIT_AUTH_HOOK_LOG:-}" ]; then
     if env | grep -Eq '^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+|PARAMETERS)=' ||
-        [ -n "${GH_TOKEN-}" ] || [ -n "${GITHUB_TOKEN-}" ]; then
+        [ -n "${GH_TOKEN-}" ] || [ -n "${GITHUB_TOKEN-}" ] ||
+        [ -n "${GH_BIN-}" ] || [ -n "${GH_CONFIG_DIR-}" ]; then
         printf 'token-in-hook\n' > "$GIT_AUTH_HOOK_LOG"
         exit 1
     fi
@@ -111,7 +112,7 @@ EOF
 chmod +x "$TEST_ROOT/bin/git"
 auth_log="$TEST_ROOT/git-auth.log"
 hook_auth_log="$TEST_ROOT/hook-auth.log"
-auth_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$auth_log" GIT_AUTH_HOOK_LOG="$hook_auth_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$auth_base_sha")"
+auth_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$auth_log" GIT_AUTH_HOOK_LOG="$hook_auth_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$auth_base_sha")"
 case "$auth_output" in
     *"codex push verified"*) ;;
     *)
@@ -136,7 +137,7 @@ git -C "$TEST_ROOT/work" add state.txt
 git -C "$TEST_ROOT/work" commit -qm 'reuse existing checkout header'
 existing_header_log="$TEST_ROOT/existing-header-auth.log"
 : > "$existing_header_log"
-existing_header_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$existing_header_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$existing_header_base_sha")"
+existing_header_output="$(PATH="$TEST_ROOT/bin:$PATH" GIT_AUTH_LOG="$existing_header_log" GIT_REAL_BIN="$real_git" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$existing_header_base_sha")"
 case "$existing_header_output" in
     *"codex push verified"*) ;;
     *)

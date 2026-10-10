@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-unset GH_TOKEN GITHUB_TOKEN
+unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR
 for variable in $(env | sed -n 's/^\(GIT_CONFIG_[A-Za-z0-9_]*\)=.*$/\1/p'); do
   unset "$variable"
 done

@@ -198,6 +198,10 @@ fi
 if [ -n "${JDSNACK_TEST_CUSTOM-}" ]; then
   exit 7
 fi
+if [ "${JDSNACK_ASSERT_HOOK_GH_ISOLATION-}" = '1' ] &&
+    { [ -n "${GH_BIN-}" ] || [ -n "${GH_CONFIG_DIR-}" ]; }; then
+  exit 23
+fi
 if [ -n "${APPDATA-}" ] || [ -n "${LOCALAPPDATA-}" ]; then
   exit 11
 fi
@@ -382,6 +386,9 @@ run_review() {
     printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$base_sha" \
       | PATH="$fake_root:$PATH" \
         JDSNACK_REVIEW_BASE_REF="$base_ref" \
+        GH_BIN="$fake_root/gh.exe" \
+        GH_CONFIG_DIR="$fake_root/gh-config" \
+        JDSNACK_ASSERT_HOOK_GH_ISOLATION=1 \
         run_hook_with_origin_urls "$test_worktree/.githooks/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
   )
 }
