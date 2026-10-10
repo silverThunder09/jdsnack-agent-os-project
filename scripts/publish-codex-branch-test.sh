@@ -52,17 +52,17 @@ git -C "$TEST_ROOT/work" commit -qm published
 mkdir -p "$TEST_ROOT/hooks"
 cat > "$TEST_ROOT/hooks/pre-push" <<'EOF'
 #!/bin/sh
-unset GH_TOKEN GITHUB_TOKEN GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
+unset GH_TOKEN GITHUB_TOKEN
+for variable in $(env | sed -n 's/^\(GIT_CONFIG_[A-Za-z0-9_]*\)=.*$/\1/p'); do
+    unset "$variable"
+done
 if [ -n "${GIT_AUTH_HOOK_LOG:-}" ]; then
-    case "${GH_TOKEN-}|${GITHUB_TOKEN-}|${GIT_CONFIG_PARAMETERS-}|${GIT_CONFIG_VALUE_0-}" in
-        *fixture-token*)
-            printf 'token-in-hook\n' > "$GIT_AUTH_HOOK_LOG"
-            exit 1
-            ;;
-        *)
-            : > "$GIT_AUTH_HOOK_LOG"
-            ;;
-    esac
+    if env | grep -Eq '^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+|PARAMETERS)=' ||
+        [ -n "${GH_TOKEN-}" ] || [ -n "${GITHUB_TOKEN-}" ]; then
+        printf 'token-in-hook\n' > "$GIT_AUTH_HOOK_LOG"
+        exit 1
+    fi
+    : > "$GIT_AUTH_HOOK_LOG"
 fi
 while read -r local_ref local_sha remote_ref remote_sha; do
     case "$local_ref" in
@@ -97,6 +97,15 @@ real_git="$(command -v git)"
 cat > "$TEST_ROOT/bin/git" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >> "$GIT_AUTH_LOG"
+case " $* " in
+    *" push "*)
+        export GIT_CONFIG_COUNT=2
+        export GIT_CONFIG_KEY_0='http.https://github.com/.extraheader'
+        export GIT_CONFIG_VALUE_0='AUTHORIZATION: bearer fixture-token'
+        export GIT_CONFIG_KEY_1='http.https://github.com/.extraheader'
+        export GIT_CONFIG_VALUE_1='AUTHORIZATION: bearer fixture-token'
+        ;;
+esac
 exec "$GIT_REAL_BIN" "$@"
 EOF
 chmod +x "$TEST_ROOT/bin/git"

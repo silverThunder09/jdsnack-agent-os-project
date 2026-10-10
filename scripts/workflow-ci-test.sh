@@ -65,7 +65,7 @@ grep -Fq -- '$wslCodexPath = Convert-ToWslPath $codexPath' "$AUTONOMOUS_WORKFLOW
   || { echo 'autonomous loop must convert the Codex CLI path before invoking WSL' >&2; exit 1; }
 grep -Fq -- 'CODEX_BIN/u' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass CODEX_BIN into WSL' >&2; exit 1; }
-grep -Fq -- 'GH_CONFIG_DIR/u' "$AUTONOMOUS_WORKFLOW" \
+grep -Fq -- 'GH_CONFIG_DIR/wp' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass the isolated GitHub CLI config path into WSL' >&2; exit 1; }
 grep -Fq -- 'require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must use Codex for Spec planning' >&2; exit 1; }
@@ -107,8 +107,8 @@ grep -Fq -- 'git -C "$auth_repo" config --local --get-all http.https://github.co
   || { echo 'standalone Codex creation must reuse an existing checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'git -C "$WORKTREE" config --local core.hooksPath .githooks' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex clones must retain the repository pre-push hook path' >&2; exit 1; }
-grep -Fq -- 'unset GH_TOKEN GITHUB_TOKEN GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS' "$ROOT_DIR/.githooks/pre-push" \
-  || { echo 'pre-push hooks must sanitize coordinator GitHub credentials before launching the reviewer' >&2; exit 1; }
+grep -Fq -- 'for variable in $(env | sed' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must sanitize all coordinator Git config variables before launching the reviewer' >&2; exit 1; }
 grep -Fq -- 'git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer $GH_TOKEN"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must provide GitHub authentication without exposing a token to hooks' >&2; exit 1; }
 grep -Fq -- 'git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
@@ -277,7 +277,7 @@ if (\$global:CapturedCodexBin -ne \"/mnt/c/Users/runner/AppData/Local/Programs/O
 if (\$global:CapturedWslEnv -notmatch \"CODEX_BIN/u\") {
   throw \"WSLENV does not translate CODEX_BIN: \$global:CapturedWslEnv\"
 }
-if (\$global:CapturedWslEnv -notmatch \"GH_CONFIG_DIR/u\") {
+if (\$global:CapturedWslEnv -notmatch \"GH_CONFIG_DIR/wp\") {
   throw \"WSLENV does not translate GH_CONFIG_DIR: \$global:CapturedWslEnv\"
 }
 if (\$global:CapturedWslCommand -notmatch \"bash scripts/autonomous-spec-loop\\.sh --event 'issues' --event-key 'issues:123:abc' --event-path '/mnt/c/runner/event.json' --apply\") {

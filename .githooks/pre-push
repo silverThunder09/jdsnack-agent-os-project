@@ -1,7 +1,10 @@
 #!/bin/sh
 set -eu
 
-unset GH_TOKEN GITHUB_TOKEN GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
+unset GH_TOKEN GITHUB_TOKEN
+for variable in $(env | sed -n 's/^\(GIT_CONFIG_[A-Za-z0-9_]*\)=.*$/\1/p'); do
+  unset "$variable"
+done
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
