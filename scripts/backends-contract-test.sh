@@ -9,9 +9,9 @@ jq -e '
   and (.workers | type == "object")
   and ([
    .workers.codex.implementation,
+   .workers.codex["documentation-planning"],
    .workers.codex["test-authoring-and-analysis"],
     .workers.codex["review-fallback"],
-   .workers.claude["documentation-planning"],
     .workers.claude.review
   ] | all(.[]; (.provider | type == "string") and (.provider | length > 0) and (.model | type == "string") and (.model | length > 0) and (.reason | type == "string") and (.reason | length > 0)))
   and .workers.codex["review-fallback"].model == "gpt-6-luna"

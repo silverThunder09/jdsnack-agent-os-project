@@ -7,6 +7,11 @@
         "model": "gpt-5.6-luna",
         "reason": "기능 구현 속도와 기존 코드 경계 준수에 적합합니다."
       },
+      "documentation-planning": {
+        "provider": "openai",
+        "model": "gpt-5.6-luna",
+        "reason": "활성 Spec의 요구사항·계약·수직 티켓을 일관되게 설계하고 자동화 러너에서 바로 실행할 수 있습니다."
+      },
       "test-authoring-and-analysis": {
         "provider": "openai",
         "model": "gpt-5.6-luna-medium",
@@ -24,11 +29,6 @@
         "provider": "anthropic",
         "model": "sonnet",
         "reason": "Codex outage 시 사용자 승인 후 구현·테스트를 대행합니다. spec 계약 준수 신뢰성이 높고 즉시 가용한 유일한 폴백 백엔드입니다."
-      },
-      "documentation-planning": {
-        "provider": "anthropic",
-        "model": "opus",
-        "reason": "기능 계약과 장기 문서 구조를 일관되게 설계하는 역할에 사용합니다."
       },
       "review": {
         "provider": "anthropic",

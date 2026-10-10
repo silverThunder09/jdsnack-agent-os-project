@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 AUTONOMOUS_WORKFLOW="$ROOT_DIR/.github/workflows/autonomous-loop.yml"
+AUTONOMOUS_LOOP="$ROOT_DIR/scripts/autonomous-spec-loop.sh"
 PR_CI_ROUTER="$ROOT_DIR/.github/workflows/pr-ci-router.yml"
 PUSH_PATH_FILTER="$(awk '
   { sub(/\r$/, "") }
@@ -54,6 +55,20 @@ grep -Fq -- '$wslGhPath = Convert-ToWslPath $ghPath' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must convert the GitHub CLI path before invoking WSL' >&2; exit 1; }
 grep -Fq -- 'GH_BIN/u' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass GH_BIN into WSL' >&2; exit 1; }
+grep -Fq -- 'Get-Command codex.exe -CommandType Application' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must resolve the Windows Codex CLI explicitly' >&2; exit 1; }
+grep -Fq -- '$wslCodexPath = Convert-ToWslPath $codexPath' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must convert the Codex CLI path before invoking WSL' >&2; exit 1; }
+grep -Fq -- 'CODEX_BIN/u' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must pass CODEX_BIN into WSL' >&2; exit 1; }
+grep -Fq -- 'require_binary "$CODEX_BIN" "codex_unavailable_for_spec_planning"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must use Codex for Spec planning' >&2; exit 1; }
+grep -Fq -- '"$CODEX_BIN" exec --cd "$worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must run the Spec planner in the Codex workspace sandbox' >&2; exit 1; }
+if grep -Fq -- 'CLAUDE_BIN' "$AUTONOMOUS_LOOP"; then
+  echo 'autonomous loop must not require Claude for Spec planning' >&2
+  exit 1
+fi
 grep -Fq -- 'bash scripts/autonomous-spec-loop.sh' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must invoke the coordinator script' >&2; exit 1; }
 if grep -Fq -- '        shell: bash' "$AUTONOMOUS_WORKFLOW"; then

@@ -5,7 +5,7 @@ description: JDSnack 코드 리뷰 핸드오프 루프. 설정된 reviewer가 �
 
 # review-loop (설정된 reviewer = 게이트키퍼)
 
-역할 분담: **Codex는 구현·테스트와 현재 기본 PR 리뷰**, **Claude는 기획·검증·PR 관리**를 담당합니다. reviewer 선택은 `scripts/review-policy.json`의 `primaryReviewer`를 따릅니다.
+역할 분담: **Codex는 구현·테스트와 현재 기본 PR 리뷰 및 Spec 기획·문서 계획**, **Claude는 명시적으로 선택된 리뷰 backend 또는 사용자 승인 폴백**을 담당합니다. reviewer 선택은 `scripts/review-policy.json`의 `primaryReviewer`를 따릅니다.
 현재 primary reviewer는 Codex이므로 Claude 호출 없이 바로 읽기 전용 리뷰를 실행합니다. primary가 Claude이고 Claude가 unavailable이거나 구조화 결과를 반환하지 못하면 Codex read-only reviewer로 전환합니다. 유효한 Claude 판정은 Codex 결과로 덮어쓰지 않습니다. 어느 reviewer든 소스 코드를 수정하지 않습니다.
 규칙 정본은 `.agent-os/`이며 여기서 재서술하지 않습니다.
 

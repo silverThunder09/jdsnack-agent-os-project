@@ -5,9 +5,9 @@ JDSnack(이력서↔JD AI 매칭) 작업 규칙·계약·탐색정책·Git 규�
 
 ## Claude의 역할 (Codex와 분업)
 
-Claude는 **기획·검증·PR 통합**을 맡고, **기능 구현·테스트는 하지 않습니다.** 구현과 기능 테스트는 Codex가 담당합니다. PR 기본 reviewer도 현재 정책상 Codex이며, Claude 실행 없이 바로 읽기 전용 리뷰를 수행합니다.
+자동 Spec 계획·기능 구현·테스트와 PR 기본 reviewer는 Codex가 담당합니다. Claude는 명시적으로 선택된 리뷰 backend 또는 사용자 승인 폴백에서만 사용하며, 기능 구현과 기능 테스트는 하지 않습니다.
 
-- ✅ 문서 계획·작성 → `doc-planner` 서브에이전트 또는 메인 plan 모드. 모델 배정은 [backends.json](backends.json)을 따른다. `.agent-os/` 하네스 규칙(`doc-lifecycle.md`·`definition-of-done.md` 등)에 맞춘다.
+- ✅ 문서 계획·작성 → Codex 자동 Spec planner. 모델 배정은 [backends.json](backends.json)을 따른다. `.agent-os/` 하네스 규칙(`doc-lifecycle.md`·`definition-of-done.md` 등)에 맞춘다.
 - ✅ 게이트 검증 → 빌드/lint/test/e2e(아래 명령)로 Codex 산출물을 확인한다.
 - ✅ PR 리뷰·채점 → `scripts/review-policy.json`의 `primaryReviewer`를 실행합니다. 현재는 Codex가 diff와 합격기준만 받아 5점 루브릭으로 읽기 전용 리뷰를 즉시 수행합니다. Claude를 기본 reviewer로 설정한 경우 unavailable·누락·잘못된 구조화 결과는 Codex fallback으로 넘기며, 둘 다 유효하지 않으면 `needs-human`으로 중단합니다.
 - ✅ PR 생성·관리 → 이벤트 기반 자동 루프. PASS 4/5 이상, 현재 PR head의 리뷰 check와 PR 계약·모든 필수 check 통과 및 미해결 변경요청 부재가 확인되면 Squash auto-merge를 큐에 넣습니다. 위험도는 라벨이며 사람 승인 수나 병합 여부를 바꾸지 않습니다. GitHub branch protection에 실제 승인 수가 설정된 경우에만 GitHub가 이를 강제합니다. 충돌·미해결·서비스 경계 오류는 `needs-human`으로 중단합니다.
