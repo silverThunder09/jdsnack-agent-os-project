@@ -53,8 +53,9 @@ git_with_github_auth() {
     fi
 
     if [ -n "${GH_TOKEN:-}" ] && [ "$has_existing_header" = false ]; then
-        env -u GH_TOKEN -u GITHUB_TOKEN \
-            git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer $GH_TOKEN" "$@"
+        local credential_helper='!f() { case "$1" in get) printf "protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n" "$GH_TOKEN";; esac; }; f'
+        env -u GITHUB_TOKEN \
+            git -c "credential.helper=$credential_helper" "$@"
     else
         git "$@"
     fi

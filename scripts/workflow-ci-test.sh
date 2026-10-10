@@ -101,16 +101,16 @@ grep -Fq -- 'git clone --no-hardlinks --no-checkout' "$ROOT_DIR/scripts/create-c
   || { echo 'Codex.exe worktrees must use standalone Git metadata' >&2; exit 1; }
 grep -Fq -- 'remote set-url origin' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex clones must retain the real origin URL' >&2; exit 1; }
-grep -Fq -- 'git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer $GH_TOKEN"' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
-  || { echo 'standalone Codex creation must provide GitHub authentication without exposing a token to hooks' >&2; exit 1; }
+grep -Fq -- 'credential.helper=$credential_helper' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'standalone Codex creation must use a token-free Git credential helper argument' >&2; exit 1; }
 grep -Fq -- 'git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex creation must reuse an existing checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'git -C "$WORKTREE" config --local core.hooksPath .githooks' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex clones must retain the repository pre-push hook path' >&2; exit 1; }
 grep -Fq -- 'for variable in $(env | sed' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must sanitize all coordinator Git config variables before launching the reviewer' >&2; exit 1; }
-grep -Fq -- 'git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer $GH_TOKEN"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
-  || { echo 'Codex branch publishing must provide GitHub authentication without exposing a token to hooks' >&2; exit 1; }
+grep -Fq -- 'credential.helper=$credential_helper' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must use a token-free Git credential helper argument' >&2; exit 1; }
 grep -Fq -- 'git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must reuse an existing checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'publish-codex-branch.sh" --worktree "$worktree" --branch "$branch" --base-sha "$base_sha"' "$AUTONOMOUS_LOOP" \

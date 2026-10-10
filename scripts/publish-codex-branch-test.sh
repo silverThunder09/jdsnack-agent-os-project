@@ -119,7 +119,11 @@ case "$auth_output" in
         exit 1
         ;;
 esac
-grep -Fq "http.https://github.com/.extraheader=AUTHORIZATION: bearer fixture-token" "$auth_log"
+grep -Fq 'credential.helper=!f()' "$auth_log"
+if grep -Fq "fixture-token" "$auth_log"; then
+    printf 'FAIL: authenticated Git command arguments contained the token\n' >&2
+    exit 1
+fi
 if grep -Fq "token-in-hook" "$hook_auth_log"; then
     printf 'FAIL: authenticated push exposed its token to the pre-push hook\n' >&2
     exit 1
