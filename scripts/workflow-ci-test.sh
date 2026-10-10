@@ -59,6 +59,8 @@ grep -Fq -- 'Get-Command codex.exe -CommandType Application' "$AUTONOMOUS_WORKFL
   || { echo 'autonomous loop must resolve the Windows Codex CLI explicitly' >&2; exit 1; }
 grep -Fq -- '  contents: write' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must retain contents write permission for Codex branch publishing' >&2; exit 1; }
+grep -Fq -- '          persist-credentials: false' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop checkout must not persist a write-capable GitHub token' >&2; exit 1; }
 grep -Fq -- '$wslCodexPath = Convert-ToWslPath $codexPath' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must convert the Codex CLI path before invoking WSL' >&2; exit 1; }
 grep -Fq -- 'CODEX_BIN/u' "$AUTONOMOUS_WORKFLOW" \
