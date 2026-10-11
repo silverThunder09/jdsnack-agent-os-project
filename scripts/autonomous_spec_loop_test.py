@@ -2,6 +2,7 @@
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -53,7 +54,7 @@ class AutonomousSpecLoopTest(unittest.TestCase):
 
     def run_engine(self, *args):
         return subprocess.run(
-            ["python3", str(ENGINE), *args, "--repo", str(self.temp)],
+            [sys.executable, str(ENGINE), *args, "--repo", str(self.temp)],
             check=False,
             text=True,
             capture_output=True,

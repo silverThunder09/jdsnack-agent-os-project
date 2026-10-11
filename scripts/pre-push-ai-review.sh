@@ -11,7 +11,22 @@ fi
 require_host_tool() {
   local name="$1"
   local path
-  path="$(command -v "$name" || true)"
+  if [ "$name" = codex ] && [ -n "${CODEX_BIN:-}" ]; then
+    path="$CODEX_BIN"
+    case "$path" in
+      /*|[A-Za-z]:[\\/]*) ;;
+      *)
+        echo "ERROR: CODEX_BIN은 절대 경로여야 합니다." >&2
+        exit 1
+        ;;
+    esac
+    if [ ! -f "$path" ] || [ ! -x "$path" ]; then
+      echo "ERROR: CODEX_BIN 실행 파일을 사용할 수 없습니다: $path" >&2
+      exit 1
+    fi
+  else
+    path="$(command -v "$name" || true)"
+  fi
   if [ -z "$path" ]; then
     echo "ERROR: pre-push AI 리뷰를 위해 $name이(가) 필요합니다." >&2
     exit 1
@@ -23,8 +38,25 @@ for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex;
 done
 require_host_tool cat
 
+path_converter_bin=""
+path_converter_kind=""
+if cygpath_bin="$(command -p -v cygpath 2>/dev/null)"; then
+  path_converter_bin="$cygpath_bin"
+  path_converter_kind="cygpath"
+elif [[ "$codex_bin" == *.exe ]]; then
+  require_host_tool wslpath
+  path_converter_bin="$wslpath_bin"
+  path_converter_kind="wslpath"
+fi
+if [[ "$codex_bin" == *.exe ]] && [ "$path_converter_kind" = wslpath ] && [ -z "${WSL_INTEROP-}" ]; then
+  echo "ERROR: WSL에서 Windows Codex를 실행하려면 WSL_INTEROP가 필요합니다." >&2
+  exit 1
+fi
+
 pwsh_bin=""
-if command -v pwsh >/dev/null 2>&1; then
+if [[ "$codex_bin" == *.exe ]] && command -p -v powershell.exe >/dev/null 2>&1; then
+  pwsh_bin="$(command -p -v powershell.exe)"
+elif command -v pwsh >/dev/null 2>&1; then
   pwsh_bin="$(command -v pwsh)"
 elif command -v powershell.exe >/dev/null 2>&1; then
   pwsh_bin="$(command -v powershell.exe)"
@@ -149,13 +181,13 @@ trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
 
 "$chmod_bin" 700 "$tmp_dir"
-if command -v cygpath >/dev/null 2>&1; then
+if [ -n "$path_converter_bin" ]; then
   secure_windows_temp_path() {
     local path="$1"
     local windows_path
     local windows_script_path
-    windows_path="$(cygpath -w "$path")" || return 1
-    windows_script_path="$(cygpath -w "$ROOT_DIR/scripts/secure-review-temp-acl.ps1")" || return 1
+    windows_path="$("$path_converter_bin" -w "$path")" || return 1
+    windows_script_path="$("$path_converter_bin" -w "$ROOT_DIR/scripts/secure-review-temp-acl.ps1")" || return 1
     # Both PowerShell arguments are already cygpath-converted Windows paths; keep this conversion override scoped to this call.
     MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path"
   }
@@ -167,11 +199,11 @@ fi
 
 verify_codex_auth_permissions() {
   local auth_path="$codex_home_dir/auth.json"
-  if command -v cygpath >/dev/null 2>&1; then
+  if [ -n "$path_converter_bin" ]; then
     local windows_home_path
     local windows_script_path
-    windows_home_path="$(cygpath -w "$codex_home_base")" || return 1
-    windows_script_path="$(cygpath -w "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1")" || return 1
+    windows_home_path="$("$path_converter_bin" -w "$codex_home_base")" || return 1
+    windows_script_path="$("$path_converter_bin" -w "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1")" || return 1
     MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_home_path"
     return $?
   fi
@@ -342,8 +374,8 @@ if [ ! -s "$branch_path" ]; then
 fi
 
 workspace_arg="$ROOT_DIR"
-if command -v cygpath >/dev/null 2>&1; then
-  workspace_arg="$(cygpath -w "$ROOT_DIR")"
+if [ -n "$path_converter_bin" ]; then
+  workspace_arg="$("$path_converter_bin" -w "$ROOT_DIR")"
 fi
 risk_stderr_path="$tmp_dir/review-risk.stderr"
 if ! risk_json="$($pwsh_bin -NoProfile -File "$workspace_arg/scripts/review-risk.ps1" -Workspace "$workspace_arg" -BaseSha "$base_sha" -HeadSha "$reviewed_ref" 2>"$risk_stderr_path")"; then
@@ -439,16 +471,16 @@ codex_answer_path="$answer_path"
 codex_home_base="${CODEX_HOME-}"
 if [ -z "$codex_home_base" ] && [ -n "${HOME-}" ]; then
   codex_home_base="$HOME"
-  if [ "${codex_home_base:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
-    codex_home_base="$(cygpath -u "$codex_home_base")" || {
+  if [ "${codex_home_base:1:1}" = ':' ] && [ -n "$path_converter_bin" ]; then
+    codex_home_base="$("$path_converter_bin" -u "$codex_home_base")" || {
       echo "ERROR: Codex 사용자 홈 경로를 확인할 수 없습니다." >&2
       exit 1
     }
   fi
   codex_home_base="$codex_home_base/.codex"
 fi
-if [ "${codex_home_base:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
-  codex_home_base="$(cygpath -u "$codex_home_base")" || {
+if [ "${codex_home_base:1:1}" = ':' ] && [ -n "$path_converter_bin" ]; then
+  codex_home_base="$("$path_converter_bin" -u "$codex_home_base")" || {
     echo "ERROR: Codex 사용자 홈 경로를 확인할 수 없습니다." >&2
     exit 1
   }
@@ -457,7 +489,7 @@ if [ -z "$codex_home_base" ] || [ ! -d "$codex_home_base" ]; then
   echo "ERROR: Codex CLI 홈 디렉터리가 없습니다." >&2
   exit 1
 fi
-if ! command -v cygpath >/dev/null 2>&1 && [ -L "$codex_home_base" ]; then
+if [ -z "$path_converter_bin" ] && [ -L "$codex_home_base" ]; then
   echo "ERROR: Codex CLI 홈 디렉터리는 심볼릭 링크일 수 없습니다." >&2
   exit 1
 fi
@@ -510,15 +542,15 @@ if ! "$chmod_bin" 700 "$review_lock_dir"; then
   echo "ERROR: Codex reviewer lock 권한을 제한할 수 없습니다." >&2
   exit 1
 fi
-if command -v cygpath >/dev/null 2>&1 && ! secure_windows_temp_path "$review_lock_dir"; then
+if [ -n "$path_converter_bin" ] && ! secure_windows_temp_path "$review_lock_dir"; then
   echo "ERROR: Windows Codex reviewer lock ACL을 제한할 수 없습니다." >&2
   exit 1
 fi
 codex_home_arg="$codex_home_dir"
-if command -v cygpath >/dev/null 2>&1; then
-  codex_tmp_dir="$(cygpath -w "$tmp_dir")"
-  codex_answer_path="$(cygpath -w "$answer_path")"
-  codex_home_arg="$(cygpath -w "$codex_home_arg")"
+if [ -n "$path_converter_bin" ]; then
+  codex_tmp_dir="$("$path_converter_bin" -w "$tmp_dir")"
+  codex_answer_path="$("$path_converter_bin" -w "$answer_path")"
+  codex_home_arg="$("$path_converter_bin" -w "$codex_home_arg")"
 fi
 
 codex_dir="${codex_bin%/*}"
@@ -549,7 +581,16 @@ if [ -z "$windows_root" ]; then
   echo "ERROR: Windows Codex reviewer runtime에 필요한 SystemRoot/WINDIR가 없습니다." >&2
   exit 1
 fi
+if [ -n "$path_converter_bin" ] && [[ "$windows_root" == /* ]]; then
+  windows_root="$("$path_converter_bin" -w "$windows_root")" || {
+    echo "ERROR: Windows Codex reviewer의 SystemRoot/WINDIR 경로를 변환할 수 없습니다." >&2
+    exit 1
+  }
+fi
 review_env_args+=("SystemRoot=$windows_root" "WINDIR=$windows_root")
+if [[ "$codex_bin" == *.exe ]] && [ -n "${WSL_INTEROP-}" ]; then
+  review_env_args+=("WSL_INTEROP=$WSL_INTEROP" 'WSLENV=CODEX_HOME/p:TEMP/p:TMP/p:TMPDIR/p')
+fi
 
 run_reviewer() (
     cd "$tmp_dir"

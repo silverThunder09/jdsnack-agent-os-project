@@ -96,7 +96,7 @@ test ! -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
 cp "$TEST_ROOT/completed-plan.md" "$TEST_ROOT/.agent-os/specs/current/plan.md"
 
 # Replace the production queue with a minimal deterministic fixture.
-python3 - "$TEST_ROOT/.agent-os/product/spec-queue.json" <<'PY'
+"${PYTHON_BIN:-python3}" - "$TEST_ROOT/.agent-os/product/spec-queue.json" <<'PY'
 import json
 import sys
 path = sys.argv[1]
