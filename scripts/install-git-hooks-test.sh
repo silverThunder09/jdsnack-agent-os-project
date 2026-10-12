@@ -32,17 +32,6 @@ git -C "$test_worktree" config user.name test
 git -C "$test_worktree" config user.email test@example.com
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$trusted_source_sha"
 
-# Keep a complete but stale trusted source so the bootstrap path proves that
-# HEAD, rather than origin/main, is selected when the installer is piped from
-# the verified commit object.
-git -C "$test_worktree" switch -q -c codex/stale-hook-source
-printf '#!/bin/sh\nprintf stale-trusted-hook\\n' > "$test_worktree/.githooks/pre-push"
-git -C "$test_worktree" add .githooks/pre-push
-git -C "$test_worktree" commit -qm 'stale trusted hook fixture'
-stale_source_sha="$(git -C "$test_worktree" rev-parse HEAD)"
-git -C "$test_worktree" switch -q codex/install-hook-test
-git -C "$test_worktree" update-ref refs/remotes/origin/main "$trusted_source_sha"
-
 cat > "$test_worktree/.githooks/pre-push" <<'EOF'
 #!/bin/sh
 printf '%s\n' branch-controlled-hook
@@ -118,19 +107,16 @@ test -x "$configured_python_path" \
   PATH="$fixture_bin:$PATH" "$trusted_hooks_dir/pre-commit" >/dev/null
 ) || fail 'trusted pre-commit이 branch 변조 readiness 스크립트를 실행했습니다.'
 
-git -C "$test_worktree" update-ref refs/remotes/origin/main "$stale_source_sha"
-(
+set +e
+override_output="$(
   cd "$test_worktree"
-  JDSNACK_HOOK_SOURCE_REF=HEAD PATH="$fixture_bin:$PATH" sh < <(git show HEAD:scripts/install-git-hooks.sh) >/dev/null
-)
-(
-  cd "$test_worktree"
-  MSYS_NO_PATHCONV=1 git show 'HEAD:.githooks/pre-push'
-) | cmp - "$trusted_hooks_dir/pre-push" \
-  || fail 'bootstrap installer가 origin/main의 stale pre-push를 복사했습니다.'
-test "$(<"$trusted_hooks_dir/trusted-source-sha")" = "$trusted_source_sha" \
-  || fail 'bootstrap installer가 HEAD trusted source SHA를 기록하지 않았습니다.'
-test "$(<"$trusted_hooks_dir/trusted-source-ref")" = HEAD \
-  || fail 'bootstrap installer가 HEAD source ref를 기록하지 않았습니다.'
+  JDSNACK_HOOK_SOURCE_REF=HEAD PATH="$fixture_bin:$PATH" sh < <(git show refs/remotes/origin/main:scripts/install-git-hooks.sh) 2>&1
+)"
+override_status=$?
+set -e
+test "$override_status" -ne 0 \
+  || fail 'installer가 branch-controlled trusted source override를 허용했습니다.'
+grep -Fq 'trusted hook source override는 허용되지 않습니다' <<<"$override_output" \
+  || fail 'installer가 trusted source override 차단 원인을 설명하지 않았습니다.'
 
-echo 'Trusted hook installer ignores branch-mutated source files'
+echo 'Trusted hook installer requires the independent origin/main source'

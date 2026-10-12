@@ -61,7 +61,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-KoreanReviewText', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-KoreanReviewText', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems', 'Test-SelfReviewSubmissionFailure')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -71,6 +71,13 @@ foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput'
         throw "$functionName function was not found."
     }
     . ([scriptblock]::Create($dependencyAst.Extent.Text))
+}
+
+if (-not (Test-SelfReviewSubmissionFailure -Output 'GraphQL: Review Can not request changes on your own pull request (addPullRequestReview)')) {
+    throw 'GitHub self-review REQUEST_CHANGES failures were not recognized for comment fallback.'
+}
+if (Test-SelfReviewSubmissionFailure -Output 'GraphQL: authentication failed') {
+    throw 'Unrelated GitHub review submission failures were incorrectly treated as self-review limitations.'
 }
 
 $paginatedComments = @(Get-PaginatedJsonItems -Json '[[{"id":101,"body":"first"}],[{"id":202,"body":"second"}]]')

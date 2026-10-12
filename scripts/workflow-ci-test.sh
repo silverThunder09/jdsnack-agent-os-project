@@ -45,8 +45,10 @@ grep -Fq -- "-replace '\\\\', '/'" "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must normalize Windows separators before wslpath' >&2; exit 1; }
 grep -Fq -- 'Convert-ToWslPath' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must validate WSL path conversion results' >&2; exit 1; }
-grep -Fq -- 'wsl.exe bash -lc' "$AUTONOMOUS_WORKFLOW" \
-  || { echo 'autonomous loop must invoke Bash through WSL explicitly' >&2; exit 1; }
+grep -Fq -- 'wsl.exe /usr/bin/bash -lc' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must invoke the fixed system Bash through WSL explicitly' >&2; exit 1; }
+! grep -Fq -- 'wsl.exe bash -lc' "$AUTONOMOUS_WORKFLOW" \
+  || { echo 'autonomous loop must not resolve the coordinator Bash from PATH' >&2; exit 1; }
 grep -Fq -- 'GITHUB_STEP_SUMMARY/p' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must translate the step summary path into WSL' >&2; exit 1; }
 grep -Fq -- 'Get-Command gh.exe -CommandType Application' "$AUTONOMOUS_WORKFLOW" \
@@ -171,10 +173,12 @@ grep -Fq -- 'source_sha="$(git rev-parse HEAD)"' "$ROOT_DIR/scripts/install-git-
   || { echo 'Git hook installation must record the checkout SHA in the trusted bundle' >&2; exit 1; }
 grep -Fq -- "trusted_source_ref='refs/remotes/origin/main'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || { echo 'Git hook installation must use an independent origin/main source' >&2; exit 1; }
-grep -Fq -- 'JDSNACK_HOOK_SOURCE_REF=HEAD' "$ROOT_DIR/scripts/install-git-hooks-test.sh" \
-  || { echo 'Git hook installation must test the verified HEAD bootstrap source' >&2; exit 1; }
-grep -Fq -- "HEAD) trusted_source_ref='HEAD'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
-  || { echo 'Git hook installation must allow only the verified HEAD bootstrap source override' >&2; exit 1; }
+! grep -Fq -- 'JDSNACK_HOOK_SOURCE_REF=HEAD' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || { echo 'Git hook installation must not trust a branch-controlled HEAD source override' >&2; exit 1; }
+grep -Fq -- 'trusted hook source override는 허용되지 않습니다' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || { echo 'Git hook installation must reject source overrides instead of self-trusting HEAD' >&2; exit 1; }
+grep -Fq -- 'independent origin/main source' "$ROOT_DIR/scripts/install-git-hooks-test.sh" \
+  || { echo 'Git hook installation must test the independent origin/main source contract' >&2; exit 1; }
 grep -Fq -- 'git show "$trusted_source_ref:$source_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || { echo 'Git hook installation must copy from the trusted source ref' >&2; exit 1; }
 grep -Fq -- 'bundle_manifest="$trusted_hooks_dir/bundle-manifest"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
@@ -233,8 +237,8 @@ grep -Fq -- 'multiple GitHub Authorization headers' "$ROOT_DIR/scripts/publish-c
   || { echo 'Codex branch publishing must reject duplicate checkout Authorization headers' >&2; exit 1; }
 grep -Fq -- 'cleanup_failed=false' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must fail closed when worktree or config cleanup fails' >&2; exit 1; }
-grep -Fq -- 'publish-codex-branch.sh" --worktree "$worktree" --branch "$branch" --base-sha "$base_sha"' "$AUTONOMOUS_LOOP" \
-  || { echo 'Spec promotion must use the authenticated Codex branch publisher' >&2; exit 1; }
+grep -Fq -- '"$TRUSTED_BASH_BIN" "$REPO/scripts/publish-codex-branch.sh" --worktree "$worktree" --branch "$branch" --base-sha "$base_sha"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must invoke the Codex branch publisher through trusted Bash' >&2; exit 1; }
 grep -Fq -- 'CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must pass the Windows-compatible worktree mode to the creator' >&2; exit 1; }
 grep -Fq -- 'candidate_title_invalid' "$AUTONOMOUS_LOOP" \

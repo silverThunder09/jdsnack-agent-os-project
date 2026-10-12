@@ -29,7 +29,7 @@
 - PR 계약·PR CI Gate·branch-required check 누락/실패, check provider 또는 GitHub API 확인 실패
 - 미해결 `CHANGES_REQUESTED`, artifact 누락, Squash auto-merge 큐 등록 실패
 
-`REQUEST_CHANGES`는 GitHub review로 한 번 제출하고 findings 전체를 보존합니다. 점수·판정이 통과해도 필수 check가 실패하면 자동 병합하지 않습니다.
+`REQUEST_CHANGES`는 GitHub review로 한 번 제출하고 findings 전체를 보존합니다. 인증된 runner 계정이 PR 작성자와 같아 GitHub가 자기 PR의 `REQUEST_CHANGES` review를 거부하면 같은 report를 일반 PR comment로 남기고 `review` check를 실패시킵니다. 이 플랫폼 제한은 `needs-human`으로 분류하지 않으며, 실제 제출 오류·댓글 오류만 `needs-human`으로 올립니다. 점수·판정이 통과해도 필수 check가 실패하면 자동 병합하지 않습니다.
 
 ## 안전 경계
 

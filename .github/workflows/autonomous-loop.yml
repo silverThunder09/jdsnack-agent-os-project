@@ -110,6 +110,9 @@ jobs:
           $env:WSLENV = 'GH_TOKEN/u:GITHUB_REPOSITORY/u:GITHUB_STEP_SUMMARY/p:GH_BIN/u:CODEX_BIN/u:GH_CONFIG_DIR/wp'
           $eventSha = if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) { 'none' } else { $env:GITHUB_SHA }
           $eventKey = '{0}:{1}:{2}' -f $env:GITHUB_EVENT_NAME, $env:GITHUB_RUN_ID, $eventSha
-          $command = "cd '$wslWorkspace' && bash scripts/autonomous-spec-loop.sh --event '$($env:GITHUB_EVENT_NAME)' --event-key '$eventKey' --event-path '$wslEventPath' --apply"
-          wsl.exe bash -lc $command
+          # Invoke the coordinator through the fixed system Bash path. A bare
+          # `bash` would resolve through a runner-controlled PATH while GH_TOKEN
+          # is still present in the process environment.
+          $command = "cd '$wslWorkspace' && /usr/bin/bash scripts/autonomous-spec-loop.sh --event '$($env:GITHUB_EVENT_NAME)' --event-key '$eventKey' --event-path '$wslEventPath' --apply"
+          wsl.exe /usr/bin/bash -lc $command
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

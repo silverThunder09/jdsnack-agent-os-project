@@ -115,15 +115,10 @@ git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
 }
 trusted_hooks_dir="$git_common_dir/jdsnack-hooks"
 trusted_source_ref='refs/remotes/origin/main'
-case "${JDSNACK_HOOK_SOURCE_REF-}" in
-  '') ;;
-  HEAD) trusted_source_ref='HEAD' ;;
-  refs/remotes/origin/main) ;;
-  *)
-    echo "ERROR: 지원하지 않는 trusted hook source입니다: ${JDSNACK_HOOK_SOURCE_REF}" >&2
-    exit 1
-    ;;
-esac
+if [ -n "${JDSNACK_HOOK_SOURCE_REF-}" ]; then
+  echo "ERROR: trusted hook source override는 허용되지 않습니다. refs/remotes/origin/main의 installer를 실행하십시오." >&2
+  exit 1
+fi
 trusted_source_sha="$(git rev-parse --verify "${trusted_source_ref}^{commit}" 2>/dev/null)" || {
   echo "ERROR: independently trusted hook source ${trusted_source_ref}를 확인할 수 없습니다." >&2
   exit 1

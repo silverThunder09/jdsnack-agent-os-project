@@ -17,14 +17,14 @@ git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
 case "$hook_root" in
   "$git_common_dir/jdsnack-hooks") ;;
   *)
-    echo "ERROR: pre-commit은 Git common dir의 trusted hook bundle에서만 실행해야 합니다. git show HEAD:scripts/install-git-hooks.sh | JDSNACK_HOOK_SOURCE_REF=HEAD sh를 다시 실행하십시오." >&2
+    echo "ERROR: pre-commit은 Git common dir의 trusted hook bundle에서만 실행해야 합니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
     exit 1
     ;;
 esac
 
 trusted_readiness_script="$hook_root/scripts/check-ai-readiness.py"
 if [ ! -f "$trusted_readiness_script" ] || [ -L "$trusted_readiness_script" ]; then
-  echo "ERROR: trusted pre-commit readiness 스크립트가 없습니다. git show HEAD:scripts/install-git-hooks.sh | JDSNACK_HOOK_SOURCE_REF=HEAD sh를 다시 실행하십시오." >&2
+  echo "ERROR: trusted pre-commit readiness 스크립트가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
   exit 1
 fi
 
@@ -32,7 +32,7 @@ python_bin="$(git config --local --get jdsnack.python || true)"
 case "$python_bin" in
   /*|[A-Za-z]:[\\/]*) ;;
   *)
-  echo "ERROR: 검증된 pre-commit Python 경로가 없습니다. git show HEAD:scripts/install-git-hooks.sh | JDSNACK_HOOK_SOURCE_REF=HEAD sh를 다시 실행하십시오." >&2
+  echo "ERROR: 검증된 pre-commit Python 경로가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
     exit 1
     ;;
 esac

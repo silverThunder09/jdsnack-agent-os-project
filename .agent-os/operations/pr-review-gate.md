@@ -37,7 +37,7 @@ bash scripts/pr-contract-test.sh <PR_NUMBER>
 
 `REQUEST_CHANGES`가 하나라도 있으면 PR은 머지할 수 없습니다.
 
-리뷰 workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정을 사용합니다. approval job은 `review`·`PR CI Gate`·`Validate PR contract`를 자체 게이트로 요구하며, GitHub branch protection에 실제 설정된 모든 필수 check와 승인 수를 별도로 확인합니다. 보호 규칙과 approval job의 게이트 목록은 동일하다고 가정하지 않습니다. 현재 저장소 정책상 위험도별 추가 사람 승인 수는 0입니다. `REQUEST_CHANGES`는 한 번 제출하며, `NEEDS_HUMAN`은 자동 병합을 막습니다.
+리뷰 workflow는 저장소 소유자와 일치하는 runner의 사전 인증 `gh` 계정을 사용합니다. approval job은 `review`·`PR CI Gate`·`Validate PR contract`를 자체 게이트로 요구하며, GitHub branch protection에 실제 설정된 모든 필수 check와 승인 수를 별도로 확인합니다. 보호 규칙과 approval job의 게이트 목록은 동일하다고 가정하지 않습니다. 현재 저장소 정책상 위험도별 추가 사람 승인 수는 0입니다. `REQUEST_CHANGES`는 한 번 제출하고, 자기 PR이라 GitHub review 등록이 거부되면 일반 PR comment와 실패한 `review` check로 대체합니다. `NEEDS_HUMAN`과 실제 제출·댓글 실패는 자동 병합을 막습니다.
 
 ## 변경 범위별 확인 기준
 
@@ -67,7 +67,7 @@ bash scripts/pr-contract-test.sh <PR_NUMBER>
 4. CI 상태를 확인합니다.
 5. `PASS`면 요약·점수·위험도·head SHA를 PR 코멘트로 공개하고 전문 라벨을 붙입니다.
 6. approval job이 최신 base/head SHA, 현재 `review` check, PR 계약·CI Gate·branch-required check, branch protection이 실제 요구하는 승인만 재확인한 뒤 Squash auto-merge를 큐에 넣습니다.
-7. `REQUEST_CHANGES`면 GitHub PR에 request changes를 남기고 실패 Issue를 생성합니다.
+7. `REQUEST_CHANGES`면 GitHub PR에 request changes를 남기고 실패 Issue를 생성합니다. 자기 PR review 등록이 거부되면 report를 일반 PR comment로 남기고 `review` check를 실패시킵니다.
 
 대표 명령:
 
