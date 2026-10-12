@@ -52,6 +52,7 @@ fixture_head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 trusted_hooks_root="$test_worktree/.git/jdsnack-hooks"
 mkdir -p "$trusted_hooks_root/scripts"
 cp "$ROOT_DIR/.githooks/pre-push" "$trusted_hooks_root/pre-push"
+cp "$test_worktree/.githooks/pre-commit" "$trusted_hooks_root/pre-commit"
 cp "$test_worktree/backends.json" "$trusted_hooks_root/backends.json"
 cp "$test_worktree/scripts/pre-push-ai-review.sh" "$trusted_hooks_root/scripts/pre-push-ai-review.sh"
 for script_name in \
@@ -65,6 +66,22 @@ for script_name in \
 done
 chmod 700 "$trusted_hooks_root/pre-push" "$trusted_hooks_root/scripts/pre-push-ai-review.sh"
 printf '%s\n' "$head_sha" > "$trusted_hooks_root/source-sha"
+printf '%s\n' "$base_sha" > "$trusted_hooks_root/trusted-source-sha"
+bundle_manifest="$trusted_hooks_root/bundle-manifest"
+: > "$bundle_manifest"
+for bundle_path in \
+  pre-commit \
+  pre-push \
+  backends.json \
+  scripts/pre-push-ai-review.sh \
+  scripts/review-policy.json \
+  scripts/review-risk.ps1 \
+  scripts/secure-review-temp-acl.ps1 \
+  scripts/verify-codex-auth-permissions.ps1 \
+  scripts/codex-auth-permissions.ps1 \
+  scripts/review-path-safety.ps1; do
+  printf '%s %s\n' "$bundle_path" "$(git -C "$test_worktree" hash-object "$trusted_hooks_root/$bundle_path")" >> "$bundle_manifest"
+done
 git -C "$test_worktree" config --local core.hooksPath "$trusted_hooks_root"
 head_tree="$(git -C "$test_worktree" rev-parse "$head_sha^{tree}")"
 non_ff_remote_sha="$(git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com commit-tree "$head_tree" -p "$base_sha" -m 'non-fast-forward pre-push fixture')"

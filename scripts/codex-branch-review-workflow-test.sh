@@ -207,8 +207,12 @@ grep -Fq -- 'git_common_dir="$(git rev-parse --git-common-dir)"' "$ROOT_DIR/scri
   || fail 'Git hook 설치가 Git common dir를 trusted bundle 기준으로 사용하지 않습니다.'
 grep -Fq -- 'trusted_hooks_dir="$git_common_dir/jdsnack-hooks"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 checkout 밖의 trusted bundle 경로를 고정하지 않습니다.'
-grep -Fq -- 'cp "$repo_root/scripts/pre-push-ai-review.sh" "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
-  || fail 'Git hook 설치가 pre-push 리뷰 스크립트를 trusted bundle로 복사하지 않습니다.'
+grep -Fq -- "trusted_source_ref='refs/remotes/origin/main'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 독립 trusted source를 고정하지 않습니다.'
+grep -Fq -- 'git show "$trusted_source_ref:$source_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 현재 branch가 아닌 trusted source에서 bundle을 복사하지 않습니다.'
+grep -Fq -- 'bundle_manifest="$trusted_hooks_dir/bundle-manifest"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 bundle content digest manifest를 기록하지 않습니다.'
 grep -Fq -- 'git config --local core.hooksPath "$trusted_hooks_dir"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 core.hooksPath를 trusted bundle로 연결하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(git config --local --get jdsnack.hookBash || true)"' "$ROOT_DIR/.githooks/pre-push" \
@@ -221,6 +225,12 @@ grep -Fq -- 'trusted_source_sha_file="$hook_root/source-sha"' "$ROOT_DIR/.githoo
   || fail 'pre-push hook이 stale trusted review bundle을 거부하지 않습니다.'
 grep -Fq -- 'source_sha="$(git rev-parse HEAD)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 trusted bundle에 checkout SHA를 기록하지 않습니다.'
+grep -Fq -- 'trusted_base_sha_file="$hook_root/trusted-source-sha"' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook이 독립 trusted source SHA를 검증하지 않습니다.'
+grep -Fq -- 'bundle_manifest="$hook_root/bundle-manifest"' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook이 trusted bundle content digest를 검증하지 않습니다.'
+grep -Fq -- 'actual_blob="$(git hash-object "$bundle_file")"' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook이 bundle 파일의 독립 digest를 비교하지 않습니다.'
 grep -Fq -- 'exec "$git_bash_path" "$trusted_review_script" "$@"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 PATH 탐색 대신 검증된 Git Bash 실행 파일을 호출하지 않습니다.'
 grep -Fq -- 'for candidate in python3 python; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \

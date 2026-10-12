@@ -6,7 +6,7 @@ Git 훅은 사람이 놓치기 쉬운 하네스 규칙을 커밋/푸시 전에 �
 
 ## 적용 단계
 
-현재 저장소는 버전관리되는 `.githooks/pre-commit`과 `.githooks/pre-push`를 설치 원본으로 사용합니다. clone 직후 `sh scripts/install-git-hooks.sh`를 실행하면 hook 파일과 downstream 스크립트, pre-push에서 사용할 실행 가능한 Git Bash를 검증해 절대 경로로 로컬 Git 설정(`jdsnack.hookBash`)에 저장하고, 리뷰 정책·위험도 계산기·Codex ACL 검증기·`backends.json`을 Git common dir 아래의 trusted 외부 bundle로 복사합니다. bundle에는 설치 시점의 checkout SHA도 기록하며, 이후 branch HEAD가 바뀌면 재설치 전까지 push를 중단합니다. pre-commit readiness용 Python, `jq`, PowerShell(`pwsh` 또는 `powershell.exe`), Codex CLI도 확인한 뒤에만 `core.hooksPath`를 branch checkout 밖의 trusted bundle로 연결합니다. push hook은 이 bundle의 고정된 리뷰 스크립트와 검증된 Bash 경로를 호출하므로 branch가 `.githooks`나 `scripts/pre-push-ai-review.sh`를 바꿔도 Codex 로그인 캐시에 접근하기 전에 실행되지 않습니다. 사전조건이나 설정 검증이 실패하면 hook 활성화를 성공으로 처리하지 않습니다.
+현재 저장소의 `.githooks`와 리뷰 스크립트는 branch가 바꿀 수 있는 입력입니다. clone 직후 `sh scripts/install-git-hooks.sh`를 실행하면 hook 파일과 downstream 스크립트, pre-push에서 사용할 실행 가능한 Git Bash를 검증하고, bundle 내용은 독립 trusted source인 `refs/remotes/origin/main`에서 읽어 Git common dir 아래의 외부 bundle로 복사합니다. bundle에는 현재 checkout SHA, trusted source SHA와 각 파일의 Git blob digest를 기록하며, pre-push는 세 값을 모두 다시 확인하므로 branch가 hook 또는 reviewer 파일을 바꿔도 그 내용이 로그인 캐시에 접근하기 전에 실행되지 않습니다. pre-commit readiness용 Python, `jq`, PowerShell(`pwsh` 또는 `powershell.exe`), Codex CLI도 확인한 뒤에만 절대 경로로 로컬 Git 설정(`jdsnack.hookBash`)과 `core.hooksPath`를 branch checkout 밖의 trusted bundle에 연결합니다. `origin/main`이 갱신되거나 checkout HEAD가 바뀌면 재설치 전까지 push를 중단합니다. 사전조건이나 설정 검증이 실패하면 hook 활성화를 성공으로 처리하지 않습니다.
 
 ## `commit-msg` 훅
 

@@ -27,6 +27,17 @@ git -C "$test_worktree" remote set-url origin "$bare_remote"
 trusted_hooks_root="$test_worktree/.git/jdsnack-hooks"
 mkdir -p "$trusted_hooks_root/scripts"
 cp "$ROOT_DIR/.githooks/pre-push" "$trusted_hooks_root/pre-push"
+cp "$ROOT_DIR/.githooks/pre-commit" "$trusted_hooks_root/pre-commit"
+cp "$ROOT_DIR/backends.json" "$trusted_hooks_root/backends.json"
+for script_name in \
+  review-policy.json \
+  review-risk.ps1 \
+  secure-review-temp-acl.ps1 \
+  verify-codex-auth-permissions.ps1 \
+  codex-auth-permissions.ps1 \
+  review-path-safety.ps1; do
+  cp "$ROOT_DIR/scripts/$script_name" "$trusted_hooks_root/scripts/$script_name"
+done
 git -C "$test_worktree" config --local jdsnack.hookBash "$(command -v bash)"
 git -C "$test_worktree" config --local core.hooksPath "$trusted_hooks_root"
 
@@ -44,7 +55,24 @@ BRANCH_REVIEW
 
 chmod +x "$trusted_hooks_root/pre-push" "$trusted_hooks_root/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
 head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
+git -C "$test_worktree" update-ref refs/remotes/origin/main "$head_sha"
 printf '%s\n' "$head_sha" > "$trusted_hooks_root/source-sha"
+printf '%s\n' "$head_sha" > "$trusted_hooks_root/trusted-source-sha"
+bundle_manifest="$trusted_hooks_root/bundle-manifest"
+: > "$bundle_manifest"
+for bundle_path in \
+  pre-commit \
+  pre-push \
+  backends.json \
+  scripts/pre-push-ai-review.sh \
+  scripts/review-policy.json \
+  scripts/review-risk.ps1 \
+  scripts/secure-review-temp-acl.ps1 \
+  scripts/verify-codex-auth-permissions.ps1 \
+  scripts/codex-auth-permissions.ps1 \
+  scripts/review-path-safety.ps1; do
+  printf '%s %s\n' "$bundle_path" "$(git -C "$test_worktree" hash-object "$trusted_hooks_root/$bundle_path")" >> "$bundle_manifest"
+done
 remote_ref="refs/heads/$branch_name"
 zero_sha='0000000000000000000000000000000000000000'
 JDSNACK_HOOK_ARGS_CAPTURE="$hook_args_path" \

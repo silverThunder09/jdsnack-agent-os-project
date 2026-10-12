@@ -93,30 +93,45 @@ git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
   exit 1
 }
 trusted_hooks_dir="$git_common_dir/jdsnack-hooks"
+trusted_source_ref='refs/remotes/origin/main'
+trusted_source_sha="$(git rev-parse --verify "${trusted_source_ref}^{commit}" 2>/dev/null)" || {
+  echo "ERROR: independently trusted hook source refs/remotes/origin/main을 확인할 수 없습니다. 먼저 origin/main을 fetch하십시오." >&2
+  exit 1
+}
 mkdir -p "$trusted_hooks_dir/scripts"
 chmod 700 "$trusted_hooks_dir" "$trusted_hooks_dir/scripts"
 
-for source_path in \
-  "$repo_root/.githooks/pre-commit" \
-  "$repo_root/.githooks/pre-push" \
-  "$repo_root/backends.json" \
-  "$repo_root/scripts/pre-push-ai-review.sh" \
-  "$repo_root/scripts/review-policy.json" \
-  "$repo_root/scripts/review-risk.ps1" \
-  "$repo_root/scripts/secure-review-temp-acl.ps1" \
-  "$repo_root/scripts/verify-codex-auth-permissions.ps1" \
-  "$repo_root/scripts/codex-auth-permissions.ps1" \
-  "$repo_root/scripts/review-path-safety.ps1"; do
-  if [ -L "$source_path" ]; then
-    echo "ERROR: trusted Git hook source는 심볼릭 링크일 수 없습니다: $source_path" >&2
+copy_trusted_source() {
+  source_path="$1"
+  destination_path="$2"
+  if ! MSYS_NO_PATHCONV=1 git cat-file -e "$trusted_source_ref:$source_path" 2>/dev/null; then
+    echo "ERROR: trusted hook source가 origin/main에 없습니다: $source_path" >&2
     exit 1
   fi
-done
+  if [ -L "$destination_path" ]; then
+    echo "ERROR: trusted Git hook destination은 심볼릭 링크일 수 없습니다: $destination_path" >&2
+    exit 1
+  fi
+  MSYS_NO_PATHCONV=1 git show "$trusted_source_ref:$source_path" > "$destination_path" || {
+    echo "ERROR: origin/main trusted hook source를 bundle로 복사할 수 없습니다: $source_path" >&2
+    exit 1
+  }
+}
 
-cp "$repo_root/.githooks/pre-commit" "$trusted_hooks_dir/pre-commit"
-cp "$repo_root/.githooks/pre-push" "$trusted_hooks_dir/pre-push"
-cp "$repo_root/backends.json" "$trusted_hooks_dir/backends.json"
-cp "$repo_root/scripts/pre-push-ai-review.sh" "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"
+write_manifest_entry() {
+  destination_path="$1"
+  source_path="$2"
+  source_blob="$(MSYS_NO_PATHCONV=1 git rev-parse "$trusted_source_ref:$source_path")" || {
+    echo "ERROR: trusted hook source digest를 계산할 수 없습니다: $source_path" >&2
+    exit 1
+  }
+  printf '%s %s\n' "$destination_path" "$source_blob" >> "$bundle_manifest"
+}
+
+copy_trusted_source '.githooks/pre-commit' "$trusted_hooks_dir/pre-commit"
+copy_trusted_source '.githooks/pre-push' "$trusted_hooks_dir/pre-push"
+copy_trusted_source 'backends.json' "$trusted_hooks_dir/backends.json"
+copy_trusted_source 'scripts/pre-push-ai-review.sh' "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"
 for script_name in \
   review-policy.json \
   review-risk.ps1 \
@@ -124,14 +139,30 @@ for script_name in \
   verify-codex-auth-permissions.ps1 \
   codex-auth-permissions.ps1 \
   review-path-safety.ps1; do
-  cp "$repo_root/scripts/$script_name" "$trusted_hooks_dir/scripts/$script_name"
+  copy_trusted_source "scripts/$script_name" "$trusted_hooks_dir/scripts/$script_name"
+done
+bundle_manifest="$trusted_hooks_dir/bundle-manifest"
+: > "$bundle_manifest"
+write_manifest_entry 'pre-commit' '.githooks/pre-commit'
+write_manifest_entry 'pre-push' '.githooks/pre-push'
+write_manifest_entry 'backends.json' 'backends.json'
+write_manifest_entry 'scripts/pre-push-ai-review.sh' 'scripts/pre-push-ai-review.sh'
+for script_name in \
+  review-policy.json \
+  review-risk.ps1 \
+  secure-review-temp-acl.ps1 \
+  verify-codex-auth-permissions.ps1 \
+  codex-auth-permissions.ps1 \
+  review-path-safety.ps1; do
+  write_manifest_entry "scripts/$script_name" "scripts/$script_name"
 done
 source_sha="$(git rev-parse HEAD)" || {
   echo "ERROR: trusted Git hook bundle의 source SHA를 확인할 수 없습니다." >&2
   exit 1
 }
 printf '%s\n' "$source_sha" > "$trusted_hooks_dir/source-sha"
-chmod 600 "$trusted_hooks_dir/source-sha"
+printf '%s\n' "$trusted_source_sha" > "$trusted_hooks_dir/trusted-source-sha"
+chmod 600 "$trusted_hooks_dir/source-sha" "$trusted_hooks_dir/trusted-source-sha" "$bundle_manifest"
 chmod 700 "$trusted_hooks_dir/pre-commit" "$trusted_hooks_dir/pre-push" "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"
 
 git config --local jdsnack.hookBash "$git_bash_path"

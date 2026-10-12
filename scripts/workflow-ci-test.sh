@@ -157,8 +157,18 @@ grep -Fq -- 'trusted_review_script="$hook_root/scripts/pre-push-ai-review.sh"' "
   || { echo 'pre-push hooks must invoke the trusted external review copy' >&2; exit 1; }
 grep -Fq -- 'trusted_source_sha_file="$hook_root/source-sha"' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must reject stale trusted review bundles' >&2; exit 1; }
+grep -Fq -- 'trusted_base_sha_file="$hook_root/trusted-source-sha"' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must verify the independent trusted source SHA' >&2; exit 1; }
+grep -Fq -- 'bundle_manifest="$hook_root/bundle-manifest"' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must verify trusted bundle content digests' >&2; exit 1; }
 grep -Fq -- 'source_sha="$(git rev-parse HEAD)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || { echo 'Git hook installation must record the checkout SHA in the trusted bundle' >&2; exit 1; }
+grep -Fq -- "trusted_source_ref='refs/remotes/origin/main'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || { echo 'Git hook installation must use an independent origin/main source' >&2; exit 1; }
+grep -Fq -- 'git show "$trusted_source_ref:$source_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || { echo 'Git hook installation must copy from the trusted source ref' >&2; exit 1; }
+grep -Fq -- 'bundle_manifest="$trusted_hooks_dir/bundle-manifest"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || { echo 'Git hook installation must record trusted bundle content digests' >&2; exit 1; }
 grep -Fq -- 'github_askpass_git' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must use a token-free Git askpass boundary' >&2; exit 1; }
 grep -Fq -- '--jdsnack-askpass' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
@@ -429,6 +439,10 @@ test -f "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh" \
   || { echo 'scripts/pre-push-git-invocation-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"
 bash "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"
+test -f "$ROOT_DIR/scripts/install-git-hooks-test.sh" \
+  || { echo 'scripts/install-git-hooks-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/install-git-hooks-test.sh"
+bash "$ROOT_DIR/scripts/install-git-hooks-test.sh"
 bash -n "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
 bash "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"

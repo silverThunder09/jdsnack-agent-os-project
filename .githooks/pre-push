@@ -49,6 +49,78 @@ if [ -z "$trusted_source_sha" ] || [ "$trusted_source_sha" != "$current_source_s
   echo "ERROR: trusted pre-push bundle이 현재 checkout보다 오래되었습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
   exit 1
 fi
+trusted_base_sha_file="$hook_root/trusted-source-sha"
+if [ ! -f "$trusted_base_sha_file" ] || [ -L "$trusted_base_sha_file" ]; then
+  echo "ERROR: trusted pre-push bundle의 독립 trusted source SHA가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+IFS= read -r trusted_base_sha < "$trusted_base_sha_file" || {
+  echo "ERROR: trusted pre-push bundle의 독립 trusted source SHA를 읽을 수 없습니다." >&2
+  exit 1
+}
+current_base_sha="$(git rev-parse --verify refs/remotes/origin/main^{commit} 2>/dev/null)" || {
+  echo "ERROR: origin/main의 trusted hook source SHA를 확인할 수 없습니다." >&2
+  exit 1
+}
+if [ -z "$trusted_base_sha" ] || [ "$trusted_base_sha" != "$current_base_sha" ]; then
+  echo "ERROR: trusted pre-push bundle이 origin/main trusted source보다 오래되었습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+bundle_manifest="$hook_root/bundle-manifest"
+if [ ! -f "$bundle_manifest" ] || [ -L "$bundle_manifest" ]; then
+  echo "ERROR: trusted pre-push bundle의 독립 content digest가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+manifest_count=0
+seen_paths=""
+while IFS=' ' read -r bundle_path expected_blob extra; do
+  if [ -z "$bundle_path" ] || [ -n "$extra" ]; then
+    echo "ERROR: trusted pre-push bundle manifest 형식이 잘못되었습니다." >&2
+    exit 1
+  fi
+  case "$bundle_path" in
+    pre-commit|pre-push|backends.json|scripts/pre-push-ai-review.sh|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1) ;;
+    *)
+      echo "ERROR: trusted pre-push bundle manifest에 허용되지 않은 경로가 있습니다: $bundle_path" >&2
+      exit 1
+      ;;
+  esac
+  case " $seen_paths " in
+    *" $bundle_path "*)
+      echo "ERROR: trusted pre-push bundle manifest에 중복 경로가 있습니다: $bundle_path" >&2
+      exit 1
+      ;;
+  esac
+  case "$expected_blob" in
+    ''|*[!0-9a-f]*)
+      echo "ERROR: trusted pre-push bundle manifest digest가 잘못되었습니다: $bundle_path" >&2
+      exit 1
+      ;;
+  esac
+  if [ "${#expected_blob}" -ne 40 ]; then
+    echo "ERROR: trusted pre-push bundle manifest digest 길이가 잘못되었습니다: $bundle_path" >&2
+    exit 1
+  fi
+  bundle_file="$hook_root/$bundle_path"
+  if [ ! -f "$bundle_file" ] || [ -L "$bundle_file" ]; then
+    echo "ERROR: trusted pre-push bundle 파일이 없습니다: $bundle_path" >&2
+    exit 1
+  fi
+  actual_blob="$(git hash-object "$bundle_file")" || {
+    echo "ERROR: trusted pre-push bundle digest를 계산할 수 없습니다: $bundle_path" >&2
+    exit 1
+  }
+  if [ "$actual_blob" != "$expected_blob" ]; then
+    echo "ERROR: trusted pre-push bundle content가 독립 digest와 다릅니다: $bundle_path" >&2
+    exit 1
+  fi
+  seen_paths="$seen_paths $bundle_path"
+  manifest_count=$((manifest_count + 1))
+done < "$bundle_manifest"
+if [ "$manifest_count" -ne 10 ]; then
+  echo "ERROR: trusted pre-push bundle manifest 항목 수가 올바르지 않습니다." >&2
+  exit 1
+fi
 
 # Git passes the destination remote name and its location as arguments 1 and 2.
 git_bash_path="$(git config --local --get jdsnack.hookBash || true)"

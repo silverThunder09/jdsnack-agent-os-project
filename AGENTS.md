@@ -11,7 +11,7 @@ JDSnack은 개발자 이력서와 JD를 AI로 분석하는 웹 서비스입니�
 - 코덱스: 문서 계획(spec), 활성 spec 기준 기능 **구현 + 기능 테스트 작성**과 현재 기본 PR 리뷰를 담당합니다. PR 리뷰에서는 diff와 검토 기준만 받는 격리된 읽기 전용 경로를 사용합니다.
 - 클로드: 명시적으로 선택된 리뷰 backend 또는 사용자 승인 폴백을 담당합니다. `backend`/`frontend` 소스는 직접 수정하지 않습니다.
 - PR 리뷰·자동 병합: PASS 4/5 이상, 현재 base/head SHA, PR 계약, PR CI Gate, 모든 branch-required check, 미해결 변경요청 부재를 별도 approval job이 다시 확인한 뒤 Squash auto-merge를 큐에 넣습니다. 위험도 점수는 라벨에만 사용하고 자동화 정책의 추가 사람 승인 수는 0입니다. GitHub에 실제 설정된 필수 승인 규칙은 그대로 존중합니다. 세부 절차는 [review-backend-fallback.md](./.agent-os/operations/review-backend-fallback.md)를 따릅니다.
-- clone 직후 `sh scripts/install-git-hooks.sh`로 Git common dir 아래 trusted 외부 hook bundle과 pre-commit/pre-push 설치를 검증합니다. pre-push는 staged/working-tree/branch diff를 Codex 읽기 전용 리뷰어에게 전달하고 PASS 4점 미만이면 push를 차단합니다.
+- clone 직후 `sh scripts/install-git-hooks.sh`로 `origin/main`의 독립 trusted source를 사용한 Git common dir 아래 외부 hook bundle과 pre-commit/pre-push 설치를 검증합니다. bundle은 독립 source SHA와 파일 digest를 기록하며, pre-push는 staged/working-tree/branch diff를 Codex 읽기 전용 리뷰어에게 전달하고 PASS 4점 미만이면 push를 차단합니다.
 - 리뷰는 [review-routing.md](./.agent-os/operations/review-routing.md)의 고정 위험도 산식과 Security·Performance·Test Coverage·Architecture 라벨을 사용합니다. `scripts/review-policy.json`은 `dryRun=false`이며, 점수·현재 SHA·필수 check를 검증한 뒤 자동 Squash 병합을 허용합니다.
 - 폴백: 코덱스가 토큰이 없어 막힐 때만, 사용자가 "네가 구현해"라고 지시하면 클로드가 직접 구현·테스트합니다. 전환·복귀·가드레일은 `.agent-os/operations/worker-backends.md`의 폴백 규칙을 따릅니다.
 - **무인 배치**: Codex 구현 PR은 이벤트 기반 리뷰-머지 루프가 리뷰·CI를 확인합니다. 마지막 Feature가 머지되면 `spec-queue.json`의 eligible 후보를 자동으로 Spec으로 승격하고 T1을 다시 Codex에 디스패치합니다. 리뷰 `PASS` 4점 이상과 필수 게이트가 모두 통과하면 위험도 구간과 무관하게 Squash auto-merge를 큐에 넣습니다. 제품 판단·충돌은 `needs-human`으로 멈춥니다.
