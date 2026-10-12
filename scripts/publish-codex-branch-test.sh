@@ -31,8 +31,15 @@ EOF
 chmod +x "$PUBLISH_ROOT/scripts/pre-push-ai-review.sh"
 PUBLISH="$PUBLISH_ROOT/scripts/publish-codex-branch.sh"
 
+fixture_codex_release="${HOME:?}/.codex/packages/standalone/releases/publish-test-$$-${RANDOM}"
+fixture_codex="$fixture_codex_release/bin/codex"
+mkdir -p "$(dirname "$fixture_codex")"
+printf '#!/bin/sh\nexit 0\n' > "$fixture_codex"
+chmod 700 "$fixture_codex"
+export CODEX_BIN="$fixture_codex"
+
 cleanup() {
-    rm -rf "$TEST_ROOT"
+    rm -rf "$TEST_ROOT" "$fixture_codex_release"
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -85,7 +92,7 @@ git -C "$TEST_ROOT/work" remote add origin "$TEST_ROOT/remote.git"
 git -C "$TEST_ROOT/work" push -q -u origin codex/example
 git -C "$TEST_ROOT/work" push -q origin HEAD:refs/heads/main
 real_bash="$(command -v bash)"
-real_codex="$(command -v codex || true)"
+real_codex="$fixture_codex"
 base_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
 
 set +e

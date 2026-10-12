@@ -165,7 +165,7 @@ resolve_trusted_codex_bin() {
     validate_trusted_path_ancestors "$canonical"
     case "$canonical" in
         "$WORKTREE"|"$WORKTREE"/*|"$ROOT_DIR"|"$ROOT_DIR"/*) fail "CODEX_BIN points inside the untrusted checkout" ;;
-        /usr/bin/codex*|/bin/codex*|/usr/local/bin/codex*|/mingw64/bin/codex*|/c/Users/*/AppData/Local/OpenAI/Codex/*|/c/Users/*/AppData/Local/Programs/OpenAI/Codex/*|/c/Users/*/.codex/packages/standalone/releases/*/bin/codex*|/mnt/c/Users/*/AppData/Local/OpenAI/Codex/*|/mnt/c/Users/*/AppData/Local/Programs/OpenAI/Codex/*|/mnt/c/Users/*/.codex/packages/standalone/releases/*/bin/codex*) ;;
+        /usr/bin/codex*|/bin/codex*|/usr/local/bin/codex*|/mingw64/bin/codex*|/c/Users/*/AppData/Local/OpenAI/Codex/*|/c/Users/*/AppData/Local/Programs/OpenAI/Codex/*|/c/Users/*/.codex/packages/standalone/releases/*/bin/codex*|/mnt/c/Users/*/AppData/Local/OpenAI/Codex/*|/mnt/c/Users/*/AppData/Local/Programs/OpenAI/Codex/*|/mnt/c/Users/*/.codex/packages/standalone/releases/*/bin/codex*|*/.codex/packages/standalone/releases/*/bin/codex*) ;;
         *) fail "CODEX_BIN is outside the trusted Codex installation paths" ;;
     esac
     mode="$("$TRUSTED_STAT" -c '%a' -- "$canonical" 2>/dev/null || true)"
