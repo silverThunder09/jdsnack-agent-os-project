@@ -163,12 +163,18 @@ grep -Fq -- 'trusted_source_sha_file="$hook_root/source-sha"' "$ROOT_DIR/.githoo
   || { echo 'pre-push hooks must reject stale trusted review bundles' >&2; exit 1; }
 grep -Fq -- 'trusted_base_sha_file="$hook_root/trusted-source-sha"' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must verify the independent trusted source SHA' >&2; exit 1; }
+grep -Fq -- 'trusted_source_ref_file="$hook_root/trusted-source-ref"' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must verify the trusted source ref mode' >&2; exit 1; }
 grep -Fq -- 'bundle_manifest="$hook_root/bundle-manifest"' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must verify trusted bundle content digests' >&2; exit 1; }
 grep -Fq -- 'source_sha="$(git rev-parse HEAD)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || { echo 'Git hook installation must record the checkout SHA in the trusted bundle' >&2; exit 1; }
 grep -Fq -- "trusted_source_ref='refs/remotes/origin/main'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || { echo 'Git hook installation must use an independent origin/main source' >&2; exit 1; }
+grep -Fq -- 'JDSNACK_HOOK_SOURCE_REF=HEAD' "$ROOT_DIR/scripts/install-git-hooks-test.sh" \
+  || { echo 'Git hook installation must test the verified HEAD bootstrap source' >&2; exit 1; }
+grep -Fq -- "HEAD) trusted_source_ref='HEAD'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || { echo 'Git hook installation must allow only the verified HEAD bootstrap source override' >&2; exit 1; }
 grep -Fq -- 'git show "$trusted_source_ref:$source_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || { echo 'Git hook installation must copy from the trusted source ref' >&2; exit 1; }
 grep -Fq -- 'bundle_manifest="$trusted_hooks_dir/bundle-manifest"' "$ROOT_DIR/scripts/install-git-hooks.sh" \

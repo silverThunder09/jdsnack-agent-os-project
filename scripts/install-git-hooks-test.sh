@@ -28,6 +28,19 @@ chmod +x "$fixture_bin/codex"
 trusted_source_sha="$(git rev-parse HEAD)"
 git clone --quiet --no-checkout "$ROOT_DIR" "$test_worktree"
 git -C "$test_worktree" checkout -B codex/install-hook-test HEAD >/dev/null
+git -C "$test_worktree" config user.name test
+git -C "$test_worktree" config user.email test@example.com
+git -C "$test_worktree" update-ref refs/remotes/origin/main "$trusted_source_sha"
+
+# Keep a complete but stale trusted source so the bootstrap path proves that
+# HEAD, rather than origin/main, is selected when the installer is piped from
+# the verified commit object.
+git -C "$test_worktree" switch -q -c codex/stale-hook-source
+printf '#!/bin/sh\nprintf stale-trusted-hook\\n' > "$test_worktree/.githooks/pre-push"
+git -C "$test_worktree" add .githooks/pre-push
+git -C "$test_worktree" commit -qm 'stale trusted hook fixture'
+stale_source_sha="$(git -C "$test_worktree" rev-parse HEAD)"
+git -C "$test_worktree" switch -q codex/install-hook-test
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$trusted_source_sha"
 
 cat > "$test_worktree/.githooks/pre-push" <<'EOF'
@@ -82,6 +95,8 @@ trusted_hooks_dir="$test_worktree/.git/jdsnack-hooks"
   || fail 'installer가 branch에서 변조한 readiness 스크립트를 trusted bundle에 복사했습니다.'
 test "$(<"$trusted_hooks_dir/trusted-source-sha")" = "$trusted_source_sha" \
   || fail 'trusted bundle이 독립 source SHA를 기록하지 않았습니다.'
+test "$(<"$trusted_hooks_dir/trusted-source-ref")" = refs/remotes/origin/main \
+  || fail '기본 installer가 origin/main source ref를 기록하지 않았습니다.'
 configured_hooks_path="$(git -C "$test_worktree" config --local --get core.hooksPath)"
 if command -v cygpath >/dev/null 2>&1; then
   configured_hooks_path="$(cygpath -u "$configured_hooks_path")"
@@ -102,5 +117,20 @@ test -x "$configured_python_path" \
   cd "$test_worktree"
   PATH="$fixture_bin:$PATH" "$trusted_hooks_dir/pre-commit" >/dev/null
 ) || fail 'trusted pre-commit이 branch 변조 readiness 스크립트를 실행했습니다.'
+
+git -C "$test_worktree" update-ref refs/remotes/origin/main "$stale_source_sha"
+(
+  cd "$test_worktree"
+  JDSNACK_HOOK_SOURCE_REF=HEAD PATH="$fixture_bin:$PATH" sh < <(git show HEAD:scripts/install-git-hooks.sh) >/dev/null
+)
+(
+  cd "$test_worktree"
+  MSYS_NO_PATHCONV=1 git show 'HEAD:.githooks/pre-push'
+) | cmp - "$trusted_hooks_dir/pre-push" \
+  || fail 'bootstrap installer가 origin/main의 stale pre-push를 복사했습니다.'
+test "$(<"$trusted_hooks_dir/trusted-source-sha")" = "$trusted_source_sha" \
+  || fail 'bootstrap installer가 HEAD trusted source SHA를 기록하지 않았습니다.'
+test "$(<"$trusted_hooks_dir/trusted-source-ref")" = HEAD \
+  || fail 'bootstrap installer가 HEAD source ref를 기록하지 않았습니다.'
 
 echo 'Trusted hook installer ignores branch-mutated source files'

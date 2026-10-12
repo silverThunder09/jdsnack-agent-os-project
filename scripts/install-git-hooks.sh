@@ -115,8 +115,17 @@ git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
 }
 trusted_hooks_dir="$git_common_dir/jdsnack-hooks"
 trusted_source_ref='refs/remotes/origin/main'
+case "${JDSNACK_HOOK_SOURCE_REF-}" in
+  '') ;;
+  HEAD) trusted_source_ref='HEAD' ;;
+  refs/remotes/origin/main) ;;
+  *)
+    echo "ERROR: 지원하지 않는 trusted hook source입니다: ${JDSNACK_HOOK_SOURCE_REF}" >&2
+    exit 1
+    ;;
+esac
 trusted_source_sha="$(git rev-parse --verify "${trusted_source_ref}^{commit}" 2>/dev/null)" || {
-  echo "ERROR: independently trusted hook source refs/remotes/origin/main을 확인할 수 없습니다. 먼저 origin/main을 fetch하십시오." >&2
+  echo "ERROR: independently trusted hook source ${trusted_source_ref}를 확인할 수 없습니다." >&2
   exit 1
 }
 mkdir -p "$trusted_hooks_dir/scripts"
@@ -126,7 +135,7 @@ copy_trusted_source() {
   source_path="$1"
   destination_path="$2"
   if ! MSYS_NO_PATHCONV=1 git cat-file -e "$trusted_source_ref:$source_path" 2>/dev/null; then
-    echo "ERROR: trusted hook source가 origin/main에 없습니다: $source_path" >&2
+    echo "ERROR: trusted hook source에 파일이 없습니다 (${trusted_source_ref}): $source_path" >&2
     exit 1
   fi
   if [ -L "$destination_path" ]; then
@@ -134,7 +143,7 @@ copy_trusted_source() {
     exit 1
   fi
   MSYS_NO_PATHCONV=1 git show "$trusted_source_ref:$source_path" > "$destination_path" || {
-    echo "ERROR: origin/main trusted hook source를 bundle로 복사할 수 없습니다: $source_path" >&2
+    echo "ERROR: trusted hook source를 bundle로 복사할 수 없습니다 (${trusted_source_ref}): $source_path" >&2
     exit 1
   }
 }
@@ -185,7 +194,8 @@ source_sha="$(git rev-parse HEAD)" || {
 }
 printf '%s\n' "$source_sha" > "$trusted_hooks_dir/source-sha"
 printf '%s\n' "$trusted_source_sha" > "$trusted_hooks_dir/trusted-source-sha"
-chmod 600 "$trusted_hooks_dir/source-sha" "$trusted_hooks_dir/trusted-source-sha" "$bundle_manifest"
+printf '%s\n' "$trusted_source_ref" > "$trusted_hooks_dir/trusted-source-ref"
+chmod 600 "$trusted_hooks_dir/source-sha" "$trusted_hooks_dir/trusted-source-sha" "$trusted_hooks_dir/trusted-source-ref" "$bundle_manifest"
 chmod 700 "$trusted_hooks_dir/pre-commit" "$trusted_hooks_dir/pre-push" "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"
 
 git config --local jdsnack.hookBash "$git_bash_path"
