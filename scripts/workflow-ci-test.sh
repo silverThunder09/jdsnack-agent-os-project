@@ -115,6 +115,8 @@ grep -Fq -- 'github_askpass_git' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex creation must use a token-free Git askpass boundary' >&2; exit 1; }
 grep -Fq -- '--jdsnack-askpass' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex creation must pass the askpass path without putting the token in Git argv' >&2; exit 1; }
+grep -Fq -- '--jdsnack-keep-github-header' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'standalone Codex creation must preserve a validated checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'trusted_git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex creation must reuse an existing checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'trusted_git -C "$WORKTREE" config --local core.hooksPath .githooks' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
@@ -129,6 +131,8 @@ grep -Fq -- 'github_askpass_git' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must use a token-free Git askpass boundary' >&2; exit 1; }
 grep -Fq -- '--jdsnack-askpass' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must pass the askpass path without putting the token in Git argv' >&2; exit 1; }
+grep -Fq -- '--jdsnack-keep-github-header' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must preserve a validated checkout Authorization header' >&2; exit 1; }
 if grep -Fq -- 'password=%s' "$ROOT_DIR/scripts/create-codex-worktree.sh" || grep -Fq -- 'password=%s' "$ROOT_DIR/scripts/publish-codex-branch.sh"; then
   echo 'Git authentication must not serialize GH_TOKEN into a credential helper command' >&2
   exit 1

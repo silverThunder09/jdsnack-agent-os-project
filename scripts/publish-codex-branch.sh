@@ -228,11 +228,23 @@ trusted_git() (
     local variable
     local -a git_config_args
     local trusted_askpass=""
-    if [ "${1:-}" = '--jdsnack-askpass' ]; then
-        [ "$#" -ge 2 ] || { printf 'codex push failed: trusted Git askpass path is missing\n' >&2; exit 20; }
-        trusted_askpass="$2"
-        shift 2
-    fi
+    local keep_github_header=false
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --jdsnack-askpass)
+                [ "$#" -ge 2 ] || { printf 'codex push failed: trusted Git askpass path is missing\n' >&2; exit 20; }
+                trusted_askpass="$2"
+                shift 2
+                ;;
+            --jdsnack-keep-github-header)
+                keep_github_header=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
     export PATH="$TRUSTED_PATH"
     unset GITHUB_TOKEN GH_BIN GH_CONFIG_DIR GIT_ASKPASS GIT_SSH GIT_SSH_COMMAND SSH_AUTH_SOCK SSH_AGENT_PID
     unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy GIT_PROXY_COMMAND
@@ -255,8 +267,10 @@ trusted_git() (
         -c credential.helper=
         -c core.askPass=
         -c core.sshCommand=
-        -c http.extraheader=
     )
+    if [ "$keep_github_header" != true ]; then
+        git_config_args+=(-c http.extraheader=)
+    fi
     if [ "${TRUSTED_GIT_HOOKS_ENABLED:-false}" != true ]; then
         git_config_args+=(-c core.hooksPath=/dev/null)
     fi
@@ -507,7 +521,9 @@ git_with_github_auth() {
         has_existing_header=true
     fi
 
-    if [ "$remote_mode" = github-https ] && [ -n "${GH_TOKEN:-}" ] && [ "$has_existing_header" = false ]; then
+    if [ "$remote_mode" = github-https ] && [ "$has_existing_header" = true ]; then
+        trusted_git --jdsnack-keep-github-header "$@"
+    elif [ "$remote_mode" = github-https ] && [ -n "${GH_TOKEN:-}" ]; then
         github_askpass_git "$@"
     else
         trusted_git "$@"
