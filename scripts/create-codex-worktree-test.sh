@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CREATE="$ROOT_DIR/scripts/create-codex-worktree.sh"
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-worktree.XXXXXX")"
+checkout_hook_log="$TEST_ROOT/checkout-hook.log"
 
 cleanup() {
     git -C "$TEST_ROOT/work" worktree remove --force "$TEST_ROOT/feature" >/dev/null 2>&1 || true
@@ -18,11 +19,18 @@ git -C "$TEST_ROOT/work" config user.email test@example.com
 mkdir -p "$TEST_ROOT/work/.githooks"
 printf '#!/bin/sh\nexit 0\n' > "$TEST_ROOT/work/.githooks/pre-push"
 chmod +x "$TEST_ROOT/work/.githooks/pre-push"
+cat > "$TEST_ROOT/work/.githooks/post-checkout" <<EOF
+#!/bin/sh
+: > '$checkout_hook_log'
+EOF
+chmod +x "$TEST_ROOT/work/.githooks/post-checkout"
 printf 'initial\n' > "$TEST_ROOT/work/state.txt"
 git -C "$TEST_ROOT/work" add .githooks/pre-push
+git -C "$TEST_ROOT/work" add .githooks/post-checkout
 git -C "$TEST_ROOT/work" add state.txt
 git -C "$TEST_ROOT/work" commit -qm initial
 git -C "$TEST_ROOT/work" branch -M main
+git -C "$TEST_ROOT/work" config core.hooksPath .githooks
 git -C "$TEST_ROOT/work" remote add origin "$TEST_ROOT/remote.git"
 git -C "$TEST_ROOT/work" push -q -u origin main
 expected_origin_url="$(git -C "$TEST_ROOT/work" remote get-url origin)"
@@ -49,6 +57,7 @@ if [ "$actual_sha" != "$remote_main_sha" ]; then
     printf 'FAIL: worktree did not start from origin/main (expected %s, got %s)\n' "$remote_main_sha" "$actual_sha" >&2
     exit 1
 fi
+test ! -e "$checkout_hook_log"
 
 git -C "$TEST_ROOT/work" config filter.malicious.clean '!printf unsafe-filter'
 set +e
@@ -89,6 +98,7 @@ test "$(git -C "$TEST_ROOT/feature-windows" remote get-url origin)" = "$expected
 test "$(git -C "$TEST_ROOT/feature-windows" config --local --get core.hooksPath)" = .githooks
 test -n "$(git -C "$TEST_ROOT/feature-windows" config --local --get jdsnack.hookBash)"
 test -f "$TEST_ROOT/feature-windows/.githooks/pre-push"
+test ! -e "$checkout_hook_log"
 
 printf 'Codex worktree creation tests passed\n'
 printf 'Windows-compatible standalone clone contract passed\n'

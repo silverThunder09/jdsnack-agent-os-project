@@ -60,6 +60,7 @@ trusted_git() (
     "$TRUSTED_GIT" \
         -c credential.helper= \
         -c core.askPass= \
+        -c core.hooksPath=/dev/null \
         -c core.sshCommand= \
         -c http.extraheader= \
         "$@"
