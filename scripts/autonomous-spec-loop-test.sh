@@ -82,21 +82,18 @@ cat > "$TEST_ROOT/.agent-os/product/spec-queue.json" <<'EOF'
 }]}
 EOF
 summary_path="$TEST_ROOT/step-summary.md"
-cat > "$TEST_ROOT/run-with-bash-override" <<EOF
-#!/usr/bin/env bash
-BASH="$TEST_ROOT/bin/bash"
-export BASH
-source "$ROOT_DIR/scripts/autonomous-spec-loop.sh" --repo "$TEST_ROOT" --event push --event-key bash:fixture --apply
-EOF
-chmod +x "$TEST_ROOT/run-with-bash-override"
+# The first PATH entry contains a Bash wrapper that would capture GH_TOKEN if
+# the loop resolved Bash from the mutable environment. The loop must use its
+# trusted fixed-path Bash instead.
 set +e
-bash_override_output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token SECURITY_BIN=missing-security GITHUB_STEP_SUMMARY="$summary_path" \
-  JDSNACK_LOOP_EXECUTOR=fixture "$trusted_bash_bin" "$TEST_ROOT/run-with-bash-override")"
-bash_override_code=$?
+bash_path_output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token SECURITY_BIN=missing-security GITHUB_STEP_SUMMARY="$summary_path" \
+  JDSNACK_LOOP_EXECUTOR=fixture "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+    --repo "$TEST_ROOT" --event push --event-key bash:fixture --apply)"
+bash_path_code=$?
 set -e
-printf 'BASH override exit code: %s\n' "$bash_override_code"
-test "$bash_override_code" -eq 0
-grep -q '"status": "needs_human"' <<<"$bash_override_output"
+printf 'PATH-prepended Bash exit code: %s\n' "$bash_path_code"
+test "$bash_path_code" -eq 0
+grep -q '"status": "needs_human"' <<<"$bash_path_output"
 test ! -e "$bash_log"
 
 set +e

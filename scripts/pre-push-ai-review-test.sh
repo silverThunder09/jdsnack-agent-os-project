@@ -64,6 +64,7 @@ for script_name in \
   cp "$test_worktree/scripts/$script_name" "$trusted_hooks_root/scripts/$script_name"
 done
 chmod 700 "$trusted_hooks_root/pre-push" "$trusted_hooks_root/scripts/pre-push-ai-review.sh"
+printf '%s\n' "$head_sha" > "$trusted_hooks_root/source-sha"
 git -C "$test_worktree" config --local core.hooksPath "$trusted_hooks_root"
 head_tree="$(git -C "$test_worktree" rev-parse "$head_sha^{tree}")"
 non_ff_remote_sha="$(git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com commit-tree "$head_tree" -p "$base_sha" -m 'non-fast-forward pre-push fixture')"

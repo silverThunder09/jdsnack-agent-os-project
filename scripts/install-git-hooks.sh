@@ -126,6 +126,12 @@ for script_name in \
   review-path-safety.ps1; do
   cp "$repo_root/scripts/$script_name" "$trusted_hooks_dir/scripts/$script_name"
 done
+source_sha="$(git rev-parse HEAD)" || {
+  echo "ERROR: trusted Git hook bundle의 source SHA를 확인할 수 없습니다." >&2
+  exit 1
+}
+printf '%s\n' "$source_sha" > "$trusted_hooks_dir/source-sha"
+chmod 600 "$trusted_hooks_dir/source-sha"
 chmod 700 "$trusted_hooks_dir/pre-commit" "$trusted_hooks_dir/pre-push" "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"
 
 git config --local jdsnack.hookBash "$git_bash_path"

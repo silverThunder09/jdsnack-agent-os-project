@@ -32,6 +32,23 @@ if [ ! -f "$trusted_review_script" ] || [ -L "$trusted_review_script" ]; then
   echo "ERROR: trusted pre-push AI 리뷰 스크립트가 없습니다." >&2
   exit 1
 fi
+trusted_source_sha_file="$hook_root/source-sha"
+if [ ! -f "$trusted_source_sha_file" ] || [ -L "$trusted_source_sha_file" ]; then
+  echo "ERROR: trusted pre-push bundle의 source SHA가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+IFS= read -r trusted_source_sha < "$trusted_source_sha_file" || {
+  echo "ERROR: trusted pre-push bundle의 source SHA를 읽을 수 없습니다." >&2
+  exit 1
+}
+current_source_sha="$(git rev-parse HEAD)" || {
+  echo "ERROR: 현재 checkout의 source SHA를 확인할 수 없습니다." >&2
+  exit 1
+}
+if [ -z "$trusted_source_sha" ] || [ "$trusted_source_sha" != "$current_source_sha" ]; then
+  echo "ERROR: trusted pre-push bundle이 현재 checkout보다 오래되었습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  exit 1
+fi
 
 # Git passes the destination remote name and its location as arguments 1 and 2.
 git_bash_path="$(git config --local --get jdsnack.hookBash || true)"

@@ -217,6 +217,10 @@ grep -Fq -- 'git rev-parse --git-common-dir' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 Git common dir trusted bundle을 검증하지 않습니다.'
 grep -Fq -- 'trusted_review_script="$hook_root/scripts/pre-push-ai-review.sh"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 외부 trusted review copy를 선택하지 않습니다.'
+grep -Fq -- 'trusted_source_sha_file="$hook_root/source-sha"' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook이 stale trusted review bundle을 거부하지 않습니다.'
+grep -Fq -- 'source_sha="$(git rev-parse HEAD)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 trusted bundle에 checkout SHA를 기록하지 않습니다.'
 grep -Fq -- 'exec "$git_bash_path" "$trusted_review_script" "$@"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 PATH 탐색 대신 검증된 Git Bash 실행 파일을 호출하지 않습니다.'
 grep -Fq -- 'for candidate in python3 python; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \

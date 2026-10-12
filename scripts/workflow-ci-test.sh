@@ -155,6 +155,10 @@ grep -Fq -- 'git rev-parse --git-common-dir' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must anchor their executable bundle to Git common dir' >&2; exit 1; }
 grep -Fq -- 'trusted_review_script="$hook_root/scripts/pre-push-ai-review.sh"' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must invoke the trusted external review copy' >&2; exit 1; }
+grep -Fq -- 'trusted_source_sha_file="$hook_root/source-sha"' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must reject stale trusted review bundles' >&2; exit 1; }
+grep -Fq -- 'source_sha="$(git rev-parse HEAD)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || { echo 'Git hook installation must record the checkout SHA in the trusted bundle' >&2; exit 1; }
 grep -Fq -- 'github_askpass_git' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must use a token-free Git askpass boundary' >&2; exit 1; }
 grep -Fq -- '--jdsnack-askpass' "$ROOT_DIR/scripts/publish-codex-branch.sh" \

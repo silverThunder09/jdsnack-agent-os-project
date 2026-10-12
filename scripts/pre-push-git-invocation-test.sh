@@ -44,6 +44,7 @@ BRANCH_REVIEW
 
 chmod +x "$trusted_hooks_root/pre-push" "$trusted_hooks_root/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
 head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
+printf '%s\n' "$head_sha" > "$trusted_hooks_root/source-sha"
 remote_ref="refs/heads/$branch_name"
 zero_sha='0000000000000000000000000000000000000000'
 JDSNACK_HOOK_ARGS_CAPTURE="$hook_args_path" \
