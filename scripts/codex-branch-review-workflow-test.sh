@@ -255,7 +255,7 @@ grep -Fq -- 'Assert-NoReparsePointsInPath -Path $fullPath' "$ROOT_DIR/scripts/se
   || fail '임시 ACL 적용기가 DACL 적용 전후 재분석 지점을 재검증하지 않습니다.'
 grep -Fq -- '재분석 지점' "$ROOT_DIR/scripts/review-path-safety.ps1" \
   || fail '경로 안전성 검증기가 재분석 지점을 거부하지 않습니다.'
-grep -Fq -- "검증해 절대 경로로 로컬 Git 설정(\`jdsnack.hookBash\`)에 저장" "$ROOT_DIR/.agent-os/standards/git-hooks.md" \
+grep -Fq -- "절대 경로로 로컬 Git 설정(\`jdsnack.hookBash\`)" "$ROOT_DIR/.agent-os/standards/git-hooks.md" \
   || fail 'git-hooks 문서가 설치 시 검증하는 도구 의존성을 설명하지 않습니다.'
 grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'
 grep -Fq -- 'required_file' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 downstream 파일 의존성을 확인하지 않습니다.'
