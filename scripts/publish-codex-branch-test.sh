@@ -7,6 +7,7 @@ TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-publish.XXXXXX")"
 malicious_hook_log="$TEST_ROOT/malicious-hook.log"
 trusted_hook_log="$TEST_ROOT/trusted-hook.log"
 fake_tool_log="$TEST_ROOT/fake-tool.log"
+local_receive_hook_log="$TEST_ROOT/local-receive-hook.log"
 PUBLISH_ROOT="$TEST_ROOT/publisher-root"
 mkdir -p "$PUBLISH_ROOT/scripts"
 cp "$PUBLISH_SOURCE" "$PUBLISH_ROOT/scripts/publish-codex-branch.sh"
@@ -46,6 +47,14 @@ assert_eq() {
 }
 
 git init --bare -q "$TEST_ROOT/remote.git"
+cat > "$TEST_ROOT/remote.git/hooks/pre-receive" <<EOF
+#!/bin/sh
+if [ -n "\${GH_TOKEN-}" ]; then
+    printf 'local-receive-token=%s\n' "\${GH_TOKEN}" > '$local_receive_hook_log'
+fi
+exit 0
+EOF
+chmod +x "$TEST_ROOT/remote.git/hooks/pre-receive"
 git init -q "$TEST_ROOT/work"
 git -C "$TEST_ROOT/work" config user.name test
 git -C "$TEST_ROOT/work" config user.email test@example.com
@@ -130,6 +139,7 @@ case "$output" in
         ;;
 esac
 test ! -e "$malicious_hook_log"
+test ! -e "$local_receive_hook_log"
 test -f "$trusted_hook_log"
 test ! -e "$fake_tool_log"
 
@@ -185,6 +195,7 @@ if grep -Fq "trusted-hook-received-secret" "$trusted_hook_log"; then
     exit 1
 fi
 test ! -e "$malicious_hook_log"
+test ! -e "$local_receive_hook_log"
 
 if [ -n "$real_codex" ]; then
     codex_path_output="$(PATH="$TEST_ROOT/work:$PATH" MALICIOUS_HOOK_LOG="$malicious_hook_log" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_BIN="$real_codex" CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$real_bash" "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$auth_base_sha" 2>&1)"

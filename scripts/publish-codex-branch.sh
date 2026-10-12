@@ -235,6 +235,7 @@ trusted_git() (
     local variable
     local -a git_config_args
     local trusted_askpass=""
+    local trusted_askpass_token="${GH_TOKEN-}"
     local keep_github_header=false
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -253,7 +254,7 @@ trusted_git() (
         esac
     done
     export PATH="$TRUSTED_PATH"
-    unset GITHUB_TOKEN GH_BIN GH_CONFIG_DIR GIT_ASKPASS GIT_SSH GIT_SSH_COMMAND SSH_AUTH_SOCK SSH_AGENT_PID
+    unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR GIT_ASKPASS GIT_SSH GIT_SSH_COMMAND SSH_AUTH_SOCK SSH_AGENT_PID
     unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy GIT_PROXY_COMMAND
     unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS
     unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
@@ -264,6 +265,8 @@ trusted_git() (
     done
     if [ -n "$trusted_askpass" ]; then
         [ -x "$trusted_askpass" ] || { printf 'codex push failed: trusted Git askpass is unavailable\n' >&2; exit 20; }
+        [ -n "$trusted_askpass_token" ] || { printf 'codex push failed: GitHub askpass token is unavailable\n' >&2; exit 20; }
+        export GH_TOKEN="$trusted_askpass_token"
         export GIT_ASKPASS="$trusted_askpass"
     fi
     export GIT_CONFIG_NOSYSTEM=1
