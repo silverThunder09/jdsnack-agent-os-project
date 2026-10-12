@@ -95,6 +95,14 @@ fi
 exit 91
 EOF
 chmod +x "$TEST_ROOT/hooks/pre-push"
+cat > "$TEST_ROOT/hooks/reference-transaction" <<EOF
+#!/bin/sh
+if [ -n "\${GH_TOKEN-}" ]; then
+    printf 'reference-transaction-token=%s\n' "\${GH_TOKEN-}" > '$malicious_hook_log'
+fi
+exit 0
+EOF
+chmod +x "$TEST_ROOT/hooks/reference-transaction"
 git -C "$TEST_ROOT/work" config core.hooksPath "$TEST_ROOT/hooks"
 set +e
 output="$(PATH="$TEST_ROOT/bin:$TEST_ROOT/work:$PATH" MALICIOUS_HOOK_LOG="$malicious_hook_log" CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$real_bash" "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/example --base-sha "$base_sha")"

@@ -226,6 +226,7 @@ resolve_trusted_runtime_dir() {
 
 trusted_git() (
     local variable
+    local -a git_config_args
     export PATH="$TRUSTED_PATH"
     unset GITHUB_TOKEN GH_BIN GH_CONFIG_DIR GIT_ASKPASS GIT_SSH GIT_SSH_COMMAND SSH_AUTH_SOCK SSH_AGENT_PID
     unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy GIT_PROXY_COMMAND
@@ -240,12 +241,16 @@ trusted_git() (
     export GIT_CONFIG_SYSTEM=/dev/null
     export GIT_CONFIG_GLOBAL=/dev/null
     export GIT_TERMINAL_PROMPT=0
-    "$TRUSTED_GIT" \
-        -c credential.helper= \
-        -c core.askPass= \
-        -c core.sshCommand= \
-        -c http.extraheader= \
-        "$@"
+    git_config_args=(
+        -c credential.helper=
+        -c core.askPass=
+        -c core.sshCommand=
+        -c http.extraheader=
+    )
+    if [ "${TRUSTED_GIT_HOOKS_ENABLED:-false}" != true ]; then
+        git_config_args+=(-c core.hooksPath=/dev/null)
+    fi
+    "$TRUSTED_GIT" "${git_config_args[@]}" "$@"
 )
 
 shell_quote() {
@@ -478,6 +483,10 @@ git_with_github_auth() {
     fi
 }
 
+git_with_trusted_push_hook() {
+    TRUSTED_GIT_HOOKS_ENABLED=true git_with_github_auth "$@"
+}
+
 reject_untrusted_local_config() {
     local key
     local local_keys
@@ -560,7 +569,7 @@ last_error=""
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     push_output=""
-    if push_output="$(git_with_github_auth -C "$WORKTREE" push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" 2>&1)"; then
+    if push_output="$(git_with_trusted_push_hook -C "$WORKTREE" push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" 2>&1)"; then
         printf '%s\n' "$push_output" >&2
         remote_payload=""
         if remote_payload="$(git_with_github_auth -C "$WORKTREE" ls-remote --exit-code origin "refs/heads/$BRANCH" 2>&1)"; then

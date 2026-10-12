@@ -146,6 +146,10 @@ grep -Fq -- 'remote_repository_identity' "$ROOT_DIR/scripts/publish-codex-branch
 grep -Fq -- 'http\..*' "$ROOT_DIR/scripts/publish-codex-branch.sh" && \
 grep -Fq -- 'filter\..*\.(clean|smudge|process)' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must reject unsafe local HTTP Git configuration' >&2; exit 1; }
+grep -Fq -- 'core.hooksPath=/dev/null' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must disable repository hooks during pre-push fetches' >&2; exit 1; }
+grep -Fq -- 'git_with_trusted_push_hook' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must re-enable only its trusted push hook for push' >&2; exit 1; }
 grep -Fq -- 'CODEX_BIN=$(shell_quote "$TRUSTED_CODEX_BIN")' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must pass the validated Codex executable to the trusted hook' >&2; exit 1; }
 grep -Fq -- 'TRUSTED_READLINK="$(resolve_trusted_tool readlink)"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
