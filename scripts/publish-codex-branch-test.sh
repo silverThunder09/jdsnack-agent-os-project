@@ -10,10 +10,30 @@ fake_tool_log="$TEST_ROOT/fake-tool.log"
 local_receive_hook_log="$TEST_ROOT/local-receive-hook.log"
 PUBLISH_ROOT="$TEST_ROOT/publisher-root"
 mkdir -p "$PUBLISH_ROOT/scripts"
+fixture_codex_release="${HOME:?}/.codex/packages/standalone/releases/publish-test-$$-${RANDOM}"
+fixture_codex="$fixture_codex_release/bin/codex"
+mkdir -p "$(dirname "$fixture_codex")"
+printf '#!/bin/sh\nexit 0\n' > "$fixture_codex"
+chmod 700 "$fixture_codex"
+fixture_codex_config="$fixture_codex"
+if command -v cygpath >/dev/null 2>&1; then
+    fixture_codex_config="$(cygpath -m "$fixture_codex")"
+fi
+export CODEX_BIN="$fixture_codex"
 cp "$PUBLISH_SOURCE" "$PUBLISH_ROOT/scripts/publish-codex-branch.sh"
 cat > "$PUBLISH_ROOT/scripts/pre-push-ai-review.sh" <<EOF
 #!/bin/sh
 set -eu
+expected_codex='$fixture_codex_config'
+configured_codex="\$(git config --worktree --get jdsnack.codex 2>/dev/null || true)"
+if [ -z "\$configured_codex" ]; then
+    configured_codex="\$(git config --local --get jdsnack.codex 2>/dev/null || true)"
+fi
+if [ "\$configured_codex" != "\$expected_codex" ]; then
+    printf 'trusted-hook-codex-scope-mismatch expected=%s actual=%s\n' "\$expected_codex" "\$configured_codex" >&2
+    printf 'trusted-hook-codex-scope-mismatch\n' > '$trusted_hook_log'
+    exit 1
+fi
 if [ -n "\${GH_TOKEN-}" ] || [ -n "\${GITHUB_TOKEN-}" ] ||
     env | grep -Eq '^(GIT_CONFIG_[A-Za-z0-9_]*|GIT_ASKPASS|GIT_SSH|SSH_AUTH_SOCK|GH_)='; then
     printf 'trusted-hook-received-secret\\n' > '$trusted_hook_log'
@@ -30,13 +50,6 @@ exit 0
 EOF
 chmod +x "$PUBLISH_ROOT/scripts/pre-push-ai-review.sh"
 PUBLISH="$PUBLISH_ROOT/scripts/publish-codex-branch.sh"
-
-fixture_codex_release="${HOME:?}/.codex/packages/standalone/releases/publish-test-$$-${RANDOM}"
-fixture_codex="$fixture_codex_release/bin/codex"
-mkdir -p "$(dirname "$fixture_codex")"
-printf '#!/bin/sh\nexit 0\n' > "$fixture_codex"
-chmod 700 "$fixture_codex"
-export CODEX_BIN="$fixture_codex"
 
 cleanup() {
     rm -rf "$TEST_ROOT" "$fixture_codex_release"
@@ -214,6 +227,34 @@ if [ -n "$real_codex" ]; then
             ;;
     esac
 fi
+
+linked_worktree="$TEST_ROOT/linked-worktree"
+git -C "$TEST_ROOT/work" worktree add -q -b codex/linked "$linked_worktree" HEAD
+git -C "$linked_worktree" config extensions.worktreeConfig true
+linked_original_codex="$TEST_ROOT/original-codex"
+linked_original_codex_config="$linked_original_codex"
+if command -v cygpath >/dev/null 2>&1; then
+    linked_original_codex_config="$(cygpath -m "$linked_original_codex")"
+fi
+git -C "$linked_worktree" config --worktree jdsnack.codex "$linked_original_codex"
+linked_base_sha="$(git -C "$linked_worktree" rev-parse HEAD)"
+printf 'linked worktree publish\n' >> "$linked_worktree/state.txt"
+git -C "$linked_worktree" add state.txt
+git -C "$linked_worktree" commit -qm 'linked worktree publish'
+linked_output="$(PATH="$linked_worktree:$PATH" MALICIOUS_HOOK_LOG="$malicious_hook_log" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_BIN="$real_codex" CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$real_bash" "$PUBLISH" --worktree "$linked_worktree" --branch codex/linked --base-sha "$linked_base_sha" 2>&1)"
+case "$linked_output" in
+    *"codex push verified"*) ;;
+    *)
+        printf 'FAIL: linked-worktree publish output (%s)\n' "$linked_output" >&2
+        exit 1
+        ;;
+esac
+linked_restored_codex="$(git -C "$linked_worktree" config --worktree --get jdsnack.codex 2>/dev/null || true)"
+assert_eq "$linked_original_codex_config" "$linked_restored_codex" "linked-worktree Codex config restoration"
+linked_local_codex="$(git -C "$linked_worktree" config --local --get jdsnack.codex 2>/dev/null || true)"
+test -z "$linked_local_codex"
+git -C "$TEST_ROOT/work" worktree remove "$linked_worktree"
+git -C "$TEST_ROOT/work" config --local --unset extensions.worktreeConfig
 
 git -C "$TEST_ROOT/work" config http.https://github.com/.extraheader 'AUTHORIZATION: bearer existing-fixture'
 existing_header_base_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"

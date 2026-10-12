@@ -13,7 +13,10 @@ require_host_tool() {
   local name="$1"
   local path
   if [ "$name" = codex ]; then
-    path="$($git_bin config --local --get jdsnack.codex 2>/dev/null || true)"
+    path="$($git_bin config --worktree --get jdsnack.codex 2>/dev/null || true)"
+    if [ -z "$path" ]; then
+      path="$($git_bin config --local --get jdsnack.codex 2>/dev/null || true)"
+    fi
     if [ -z "$path" ]; then
       echo "ERROR: installer가 승인한 Codex 경로가 없습니다. scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
       exit 1
