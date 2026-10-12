@@ -8,7 +8,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$HeadSha,
 
-    [string]$PolicyPath = ''
+    [string]$PolicyPath = '',
+
+    [string]$GitPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -236,7 +238,8 @@ function Get-ReviewRiskAssessment {
         [string]$ReviewWorkspace,
         [string]$ReviewBaseSha,
         [string]$ReviewHeadSha,
-        [string]$ReviewPolicyPath
+        [string]$ReviewPolicyPath,
+        [string]$ReviewGitPath
     )
 
     if ($ReviewBaseSha -notmatch '^[0-9a-fA-F]{40}$' -or $ReviewHeadSha -notmatch '^[0-9a-fA-F]{40}$') {
@@ -258,9 +261,15 @@ function Get-ReviewRiskAssessment {
     }
     Assert-FixedReviewPolicy -ReviewPolicy $policy
 
-    $gitPath = Resolve-ToolPath 'git'
+    $gitPath = $ReviewGitPath
+    if ([string]::IsNullOrWhiteSpace($gitPath)) {
+        $gitPath = Resolve-ToolPath 'git'
+    }
     if ([string]::IsNullOrWhiteSpace($gitPath)) {
         throw 'Git is unavailable for risk assessment.'
+    }
+    if (-not (Test-Path -LiteralPath $gitPath -PathType Leaf)) {
+        throw "Git executable does not exist: $gitPath"
     }
 
     $range = "$ReviewBaseSha...$ReviewHeadSha"
@@ -395,7 +404,8 @@ try {
         -ReviewWorkspace $Workspace `
         -ReviewBaseSha $BaseSha `
         -ReviewHeadSha $HeadSha `
-        -ReviewPolicyPath $PolicyPath
+        -ReviewPolicyPath $PolicyPath `
+        -ReviewGitPath $GitPath
     $assessment | ConvertTo-Json -Depth 10 -Compress
 } catch {
     [Console]::Error.WriteLine($_.Exception.Message)

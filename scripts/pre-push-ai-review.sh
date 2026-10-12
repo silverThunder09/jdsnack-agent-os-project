@@ -397,8 +397,10 @@ if [ ! -s "$branch_path" ]; then
 fi
 
 workspace_arg="$CHECKOUT_ROOT"
+git_path_arg="$git_bin"
 if [ -n "$path_converter_bin" ]; then
   workspace_arg="$("$path_converter_bin" -w "$CHECKOUT_ROOT")"
+  git_path_arg="$("$path_converter_bin" -w "$git_bin")"
 fi
 risk_script_arg="$BUNDLE_ROOT/scripts/review-risk.ps1"
 policy_path_arg="$BUNDLE_ROOT/scripts/review-policy.json"
@@ -407,7 +409,7 @@ if [ -n "$path_converter_bin" ]; then
   policy_path_arg="$("$path_converter_bin" -w "$policy_path_arg")"
 fi
 risk_stderr_path="$tmp_dir/review-risk.stderr"
-if ! risk_json="$("$pwsh_bin" -NoProfile -File "$risk_script_arg" -Workspace "$workspace_arg" -PolicyPath "$policy_path_arg" -BaseSha "$base_sha" -HeadSha "$reviewed_ref" 2>"$risk_stderr_path")"; then
+if ! risk_json="$("$pwsh_bin" -NoProfile -File "$risk_script_arg" -Workspace "$workspace_arg" -PolicyPath "$policy_path_arg" -GitPath "$git_path_arg" -BaseSha "$base_sha" -HeadSha "$reviewed_ref" 2>"$risk_stderr_path")"; then
   echo "ERROR: 결정론적 pre-push 위험도 계산기가 실패했습니다. push를 차단합니다." >&2
   exit 1
 fi
