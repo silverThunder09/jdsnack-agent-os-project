@@ -2,7 +2,11 @@
 set -euo pipefail
 umask 077
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+if [ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ]; then
+    SCRIPT_DIR='.'
+fi
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORKTREE=""
 BRANCH=""
 BASE_SHA=""
@@ -105,7 +109,10 @@ validate_trusted_path_ancestors() {
             root|"$current_user") ;;
             *) fail "trusted executable path has an untrusted owner: $path" ;;
         esac
-        parent="$(dirname -- "$path")"
+        case "$path" in
+            */*) parent="${path%/*}"; [ -n "$parent" ] || parent='/' ;;
+            *) parent='.' ;;
+        esac
         [ "$parent" != "$path" ] || break
         path="$parent"
     done

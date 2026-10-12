@@ -58,6 +58,15 @@ exit 93
 EOF
     chmod +x "$TEST_ROOT/work/$tool"
 done
+cat > "$TEST_ROOT/work/dirname" <<EOF
+#!/bin/sh
+printf '%s\n' dirname >> '$fake_tool_log'
+if [ -n "\${GH_TOKEN-}" ]; then
+    printf 'dirname-token=%s\n' "\${GH_TOKEN}" > '$malicious_hook_log'
+fi
+exit 93
+EOF
+chmod +x "$TEST_ROOT/work/dirname"
 printf 'initial\n' > "$TEST_ROOT/work/state.txt"
 git -C "$TEST_ROOT/work" add git env bash
 git -C "$TEST_ROOT/work" add state.txt
