@@ -49,6 +49,22 @@ head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$base_sha"
 fixture_head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 [ "$fixture_head_sha" = "$head_sha" ] || fail '격리 fixture가 현재 HEAD에서 생성되지 않았습니다.'
+trusted_hooks_root="$test_worktree/.git/jdsnack-hooks"
+mkdir -p "$trusted_hooks_root/scripts"
+cp "$ROOT_DIR/.githooks/pre-push" "$trusted_hooks_root/pre-push"
+cp "$test_worktree/backends.json" "$trusted_hooks_root/backends.json"
+cp "$test_worktree/scripts/pre-push-ai-review.sh" "$trusted_hooks_root/scripts/pre-push-ai-review.sh"
+for script_name in \
+  review-policy.json \
+  review-risk.ps1 \
+  secure-review-temp-acl.ps1 \
+  verify-codex-auth-permissions.ps1 \
+  codex-auth-permissions.ps1 \
+  review-path-safety.ps1; do
+  cp "$test_worktree/scripts/$script_name" "$trusted_hooks_root/scripts/$script_name"
+done
+chmod 700 "$trusted_hooks_root/pre-push" "$trusted_hooks_root/scripts/pre-push-ai-review.sh"
+git -C "$test_worktree" config --local core.hooksPath "$trusted_hooks_root"
 head_tree="$(git -C "$test_worktree" rev-parse "$head_sha^{tree}")"
 non_ff_remote_sha="$(git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com commit-tree "$head_tree" -p "$base_sha" -m 'non-fast-forward pre-push fixture')"
 if git -C "$test_worktree" merge-base --is-ancestor "$non_ff_remote_sha" "$head_sha"; then
@@ -389,7 +405,7 @@ run_review() {
         GH_BIN="$fake_root/gh.exe" \
         GH_CONFIG_DIR="$fake_root/gh-config" \
         JDSNACK_ASSERT_HOOK_GH_ISOLATION=1 \
-        run_hook_with_origin_urls "$test_worktree/.githooks/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
+        run_hook_with_origin_urls "$trusted_hooks_root/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
   )
 }
 
