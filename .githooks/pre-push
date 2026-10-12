@@ -2,9 +2,31 @@
 set -eu
 
 unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR
-for variable in $(env | sed -n 's/^\(GIT_CONFIG_[A-Za-z0-9_]*\)=.*$/\1/p'); do
-  unset "$variable"
-done
+
+# Git may pass GIT_CONFIG_* values such as http.extraHeader into hooks. Clear
+# them with shell builtins before any PATH-resolved helper can observe them.
+sanitize_git_config_environment() {
+  variable_definition=''
+  variable_name=''
+  while IFS= read -r variable_definition; do
+    case "$variable_definition" in
+      GIT_CONFIG_*=*)
+        variable_name=${variable_definition%%=*}
+        case "$variable_name" in
+          GIT_CONFIG_*)
+            case "$variable_name" in
+              *[!A-Za-z0-9_]*) ;;
+              *) unset "$variable_name" ;;
+            esac
+            ;;
+        esac
+        ;;
+    esac
+  done <<EOF
+$(set)
+EOF
+}
+sanitize_git_config_environment
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"

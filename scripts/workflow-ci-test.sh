@@ -153,8 +153,14 @@ grep -Fq -- 'config --worktree core.hooksPath /dev/null' "$ROOT_DIR/scripts/crea
   || { echo 'linked Codex worktrees must persist hook disabling in their own Git config' >&2; exit 1; }
 grep -Fq -- 'unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex Git commands must ignore inherited repository path overrides' >&2; exit 1; }
-grep -Fq -- 'for variable in $(env | sed' "$ROOT_DIR/.githooks/pre-push" \
-  || { echo 'pre-push hooks must sanitize all coordinator Git config variables before launching the reviewer' >&2; exit 1; }
+grep -Fq -- 'sanitize_git_config_environment()' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must define a builtin-only Git config environment sanitizer' >&2; exit 1; }
+grep -Fq -- 'while IFS= read -r variable_definition' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must enumerate Git config variables without PATH helpers' >&2; exit 1; }
+grep -Fq -- '$(set)' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must enumerate shell variables through the builtin set command' >&2; exit 1; }
+! grep -Fq -- 'for variable in $(env | sed' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must not expose coordinator Git config variables to env or sed' >&2; exit 1; }
 grep -Fq -- 'unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must remove GitHub CLI binary and config paths before launching the reviewer' >&2; exit 1; }
 grep -Fq -- 'git rev-parse --git-common-dir' "$ROOT_DIR/.githooks/pre-push" \
