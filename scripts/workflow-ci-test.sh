@@ -145,6 +145,10 @@ grep -Fq -- 'trusted_git -C "$auth_repo" config --local --get-all http.https://g
   || { echo 'standalone Codex creation must reuse an existing checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'trusted_git -C "$WORKTREE" config --local core.hooksPath /dev/null' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex clones must disable checkout-controlled hooks during Codex commits' >&2; exit 1; }
+grep -Fq -- 'config --local extensions.worktreeConfig true' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'linked Codex worktrees must enable per-worktree Git config before disabling hooks' >&2; exit 1; }
+grep -Fq -- 'config --worktree core.hooksPath /dev/null' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'linked Codex worktrees must persist hook disabling in their own Git config' >&2; exit 1; }
 grep -Fq -- 'unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex Git commands must ignore inherited repository path overrides' >&2; exit 1; }
 grep -Fq -- 'for variable in $(env | sed' "$ROOT_DIR/.githooks/pre-push" \
@@ -181,6 +185,8 @@ if grep -Fq -- 'password=%s' "$ROOT_DIR/scripts/create-codex-worktree.sh" || gre
 fi
 grep -Fq -- 'trusted_git -C "$WORKTREE" config --local core.hooksPath "$config_hook_dir"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must override a worktree-controlled hook with a trusted hook path' >&2; exit 1; }
+grep -Fq -- 'config --worktree core.hooksPath "$config_hook_dir"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publishing must install the trusted hook in linked worktree scope' >&2; exit 1; }
 grep -Fq -- 'restore_push_hook' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must restore the original worktree hook path' >&2; exit 1; }
 grep -Fq -- 'trusted_git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/publish-codex-branch.sh" \

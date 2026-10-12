@@ -341,5 +341,12 @@ if [ "$CODEX_WINDOWS_WORKTREE" = true ]; then
     [ -f "$WORKTREE/.githooks/pre-push" ] || fail "standalone clone is missing the pre-push hook"
 else
     trusted_git -C "$REPO_ROOT" worktree add -b "$BRANCH" "$WORKTREE" refs/remotes/origin/main >&2 || fail "git worktree add failed"
+    # Linked worktrees share the repository-local config by default. Enable
+    # per-worktree config before disabling hooks so the Codex checkout cannot
+    # change the hook policy of the primary checkout as a side effect.
+    trusted_git -C "$REPO_ROOT" config --local extensions.worktreeConfig true \
+        || fail "could not enable per-worktree Git config"
+    trusted_git -C "$WORKTREE" config --worktree core.hooksPath /dev/null \
+        || fail "could not disable linked worktree hooks"
 fi
 printf 'created %s from origin/main at %s\n' "$BRANCH" "$(trusted_git -C "$WORKTREE" rev-parse HEAD)"

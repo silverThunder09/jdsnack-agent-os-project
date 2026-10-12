@@ -17,6 +17,7 @@ TRUSTED_HOOK_DIR=""
 HOOK_CONFIG_REPO=""
 ORIGINAL_HOOK_PATH=""
 ORIGINAL_HOOK_PATH_SET=false
+HOOK_CONFIG_SCOPE=(--local)
 TRUSTED_GIT=""
 TRUSTED_ENV=""
 TRUSTED_MKDIR=""
@@ -296,9 +297,17 @@ shell_quote() {
 restore_push_hook() {
     [ -n "$HOOK_CONFIG_REPO" ] || return 0
     if [ "$ORIGINAL_HOOK_PATH_SET" = true ]; then
-        trusted_git -C "$HOOK_CONFIG_REPO" config --local core.hooksPath "$ORIGINAL_HOOK_PATH" || return 20
+        if [ "${HOOK_CONFIG_SCOPE[0]}" = --worktree ]; then
+            trusted_git -C "$HOOK_CONFIG_REPO" config --worktree core.hooksPath "$ORIGINAL_HOOK_PATH" || return 20
+        else
+            trusted_git -C "$HOOK_CONFIG_REPO" config --local core.hooksPath "$ORIGINAL_HOOK_PATH" || return 20
+        fi
     else
-        trusted_git -C "$HOOK_CONFIG_REPO" config --local --unset core.hooksPath >/dev/null 2>&1 || return 20
+        if [ "${HOOK_CONFIG_SCOPE[0]}" = --worktree ]; then
+            trusted_git -C "$HOOK_CONFIG_REPO" config --worktree --unset core.hooksPath >/dev/null 2>&1 || return 20
+        else
+            trusted_git -C "$HOOK_CONFIG_REPO" config --local --unset core.hooksPath >/dev/null 2>&1 || return 20
+        fi
     fi
     HOOK_CONFIG_REPO=""
 }
@@ -330,6 +339,7 @@ prepare_trusted_push_hook() {
     local trusted_review_literal
     local trusted_hook
     local config_hook_dir
+    local worktree_config
 
     trusted_review_script="$ROOT_DIR/scripts/pre-push-ai-review.sh"
     [ -f "$trusted_review_script" ] || fail "trusted pre-push reviewer is unavailable"
@@ -375,18 +385,36 @@ prepare_trusted_push_hook() {
     } > "$trusted_hook"
     "$TRUSTED_CHMOD" 700 "$trusted_hook" || fail "could not secure trusted push hook"
 
+    worktree_config="$(trusted_git -C "$WORKTREE" config --local --get extensions.worktreeConfig 2>/dev/null || true)"
+    if [ "$worktree_config" = true ]; then
+        HOOK_CONFIG_SCOPE=(--worktree)
+    else
+        HOOK_CONFIG_SCOPE=(--local)
+    fi
     HOOK_CONFIG_REPO="$WORKTREE"
-    if ORIGINAL_HOOK_PATH="$(trusted_git -C "$WORKTREE" config --local --get core.hooksPath 2>/dev/null)"; then
+    if [ "${HOOK_CONFIG_SCOPE[0]}" = --worktree ]; then
+        if ORIGINAL_HOOK_PATH="$(trusted_git -C "$WORKTREE" config --worktree --get core.hooksPath 2>/dev/null)"; then
+            ORIGINAL_HOOK_PATH_SET=true
+        fi
+    elif ORIGINAL_HOOK_PATH="$(trusted_git -C "$WORKTREE" config --local --get core.hooksPath 2>/dev/null)"; then
         ORIGINAL_HOOK_PATH_SET=true
     fi
     config_hook_dir="$TRUSTED_HOOK_DIR"
     if [ -n "$TRUSTED_CYGPATH" ]; then
         config_hook_dir="$("$TRUSTED_CYGPATH" -m "$TRUSTED_HOOK_DIR")"
     fi
-    trusted_git -C "$WORKTREE" config --local core.hooksPath "$config_hook_dir" \
-        || fail "could not install trusted push hook"
-    if [ "$(trusted_git -C "$WORKTREE" config --local --get core.hooksPath)" != "$config_hook_dir" ]; then
-        fail "trusted push hook was not installed"
+    if [ "${HOOK_CONFIG_SCOPE[0]}" = --worktree ]; then
+        trusted_git -C "$WORKTREE" config --worktree core.hooksPath "$config_hook_dir" \
+            || fail "could not install trusted push hook"
+        if [ "$(trusted_git -C "$WORKTREE" config --worktree --get core.hooksPath)" != "$config_hook_dir" ]; then
+            fail "trusted push hook was not installed"
+        fi
+    else
+        trusted_git -C "$WORKTREE" config --local core.hooksPath "$config_hook_dir" \
+            || fail "could not install trusted push hook"
+        if [ "$(trusted_git -C "$WORKTREE" config --local --get core.hooksPath)" != "$config_hook_dir" ]; then
+            fail "trusted push hook was not installed"
+        fi
     fi
 }
 

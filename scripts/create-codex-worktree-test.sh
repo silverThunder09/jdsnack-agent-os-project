@@ -60,6 +60,27 @@ if [ "$actual_sha" != "$remote_main_sha" ]; then
 fi
 test ! -e "$checkout_hook_log"
 
+linked_hooks_path="$(git -C "$TEST_ROOT/feature" config --get core.hooksPath)"
+case "$linked_hooks_path" in
+    /dev/null|nul) ;;
+    *)
+        printf 'FAIL: linked worktree hooks are not disabled after creation (%s)\n' "$linked_hooks_path" >&2
+        exit 1
+        ;;
+esac
+test "$(git -C "$TEST_ROOT/work" config --local --get core.hooksPath)" = .githooks
+
+# A checkout-controlled pre-commit hook must not execute while Codex commits
+# in a regular linked worktree either.
+printf '#!/bin/sh\n: > %s\n' "$commit_hook_log" > "$TEST_ROOT/feature/.githooks/pre-commit"
+chmod +x "$TEST_ROOT/feature/.githooks/pre-commit"
+git -C "$TEST_ROOT/feature" config user.name test
+git -C "$TEST_ROOT/feature" config user.email test@example.com
+printf 'linked worktree Codex change\n' > "$TEST_ROOT/feature/linked-codex-change.txt"
+git -C "$TEST_ROOT/feature" add linked-codex-change.txt
+git -C "$TEST_ROOT/feature" commit -qm 'linked worktree Codex commit'
+test ! -e "$commit_hook_log"
+
 git -C "$TEST_ROOT/work" config filter.malicious.clean '!printf unsafe-filter'
 set +e
 filter_output="$(REPO_ROOT="$TEST_ROOT/work" "$CREATE" --branch codex/filter-example --worktree "$TEST_ROOT/feature-filter" 2>&1)"
