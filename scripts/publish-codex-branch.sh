@@ -232,8 +232,10 @@ init_trusted_tools() {
         *.exe)
             case "$TRUSTED_CODEX_BIN" in
                 /mnt/*|/c/*)
-                    [ -n "$TRUSTED_WSL_INTEROP" ] || fail "Windows Codex requires WSL interop"
-                    TRUSTED_WSLENV='CODEX_HOME/p:TEMP/p:TMP/p:TMPDIR/p'
+                    if [ -z "$TRUSTED_CYGPATH" ]; then
+                        [ -n "$TRUSTED_WSL_INTEROP" ] || fail "Windows Codex requires WSL interop when cygpath is unavailable"
+                        TRUSTED_WSLENV='CODEX_HOME/p:TEMP/p:TMP/p:TMPDIR/p'
+                    fi
                     ;;
             esac
             ;;
