@@ -227,6 +227,8 @@ grep -Fq -- 'source_sha="$(git rev-parse HEAD)"' "$ROOT_DIR/scripts/install-git-
   || fail 'Git hook 설치가 trusted bundle에 checkout SHA를 기록하지 않습니다.'
 grep -Fq -- 'trusted_base_sha_file="$hook_root/trusted-source-sha"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 독립 trusted source SHA를 검증하지 않습니다.'
+grep -Fq -- 'trusted_source_ref_file="$hook_root/trusted-source-ref"' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook이 trusted source ref 모드를 검증하지 않습니다.'
 grep -Fq -- 'bundle_manifest="$hook_root/bundle-manifest"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 trusted bundle content digest를 검증하지 않습니다.'
 grep -Fq -- 'actual_blob="$(git hash-object "$bundle_file")"' "$ROOT_DIR/.githooks/pre-push" \

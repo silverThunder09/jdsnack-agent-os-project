@@ -59,6 +59,7 @@ head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$head_sha"
 printf '%s\n' "$head_sha" > "$trusted_hooks_root/source-sha"
 printf '%s\n' "$head_sha" > "$trusted_hooks_root/trusted-source-sha"
+printf '%s\n' refs/remotes/origin/main > "$trusted_hooks_root/trusted-source-ref"
 bundle_manifest="$trusted_hooks_root/bundle-manifest"
 : > "$bundle_manifest"
 for bundle_path in \

@@ -68,6 +68,7 @@ done
 chmod 700 "$trusted_hooks_root/pre-push" "$trusted_hooks_root/scripts/pre-push-ai-review.sh"
 printf '%s\n' "$head_sha" > "$trusted_hooks_root/source-sha"
 printf '%s\n' "$base_sha" > "$trusted_hooks_root/trusted-source-sha"
+printf '%s\n' refs/remotes/origin/main > "$trusted_hooks_root/trusted-source-ref"
 bundle_manifest="$trusted_hooks_root/bundle-manifest"
 : > "$bundle_manifest"
 for bundle_path in \
