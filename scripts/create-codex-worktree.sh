@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 REPO_ROOT="${REPO_ROOT:-}"
 BRANCH=""
@@ -9,6 +10,9 @@ TRUSTED_GIT=""
 TRUSTED_BASH=""
 TRUSTED_PATH=""
 TRUSTED_FIND=""
+TRUSTED_MKTEMP=""
+TRUSTED_CHMOD=""
+TRUSTED_RM=""
 TRUSTED_TOOL_DIRS=()
 
 usage() {
@@ -43,6 +47,12 @@ resolve_trusted_tool() {
 
 trusted_git() (
     local variable
+    local trusted_askpass=""
+    if [ "${1:-}" = '--jdsnack-askpass' ]; then
+        [ "$#" -ge 2 ] || { printf 'codex worktree creation failed: trusted Git askpass path is missing\n' >&2; exit 20; }
+        trusted_askpass="$2"
+        shift 2
+    fi
     export PATH="$TRUSTED_PATH"
     unset GITHUB_TOKEN GH_BIN GH_CONFIG_DIR GIT_ASKPASS GIT_SSH GIT_SSH_COMMAND SSH_AUTH_SOCK SSH_AGENT_PID
     unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy GIT_PROXY_COMMAND
@@ -53,6 +63,10 @@ trusted_git() (
     for variable in ${!GIT_@}; do
         unset "$variable"
     done
+    if [ -n "$trusted_askpass" ]; then
+        [ -x "$trusted_askpass" ] || { printf 'codex worktree creation failed: trusted Git askpass is unavailable\n' >&2; exit 20; }
+        export GIT_ASKPASS="$trusted_askpass"
+    fi
     export GIT_CONFIG_NOSYSTEM=1
     export GIT_CONFIG_SYSTEM=/dev/null
     export GIT_CONFIG_GLOBAL=/dev/null
@@ -147,6 +161,28 @@ validate_existing_github_header() {
     fi
 }
 
+github_askpass_git() (
+    local askpass_root
+    local askpass
+    askpass_root="$($TRUSTED_MKTEMP -d /tmp/jdsnack-git-askpass.XXXXXX)" \
+        || exit 20
+    cleanup_askpass() {
+        "$TRUSTED_RM" -rf -- "$askpass_root"
+    }
+    trap cleanup_askpass EXIT
+    askpass="$askpass_root/askpass"
+    printf '%s\n' \
+        '#!/bin/sh' \
+        'set -eu' \
+        'case "${1-}" in' \
+        '  *Username*) printf "%s\\n" x-access-token ;;' \
+        '  *Password*) printf "%s\\n" "${GH_TOKEN:?}" ;;' \
+        '  *) exit 1 ;;' \
+        'esac' > "$askpass"
+    "$TRUSTED_CHMOD" 700 "$askpass"
+    trusted_git --jdsnack-askpass "$askpass" "$@"
+)
+
 git_with_github_auth() {
     local auth_repo=""
     local expect_repo=false
@@ -186,8 +222,7 @@ git_with_github_auth() {
     fi
 
     if [ "$remote_mode" = github-https ] && [ -n "${GH_TOKEN:-}" ] && [ "$has_existing_header" = false ]; then
-        local credential_helper='!f() { protocol=; host=; while IFS= read -r line; do case "$line" in protocol=*) protocol="${line#protocol=}";; host=*) host="${line#host=}";; "") break;; esac; done; if [ "$protocol" = https ] && [ "$host" = github.com ]; then printf "protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n" "$GH_TOKEN"; fi; }; f'
-        trusted_git -c "credential.helper=$credential_helper" "$@"
+        github_askpass_git "$@"
     else
         trusted_git "$@"
     fi
@@ -249,6 +284,9 @@ TRUSTED_PATH="$(IFS=:; printf '%s' "${TRUSTED_TOOL_DIRS[*]}")"
 TRUSTED_GIT="$(resolve_trusted_tool git)"
 TRUSTED_BASH="$(resolve_trusted_tool bash)"
 TRUSTED_FIND="$(resolve_trusted_tool find)"
+TRUSTED_MKTEMP="$(resolve_trusted_tool mktemp)"
+TRUSTED_CHMOD="$(resolve_trusted_tool chmod)"
+TRUSTED_RM="$(resolve_trusted_tool rm)"
 
 reject_untrusted_local_config "$REPO_ROOT"
 if ! remote_mode_for_repo "$REPO_ROOT" >/dev/null; then
