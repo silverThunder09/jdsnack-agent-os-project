@@ -151,6 +151,10 @@ grep -Fq -- 'for variable in $(env | sed' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must sanitize all coordinator Git config variables before launching the reviewer' >&2; exit 1; }
 grep -Fq -- 'unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR' "$ROOT_DIR/.githooks/pre-push" \
   || { echo 'pre-push hooks must remove GitHub CLI binary and config paths before launching the reviewer' >&2; exit 1; }
+grep -Fq -- 'git rev-parse --git-common-dir' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must anchor their executable bundle to Git common dir' >&2; exit 1; }
+grep -Fq -- 'trusted_review_script="$hook_root/scripts/pre-push-ai-review.sh"' "$ROOT_DIR/.githooks/pre-push" \
+  || { echo 'pre-push hooks must invoke the trusted external review copy' >&2; exit 1; }
 grep -Fq -- 'github_askpass_git' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must use a token-free Git askpass boundary' >&2; exit 1; }
 grep -Fq -- '--jdsnack-askpass' "$ROOT_DIR/scripts/publish-codex-branch.sh" \

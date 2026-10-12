@@ -201,11 +201,23 @@ grep -Fq -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/inst
   || fail 'Git hook 설치가 pre-push에서 사용할 Git Bash 실행 경로를 명시적으로 확인하지 않습니다.'
 grep -Fq -- 'git config --local jdsnack.hookBash "$git_bash_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 검증한 Bash 실행 경로를 로컬 설정에 고정하지 않습니다.'
-grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex cat; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex cat cp mkdir; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push 실행에 필요한 전체 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'git_common_dir="$(git rev-parse --git-common-dir)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 Git common dir를 trusted bundle 기준으로 사용하지 않습니다.'
+grep -Fq -- 'trusted_hooks_dir="$git_common_dir/jdsnack-hooks"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 checkout 밖의 trusted bundle 경로를 고정하지 않습니다.'
+grep -Fq -- 'cp "$repo_root/scripts/pre-push-ai-review.sh" "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 pre-push 리뷰 스크립트를 trusted bundle로 복사하지 않습니다.'
+grep -Fq -- 'git config --local core.hooksPath "$trusted_hooks_dir"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 core.hooksPath를 trusted bundle로 연결하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(git config --local --get jdsnack.hookBash || true)"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 설치 시 검증된 Git Bash 경로를 읽지 않습니다.'
-grep -Fq -- 'exec "$git_bash_path" "$repo_root/scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" \
+grep -Fq -- 'git rev-parse --git-common-dir' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook이 Git common dir trusted bundle을 검증하지 않습니다.'
+grep -Fq -- 'trusted_review_script="$hook_root/scripts/pre-push-ai-review.sh"' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook이 외부 trusted review copy를 선택하지 않습니다.'
+grep -Fq -- 'exec "$git_bash_path" "$trusted_review_script" "$@"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 PATH 탐색 대신 검증된 Git Bash 실행 파일을 호출하지 않습니다.'
 grep -Fq -- 'for candidate in python3 python; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-commit readiness용 Python을 확인하지 않습니다.'
@@ -268,7 +280,8 @@ grep -Fq -- '현재 checkout의 HEAD와' "$ROOT_DIR/scripts/pre-push-ai-review.s
 grep -Fq -- '삭제 ref만 있는 push는' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 삭제 ref 전용 push를 fail-closed 처리하지 않습니다.'
 grep -Fq -- 'tracked checkout 상태가 다릅니다' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 push 대상과 dirty checkout의 불일치를 차단하지 않습니다.'
 grep -Fq -- 'Codex 리뷰 전에 staged·working-tree 변경' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 Codex reviewer 전에 dirty checkout을 차단하지 않습니다.'
-grep -Fq -- 'scripts/pre-push-ai-review.sh" "$@"' "$ROOT_DIR/.githooks/pre-push" || fail 'pre-push hook이 Git hook 인자를 리뷰 스크립트에 전달하지 않습니다.'
+grep -Fq -- 'exec "$git_bash_path" "$trusted_review_script" "$@"' "$ROOT_DIR/.githooks/pre-push" \
+  || fail 'pre-push hook이 Git hook 인자를 trusted 리뷰 스크립트에 전달하지 않습니다.'
 grep -Fq -- 'forbidden_tool in git gh bash pwsh powershell.exe python python3 node' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" || fail 'pre-push 격리 fixture가 ambient 실행 파일 차단을 검증하지 않습니다.'
 grep -Fq -- 'set_fixture_windows_runtime()' "$ROOT_DIR/scripts/pre-push-ai-review-test.sh" \
   || fail 'pre-push Linux workflow fixture가 격리 Codex runtime의 SystemRoot/WINDIR를 제공하지 않습니다.'

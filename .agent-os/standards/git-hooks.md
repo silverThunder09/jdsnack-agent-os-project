@@ -6,7 +6,7 @@ Git 훅은 사람이 놓치기 쉬운 하네스 규칙을 커밋/푸시 전에 �
 
 ## 적용 단계
 
-현재 저장소는 버전관리되는 `.githooks/pre-commit`과 `.githooks/pre-push`를 사용합니다. clone 직후 `sh scripts/install-git-hooks.sh`를 실행하면 hook 파일과 downstream 스크립트, pre-push에서 사용할 실행 가능한 Git Bash를 검증해 절대 경로로 로컬 Git 설정(`jdsnack.hookBash`)에 저장하고, pre-commit readiness용 Python, `jq`, PowerShell(`pwsh` 또는 `powershell.exe`), Codex CLI를 확인한 뒤에만 `core.hooksPath=.githooks`를 연결합니다. push hook은 이 검증된 Bash 경로를 호출하므로 실행 시점의 PATH 차이로 Bash를 찾지 못하는 경우를 막습니다. 사전조건이나 설정 검증이 실패하면 hook 활성화를 성공으로 처리하지 않습니다.
+현재 저장소는 버전관리되는 `.githooks/pre-commit`과 `.githooks/pre-push`를 설치 원본으로 사용합니다. clone 직후 `sh scripts/install-git-hooks.sh`를 실행하면 hook 파일과 downstream 스크립트, pre-push에서 사용할 실행 가능한 Git Bash를 검증해 절대 경로로 로컬 Git 설정(`jdsnack.hookBash`)에 저장하고, 리뷰 정책·위험도 계산기·Codex ACL 검증기·`backends.json`을 Git common dir 아래의 trusted 외부 bundle로 복사합니다. pre-commit readiness용 Python, `jq`, PowerShell(`pwsh` 또는 `powershell.exe`), Codex CLI도 확인한 뒤에만 `core.hooksPath`를 branch checkout 밖의 trusted bundle로 연결합니다. push hook은 이 bundle의 고정된 리뷰 스크립트와 검증된 Bash 경로를 호출하므로 branch가 `.githooks`나 `scripts/pre-push-ai-review.sh`를 바꿔도 Codex 로그인 캐시에 접근하기 전에 실행되지 않습니다. 사전조건이나 설정 검증이 실패하면 hook 활성화를 성공으로 처리하지 않습니다.
 
 ## `commit-msg` 훅
 
@@ -85,7 +85,7 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 ## `pre-push` 훅
 
-푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. `scripts/pre-push-ai-review.sh`는 tracked checkout이 clean한지 먼저 확인한 뒤 현재 branch와 `origin/main`의 branch diff만 전달하고, `scripts/review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙도 프롬프트에 포함합니다. 요청 모델은 `backends.json`의 `workers.codex.review-fallback.model`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
+푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. 설치된 trusted hook bundle의 `scripts/pre-push-ai-review.sh`는 tracked checkout이 clean한지 먼저 확인한 뒤 현재 branch와 `origin/main`의 branch diff만 전달하고, trusted bundle의 `scripts/review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙도 프롬프트에 포함합니다. 요청 모델은 trusted bundle의 `backends.json`에서 읽고, 실행 모델은 `runtimeModel`을 사용합니다.
 
 검사 규칙:
 

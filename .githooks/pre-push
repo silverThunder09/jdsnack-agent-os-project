@@ -9,8 +9,27 @@ done
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if [ ! -f "$repo_root/scripts/pre-push-ai-review.sh" ]; then
-  echo "ERROR: pre-push AI 리뷰 스크립트가 없습니다." >&2
+hook_root="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+git_common_dir="$(git rev-parse --git-common-dir)"
+case "$git_common_dir" in
+  /*|[A-Za-z]:[\\/]*) ;;
+  *) git_common_dir="$repo_root/$git_common_dir" ;;
+esac
+git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
+  echo "ERROR: Git common dir를 trusted hook 경로로 확인할 수 없습니다." >&2
+  exit 1
+}
+case "$hook_root" in
+  "$git_common_dir/jdsnack-hooks") ;;
+  *)
+    echo "ERROR: pre-push는 Git common dir의 trusted hook bundle에서만 실행해야 합니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+    exit 1
+    ;;
+esac
+
+trusted_review_script="$hook_root/scripts/pre-push-ai-review.sh"
+if [ ! -f "$trusted_review_script" ] || [ -L "$trusted_review_script" ]; then
+  echo "ERROR: trusted pre-push AI 리뷰 스크립트가 없습니다." >&2
   exit 1
 fi
 
@@ -21,4 +40,4 @@ if [ -z "$git_bash_path" ] || [ ! -x "$git_bash_path" ]; then
   exit 1
 fi
 
-exec "$git_bash_path" "$repo_root/scripts/pre-push-ai-review.sh" "$@"
+exec "$git_bash_path" "$trusted_review_script" "$@"
