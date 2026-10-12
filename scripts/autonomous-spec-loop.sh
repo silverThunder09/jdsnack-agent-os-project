@@ -412,6 +412,24 @@ notify_failure() {
   FAILURE_NOTIFIED=true
 }
 
+remove_unregistered_worktree() {
+  local worktree_path="$1"
+  local worktree_listing
+  case "$worktree_path" in
+    "$WORKTREE_TMP_ROOT"/jdsnack-*) ;;
+    *) return 1 ;;
+  esac
+  if run_trusted_git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1; then
+    if ! worktree_listing="$(run_trusted_git -C "$REPO" worktree list --porcelain 2>/dev/null)"; then
+      return 1
+    fi
+    if printf '%s\n' "$worktree_listing" | run_trusted_system "$TRUSTED_GREP_BIN" -F -x -- "worktree $worktree_path" >/dev/null 2>&1; then
+      return 1
+    fi
+  fi
+  "$RM_BIN" -rf -- "$worktree_path"
+}
+
 on_exit() {
   local exit_code=$?
   local cleanup_failed=false
@@ -425,7 +443,9 @@ on_exit() {
       fi
     else
       if ! run_trusted_git -C "$REPO" worktree remove --force "$WORKTREE" >/dev/null 2>&1; then
-        cleanup_failed=true
+        if ! remove_unregistered_worktree "$WORKTREE"; then
+          cleanup_failed=true
+        fi
       fi
     fi
   fi

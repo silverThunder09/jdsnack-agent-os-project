@@ -125,6 +125,10 @@ grep -Fq -- '"$TRUSTED_BASH_BIN" "$NOTIFY"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop notifications must not execute an inherited BASH path' >&2; exit 1; }
 ! grep -Fq -- '"$BASH_BIN" "$NOTIFY"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must not execute the inherited BASH path for notifications' >&2; exit 1; }
+grep -Fq -- 'remove_unregistered_worktree()' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must clean up worktree paths when Git registration fails' >&2; exit 1; }
+grep -Fq -- 'worktree list --porcelain' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must distinguish registered and unregistered worktrees before fallback cleanup' >&2; exit 1; }
 grep -Fq -- 'trusted_git clone --no-hardlinks --no-checkout' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'Codex.exe worktrees must use standalone Git metadata' >&2; exit 1; }
 grep -Fq -- 'remote set-url origin' "$ROOT_DIR/scripts/create-codex-worktree.sh" \

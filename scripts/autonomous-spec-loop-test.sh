@@ -115,6 +115,32 @@ test ! -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
 test ! -f "$TEST_ROOT/.agent-os/runtime/autonomous-loop-state.json"
 test ! -d "$TEST_ROOT/.agent-os/runtime/.autonomous-loop.lock"
 
+# A worktree creation failure before Git registration must not leave the loop lock.
+failure_root="$TEST_ROOT/worktree-failure"
+mkdir -p "$failure_root/.agent-os/standards" "$failure_root/.agent-os/product" "$failure_root/.agent-os/specs/current"
+cat > "$failure_root/.agent-os/standards/index.yml" <<'EOF'
+active_specs:
+  - .agent-os/specs/current
+EOF
+cp "$TEST_ROOT/.agent-os/specs/current/plan.md" "$failure_root/.agent-os/specs/current/plan.md"
+cat > "$failure_root/.agent-os/product/spec-queue.json" <<'EOF'
+{"version":1,"candidates":[{
+  "id":"worktree-failure","slug":"worktree-failure","title":"Worktree failure",
+  "priority":1,"status":"candidate","auto_promote":true,
+  "start_condition":{"type":"feature_completed","feature":"current"}
+}]}
+EOF
+"$(command -v git)" -C "$failure_root" init -q
+set +e
+failure_output="$(SECURITY_BIN=missing-security "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+  --repo "$failure_root" --event push --event-key worktree-failure:fixture --apply)"
+failure_code=$?
+set -e
+printf 'Worktree creation failure exit code: %s\n' "$failure_code"
+test "$failure_code" -eq 20
+test ! -d "$failure_root/.agent-os/runtime/.autonomous-loop.lock"
+test -z "$(find "$failure_root/.agent-os/runtime" -mindepth 1 -maxdepth 1 -type d -name 'jdsnack-*' -print -quit)"
+
 # A malformed state remains a failure rather than becoming an idle success.
 printf 'invalid json\n' > "$TEST_ROOT/.agent-os/runtime/autonomous-loop-state.json"
 set +e
