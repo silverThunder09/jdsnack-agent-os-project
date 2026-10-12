@@ -51,7 +51,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex; do
+for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq; do
   require_host_tool "$tool"
 done
 require_host_tool cat
@@ -101,36 +101,6 @@ validate_trusted_codex_path() {
   fi
   printf '%s\n' "$canonical"
 }
-
-codex_bin="$(validate_trusted_codex_path "$codex_bin")"
-
-path_converter_bin=""
-path_converter_kind=""
-if cygpath_bin="$(command -p -v cygpath 2>/dev/null)"; then
-  path_converter_bin="$cygpath_bin"
-  path_converter_kind="cygpath"
-elif [[ "$codex_bin" == *.exe ]]; then
-  require_host_tool wslpath
-  path_converter_bin="$wslpath_bin"
-  path_converter_kind="wslpath"
-fi
-if [[ "$codex_bin" == *.exe ]] && [ "$path_converter_kind" = wslpath ] && [ -z "${WSL_INTEROP-}" ]; then
-  echo "ERROR: WSL에서 Windows Codex를 실행하려면 WSL_INTEROP가 필요합니다." >&2
-  exit 1
-fi
-
-pwsh_bin=""
-if [[ "$codex_bin" == *.exe ]] && command -p -v powershell.exe >/dev/null 2>&1; then
-  pwsh_bin="$(command -p -v powershell.exe)"
-elif command -v pwsh >/dev/null 2>&1; then
-  pwsh_bin="$(command -v pwsh)"
-elif command -v powershell.exe >/dev/null 2>&1; then
-  pwsh_bin="$(command -v powershell.exe)"
-fi
-if [ -z "$pwsh_bin" ]; then
-  echo "ERROR: 결정론적 pre-push 검증을 위해 PowerShell이 필요합니다." >&2
-  exit 1
-fi
 
 normalize_github_repository_url() {
   local candidate="${1%/}"
@@ -245,23 +215,6 @@ handle_signal() {
 trap 'handle_signal 129' HUP
 trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
-
-"$chmod_bin" 700 "$tmp_dir"
-if [ -n "$path_converter_bin" ]; then
-  secure_windows_temp_path() {
-    local path="$1"
-    local windows_path
-    local windows_script_path
-    windows_path="$("$path_converter_bin" -w "$path")" || return 1
-    windows_script_path="$("$path_converter_bin" -w "$BUNDLE_ROOT/scripts/secure-review-temp-acl.ps1")" || return 1
-    # Both PowerShell arguments are already cygpath-converted Windows paths; keep this conversion override scoped to this call.
-    MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path"
-  }
-  if ! secure_windows_temp_path "$tmp_dir"; then
-    echo "ERROR: Windows pre-push 임시 디렉터리 ACL을 현재 제한 실행 환경에 맞게 고정할 수 없습니다." >&2
-    exit 1
-  fi
-fi
 
 verify_codex_auth_permissions() {
   local auth_path="$codex_home_dir/auth.json"
@@ -437,6 +390,55 @@ fi
 if [ ! -s "$branch_path" ]; then
   echo "ERROR: branch diff가 비어 있어 리뷰할 변경이 없습니다. no-op push를 차단합니다." >&2
   exit 1
+fi
+
+require_host_tool codex
+
+codex_bin="$(validate_trusted_codex_path "$codex_bin")"
+
+path_converter_bin=""
+path_converter_kind=""
+if cygpath_bin="$(command -p -v cygpath 2>/dev/null)"; then
+  path_converter_bin="$cygpath_bin"
+  path_converter_kind="cygpath"
+elif [[ "$codex_bin" == *.exe ]]; then
+  require_host_tool wslpath
+  path_converter_bin="$wslpath_bin"
+  path_converter_kind="wslpath"
+fi
+if [[ "$codex_bin" == *.exe ]] && [ "$path_converter_kind" = wslpath ] && [ -z "${WSL_INTEROP-}" ]; then
+  echo "ERROR: WSL에서 Windows Codex를 실행하려면 WSL_INTEROP가 필요합니다." >&2
+  exit 1
+fi
+
+pwsh_bin=""
+if [[ "$codex_bin" == *.exe ]] && command -p -v powershell.exe >/dev/null 2>&1; then
+  pwsh_bin="$(command -p -v powershell.exe)"
+elif command -v pwsh >/dev/null 2>&1; then
+  pwsh_bin="$(command -v pwsh)"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  pwsh_bin="$(command -v powershell.exe)"
+fi
+if [ -z "$pwsh_bin" ]; then
+  echo "ERROR: 결정론적 pre-push 검증을 위해 PowerShell이 필요합니다." >&2
+  exit 1
+fi
+
+"$chmod_bin" 700 "$tmp_dir"
+if [ -n "$path_converter_bin" ]; then
+  secure_windows_temp_path() {
+    local path="$1"
+    local windows_path
+    local windows_script_path
+    windows_path="$("$path_converter_bin" -w "$path")" || return 1
+    windows_script_path="$("$path_converter_bin" -w "$BUNDLE_ROOT/scripts/secure-review-temp-acl.ps1")" || return 1
+    # Both PowerShell arguments are already cygpath-converted Windows paths; keep this conversion override scoped to this call.
+    MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path"
+  }
+  if ! secure_windows_temp_path "$tmp_dir"; then
+    echo "ERROR: Windows pre-push 임시 디렉터리 ACL을 현재 제한 실행 환경에 맞게 고정할 수 없습니다." >&2
+    exit 1
+  fi
 fi
 
 workspace_arg="$CHECKOUT_ROOT"
