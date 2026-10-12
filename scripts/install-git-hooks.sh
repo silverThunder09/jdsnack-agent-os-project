@@ -51,10 +51,12 @@ case "$git_bash_path" in
 esac
 
 python_tool=""
+python_path=""
 for candidate in python3 python; do
   candidate_path="$(command -v "$candidate" || true)"
   if [ -n "$candidate_path" ] && "$candidate_path" --version >/dev/null 2>&1; then
     python_tool="$candidate"
+    python_path="$candidate_path"
     break
   fi
 done
@@ -130,6 +132,7 @@ write_manifest_entry() {
 
 copy_trusted_source '.githooks/pre-commit' "$trusted_hooks_dir/pre-commit"
 copy_trusted_source '.githooks/pre-push' "$trusted_hooks_dir/pre-push"
+copy_trusted_source 'scripts/check-ai-readiness.py' "$trusted_hooks_dir/scripts/check-ai-readiness.py"
 copy_trusted_source 'backends.json' "$trusted_hooks_dir/backends.json"
 copy_trusted_source 'scripts/pre-push-ai-review.sh' "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"
 for script_name in \
@@ -145,6 +148,7 @@ bundle_manifest="$trusted_hooks_dir/bundle-manifest"
 : > "$bundle_manifest"
 write_manifest_entry 'pre-commit' '.githooks/pre-commit'
 write_manifest_entry 'pre-push' '.githooks/pre-push'
+write_manifest_entry 'scripts/check-ai-readiness.py' 'scripts/check-ai-readiness.py'
 write_manifest_entry 'backends.json' 'backends.json'
 write_manifest_entry 'scripts/pre-push-ai-review.sh' 'scripts/pre-push-ai-review.sh'
 for script_name in \
@@ -166,6 +170,7 @@ chmod 600 "$trusted_hooks_dir/source-sha" "$trusted_hooks_dir/trusted-source-sha
 chmod 700 "$trusted_hooks_dir/pre-commit" "$trusted_hooks_dir/pre-push" "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"
 
 git config --local jdsnack.hookBash "$git_bash_path"
+git config --local jdsnack.python "$python_path"
 configured_bash_path="$(git config --local --get jdsnack.hookBash)"
 configured_bash_comparison="$configured_bash_path"
 if command -v cygpath >/dev/null 2>&1; then
@@ -176,6 +181,11 @@ if command -v cygpath >/dev/null 2>&1; then
 fi
 if [ "$configured_bash_comparison" != "$git_bash_path" ] || [ ! -x "$configured_bash_path" ]; then
   echo "ERROR: verified Git Bash path could not be persisted: $configured_bash_path" >&2
+  exit 1
+fi
+configured_python_path="$(git config --local --get jdsnack.python)"
+if [ "$configured_python_path" != "$python_path" ] || [ ! -x "$configured_python_path" ]; then
+  echo "ERROR: verified Python path could not be persisted: $configured_python_path" >&2
   exit 1
 fi
 
