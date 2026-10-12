@@ -70,6 +70,17 @@ if [ "$filter_code" -ne 20 ] || [[ "$filter_output" != *"unsafe executable or re
 fi
 git -C "$TEST_ROOT/work" config --local --unset-all filter.malicious.clean
 
+git -C "$TEST_ROOT/work" config --local credential.https://github.com.helper '!printf unsafe-credential-helper'
+set +e
+credential_helper_output="$(REPO_ROOT="$TEST_ROOT/work" "$CREATE" --branch codex/credential-helper-example --worktree "$TEST_ROOT/feature-credential-helper" 2>&1)"
+credential_helper_code=$?
+set -e
+if [ "$credential_helper_code" -ne 20 ] || [[ "$credential_helper_output" != *"unsafe executable or remote setting: credential.https://github.com.helper"* ]]; then
+    printf 'FAIL: URL-scoped credential helper config was not rejected (%s, %s)\n' "$credential_helper_code" "$credential_helper_output" >&2
+    exit 1
+fi
+git -C "$TEST_ROOT/work" config --local --unset-all credential.https://github.com.helper
+
 git -C "$TEST_ROOT/work" remote set-url origin 'git@github.com:silverThunder09/jdsnack-agent-os-project.git'
 git -C "$TEST_ROOT/work" remote set-url --push origin 'git@github.com:silverThunder09/jdsnack-agent-os-project.git'
 set +e

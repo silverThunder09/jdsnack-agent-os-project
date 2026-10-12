@@ -139,6 +139,21 @@ case "$filter_output" in
 esac
 git -C "$TEST_ROOT/work" config --local --unset-all filter.malicious.clean
 
+git -C "$TEST_ROOT/work" config --local credential.https://github.com.helper '!printf unsafe-credential-helper'
+set +e
+credential_helper_output="$(CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$real_bash" "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/example --base-sha "$base_sha" 2>&1)"
+credential_helper_code=$?
+set -e
+assert_eq 20 "$credential_helper_code" "URL-scoped credential-helper exit code"
+case "$credential_helper_output" in
+    *"unsafe executable or remote setting: credential.https://github.com.helper"*) ;;
+    *)
+        printf 'FAIL: URL-scoped credential-helper output (%s)\n' "$credential_helper_output" >&2
+        exit 1
+        ;;
+esac
+git -C "$TEST_ROOT/work" config --local --unset-all credential.https://github.com.helper
+
 remote_sha="$(git -C "$TEST_ROOT/work" ls-remote origin refs/heads/codex/example | awk 'NR == 1 { print $1 }')"
 local_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
 assert_eq "$local_sha" "$remote_sha" "remote SHA"

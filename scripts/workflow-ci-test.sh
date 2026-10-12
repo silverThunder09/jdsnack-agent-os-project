@@ -152,8 +152,11 @@ grep -Fq -- 'remote get-url --push origin' "$ROOT_DIR/scripts/publish-codex-bran
 grep -Fq -- 'remote_repository_identity' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must compare exact GitHub repository identities' >&2; exit 1; }
 grep -Fq -- 'http\..*' "$ROOT_DIR/scripts/publish-codex-branch.sh" && \
+grep -Fq -- 'credential\..*\.helper' "$ROOT_DIR/scripts/create-codex-worktree.sh" && \
+grep -Fq -- 'credential\..*\.helper' "$ROOT_DIR/scripts/publish-codex-branch.sh" && \
+grep -Fq -- 'credential\..*\.helper' "$ROOT_DIR/scripts/autonomous-spec-loop.sh" && \
 grep -Fq -- 'filter\..*\.(clean|smudge|process)' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
-  || { echo 'Codex branch publishing must reject unsafe local HTTP Git configuration' >&2; exit 1; }
+  || { echo 'Codex branch publishing must reject unsafe local Git executable and HTTP configuration' >&2; exit 1; }
 grep -Fq -- 'core.hooksPath=/dev/null' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must disable repository hooks during pre-push fetches' >&2; exit 1; }
 grep -Fq -- 'git_with_trusted_push_hook' "$ROOT_DIR/scripts/publish-codex-branch.sh" \

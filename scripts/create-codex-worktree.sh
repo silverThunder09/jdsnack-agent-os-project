@@ -232,7 +232,7 @@ reject_untrusted_local_config() {
     local key
     local local_keys
     local_keys="$(trusted_git -C "$1" config --local --name-only --get-regexp \
-        '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path|filter\..*\.(clean|smudge|process)|core\.(fsmonitor|fsmonitorhook|gitproxy|sshcommand|askpass)|diff\.(external|.*\.textconv)|merge\..*\.driver|remote\..*\.(uploadpack|receivepack)|submodule\..*\.update)$' 2>/dev/null || true)"
+        '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path|credential\..*\.helper|filter\..*\.(clean|smudge|process)|core\.(fsmonitor|fsmonitorhook|gitproxy|sshcommand|askpass)|diff\.(external|.*\.textconv)|merge\..*\.driver|remote\..*\.(uploadpack|receivepack)|submodule\..*\.update)$' 2>/dev/null || true)"
     while IFS= read -r key; do
         [ -z "$key" ] && continue
         case "$key" in
