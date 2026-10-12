@@ -265,12 +265,12 @@ grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'G
 grep -Fq -- 'required_file' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 downstream 파일 의존성을 확인하지 않습니다.'
 grep -Fq -- 'scripts/check-ai-readiness.py' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 readiness 스크립트 의존성을 확인하지 않습니다.'
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 review policy 의존성을 확인하지 않습니다.'
-grep -Fq -- 'if ! codex exec' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex exec 호환성을 확인하지 않습니다.'
+grep -Fq -- 'if ! "$codex_path" exec' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex exec 호환성을 확인하지 않습니다.'
 install_prereq_line="$(grep -nF -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
 install_chmod_line="$(grep -nF -- 'chmod +x "$repo_root/$hooks_path/$hook"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
 [[ -n "$install_prereq_line" && -n "$install_chmod_line" && "$install_prereq_line" -lt "$install_chmod_line" ]] \
     || fail 'Git hook 설치가 사전조건 검증 전에 tracked hook을 변경합니다.'
-install_exec_line="$(grep -nF -- 'if ! codex exec' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
+install_exec_line="$(grep -nF -- 'if ! "$codex_path" exec' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
 [[ -n "$install_exec_line" && "$install_exec_line" -lt "$install_chmod_line" ]] \
     || fail 'Git hook 설치가 Codex exec 호환성 확인 전에 tracked hook을 변경합니다.'
 grep -Fq -- 'Specialized review routing labels and path rules' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 전문 라우팅 지침이 없습니다.'
