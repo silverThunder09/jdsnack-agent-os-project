@@ -40,6 +40,7 @@ TRUSTED_WINDIR=""
 TRUSTED_WSL_INTEROP=""
 TRUSTED_WSLENV=""
 TRUSTED_CODEX_BIN=""
+TRUSTED_JQ_BIN=""
 TRUSTED_TOOL_DIRS=()
 
 usage() {
@@ -86,6 +87,28 @@ resolve_optional_trusted_tool() {
             fi
         done
     done
+}
+
+resolve_configured_trusted_tool() {
+    local name="$1"
+    local candidate="$2"
+    local canonical
+    [ -z "$candidate" ] && return 0
+    case "$candidate" in
+        /*|[A-Za-z]:[\\/]*) ;;
+        *) fail "$name must be an absolute trusted executable path" ;;
+    esac
+    [ -f "$candidate" ] && [ -x "$candidate" ] || fail "$name executable is unavailable"
+    canonical="$("$TRUSTED_READLINK" -f -- "$candidate" 2>/dev/null || true)"
+    [ -n "$canonical" ] || fail "$name target cannot be resolved"
+    [ -f "$canonical" ] && [ -x "$canonical" ] || fail "$name target is unavailable"
+    case "$canonical" in
+        "$WORKTREE"|"$WORKTREE"/*|"$ROOT_DIR"|"$ROOT_DIR"/*)
+            fail "$name points inside the untrusted checkout"
+            ;;
+    esac
+    validate_trusted_path_ancestors "$canonical"
+    printf '%s\n' "$canonical"
 }
 
 validate_trusted_path_ancestors() {
@@ -186,6 +209,7 @@ init_trusted_tools() {
     TRUSTED_STAT="$(resolve_trusted_tool stat)"
     TRUSTED_READLINK="$(resolve_trusted_tool readlink)"
     TRUSTED_ID="$(resolve_trusted_tool id)"
+    TRUSTED_JQ_BIN="$(resolve_configured_trusted_tool JQ_BIN "${JQ_BIN:-}")"
     TRUSTED_CODEX_HOME="$(resolve_trusted_runtime_dir CODEX_HOME "${CODEX_HOME:-}")"
     TRUSTED_HOME="$(resolve_trusted_runtime_dir HOME "${HOME:-}")"
     TRUSTED_SYSTEM_ROOT="$(resolve_trusted_runtime_dir SystemRoot "${SystemRoot:-}")"
@@ -374,6 +398,9 @@ prepare_trusted_push_hook() {
     fi
     if [ -n "$TRUSTED_CODEX_BIN" ]; then
         runtime_assignments="$runtime_assignments CODEX_BIN=$(shell_quote "$TRUSTED_CODEX_BIN")"
+    fi
+    if [ -n "$TRUSTED_JQ_BIN" ]; then
+        runtime_assignments="$runtime_assignments JQ_BIN=$(shell_quote "$TRUSTED_JQ_BIN")"
     fi
     {
         printf '%s\n' '#!/bin/sh' 'set -eu'

@@ -25,6 +25,19 @@ require_host_tool() {
       echo "ERROR: CODEX_BIN 실행 파일을 사용할 수 없습니다: $path" >&2
       exit 1
     fi
+  elif [ "$name" = jq ] && [ -n "${JQ_BIN:-}" ]; then
+    path="$JQ_BIN"
+    case "$path" in
+      /*|[A-Za-z]:[\\/]*) ;;
+      *)
+        echo "ERROR: JQ_BIN은 절대 경로여야 합니다." >&2
+        exit 1
+        ;;
+    esac
+    if [ ! -f "$path" ] || [ ! -x "$path" ]; then
+      echo "ERROR: JQ_BIN 실행 파일을 사용할 수 없습니다: $path" >&2
+      exit 1
+    fi
   else
     path="$(command -v "$name" || true)"
   fi
