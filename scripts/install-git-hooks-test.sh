@@ -13,8 +13,15 @@ command -v bash >/dev/null 2>&1 || fail 'bash가 필요합니다.'
 
 fixture_root="$(mktemp -d)"
 test_worktree="$fixture_root/worktree"
+fixture_bin="$fixture_root/bin"
 cleanup() { rm -rf "$fixture_root"; }
 trap cleanup EXIT
+
+# The installer validates the Codex CLI contract, but this fixture only tests
+# trusted source copying. Keep it independent from the runner's installed CLI.
+mkdir -p "$fixture_bin"
+printf '#!/bin/sh\nexit 0\n' > "$fixture_bin/codex"
+chmod +x "$fixture_bin/codex"
 
 trusted_source_sha="$(git rev-parse refs/remotes/origin/main)"
 git clone --quiet --no-checkout "$ROOT_DIR" "$test_worktree"
@@ -33,7 +40,7 @@ chmod +x "$test_worktree/.githooks/pre-push" "$test_worktree/scripts/pre-push-ai
 
 (
   cd "$test_worktree"
-  sh "$ROOT_DIR/scripts/install-git-hooks.sh" >/dev/null
+  PATH="$fixture_bin:$PATH" sh "$ROOT_DIR/scripts/install-git-hooks.sh" >/dev/null
 )
 
 trusted_hooks_dir="$test_worktree/.git/jdsnack-hooks"
