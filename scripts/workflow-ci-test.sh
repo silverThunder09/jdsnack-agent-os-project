@@ -109,6 +109,16 @@ grep -Fq -- 'TRUSTED_MKTEMP_BIN="$(resolve_runtime_tool mktemp)"' "$AUTONOMOUS_L
   || { echo 'autonomous loop must resolve mktemp from fixed trusted tool directories' >&2; exit 1; }
 grep -Fq -- '"$TRUSTED_MKTEMP_BIN" -d "$STATE_DIR/codex-gh-config.XXXXXX"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must use the trusted mktemp for coordinator credentials' >&2; exit 1; }
+grep -Fq -- 'TRUSTED_MKDIR_BIN="$(resolve_runtime_tool mkdir)"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must resolve mkdir from fixed trusted tool directories' >&2; exit 1; }
+grep -Fq -- 'run_trusted_jq()' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must run configurable jq without inherited credentials' >&2; exit 1; }
+grep -Fq -- 'TRUSTED_JQ_BIN="$(resolve_jq_bin)"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must resolve the configured jq executable before credential-free execution' >&2; exit 1; }
+grep -Fq -- 'run_trusted_system "$TRUSTED_JQ_BIN" "$@"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must execute jq through the credential-free trusted environment' >&2; exit 1; }
+grep -Fq -- 'run_trusted_system "$TRUSTED_MKDIR_BIN" -p "$STATE_DIR"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must run mkdir in a credential-free trusted environment' >&2; exit 1; }
 grep -Fq -- 'trusted_git clone --no-hardlinks --no-checkout' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'Codex.exe worktrees must use standalone Git metadata' >&2; exit 1; }
 grep -Fq -- 'remote set-url origin' "$ROOT_DIR/scripts/create-codex-worktree.sh" \

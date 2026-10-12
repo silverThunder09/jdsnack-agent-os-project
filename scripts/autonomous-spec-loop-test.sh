@@ -21,18 +21,34 @@ EOF
 cp "$ROOT_DIR/.agent-os/product/spec-queue.json" "$TEST_ROOT/.agent-os/product/spec-queue.json"
 
 mkdir -p "$TEST_ROOT/bin"
+helper_log="$TEST_ROOT/helper.log"
 cat > "$TEST_ROOT/bin/python3" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' '{"status":"idle"}'
 EOF
 chmod +x "$TEST_ROOT/bin/python3"
 
-cat > "$TEST_ROOT/bin/mktemp" <<'EOF'
+cat > "$TEST_ROOT/bin/mktemp" <<EOF
 #!/usr/bin/env bash
-printf 'mktemp-received-token=%s\n' "${GH_TOKEN-}" > "${JDSNACK_MKTEMP_LOG:?}"
+printf 'mktemp-received-token=%s\n' "\${GH_TOKEN-}" >> "$helper_log"
 exit 91
 EOF
 chmod +x "$TEST_ROOT/bin/mktemp"
+
+cat > "$TEST_ROOT/bin/mkdir" <<EOF
+#!/usr/bin/env bash
+printf 'mkdir-received-token=%s\n' "\${GH_TOKEN-}" >> "$helper_log"
+exit 92
+EOF
+chmod +x "$TEST_ROOT/bin/mkdir"
+
+trusted_jq_bin="$(command -v jq)"
+cat > "$TEST_ROOT/bin/jq" <<EOF
+#!/usr/bin/env bash
+printf 'jq-received-token=%s\n' "\${GH_TOKEN-}" >> "$helper_log"
+exec "$trusted_jq_bin" "\$@"
+EOF
+chmod +x "$TEST_ROOT/bin/jq"
 
 set +e
 missing_jq_output="$(
@@ -114,13 +130,13 @@ json.dump({"version": 1, "candidates": [{
 }]}, open(path, "w"), indent=2)
 PY
 
-mktemp_log="$TEST_ROOT/mktemp.log"
-output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token JDSNACK_MKTEMP_LOG="$mktemp_log" JDSNACK_LOOP_EXECUTOR=fixture bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token JQ_BIN="$TEST_ROOT/bin/jq" JDSNACK_LOOP_EXECUTOR=fixture bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
   --repo "$TEST_ROOT" --event push --event-key merge:fixture --apply)"
 printf '%s\n' "$output"
 test -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
 grep -q '"status": "promote_spec"' "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
-test ! -e "$mktemp_log"
+test -f "$helper_log"
+! grep -Fq 'fixture-token' "$helper_log"
 
 cat > "$TEST_ROOT/issue.json" <<'EOF'
 {
