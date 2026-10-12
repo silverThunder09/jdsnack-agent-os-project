@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CREATE="$ROOT_DIR/scripts/create-codex-worktree.sh"
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-worktree.XXXXXX")"
 checkout_hook_log="$TEST_ROOT/checkout-hook.log"
+commit_hook_log="$TEST_ROOT/commit-hook.log"
 
 cleanup() {
     git -C "$TEST_ROOT/work" worktree remove --force "$TEST_ROOT/feature" >/dev/null 2>&1 || true
@@ -106,10 +107,27 @@ test -d "$TEST_ROOT/feature-windows/.git"
 test "$(git -C "$TEST_ROOT/feature-windows" rev-parse HEAD)" = "$remote_main_sha"
 test "$(git -C "$TEST_ROOT/feature-windows" branch --show-current)" = codex/windows-example
 test "$(git -C "$TEST_ROOT/feature-windows" remote get-url origin)" = "$expected_origin_url"
-test "$(git -C "$TEST_ROOT/feature-windows" config --local --get core.hooksPath)" = .githooks
+disabled_hooks_path="$(git -C "$TEST_ROOT/feature-windows" config --local --get core.hooksPath)"
+case "$disabled_hooks_path" in
+    /dev/null|nul) ;;
+    *)
+        printf 'FAIL: standalone clone hooks are not disabled (%s)\n' "$disabled_hooks_path" >&2
+        exit 1
+        ;;
+esac
 test -n "$(git -C "$TEST_ROOT/feature-windows" config --local --get jdsnack.hookBash)"
 test -f "$TEST_ROOT/feature-windows/.githooks/pre-push"
 test ! -e "$checkout_hook_log"
+
+# A checkout-controlled pre-commit hook must not execute while Codex commits.
+printf '#!/bin/sh\n: > %s\n' "$commit_hook_log" > "$TEST_ROOT/feature-windows/.githooks/pre-commit"
+chmod +x "$TEST_ROOT/feature-windows/.githooks/pre-commit"
+git -C "$TEST_ROOT/feature-windows" config user.name test
+git -C "$TEST_ROOT/feature-windows" config user.email test@example.com
+printf 'codex change\n' > "$TEST_ROOT/feature-windows/codex-change.txt"
+git -C "$TEST_ROOT/feature-windows" add codex-change.txt
+git -C "$TEST_ROOT/feature-windows" commit -qm 'codex commit'
+test ! -e "$commit_hook_log"
 
 printf 'Codex worktree creation tests passed\n'
 printf 'Windows-compatible standalone clone contract passed\n'

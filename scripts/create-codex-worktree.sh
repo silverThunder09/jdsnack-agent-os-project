@@ -21,7 +21,8 @@ Usage: scripts/create-codex-worktree.sh --branch codex/...|automation/spec-... -
 
 Fetches origin/main and creates a new Codex worktree from that exact remote base.
 The branch must not already exist. Windows Codex uses a standalone clone so its
-Git metadata remains readable outside WSL.
+Git metadata remains readable outside WSL. Checkout-controlled hooks are disabled
+there while Codex commits; the publisher installs a separate trusted push hook.
 USAGE
 }
 
@@ -327,7 +328,9 @@ if [ "$CODEX_WINDOWS_WORKTREE" = true ]; then
     if [ -n "$origin_push_url" ]; then
         trusted_git -C "$WORKTREE" remote set-url --push origin "$origin_push_url" || fail "could not set standalone clone push URL"
     fi
-    trusted_git -C "$WORKTREE" config --local core.hooksPath .githooks || fail "could not configure standalone clone hooks"
+    # Codex is allowed to modify the checkout before it commits. Do not let a
+    # modified .githooks/pre-commit execute with CODEX_HOME available.
+    trusted_git -C "$WORKTREE" config --local core.hooksPath /dev/null || fail "could not disable standalone clone hooks"
     trusted_git -C "$WORKTREE" config --local jdsnack.hookBash "$TRUSTED_BASH" || fail "could not configure standalone clone hook Bash"
     base_sha="$(trusted_git -C "$REPO_ROOT" rev-parse refs/remotes/origin/main)"
     trusted_git -C "$WORKTREE" update-ref refs/remotes/origin/main "$base_sha" || fail "could not copy origin/main to standalone clone"

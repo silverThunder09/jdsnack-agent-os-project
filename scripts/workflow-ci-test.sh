@@ -143,8 +143,8 @@ grep -Fq -- '--jdsnack-keep-github-header' "$ROOT_DIR/scripts/create-codex-workt
   || { echo 'standalone Codex creation must preserve a validated checkout Authorization header' >&2; exit 1; }
 grep -Fq -- 'trusted_git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex creation must reuse an existing checkout Authorization header' >&2; exit 1; }
-grep -Fq -- 'trusted_git -C "$WORKTREE" config --local core.hooksPath .githooks' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
-  || { echo 'standalone Codex clones must retain the repository pre-push hook path' >&2; exit 1; }
+grep -Fq -- 'trusted_git -C "$WORKTREE" config --local core.hooksPath /dev/null' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  || { echo 'standalone Codex clones must disable checkout-controlled hooks during Codex commits' >&2; exit 1; }
 grep -Fq -- 'unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'standalone Codex Git commands must ignore inherited repository path overrides' >&2; exit 1; }
 grep -Fq -- 'for variable in $(env | sed' "$ROOT_DIR/.githooks/pre-push" \
