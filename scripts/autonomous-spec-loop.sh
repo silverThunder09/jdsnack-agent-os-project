@@ -20,6 +20,7 @@ TRUSTED_MKDIR_BIN=""
 TRUSTED_GREP_BIN=""
 TRUSTED_CAT_BIN=""
 TRUSTED_DATE_BIN=""
+TRUSTED_BASH_BIN=""
 TRUSTED_JQ_BIN=""
 TRUSTED_PYTHON_BIN=""
 TRUSTED_WSLPATH_BIN=""
@@ -192,6 +193,7 @@ init_trusted_runtime() {
   TRUSTED_GREP_BIN="$(resolve_runtime_tool grep)"
   TRUSTED_CAT_BIN="$(resolve_runtime_tool cat)"
   TRUSTED_DATE_BIN="$(resolve_runtime_tool date)"
+  TRUSTED_BASH_BIN="$(resolve_runtime_tool bash)"
   TRUSTED_WSLPATH_BIN="$(resolve_runtime_tool wslpath)"
   TRUSTED_DIRNAME_BIN="$(resolve_runtime_tool dirname)"
   TRUSTED_STAT="$(resolve_runtime_tool stat)"
@@ -203,6 +205,7 @@ init_trusted_runtime() {
   fi
   [ -n "$TRUSTED_ENV_BIN" ] && [ -n "$TRUSTED_GIT_BIN" ] && [ -n "$TRUSTED_MKTEMP_BIN" ] \
     && [ -n "$TRUSTED_MKDIR_BIN" ] && [ -n "$TRUSTED_GREP_BIN" ] && [ -n "$TRUSTED_CAT_BIN" ] && [ -n "$TRUSTED_DATE_BIN" ] \
+    && [ -n "$TRUSTED_BASH_BIN" ] \
     && [ -n "$TRUSTED_PYTHON_BIN" ] && [ -n "$TRUSTED_JQ_BIN" ] \
     && [ -n "$TRUSTED_DIRNAME_BIN" ] && [ -n "$TRUSTED_STAT" ] && [ -n "$TRUSTED_READLINK" ] && [ -n "$TRUSTED_ID" ] \
     || emit_needs_human "trusted_runtime_tools_unavailable"
@@ -240,10 +243,6 @@ init_trusted_codex() {
 
 RM_BIN="$(resolve_runtime_tool rm)"
 [ -n "$RM_BIN" ] || { echo 'rm is required for autonomous loop cleanup' >&2; exit 20; }
-case "$BASH_BIN" in
-  /*|[A-Za-z]:[\\/]*) ;;
-  *) BASH_BIN="$(resolve_runtime_tool bash)" ;;
-esac
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$ROOT_DIR"
@@ -403,7 +402,7 @@ fi
 notify_failure() {
   local reason="$1"
   if [ -x "$NOTIFY" ]; then
-    "$BASH_BIN" "$NOTIFY" \
+    "$TRUSTED_BASH_BIN" "$NOTIFY" \
       --source autonomous-spec-loop \
       --repository "${GITHUB_REPOSITORY:-unknown}" \
       --reason "$reason" \

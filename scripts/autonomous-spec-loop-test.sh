@@ -22,6 +22,8 @@ cp "$ROOT_DIR/.agent-os/product/spec-queue.json" "$TEST_ROOT/.agent-os/product/s
 
 mkdir -p "$TEST_ROOT/bin"
 helper_log="$TEST_ROOT/helper.log"
+bash_log="$TEST_ROOT/bash.log"
+trusted_bash_bin="$(command -v bash)"
 cat > "$TEST_ROOT/bin/python3" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' '{"status":"idle"}'
@@ -29,14 +31,14 @@ EOF
 chmod +x "$TEST_ROOT/bin/python3"
 
 cat > "$TEST_ROOT/bin/mktemp" <<EOF
-#!/usr/bin/env bash
+#!$trusted_bash_bin
 printf 'mktemp-received-token=%s\n' "\${GH_TOKEN-}" >> "$helper_log"
 exit 91
 EOF
 chmod +x "$TEST_ROOT/bin/mktemp"
 
 cat > "$TEST_ROOT/bin/mkdir" <<EOF
-#!/usr/bin/env bash
+#!$trusted_bash_bin
 printf 'mkdir-received-token=%s\n' "\${GH_TOKEN-}" >> "$helper_log"
 exit 92
 EOF
@@ -44,17 +46,24 @@ chmod +x "$TEST_ROOT/bin/mkdir"
 
 trusted_jq_bin="$(command -v jq)"
 cat > "$TEST_ROOT/bin/jq" <<EOF
-#!/usr/bin/env bash
+#!$trusted_bash_bin
 printf 'jq-received-token=%s\n' "\${GH_TOKEN-}" >> "$helper_log"
 exec "$trusted_jq_bin" "\$@"
 EOF
 chmod +x "$TEST_ROOT/bin/jq"
 
+cat > "$TEST_ROOT/bin/bash" <<EOF
+#!$trusted_bash_bin
+printf 'bash-received-token=%s\n' "\${GH_TOKEN-}" >> "$bash_log"
+exec "$trusted_bash_bin" "\$@"
+EOF
+chmod +x "$TEST_ROOT/bin/bash"
+
 set +e
 missing_jq_output="$(
   PATH="$TEST_ROOT/bin:$PATH" \
   JQ_BIN=missing-jq \
-  bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+  "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
     --repo "$TEST_ROOT" --event push --event-key missing-jq
 )"
 missing_jq_code=$?
@@ -73,6 +82,23 @@ cat > "$TEST_ROOT/.agent-os/product/spec-queue.json" <<'EOF'
 }]}
 EOF
 summary_path="$TEST_ROOT/step-summary.md"
+cat > "$TEST_ROOT/run-with-bash-override" <<EOF
+#!/usr/bin/env bash
+BASH="$TEST_ROOT/bin/bash"
+export BASH
+source "$ROOT_DIR/scripts/autonomous-spec-loop.sh" --repo "$TEST_ROOT" --event push --event-key bash:fixture --apply
+EOF
+chmod +x "$TEST_ROOT/run-with-bash-override"
+set +e
+bash_override_output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token SECURITY_BIN=missing-security GITHUB_STEP_SUMMARY="$summary_path" \
+  JDSNACK_LOOP_EXECUTOR=fixture "$trusted_bash_bin" "$TEST_ROOT/run-with-bash-override")"
+bash_override_code=$?
+set -e
+printf 'BASH override exit code: %s\n' "$bash_override_code"
+test "$bash_override_code" -eq 0
+grep -q '"status": "needs_human"' <<<"$bash_override_output"
+test ! -e "$bash_log"
+
 set +e
 waiting_output="$(SECURITY_BIN=missing-security GITHUB_STEP_SUMMARY="$summary_path" \
   JDSNACK_LOOP_EXECUTOR=fixture bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
@@ -130,7 +156,7 @@ json.dump({"version": 1, "candidates": [{
 }]}, open(path, "w"), indent=2)
 PY
 
-output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token JQ_BIN="$TEST_ROOT/bin/jq" JDSNACK_LOOP_EXECUTOR=fixture bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token JQ_BIN="$TEST_ROOT/bin/jq" JDSNACK_LOOP_EXECUTOR=fixture "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
   --repo "$TEST_ROOT" --event push --event-key merge:fixture --apply)"
 printf '%s\n' "$output"
 test -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"

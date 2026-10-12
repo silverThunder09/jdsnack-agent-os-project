@@ -119,6 +119,12 @@ grep -Fq -- 'run_trusted_system "$TRUSTED_JQ_BIN" "$@"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must execute jq through the credential-free trusted environment' >&2; exit 1; }
 grep -Fq -- 'run_trusted_system "$TRUSTED_MKDIR_BIN" -p "$STATE_DIR"' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must run mkdir in a credential-free trusted environment' >&2; exit 1; }
+grep -Fq -- 'TRUSTED_BASH_BIN="$(resolve_runtime_tool bash)"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must resolve the notification Bash from fixed trusted tool directories' >&2; exit 1; }
+grep -Fq -- '"$TRUSTED_BASH_BIN" "$NOTIFY"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop notifications must not execute an inherited BASH path' >&2; exit 1; }
+! grep -Fq -- '"$BASH_BIN" "$NOTIFY"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must not execute the inherited BASH path for notifications' >&2; exit 1; }
 grep -Fq -- 'trusted_git clone --no-hardlinks --no-checkout' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'Codex.exe worktrees must use standalone Git metadata' >&2; exit 1; }
 grep -Fq -- 'remote set-url origin' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
