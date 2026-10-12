@@ -15,6 +15,7 @@ RM_BIN=""
 BASH_BIN="${BASH:-}"
 TRUSTED_ENV_BIN=""
 TRUSTED_GIT_BIN=""
+TRUSTED_MKTEMP_BIN=""
 TRUSTED_PYTHON_BIN=""
 TRUSTED_WSLPATH_BIN=""
 TRUSTED_DIRNAME_BIN=""
@@ -171,13 +172,14 @@ init_trusted_runtime() {
   TRUSTED_PATH="$(IFS=:; printf '%s' "${TRUSTED_TOOL_DIRS[*]}")"
   TRUSTED_ENV_BIN="$(resolve_runtime_tool env)"
   TRUSTED_GIT_BIN="$(resolve_runtime_tool git)"
+  TRUSTED_MKTEMP_BIN="$(resolve_runtime_tool mktemp)"
   TRUSTED_WSLPATH_BIN="$(resolve_runtime_tool wslpath)"
   TRUSTED_DIRNAME_BIN="$(resolve_runtime_tool dirname)"
   TRUSTED_STAT="$(resolve_runtime_tool stat)"
   TRUSTED_READLINK="$(resolve_runtime_tool readlink)"
   TRUSTED_ID="$(resolve_runtime_tool id)"
   TRUSTED_PYTHON_BIN="$(resolve_trusted_python_bin)"
-  [ -n "$TRUSTED_ENV_BIN" ] && [ -n "$TRUSTED_GIT_BIN" ] && [ -n "$TRUSTED_PYTHON_BIN" ] \
+  [ -n "$TRUSTED_ENV_BIN" ] && [ -n "$TRUSTED_GIT_BIN" ] && [ -n "$TRUSTED_MKTEMP_BIN" ] && [ -n "$TRUSTED_PYTHON_BIN" ] \
     && [ -n "$TRUSTED_DIRNAME_BIN" ] && [ -n "$TRUSTED_STAT" ] && [ -n "$TRUSTED_READLINK" ] && [ -n "$TRUSTED_ID" ] \
     || emit_needs_human "trusted_runtime_tools_unavailable"
   TRUSTED_CODEX_HOME="$(resolve_trusted_runtime_dir CODEX_HOME "${CODEX_HOME:-}")"
@@ -548,7 +550,7 @@ if [ "$EXECUTOR" != "fixture" ]; then
   init_trusted_codex
 fi
 
-CODEX_GH_CONFIG_DIR="$(mktemp -d "$STATE_DIR/codex-gh-config.XXXXXX")"
+CODEX_GH_CONFIG_DIR="$("$TRUSTED_MKTEMP_BIN" -d "$STATE_DIR/codex-gh-config.XXXXXX")"
 require_trusted_python
 
 if [ "$EXECUTOR" = "fixture" ]; then
@@ -586,7 +588,7 @@ if [ "$status" = "promote_spec" ]; then
   fi
   branch="automation/spec-${candidate_slug}-$(date -u +%Y%m%d%H%M%S)"
   run_trusted_python "$ENGINE" claim --repo "$REPO" --event-key "$EVENT_KEY" --status "$status" --branch "$branch"
-  worktree="$(mktemp -d "$WORKTREE_TMP_ROOT/jdsnack-spec.XXXXXX")"
+  worktree="$("$TRUSTED_MKTEMP_BIN" -d "$WORKTREE_TMP_ROOT/jdsnack-spec.XXXXXX")"
   WORKTREE="$worktree"
   REPO_ROOT="$REPO" CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE" \
     "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
@@ -675,7 +677,7 @@ if [ "$status" = "dispatch_codex" ]; then
   ticket_id="$(printf '%s' "$decision_json" | "$JQ_BIN" -r '.ticket_id')"
   branch="codex/${spec_slug}-${ticket_id}"
   run_trusted_python "$ENGINE" claim --repo "$REPO" --event-key "$EVENT_KEY" --status "$status" --branch "$branch"
-  worktree="$(mktemp -d "$WORKTREE_TMP_ROOT/jdsnack-ticket.XXXXXX")"
+  worktree="$("$TRUSTED_MKTEMP_BIN" -d "$WORKTREE_TMP_ROOT/jdsnack-ticket.XXXXXX")"
   WORKTREE="$worktree"
   REPO_ROOT="$REPO" CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE" \
     "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"
@@ -699,7 +701,7 @@ if [ "$status" = "dispatch_issue" ]; then
   issue_slug="issue-${issue_number}"
   branch="codex/${issue_slug}"
   run_trusted_python "$ENGINE" claim --repo "$REPO" --event-key "$EVENT_KEY" --status "$status" --branch "$branch"
-  worktree="$(mktemp -d "$WORKTREE_TMP_ROOT/jdsnack-issue.XXXXXX")"
+  worktree="$("$TRUSTED_MKTEMP_BIN" -d "$WORKTREE_TMP_ROOT/jdsnack-issue.XXXXXX")"
   WORKTREE="$worktree"
   REPO_ROOT="$REPO" CODEX_WINDOWS_WORKTREE="$CODEX_WINDOWS_WORKTREE" \
     "$REPO/scripts/create-codex-worktree.sh" --branch "$branch" --worktree "$worktree"

@@ -105,6 +105,10 @@ grep -Fq -- 'WORKTREE_TMP_ROOT="${JDSNACK_WORKTREE_TMPDIR:-$REPO/.agent-os/runti
   || { echo 'autonomous loop must keep temporary worktrees on the repository filesystem' >&2; exit 1; }
 grep -Fq -- 'CODEX_WINDOWS_WORKTREE=true' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must select a Windows-compatible worktree for Codex.exe' >&2; exit 1; }
+grep -Fq -- 'TRUSTED_MKTEMP_BIN="$(resolve_runtime_tool mktemp)"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must resolve mktemp from fixed trusted tool directories' >&2; exit 1; }
+grep -Fq -- '"$TRUSTED_MKTEMP_BIN" -d "$STATE_DIR/codex-gh-config.XXXXXX"' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must use the trusted mktemp for coordinator credentials' >&2; exit 1; }
 grep -Fq -- 'trusted_git clone --no-hardlinks --no-checkout' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
   || { echo 'Codex.exe worktrees must use standalone Git metadata' >&2; exit 1; }
 grep -Fq -- 'remote set-url origin' "$ROOT_DIR/scripts/create-codex-worktree.sh" \
