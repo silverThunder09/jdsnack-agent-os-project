@@ -41,6 +41,9 @@ TRUSTED_WSL_INTEROP=""
 TRUSTED_WSLENV=""
 TRUSTED_CODEX_BIN=""
 TRUSTED_JQ_BIN=""
+TRUSTED_TEMP=""
+TRUSTED_TMP=""
+TRUSTED_TMPDIR=""
 TRUSTED_TOOL_DIRS=()
 
 usage() {
@@ -210,6 +213,9 @@ init_trusted_tools() {
     TRUSTED_READLINK="$(resolve_trusted_tool readlink)"
     TRUSTED_ID="$(resolve_trusted_tool id)"
     TRUSTED_JQ_BIN="$(resolve_configured_trusted_tool JQ_BIN "${JQ_BIN:-}")"
+    TRUSTED_TEMP="$(resolve_trusted_runtime_dir TEMP "${TEMP:-}")"
+    TRUSTED_TMP="$(resolve_trusted_runtime_dir TMP "${TMP:-}")"
+    TRUSTED_TMPDIR="$(resolve_trusted_runtime_dir TMPDIR "${TMPDIR:-}")"
     TRUSTED_CODEX_HOME="$(resolve_trusted_runtime_dir CODEX_HOME "${CODEX_HOME:-}")"
     TRUSTED_HOME="$(resolve_trusted_runtime_dir HOME "${HOME:-}")"
     TRUSTED_SYSTEM_ROOT="$(resolve_trusted_runtime_dir SystemRoot "${SystemRoot:-}")"
@@ -363,6 +369,8 @@ prepare_trusted_push_hook() {
     local trusted_sed_literal
     local trusted_bash_literal
     local trusted_review_literal
+    local trusted_temp
+    local trusted_tmp
     local trusted_hook
     local config_hook_dir
     local worktree_config
@@ -382,6 +390,16 @@ prepare_trusted_push_hook() {
     trusted_sed_literal="$(shell_quote "$TRUSTED_SED")"
     trusted_bash_literal="$(shell_quote "$TRUSTED_BASH")"
     trusted_review_literal="$(shell_quote "$trusted_review_script")"
+    trusted_temp="$TRUSTED_TEMP"
+    trusted_tmp="$TRUSTED_TMP"
+    if [ -n "$TRUSTED_CYGPATH" ]; then
+        if [ -n "$trusted_temp" ]; then
+            trusted_temp="$($TRUSTED_CYGPATH -w "$trusted_temp")"
+        fi
+        if [ -n "$trusted_tmp" ]; then
+            trusted_tmp="$($TRUSTED_CYGPATH -w "$trusted_tmp")"
+        fi
+    fi
     runtime_assignments="PATH=$(shell_quote "$TRUSTED_PATH") JDSNACK_REVIEW_BASE_REF=origin/main"
     if [ -n "$TRUSTED_CODEX_HOME" ]; then
         runtime_assignments="$runtime_assignments CODEX_HOME=$(shell_quote "$TRUSTED_CODEX_HOME")"
@@ -403,6 +421,15 @@ prepare_trusted_push_hook() {
     fi
     if [ -n "$TRUSTED_JQ_BIN" ]; then
         runtime_assignments="$runtime_assignments JQ_BIN=$(shell_quote "$TRUSTED_JQ_BIN")"
+    fi
+    if [ -n "$trusted_temp" ]; then
+        runtime_assignments="$runtime_assignments TEMP=$(shell_quote "$trusted_temp")"
+    fi
+    if [ -n "$trusted_tmp" ]; then
+        runtime_assignments="$runtime_assignments TMP=$(shell_quote "$trusted_tmp")"
+    fi
+    if [ -n "$TRUSTED_TMPDIR" ]; then
+        runtime_assignments="$runtime_assignments TMPDIR=$(shell_quote "$TRUSTED_TMPDIR")"
     fi
     {
         printf '%s\n' '#!/bin/sh' 'set -eu'
