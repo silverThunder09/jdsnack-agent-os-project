@@ -28,6 +28,7 @@ trusted_hooks_root="$test_worktree/.git/jdsnack-hooks"
 mkdir -p "$trusted_hooks_root/scripts"
 cp "$ROOT_DIR/.githooks/pre-push" "$trusted_hooks_root/pre-push"
 cp "$ROOT_DIR/.githooks/pre-commit" "$trusted_hooks_root/pre-commit"
+cp "$ROOT_DIR/scripts/check-ai-readiness.py" "$trusted_hooks_root/scripts/check-ai-readiness.py"
 cp "$ROOT_DIR/backends.json" "$trusted_hooks_root/backends.json"
 for script_name in \
   review-policy.json \
@@ -63,6 +64,7 @@ bundle_manifest="$trusted_hooks_root/bundle-manifest"
 for bundle_path in \
   pre-commit \
   pre-push \
+  scripts/check-ai-readiness.py \
   backends.json \
   scripts/pre-push-ai-review.sh \
   scripts/review-policy.json \
