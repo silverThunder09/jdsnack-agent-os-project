@@ -311,6 +311,21 @@ run_trusted_git() (
       "$@"
 )
 
+reject_untrusted_local_config() {
+  local repo="$1"
+  local key
+  local local_keys
+  local_keys="$(run_trusted_git -C "$repo" config --local --name-only --get-regexp \
+    '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path|filter\..*\.(clean|smudge|process)|core\.(fsmonitor|fsmonitorhook|gitproxy|sshcommand|askpass)|diff\.(external|.*\.textconv)|merge\..*\.driver|remote\..*\.(uploadpack|receivepack)|submodule\..*\.update)$' 2>/dev/null || true)"
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    case "$key" in
+      http.https://github.com/.extraheader) ;;
+      *) emit_needs_human "unsafe_local_git_config_${key}" ;;
+    esac
+  done <<< "$local_keys"
+}
+
 run_trusted_python() (
   local -a runtime_env=("PATH=$TRUSTED_PATH" "LANG=C" "LC_ALL=C" "PYTHONIOENCODING=UTF-8")
   [ -n "${JDSNACK_AI_READINESS_ROOT:-}" ] && runtime_env+=("JDSNACK_AI_READINESS_ROOT=$JDSNACK_AI_READINESS_ROOT")
@@ -337,6 +352,7 @@ codex_worktree_path() {
 REPO="$(cd "$REPO" && pwd)"
 require_binary "$JQ_BIN" "jq_unavailable"
 init_trusted_runtime
+reject_untrusted_local_config "$REPO"
 ENGINE="$ROOT_DIR/scripts/autonomous_spec_loop.py"
 STATE_DIR="${JDSNACK_LOOP_STATE_DIR:-$REPO/.agent-os/runtime}"
 mkdir -p "$STATE_DIR"
@@ -632,6 +648,7 @@ traceability REQ/AC/TC 집합을 맞추고 python3 scripts/check-ai-readiness.py
 PROMPT
   )")
 
+  reject_untrusted_local_config "$worktree"
   run_trusted_python "$REPO/scripts/autonomous_spec_loop.py" validate --repo "$worktree"
   JDSNACK_AI_READINESS_ROOT="$worktree" run_trusted_python "$REPO/scripts/check-ai-readiness.py"
   run_trusted_git -C "$worktree" diff --check

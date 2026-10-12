@@ -50,6 +50,30 @@ if [ "$actual_sha" != "$remote_main_sha" ]; then
     exit 1
 fi
 
+git -C "$TEST_ROOT/work" config filter.malicious.clean '!printf unsafe-filter'
+set +e
+filter_output="$(REPO_ROOT="$TEST_ROOT/work" "$CREATE" --branch codex/filter-example --worktree "$TEST_ROOT/feature-filter" 2>&1)"
+filter_code=$?
+set -e
+if [ "$filter_code" -ne 20 ] || [[ "$filter_output" != *"unsafe executable or remote setting: filter.malicious.clean"* ]]; then
+    printf 'FAIL: executable local filter config was not rejected (%s, %s)\n' "$filter_code" "$filter_output" >&2
+    exit 1
+fi
+git -C "$TEST_ROOT/work" config --local --unset-all filter.malicious.clean
+
+git -C "$TEST_ROOT/work" remote set-url origin 'git@github.com:silverThunder09/jdsnack-agent-os-project.git'
+git -C "$TEST_ROOT/work" remote set-url --push origin 'git@github.com:silverThunder09/jdsnack-agent-os-project.git'
+set +e
+ssh_output="$(REPO_ROOT="$TEST_ROOT/work" "$CREATE" --branch codex/ssh-example --worktree "$TEST_ROOT/feature-ssh" 2>&1)"
+ssh_code=$?
+set -e
+if [ "$ssh_code" -ne 20 ] || [[ "$ssh_output" != *"SSH remotes are not supported"* ]]; then
+    printf 'FAIL: SSH remote was not rejected (%s, %s)\n' "$ssh_code" "$ssh_output" >&2
+    exit 1
+fi
+git -C "$TEST_ROOT/work" remote set-url origin "$expected_origin_url"
+git -C "$TEST_ROOT/work" remote set-url --push origin "$expected_origin_url"
+
 windows_output="$(CODEX_WINDOWS_WORKTREE=true REPO_ROOT="$TEST_ROOT/work" "$CREATE" --branch codex/windows-example --worktree "$TEST_ROOT/feature-windows")"
 case "$windows_output" in
     *"created codex/windows-example from origin/main at $remote_main_sha"*) ;;

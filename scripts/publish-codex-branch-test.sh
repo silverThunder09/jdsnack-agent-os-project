@@ -116,6 +116,21 @@ test ! -e "$malicious_hook_log"
 test -f "$trusted_hook_log"
 test ! -e "$fake_tool_log"
 
+git -C "$TEST_ROOT/work" config filter.malicious.clean '!printf unsafe-filter'
+set +e
+filter_output="$(PATH="$TEST_ROOT/bin:$PATH" CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$real_bash" "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/example --base-sha "$base_sha" 2>&1)"
+filter_code=$?
+set -e
+assert_eq 20 "$filter_code" "executable-filter exit code"
+case "$filter_output" in
+    *"unsafe executable or remote setting: filter.malicious.clean"*) ;;
+    *)
+        printf 'FAIL: executable filter output (%s)\n' "$filter_output" >&2
+        exit 1
+        ;;
+esac
+git -C "$TEST_ROOT/work" config --local --unset-all filter.malicious.clean
+
 remote_sha="$(git -C "$TEST_ROOT/work" ls-remote origin refs/heads/codex/example | awk 'NR == 1 { print $1 }')"
 local_sha="$(git -C "$TEST_ROOT/work" rev-parse HEAD)"
 assert_eq "$local_sha" "$remote_sha" "remote SHA"
@@ -210,6 +225,23 @@ case "$same_host_output" in
     *"refusing authenticated Git operation for non-GitHub origin"*) ;;
     *)
         printf 'FAIL: same-host repository mismatch output (%s)\n' "$same_host_output" >&2
+        exit 1
+        ;;
+esac
+git -C "$TEST_ROOT/work" remote set-url origin "$TEST_ROOT/remote.git"
+git -C "$TEST_ROOT/work" remote set-url --push origin "$TEST_ROOT/remote.git"
+
+git -C "$TEST_ROOT/work" remote set-url origin 'git@github.com:silverThunder09/jdsnack-agent-os-project.git'
+git -C "$TEST_ROOT/work" remote set-url --push origin 'git@github.com:silverThunder09/jdsnack-agent-os-project.git'
+set +e
+ssh_remote_output="$(CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$real_bash" "$PUBLISH" --worktree "$TEST_ROOT/work" --branch codex/auth --base-sha "$existing_header_base_sha" 2>&1)"
+ssh_remote_code=$?
+set -e
+assert_eq 20 "$ssh_remote_code" "SSH remote exit code"
+case "$ssh_remote_output" in
+    *"SSH remotes are not supported"*) ;;
+    *)
+        printf 'FAIL: SSH remote output (%s)\n' "$ssh_remote_output" >&2
         exit 1
         ;;
 esac

@@ -84,7 +84,11 @@ remote_mode_for_repo() {
         expected_identity="$(remote_repository_identity "$GITHUB_REPOSITORY")" || return 20
     fi
     case "$fetch_mode" in
-        github-*)
+        github-ssh)
+            printf 'codex worktree creation failed: SSH remotes are not supported by the isolated Git runner; use an HTTPS GitHub remote\n' >&2
+            return 20
+            ;;
+        github-https)
             fetch_identity="$(remote_repository_identity "$remote_url")" || return 20
             push_identity="$(remote_repository_identity "$remote_push_url")" || return 20
             [ "$fetch_identity" = "$push_identity" ] || return 20
@@ -192,12 +196,12 @@ reject_untrusted_local_config() {
     local key
     local local_keys
     local_keys="$(trusted_git -C "$1" config --local --name-only --get-regexp \
-        '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path)$' 2>/dev/null || true)"
+        '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path|filter\..*\.(clean|smudge|process)|core\.(fsmonitor|fsmonitorhook|gitproxy|sshcommand|askpass)|diff\.(external|.*\.textconv)|merge\..*\.driver|remote\..*\.(uploadpack|receivepack)|submodule\..*\.update)$' 2>/dev/null || true)"
     while IFS= read -r key; do
         [ -z "$key" ] && continue
         case "$key" in
             http.https://github.com/.extraheader) ;;
-            *) fail "repository local Git config contains an unsafe remote rewrite or HTTP header: $key" ;;
+            *) fail "repository local Git config contains an unsafe executable or remote setting: $key" ;;
         esac
     done <<< "$local_keys"
 }
