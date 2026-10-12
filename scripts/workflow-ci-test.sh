@@ -213,6 +213,14 @@ grep -Fq -- 'exec %s -i %s %s %s' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must use an allowlisted reviewer environment' >&2; exit 1; }
 grep -Fq -- 'runtime_assignments="PATH=$(shell_quote "$TRUSTED_PATH")' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must pass only validated runtime paths to the reviewer' >&2; exit 1; }
+grep -Fq -- 'sanitize_git_config_environment()' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publisher hooks must define a builtin-only Git config environment sanitizer' >&2; exit 1; }
+grep -Fq -- 'while IFS= read -r variable_definition' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publisher hooks must enumerate Git config variables without PATH helpers' >&2; exit 1; }
+grep -Fq -- '$(set)' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publisher hooks must enumerate shell variables through the builtin set command' >&2; exit 1; }
+! grep -Fq -- 'for variable in $(%s | %s -n' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
+  || { echo 'Codex branch publisher hooks must not expose coordinator Git config variables to env or sed' >&2; exit 1; }
 grep -Fq -- 'TRUSTED_PATH="$(IFS=:; printf '\''%s'\'' "${TRUSTED_TOOL_DIRS[*]}")"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must build PATH only from fixed trusted tool directories' >&2; exit 1; }
 grep -Fq -- 'remote get-url --push origin' "$ROOT_DIR/scripts/publish-codex-branch.sh" \

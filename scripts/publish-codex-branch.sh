@@ -451,8 +451,29 @@ prepare_trusted_push_hook() {
     {
         printf '%s\n' '#!/bin/sh' 'set -eu'
         printf '%s\n' 'unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR'
-        printf 'for variable in $(%s | %s -n '\''s/^\\(GIT_CONFIG_[A-Za-z0-9_]*\\)=.*$/\\1/p'\''); do unset "$variable"; done\n' \
-            "$trusted_env_literal" "$trusted_sed_literal"
+        printf '%s\n' \
+            'sanitize_git_config_environment() {' \
+            "    variable_definition=''" \
+            "    variable_name=''" \
+            '    while IFS= read -r variable_definition; do' \
+            '        case "$variable_definition" in' \
+            '            GIT_CONFIG_*=*)' \
+            '                variable_name=${variable_definition%%=*}' \
+            '                case "$variable_name" in' \
+            '                    GIT_CONFIG_*)' \
+            '                        case "$variable_name" in' \
+            '                            *[!A-Za-z0-9_]*) ;;' \
+            '                            *) unset "$variable_name" ;;' \
+            '                        esac' \
+            '                        ;;' \
+            '                esac' \
+            '                ;;' \
+            '        esac' \
+            '    done <<EOF' \
+            '$(set)' \
+            'EOF' \
+            '}' \
+            'sanitize_git_config_environment'
         printf 'exec %s -i %s %s %s "$@"\n' \
             "$trusted_env_literal" "$runtime_assignments" "$trusted_bash_literal" "$trusted_review_literal"
     } > "$trusted_hook"
