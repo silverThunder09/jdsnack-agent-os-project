@@ -88,8 +88,16 @@ if command -v cygpath >/dev/null 2>&1; then
 fi
 test "$configured_hooks_path" = "$trusted_hooks_dir" \
   || fail 'installer가 trusted 외부 core.hooksPath를 연결하지 않았습니다.'
-test -n "$(git -C "$test_worktree" config --local --get jdsnack.python)" \
+configured_python_path="$(git -C "$test_worktree" config --local --get jdsnack.python)"
+if command -v cygpath >/dev/null 2>&1; then
+  configured_python_path="$(cygpath -u "$configured_python_path")"
+fi
+test -n "$configured_python_path" \
   || fail 'installer가 trusted pre-commit Python 경로를 저장하지 않았습니다.'
+test -x "$configured_python_path" \
+  || fail 'installer가 저장한 Python 경로가 실행 파일을 가리키지 않습니다.'
+"$configured_python_path" --version >/dev/null 2>&1 \
+  || fail 'installer가 저장한 Python 경로를 실행할 수 없습니다.'
 (
   cd "$test_worktree"
   PATH="$fixture_bin:$PATH" "$trusted_hooks_dir/pre-commit" >/dev/null

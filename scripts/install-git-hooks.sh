@@ -203,7 +203,14 @@ if [ "$configured_bash_comparison" != "$git_bash_path" ] || [ ! -x "$configured_
   exit 1
 fi
 configured_python_path="$(git config --local --get jdsnack.python)"
-if [ "$configured_python_path" != "$python_path" ] || ! "$configured_python_path" --version >/dev/null 2>&1; then
+configured_python_comparison="$configured_python_path"
+if command -v cygpath >/dev/null 2>&1; then
+  configured_python_comparison="$(cygpath -u "$configured_python_path")" || {
+    echo "ERROR: persisted Python path could not be normalized: $configured_python_path" >&2
+    exit 1
+  }
+fi
+if [ "$configured_python_comparison" != "$python_path" ] || ! "$configured_python_path" --version >/dev/null 2>&1; then
   echo "ERROR: verified Python path could not be persisted: $configured_python_path" >&2
   exit 1
 fi
