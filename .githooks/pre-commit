@@ -36,7 +36,7 @@ case "$python_bin" in
     exit 1
     ;;
 esac
-if [ ! -x "$python_bin" ]; then
+if ! "$python_bin" --version >/dev/null 2>&1; then
   echo "ERROR: 검증된 pre-commit Python을 실행할 수 없습니다: $python_bin" >&2
   exit 1
 fi
