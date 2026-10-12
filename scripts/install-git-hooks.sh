@@ -67,6 +67,15 @@ for candidate in python3 python; do
     if [ ! -x "$python_path" ] && [ -x "${python_path}.exe" ]; then
       python_path="${python_path}.exe"
     fi
+    if command -v cygpath >/dev/null 2>&1; then
+      normalized_python_path="$(cygpath -u "$python_path" 2>/dev/null || true)"
+      if [ -n "$normalized_python_path" ]; then
+        python_path="$normalized_python_path"
+      fi
+    fi
+    if [ ! -x "$python_path" ] && [ -x "${python_path}.exe" ]; then
+      python_path="${python_path}.exe"
+    fi
     break
   fi
 done
