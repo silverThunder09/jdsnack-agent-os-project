@@ -23,7 +23,9 @@ mkdir -p "$fixture_bin"
 printf '#!/bin/sh\nexit 0\n' > "$fixture_bin/codex"
 chmod +x "$fixture_bin/codex"
 
-trusted_source_sha="$(git rev-parse refs/remotes/origin/main)"
+# The checkout's origin/main may predate the trusted-bundle installer. Use the
+# committed installer as the trusted fixture, then mutate only the worktree.
+trusted_source_sha="$(git rev-parse HEAD)"
 git clone --quiet --no-checkout "$ROOT_DIR" "$test_worktree"
 git -C "$test_worktree" checkout -B codex/install-hook-test HEAD >/dev/null
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$trusted_source_sha"
@@ -37,10 +39,16 @@ cat > "$test_worktree/scripts/pre-push-ai-review.sh" <<'EOF'
 printf '%s\n' branch-controlled-reviewer
 EOF
 chmod +x "$test_worktree/.githooks/pre-push" "$test_worktree/scripts/pre-push-ai-review.sh"
+cat > "$test_worktree/scripts/install-git-hooks.sh" <<'EOF'
+#!/bin/sh
+echo branch-controlled-installer >&2
+exit 99
+EOF
+chmod +x "$test_worktree/scripts/install-git-hooks.sh"
 
 (
   cd "$test_worktree"
-  PATH="$fixture_bin:$PATH" sh "$ROOT_DIR/scripts/install-git-hooks.sh" >/dev/null
+  git show refs/remotes/origin/main:scripts/install-git-hooks.sh | PATH="$fixture_bin:$PATH" sh >/dev/null
 )
 
 trusted_hooks_dir="$test_worktree/.git/jdsnack-hooks"
