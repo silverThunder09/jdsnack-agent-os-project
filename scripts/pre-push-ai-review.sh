@@ -51,7 +51,11 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq; do
+for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex; do
+  if [ "$tool" = codex ]; then
+    # Empty branch diffs must be rejected before the reviewer executable is required.
+    continue
+  fi
   require_host_tool "$tool"
 done
 require_host_tool cat
