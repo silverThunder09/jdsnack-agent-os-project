@@ -57,6 +57,9 @@ for candidate in python3 python; do
   if [ -n "$candidate_path" ] && "$candidate_path" --version >/dev/null 2>&1; then
     python_tool="$candidate"
     python_path="$candidate_path"
+    if [ ! -x "$python_path" ] && [ -x "${python_path}.exe" ]; then
+      python_path="${python_path}.exe"
+    fi
     break
   fi
 done
