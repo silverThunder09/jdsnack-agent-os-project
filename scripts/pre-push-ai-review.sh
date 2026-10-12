@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUNDLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CHECKOUT_ROOT=""
 push_remote="${1-}"
 if [ "$push_remote" != "origin" ]; then
   echo "ERROR: pre-push 리뷰 대상 remote는 origin으로 고정됩니다: ${push_remote:-unavailable}" >&2
@@ -37,6 +38,15 @@ for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex;
   require_host_tool "$tool"
 done
 require_host_tool cat
+
+CHECKOUT_ROOT="$($git_bin rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "ERROR: pre-push 리뷰 대상 checkout root를 확인할 수 없습니다." >&2
+  exit 1
+}
+CHECKOUT_ROOT="$(CDPATH= cd -- "$CHECKOUT_ROOT" && pwd -P)" || {
+  echo "ERROR: pre-push 리뷰 대상 checkout root를 정규화할 수 없습니다." >&2
+  exit 1
+}
 
 path_converter_bin=""
 path_converter_kind=""
@@ -127,8 +137,8 @@ if [ "$push_repository" != "$origin_push_repository" ] || [ "$origin_fetch_repos
   exit 1
 fi
 
-MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
-EFFORT="$("$jq_bin" -r '.workers.codex["review-fallback"].effort // empty' "$ROOT_DIR/backends.json")"
+MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$BUNDLE_ROOT/backends.json")"
+EFFORT="$("$jq_bin" -r '.workers.codex["review-fallback"].effort // empty' "$BUNDLE_ROOT/backends.json")"
 
 if [ -z "$MODEL" ] || [ -z "$EFFORT" ]; then
   echo "ERROR: backends.json에 Codex review-fallback 모델과 effort가 필요합니다." >&2
@@ -141,7 +151,7 @@ case "$EFFORT" in
     exit 1
     ;;
 esac
-if [ ! -f "$ROOT_DIR/scripts/review-policy.json" ]; then
+if [ ! -f "$BUNDLE_ROOT/scripts/review-policy.json" ]; then
   echo "ERROR: 전문 리뷰 라우팅 정책이 없습니다: scripts/review-policy.json" >&2
   exit 1
 fi
@@ -187,7 +197,7 @@ if [ -n "$path_converter_bin" ]; then
     local windows_path
     local windows_script_path
     windows_path="$("$path_converter_bin" -w "$path")" || return 1
-    windows_script_path="$("$path_converter_bin" -w "$ROOT_DIR/scripts/secure-review-temp-acl.ps1")" || return 1
+    windows_script_path="$("$path_converter_bin" -w "$BUNDLE_ROOT/scripts/secure-review-temp-acl.ps1")" || return 1
     # Both PowerShell arguments are already cygpath-converted Windows paths; keep this conversion override scoped to this call.
     MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path"
   }
@@ -203,7 +213,7 @@ verify_codex_auth_permissions() {
     local windows_home_path
     local windows_script_path
     windows_home_path="$("$path_converter_bin" -w "$codex_home_base")" || return 1
-    windows_script_path="$("$path_converter_bin" -w "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1")" || return 1
+    windows_script_path="$("$path_converter_bin" -w "$BUNDLE_ROOT/scripts/verify-codex-auth-permissions.ps1")" || return 1
     MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_home_path"
     return $?
   fi
@@ -373,12 +383,18 @@ if [ ! -s "$branch_path" ]; then
   exit 1
 fi
 
-workspace_arg="$ROOT_DIR"
+workspace_arg="$CHECKOUT_ROOT"
 if [ -n "$path_converter_bin" ]; then
-  workspace_arg="$("$path_converter_bin" -w "$ROOT_DIR")"
+  workspace_arg="$("$path_converter_bin" -w "$CHECKOUT_ROOT")"
+fi
+risk_script_arg="$BUNDLE_ROOT/scripts/review-risk.ps1"
+policy_path_arg="$BUNDLE_ROOT/scripts/review-policy.json"
+if [ -n "$path_converter_bin" ]; then
+  risk_script_arg="$("$path_converter_bin" -w "$risk_script_arg")"
+  policy_path_arg="$("$path_converter_bin" -w "$policy_path_arg")"
 fi
 risk_stderr_path="$tmp_dir/review-risk.stderr"
-if ! risk_json="$($pwsh_bin -NoProfile -File "$workspace_arg/scripts/review-risk.ps1" -Workspace "$workspace_arg" -BaseSha "$base_sha" -HeadSha "$reviewed_ref" 2>"$risk_stderr_path")"; then
+if ! risk_json="$("$pwsh_bin" -NoProfile -File "$risk_script_arg" -Workspace "$workspace_arg" -PolicyPath "$policy_path_arg" -BaseSha "$base_sha" -HeadSha "$reviewed_ref" 2>"$risk_stderr_path")"; then
   echo "ERROR: 결정론적 pre-push 위험도 계산기가 실패했습니다. push를 차단합니다." >&2
   exit 1
 fi
@@ -461,7 +477,7 @@ printf '\nReviewer model: %s\nReviewer effort: %s\n' "$MODEL" "$EFFORT" >> "$pro
 printf '\nReview base: %s\nReview head: %s\n' "$base_sha" "$reviewed_ref" >> "$prompt_path"
 printf '\nDeterministic risk score: %s/100\nDeterministic risk band: %s\nDeterministic review labels: %s\n' "$expected_risk_score" "$expected_risk" "$expected_labels" >> "$prompt_path"
 printf '\nSpecialized review routing labels and path rules (apply these to findings):\n' >> "$prompt_path"
-cat "$ROOT_DIR/scripts/review-policy.json" >> "$prompt_path"
+cat "$BUNDLE_ROOT/scripts/review-policy.json" >> "$prompt_path"
 printf '\n--- BEGIN BRANCH DIFF ---\n' >> "$prompt_path"
 cat "$branch_path" >> "$prompt_path"
 printf '\n--- END BRANCH DIFF ---\n' >> "$prompt_path"
@@ -494,7 +510,7 @@ if [ -z "$path_converter_bin" ] && [ -L "$codex_home_base" ]; then
   exit 1
 fi
 codex_auth_home_root="$(cd "$codex_home_base" && pwd -P)"
-repo_root_real="$(cd "$ROOT_DIR" && pwd -P)"
+repo_root_real="$(cd "$CHECKOUT_ROOT" && pwd -P)"
 codex_auth_home_comparison="$codex_auth_home_root"
 repo_root_comparison="$repo_root_real"
 case "${OSTYPE-}" in
