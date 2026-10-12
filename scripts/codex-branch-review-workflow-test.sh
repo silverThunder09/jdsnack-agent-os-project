@@ -196,7 +196,9 @@ grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-p
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
-grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 로그인 캐시 권한 검증을 위한 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 로그인 캐시 권한 검증을 위한 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'jdsnack.codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push hook이 installer가 승인한 Codex 경로를 사용하지 않습니다.'
+grep -Fq -- 'jdsnack.codex' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook installer가 Codex 실행 경로를 고정하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push에서 사용할 Git Bash 실행 경로를 명시적으로 확인하지 않습니다.'
 grep -Fq -- 'git config --local jdsnack.hookBash "$git_bash_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \

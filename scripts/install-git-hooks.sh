@@ -40,6 +40,25 @@ for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp 
   require_tool "$required_tool"
 done
 
+codex_path="$(command -v codex || true)"
+case "$codex_path" in
+  /*|[A-Za-z]:[\\/]*) ;;
+  *)
+    echo "ERROR: Codex CLI 경로를 절대 경로로 확인할 수 없습니다: ${codex_path:-unavailable}" >&2
+    exit 1
+    ;;
+esac
+if command -v cygpath >/dev/null 2>&1; then
+  normalized_codex_path="$(cygpath -u "$codex_path" 2>/dev/null || true)"
+  if [ -n "$normalized_codex_path" ]; then
+    codex_path="$normalized_codex_path"
+  fi
+fi
+if [ ! -f "$codex_path" ] || [ ! -x "$codex_path" ]; then
+  echo "ERROR: Codex CLI 실행 파일을 사용할 수 없습니다: $codex_path" >&2
+  exit 1
+fi
+
 git_bash_path="$(command -v bash || true)"
 if [ -z "$git_bash_path" ] || [ ! -x "$git_bash_path" ]; then
   echo "ERROR: Git hooks require an executable Git Bash on PATH before core.hooksPath can be enabled." >&2
@@ -93,7 +112,7 @@ else
   exit 1
 fi
 
-if ! codex exec \
+if ! "$codex_path" exec \
   --ephemeral \
   --ignore-user-config \
   --strict-config \
@@ -195,6 +214,7 @@ chmod 700 "$trusted_hooks_dir/pre-commit" "$trusted_hooks_dir/pre-push" "$truste
 
 git config --local jdsnack.hookBash "$git_bash_path"
 git config --local jdsnack.python "$python_path"
+git config --local jdsnack.codex "$codex_path"
 configured_bash_path="$(git config --local --get jdsnack.hookBash)"
 configured_bash_comparison="$configured_bash_path"
 if command -v cygpath >/dev/null 2>&1; then
@@ -217,6 +237,18 @@ if command -v cygpath >/dev/null 2>&1; then
 fi
 if [ "$configured_python_comparison" != "$python_path" ] || ! "$configured_python_path" --version >/dev/null 2>&1; then
   echo "ERROR: verified Python path could not be persisted: $configured_python_path" >&2
+  exit 1
+fi
+configured_codex_path="$(git config --local --get jdsnack.codex)"
+configured_codex_comparison="$configured_codex_path"
+if command -v cygpath >/dev/null 2>&1; then
+  configured_codex_comparison="$(cygpath -u "$configured_codex_path")" || {
+    echo "ERROR: persisted Codex path could not be normalized: $configured_codex_path" >&2
+    exit 1
+  }
+fi
+if [ "$configured_codex_comparison" != "$codex_path" ] || [ ! -x "$configured_codex_path" ]; then
+  echo "ERROR: verified Codex path could not be persisted: $configured_codex_path" >&2
   exit 1
 fi
 
@@ -245,5 +277,5 @@ if [ "$configured_path_comparison" != "$trusted_hooks_comparison" ]; then
   exit 1
 fi
 
-echo "Git hook prerequisites verified: $git_bash_path, $python_tool, jq, $powershell_tool, Codex CLI and required Git Bash tools"
+echo "Git hook prerequisites verified: $git_bash_path, $python_tool, jq, $powershell_tool, $codex_path and required Git Bash tools"
 echo "Git hooks enabled: $configured_path (trusted outside checkout; pre-commit, pre-push)"

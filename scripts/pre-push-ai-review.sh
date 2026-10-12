@@ -12,17 +12,21 @@ fi
 require_host_tool() {
   local name="$1"
   local path
-  if [ "$name" = codex ] && [ -n "${CODEX_BIN:-}" ]; then
-    path="$CODEX_BIN"
+  if [ "$name" = codex ]; then
+    path="$($git_bin config --local --get jdsnack.codex 2>/dev/null || true)"
+    if [ -z "$path" ]; then
+      echo "ERROR: installer가 승인한 Codex 경로가 없습니다. scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+      exit 1
+    fi
     case "$path" in
       /*|[A-Za-z]:[\\/]*) ;;
       *)
-        echo "ERROR: CODEX_BIN은 절대 경로여야 합니다." >&2
+        echo "ERROR: installer가 저장한 Codex 경로는 절대 경로여야 합니다: $path" >&2
         exit 1
         ;;
     esac
     if [ ! -f "$path" ] || [ ! -x "$path" ]; then
-      echo "ERROR: CODEX_BIN 실행 파일을 사용할 수 없습니다: $path" >&2
+      echo "ERROR: installer가 저장한 Codex 실행 파일을 사용할 수 없습니다: $path" >&2
       exit 1
     fi
   elif [ "$name" = jq ] && [ -n "${JQ_BIN:-}" ]; then
@@ -47,7 +51,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex; do
+for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex; do
   require_host_tool "$tool"
 done
 require_host_tool cat
@@ -60,6 +64,45 @@ CHECKOUT_ROOT="$(CDPATH= cd -- "$CHECKOUT_ROOT" && pwd -P)" || {
   echo "ERROR: pre-push 리뷰 대상 checkout root를 정규화할 수 없습니다." >&2
   exit 1
 }
+
+validate_trusted_codex_path() {
+  local candidate="$1"
+  local canonical
+  local current_user
+  local owner
+  local mode
+  canonical="$($readlink_bin -f -- "$candidate" 2>/dev/null || true)"
+  if [ -z "$canonical" ] || [ ! -f "$canonical" ] || [ ! -x "$canonical" ]; then
+    echo "ERROR: installer가 승인한 Codex 실행 파일의 실제 대상을 확인할 수 없습니다: $candidate" >&2
+    exit 1
+  fi
+  case "$canonical" in
+    "$CHECKOUT_ROOT"|"$CHECKOUT_ROOT"/*)
+      echo "ERROR: Codex 실행 파일은 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
+      exit 1
+      ;;
+  esac
+  mode="$($stat_bin -c '%a' -- "$canonical" 2>/dev/null || true)"
+  case "$mode" in
+    ''|*[!0-7]*)
+      echo "ERROR: Codex 실행 파일 권한을 확인할 수 없습니다: $canonical" >&2
+      exit 1
+      ;;
+  esac
+  if (( 8#$mode & 022 )); then
+    echo "ERROR: Codex 실행 파일이 group/world writable입니다: $canonical" >&2
+    exit 1
+  fi
+  owner="$($stat_bin -c '%U' -- "$canonical" 2>/dev/null || true)"
+  current_user="$($id_bin -un 2>/dev/null || true)"
+  if [ -z "$owner" ] || [ -z "$current_user" ] || [ "$owner" != "$current_user" ] && [ "$owner" != root ]; then
+    echo "ERROR: Codex 실행 파일 소유자를 신뢰할 수 없습니다: $canonical" >&2
+    exit 1
+  fi
+  printf '%s\n' "$canonical"
+}
+
+codex_bin="$(validate_trusted_codex_path "$codex_bin")"
 
 path_converter_bin=""
 path_converter_kind=""

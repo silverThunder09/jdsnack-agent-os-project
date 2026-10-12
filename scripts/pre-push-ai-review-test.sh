@@ -397,6 +397,7 @@ FAKE_CYGPATH
 fi
 printf '#!/bin/sh\nif [ "$#" -eq 0 ]; then set -- 1; fi\nexec "%s" "$@"\n' "$test_sleep_bin" > "$fake_root/sleep-one-second"
 chmod +x "$fake_root/sleep-one-second"
+git -C "$test_worktree" config --local jdsnack.codex "$fake_root/codex"
 
 set_origin_urls() {
   local origin_fetch_url="$1"

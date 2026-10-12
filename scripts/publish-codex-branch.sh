@@ -17,6 +17,8 @@ TRUSTED_HOOK_DIR=""
 HOOK_CONFIG_REPO=""
 ORIGINAL_HOOK_PATH=""
 ORIGINAL_HOOK_PATH_SET=false
+ORIGINAL_CODEX_BIN=""
+ORIGINAL_CODEX_BIN_SET=false
 HOOK_CONFIG_SCOPE=(--local)
 TRUSTED_GIT=""
 TRUSTED_ENV=""
@@ -341,6 +343,21 @@ restore_push_hook() {
             trusted_git -C "$HOOK_CONFIG_REPO" config --local --unset core.hooksPath >/dev/null 2>&1 || return 20
         fi
     fi
+    if [ "$ORIGINAL_CODEX_BIN_SET" = true ]; then
+        if [ "${HOOK_CONFIG_SCOPE[0]}" = --worktree ]; then
+            trusted_git -C "$HOOK_CONFIG_REPO" config --worktree jdsnack.codex "$ORIGINAL_CODEX_BIN" || return 20
+        else
+            trusted_git -C "$HOOK_CONFIG_REPO" config --local jdsnack.codex "$ORIGINAL_CODEX_BIN" || return 20
+        fi
+    else
+        if [ "${HOOK_CONFIG_SCOPE[0]}" = --worktree ]; then
+            trusted_git -C "$HOOK_CONFIG_REPO" config --worktree --unset jdsnack.codex >/dev/null 2>&1 || return 20
+        else
+            trusted_git -C "$HOOK_CONFIG_REPO" config --local --unset jdsnack.codex >/dev/null 2>&1 || return 20
+        fi
+    fi
+    ORIGINAL_CODEX_BIN=""
+    ORIGINAL_CODEX_BIN_SET=false
     HOOK_CONFIG_REPO=""
 }
 
@@ -452,9 +469,18 @@ prepare_trusted_push_hook() {
         if ORIGINAL_HOOK_PATH="$(trusted_git -C "$WORKTREE" config --worktree --get core.hooksPath 2>/dev/null)"; then
             ORIGINAL_HOOK_PATH_SET=true
         fi
+        if ORIGINAL_CODEX_BIN="$(trusted_git -C "$WORKTREE" config --worktree --get jdsnack.codex 2>/dev/null)"; then
+            ORIGINAL_CODEX_BIN_SET=true
+        fi
     elif ORIGINAL_HOOK_PATH="$(trusted_git -C "$WORKTREE" config --local --get core.hooksPath 2>/dev/null)"; then
         ORIGINAL_HOOK_PATH_SET=true
+        if ORIGINAL_CODEX_BIN="$(trusted_git -C "$WORKTREE" config --local --get jdsnack.codex 2>/dev/null)"; then
+            ORIGINAL_CODEX_BIN_SET=true
+        fi
+    elif ORIGINAL_CODEX_BIN="$(trusted_git -C "$WORKTREE" config --local --get jdsnack.codex 2>/dev/null)"; then
+        ORIGINAL_CODEX_BIN_SET=true
     fi
+    [ -n "$TRUSTED_CODEX_BIN" ] || fail "trusted Codex executable is unavailable"
     config_hook_dir="$TRUSTED_HOOK_DIR"
     if [ -n "$TRUSTED_CYGPATH" ]; then
         config_hook_dir="$("$TRUSTED_CYGPATH" -m "$TRUSTED_HOOK_DIR")"
@@ -471,6 +497,13 @@ prepare_trusted_push_hook() {
         if [ "$(trusted_git -C "$WORKTREE" config --local --get core.hooksPath)" != "$config_hook_dir" ]; then
             fail "trusted push hook was not installed"
         fi
+    fi
+    if [ "${HOOK_CONFIG_SCOPE[0]}" = --worktree ]; then
+        trusted_git -C "$WORKTREE" config --worktree jdsnack.codex "$TRUSTED_CODEX_BIN" \
+            || fail "could not pin trusted Codex executable"
+    else
+        trusted_git -C "$WORKTREE" config --local jdsnack.codex "$TRUSTED_CODEX_BIN" \
+            || fail "could not pin trusted Codex executable"
     fi
 }
 
