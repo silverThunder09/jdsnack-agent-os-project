@@ -57,6 +57,13 @@ for candidate in python3 python; do
   if [ -n "$candidate_path" ] && "$candidate_path" --version >/dev/null 2>&1; then
     python_tool="$candidate"
     python_path="$candidate_path"
+    case "$python_path" in
+      [A-Za-z]:[\\/]*)
+        if command -v cygpath >/dev/null 2>&1; then
+          python_path="$(cygpath -u "$python_path")"
+        fi
+        ;;
+    esac
     if [ ! -x "$python_path" ] && [ -x "${python_path}.exe" ]; then
       python_path="${python_path}.exe"
     fi
