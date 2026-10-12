@@ -22,7 +22,7 @@ git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
 case "$hook_root" in
   "$git_common_dir/jdsnack-hooks") ;;
   *)
-    echo "ERROR: pre-push는 Git common dir의 trusted hook bundle에서만 실행해야 합니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+    echo "ERROR: pre-push는 Git common dir의 trusted hook bundle에서만 실행해야 합니다. git show HEAD:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
     exit 1
     ;;
 esac
@@ -34,7 +34,7 @@ if [ ! -f "$trusted_review_script" ] || [ -L "$trusted_review_script" ]; then
 fi
 trusted_source_sha_file="$hook_root/source-sha"
 if [ ! -f "$trusted_source_sha_file" ] || [ -L "$trusted_source_sha_file" ]; then
-  echo "ERROR: trusted pre-push bundle의 source SHA가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  echo "ERROR: trusted pre-push bundle의 source SHA가 없습니다. git show HEAD:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
   exit 1
 fi
 IFS= read -r trusted_source_sha < "$trusted_source_sha_file" || {
@@ -46,12 +46,12 @@ current_source_sha="$(git rev-parse HEAD)" || {
   exit 1
 }
 if [ -z "$trusted_source_sha" ] || [ "$trusted_source_sha" != "$current_source_sha" ]; then
-  echo "ERROR: trusted pre-push bundle이 현재 checkout보다 오래되었습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  echo "ERROR: trusted pre-push bundle이 현재 checkout보다 오래되었습니다. git show HEAD:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
   exit 1
 fi
 trusted_base_sha_file="$hook_root/trusted-source-sha"
 if [ ! -f "$trusted_base_sha_file" ] || [ -L "$trusted_base_sha_file" ]; then
-  echo "ERROR: trusted pre-push bundle의 독립 trusted source SHA가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  echo "ERROR: trusted pre-push bundle의 독립 trusted source SHA가 없습니다. git show HEAD:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
   exit 1
 fi
 IFS= read -r trusted_base_sha < "$trusted_base_sha_file" || {
@@ -63,12 +63,12 @@ current_base_sha="$(git rev-parse --verify refs/remotes/origin/main^{commit} 2>/
   exit 1
 }
 if [ -z "$trusted_base_sha" ] || [ "$trusted_base_sha" != "$current_base_sha" ]; then
-  echo "ERROR: trusted pre-push bundle이 origin/main trusted source보다 오래되었습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  echo "ERROR: trusted pre-push bundle이 origin/main trusted source보다 오래되었습니다. git show HEAD:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
   exit 1
 fi
 bundle_manifest="$hook_root/bundle-manifest"
 if [ ! -f "$bundle_manifest" ] || [ -L "$bundle_manifest" ]; then
-  echo "ERROR: trusted pre-push bundle의 독립 content digest가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  echo "ERROR: trusted pre-push bundle의 독립 content digest가 없습니다. git show HEAD:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
   exit 1
 fi
 manifest_count=0
@@ -125,7 +125,7 @@ fi
 # Git passes the destination remote name and its location as arguments 1 and 2.
 git_bash_path="$(git config --local --get jdsnack.hookBash || true)"
 if [ -z "$git_bash_path" ] || [ ! -x "$git_bash_path" ]; then
-  echo "ERROR: 검증된 Git Bash 경로가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  echo "ERROR: 검증된 Git Bash 경로가 없습니다. git show HEAD:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
   exit 1
 fi
 

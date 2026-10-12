@@ -17,6 +17,7 @@ TRUSTED_ENV_BIN=""
 TRUSTED_GIT_BIN=""
 TRUSTED_MKTEMP_BIN=""
 TRUSTED_MKDIR_BIN=""
+TRUSTED_CHMOD_BIN=""
 TRUSTED_GREP_BIN=""
 TRUSTED_CAT_BIN=""
 TRUSTED_DATE_BIN=""
@@ -190,6 +191,7 @@ init_trusted_runtime() {
   TRUSTED_GIT_BIN="$(resolve_runtime_tool git)"
   TRUSTED_MKTEMP_BIN="$(resolve_runtime_tool mktemp)"
   TRUSTED_MKDIR_BIN="$(resolve_runtime_tool mkdir)"
+  TRUSTED_CHMOD_BIN="$(resolve_runtime_tool chmod)"
   TRUSTED_GREP_BIN="$(resolve_runtime_tool grep)"
   TRUSTED_CAT_BIN="$(resolve_runtime_tool cat)"
   TRUSTED_DATE_BIN="$(resolve_runtime_tool date)"
@@ -204,7 +206,7 @@ init_trusted_runtime() {
     emit_needs_human "jq_unavailable"
   fi
   [ -n "$TRUSTED_ENV_BIN" ] && [ -n "$TRUSTED_GIT_BIN" ] && [ -n "$TRUSTED_MKTEMP_BIN" ] \
-    && [ -n "$TRUSTED_MKDIR_BIN" ] && [ -n "$TRUSTED_GREP_BIN" ] && [ -n "$TRUSTED_CAT_BIN" ] && [ -n "$TRUSTED_DATE_BIN" ] \
+    && [ -n "$TRUSTED_MKDIR_BIN" ] && [ -n "$TRUSTED_CHMOD_BIN" ] && [ -n "$TRUSTED_GREP_BIN" ] && [ -n "$TRUSTED_CAT_BIN" ] && [ -n "$TRUSTED_DATE_BIN" ] \
     && [ -n "$TRUSTED_BASH_BIN" ] \
     && [ -n "$TRUSTED_PYTHON_BIN" ] && [ -n "$TRUSTED_JQ_BIN" ] \
     && [ -n "$TRUSTED_DIRNAME_BIN" ] && [ -n "$TRUSTED_STAT" ] && [ -n "$TRUSTED_READLINK" ] && [ -n "$TRUSTED_ID" ] \
@@ -334,6 +336,73 @@ run_trusted_git() (
       -c http.curloptResolve= \
       -c http.extraheader= \
       "$@"
+)
+
+run_trusted_github_git() (
+  local auth_repo="$REPO"
+  local expect_repo=false
+  local arg
+  local remote_url
+  local token="${GH_TOKEN:-}"
+  local askpass_root
+  local askpass
+  [ -n "$token" ] || return 20
+  for arg in "$@"; do
+    if [ "$expect_repo" = true ]; then
+      auth_repo="$arg"
+      break
+    fi
+    case "$arg" in
+      -C) expect_repo=true ;;
+      -C*) auth_repo="${arg#-C}"; break ;;
+    esac
+  done
+  remote_url="$(run_trusted_git -C "$auth_repo" remote get-url origin 2>/dev/null || true)"
+  case "$remote_url" in
+    https://github.com/*) ;;
+    *) return 20 ;;
+  esac
+  askpass_root="$("$TRUSTED_MKTEMP_BIN" -d "$STATE_DIR/github-askpass.XXXXXX")" || return 20
+  cleanup_github_askpass() { "$RM_BIN" -rf -- "$askpass_root"; }
+  trap cleanup_github_askpass EXIT
+  askpass="$askpass_root/askpass"
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'set -eu' \
+    'case "${1-}" in' \
+    '  *Username*) printf "%s\\n" x-access-token ;;' \
+    '  *Password*) printf "%s\\n" "${GH_TOKEN:?}" ;;' \
+    '  *) exit 1 ;;' \
+    'esac' > "$askpass"
+  "$TRUSTED_ENV_BIN" -i "PATH=$TRUSTED_PATH" "$TRUSTED_CHMOD_BIN" 700 "$askpass"
+  (
+    export PATH="$TRUSTED_PATH"
+    export GH_TOKEN="$token" GIT_ASKPASS="$askpass"
+    unset GITHUB_TOKEN GH_BIN GH_CONFIG_DIR GIT_SSH GIT_SSH_COMMAND SSH_AUTH_SOCK SSH_AGENT_PID
+    unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy GIT_PROXY_COMMAND
+    unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS
+    unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_OBJECT_DIRECTORY_RELATIVE GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE
+    unset HOME USERPROFILE XDG_CONFIG_HOME
+    for variable in ${!GIT_@}; do
+      unset "$variable"
+    done
+    export GIT_CONFIG_NOSYSTEM=1
+    export GIT_CONFIG_SYSTEM=/dev/null
+    export GIT_CONFIG_GLOBAL=/dev/null
+    export GIT_TERMINAL_PROMPT=0
+    "$TRUSTED_GIT_BIN" \
+      -c core.hooksPath=/dev/null \
+      -c credential.helper= \
+      -c core.askPass= \
+      -c core.sshCommand= \
+      -c http.proxy= \
+      -c http.sslVerify=true \
+      -c http.sslCAInfo= \
+      -c http.curloptResolve= \
+      -c http.extraheader= \
+      "$@"
+  )
 )
 
 run_trusted_system() (
@@ -621,7 +690,7 @@ inflight_status="$(run_trusted_jq -r '.in_flight.status // empty' "$STATE_DIR/au
 inflight_branch="$(run_trusted_jq -r '.in_flight.branch // empty' "$STATE_DIR/autonomous-loop-state.json" 2>/dev/null || true)"
 if [ "$inflight_event" = "$EVENT_KEY" ] && [ "$inflight_status" = "$status" ] && [ -n "$inflight_branch" ]; then
   if [[ "$status" == dispatch_codex || "$status" == dispatch_issue ]] && \
-      run_trusted_git -C "$REPO" ls-remote --exit-code --heads origin "$inflight_branch" >/dev/null 2>&1; then
+      run_trusted_github_git -C "$REPO" ls-remote --exit-code --heads origin "$inflight_branch" >/dev/null 2>&1; then
     printf '%s\n' "{\"status\":\"no_action\",\"reason\":\"in_flight_branch_already_published\",\"branch\":\"$inflight_branch\"}"
     run_trusted_python "$ENGINE" record --repo "$REPO" --event-key "$EVENT_KEY"
     exit 0
