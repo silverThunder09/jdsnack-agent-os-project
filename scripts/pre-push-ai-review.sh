@@ -448,6 +448,32 @@ resolve_powershell_bin() {
   printf '%s\n' "$resolved_path"
 }
 
+resolve_windows_git_bin() {
+  local candidate=""
+  local canonical=""
+  if command -p -v git.exe >/dev/null 2>&1; then
+    candidate="$(command -p -v git.exe)"
+  elif command -v git.exe >/dev/null 2>&1; then
+    candidate="$(command -v git.exe)"
+  fi
+  if [ -z "$candidate" ]; then
+    echo "ERROR: Windows Codex를 실행하는 WSL 환경에서는 Windows git.exe가 필요합니다. Linux git 경로를 Windows PowerShell에 전달하지 않습니다." >&2
+    return 1
+  fi
+  canonical="$($readlink_bin -f -- "$candidate" 2>/dev/null || true)"
+  if [ -z "$canonical" ] || [ ! -f "$canonical" ] || [ ! -x "$canonical" ]; then
+    echo "ERROR: Windows git.exe의 실제 실행 파일을 확인할 수 없습니다: $candidate" >&2
+    return 1
+  fi
+  case "$canonical" in
+    "$CHECKOUT_ROOT"|"$CHECKOUT_ROOT"/*)
+      echo "ERROR: Windows git.exe는 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
+      return 1
+      ;;
+  esac
+  printf '%s\n' "$canonical"
+}
+
 if ! pwsh_bin="$(resolve_powershell_bin "$codex_bin")"; then
   exit 1
 fi
@@ -473,7 +499,12 @@ workspace_arg="$CHECKOUT_ROOT"
 git_path_arg="$git_bin"
 if [ -n "$path_converter_bin" ]; then
   workspace_arg="$("$path_converter_bin" -w "$CHECKOUT_ROOT")"
-  git_path_arg="$("$path_converter_bin" -w "$git_bin")"
+  if [[ "$codex_bin" == *.exe ]]; then
+    windows_git_bin="$(resolve_windows_git_bin)" || exit 1
+    git_path_arg="$("$path_converter_bin" -w "$windows_git_bin")"
+  else
+    git_path_arg="$("$path_converter_bin" -w "$git_bin")"
+  fi
 fi
 risk_script_arg="$BUNDLE_ROOT/scripts/review-risk.ps1"
 policy_path_arg="$BUNDLE_ROOT/scripts/review-policy.json"

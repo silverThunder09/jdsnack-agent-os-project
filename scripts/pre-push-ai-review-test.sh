@@ -381,6 +381,42 @@ if [ "$powershell_resolver_status" -eq 0 ] || ! grep -Fq 'Windows powershell.exe
   fail 'Windows Codex가 powershell.exe 대신 Linux pwsh로 대체되는 경로를 차단하지 않았습니다.'
 fi
 
+windows_git_resolver="$fake_root/resolve-windows-git-bin.sh"
+awk '
+  /^resolve_windows_git_bin\(\) \{/ { capture=1; depth=0 }
+  capture {
+    line=$0
+    print
+    depth += gsub(/\{/, "", line)
+    line=$0
+    depth -= gsub(/\}/, "", line)
+    if (depth == 0) exit
+  }
+' "$ROOT_DIR/scripts/pre-push-ai-review.sh" > "$windows_git_resolver"
+. "$windows_git_resolver"
+printf '#!/bin/sh\nexit 0\n' > "$fake_root/git.exe"
+chmod +x "$fake_root/git.exe"
+readlink_bin="$(builtin command -v readlink)"
+CHECKOUT_ROOT="$test_worktree"
+command() {
+  if [ "${1-}" = '-p' ] && [ "${2-}" = '-v' ] && [ "${3-}" = 'git.exe' ]; then
+    printf '%s\n' "$fake_root/git.exe"
+    return 0
+  fi
+  if [ "${1-}" = '-v' ] && [ "${2-}" = 'git.exe' ]; then
+    printf '%s\n' "$fake_root/git.exe"
+    return 0
+  fi
+  builtin command "$@"
+}
+windows_git_output="$(resolve_windows_git_bin)"
+expected_windows_git="$(readlink -f -- "$fake_root/git.exe")"
+unset -f command
+if [ "$windows_git_output" != "$expected_windows_git" ]; then
+  printf 'expected=%s actual=%s\n' "$expected_windows_git" "$windows_git_output" >&2
+  fail 'Windows Codex 경로에서 Linux git 대신 검증된 git.exe를 선택하지 않았습니다.'
+fi
+
 if [ -n "$test_cygpath_bin" ]; then
   cat > "$fake_root/cygpath" <<'FAKE_CYGPATH'
 #!/bin/sh
