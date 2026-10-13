@@ -738,6 +738,9 @@ done
 
 [ -n "$WORKTREE" ] || { usage >&2; exit 2; }
 [ -n "$BRANCH" ] || { usage >&2; exit 2; }
+case "$BRANCH" in
+    main|master) fail "protected branch direct push is not allowed: $BRANCH; publish through a codex/* PR" ;;
+esac
 [ -d "$WORKTREE" ] || fail "worktree does not exist: $WORKTREE"
 WORKTREE="$(cd -- "$WORKTREE" && pwd -P)"
 init_trusted_tools

@@ -369,6 +369,18 @@ test -n "$restored_hook_path"
 git -C "$TEST_ROOT/work" config --local --unset core.hooksPath
 git -C "$TEST_ROOT/work" fetch -q origin main
 git -C "$TEST_ROOT/work" switch -q -c main refs/remotes/origin/main
+set +e
+protected_publish_output="$(CODEX_PUSH_ATTEMPTS=1 "$real_bash" "$PUBLISH" --worktree "$TEST_ROOT/work" --branch main 2>&1)"
+protected_publish_code=$?
+set -e
+assert_eq 20 "$protected_publish_code" "protected branch publish exit code"
+case "$protected_publish_output" in
+    *"protected branch direct push is not allowed: main"*) ;;
+    *)
+        printf 'FAIL: protected branch publish output (%s)\n' "$protected_publish_output" >&2
+        exit 1
+        ;;
+esac
 printf 'remote main advanced\n' >> "$TEST_ROOT/work/state.txt"
 git -C "$TEST_ROOT/work" add state.txt
 git -C "$TEST_ROOT/work" commit -qm 'advance remote main'

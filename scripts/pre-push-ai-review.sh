@@ -341,6 +341,12 @@ if [ "${#push_shas[@]}" -ne 1 ]; then
   printf 'refs=%s\n' "${push_refs[*]}" >&2
   exit 1
 fi
+case "${push_refs[0]}" in
+  refs/heads/main|refs/heads/master)
+    echo "ERROR: 보호 브랜치 직접 push는 허용하지 않습니다. codex/* 작업 브랜치에서 PR을 생성하십시오." >&2
+    exit 1
+    ;;
+esac
 if ! checkout_ref="$("$git_bin" symbolic-ref --quiet HEAD 2>/dev/null)"; then
   echo "ERROR: detached checkout에서는 push branch를 리뷰 대상 ref에 고정할 수 없습니다." >&2
   exit 1

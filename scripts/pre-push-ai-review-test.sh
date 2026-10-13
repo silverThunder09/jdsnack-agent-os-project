@@ -431,6 +431,20 @@ run_review() {
   )
 }
 
+run_protected_branch_review() {
+  local canonical_origin_url='https://github.com/silverThunder09/jdsnack-agent-os-project'
+  (
+    cd "$test_worktree"
+    printf 'refs/heads/main %s refs/heads/main %s\n' "$head_sha" "$base_sha" \
+      | PATH="$fake_root:$PATH" \
+        JDSNACK_REVIEW_BASE_REF="$base_ref" \
+        GH_BIN="$fake_root/gh.exe" \
+        GH_CONFIG_DIR="$fake_root/gh-config" \
+        JDSNACK_ASSERT_HOOK_GH_ISOLATION=1 \
+        run_hook_with_origin_urls "$trusted_hooks_root/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
+  )
+}
+
 set_fixture_windows_runtime() {
   local test_windows_root="${SystemRoot:-${WINDIR:-$fixture_root}}"
   export SystemRoot="${SystemRoot:-$test_windows_root}"
@@ -469,6 +483,23 @@ fi
 set_fixture_windows_runtime
 if [ -z "$SystemRoot" ] || [ -z "$WINDIR" ]; then
   fail 'workflow fixture must provide SystemRoot and WINDIR to the isolated reviewer.'
+fi
+
+if [ "${JDSNACK_PRE_PUSH_TEST_CASE-}" = 'protected-branch' ]; then
+  rm -f "$fake_root/codex.invoked"
+  set +e
+  protected_branch_output="$(run_protected_branch_review 2>&1)"
+  protected_branch_status=$?
+  set -e
+  if [ "$protected_branch_status" -eq 0 ] || ! grep -Fq '보호 브랜치 직접 push는 허용하지 않습니다' <<< "$protected_branch_output"; then
+    printf '%s\n' "$protected_branch_output" >&2
+    fail 'main 직접 push focused fixture가 pre-push 차단을 확인하지 못했습니다.'
+  fi
+  if [ -e "$fake_root/codex.invoked" ]; then
+    fail 'main 직접 push focused fixture가 Codex reviewer 실행 전에 차단하지 못했습니다.'
+  fi
+  echo 'Protected branch push is rejected before Codex review'
+  exit 0
 fi
 
 assert_malformed_duplicate_scalar_headers_rejected
@@ -776,6 +807,19 @@ if [ "$tag_status" -eq 0 ] || ! grep -Fq 'branch push만 허용됩니다' <<< "$
 fi
 if [ -e "$fake_root/codex.invoked" ]; then
   fail 'tag ref push가 Codex reviewer 실행 전에 차단되지 않았습니다.'
+fi
+
+rm -f "$fake_root/codex.invoked"
+set +e
+protected_branch_output="$(run_protected_branch_review 2>&1)"
+protected_branch_status=$?
+set -e
+if [ "$protected_branch_status" -eq 0 ] || ! grep -Fq '보호 브랜치 직접 push는 허용하지 않습니다' <<< "$protected_branch_output"; then
+  printf '%s\n' "$protected_branch_output" >&2
+  fail 'main 직접 push를 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail 'main 직접 push가 Codex reviewer 실행 전에 차단되지 않았습니다.'
 fi
 
 set +e
