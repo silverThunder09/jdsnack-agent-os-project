@@ -3,7 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-gh-bin-test.XXXXXX")"
-MALICIOUS_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/jdsnack-gh-malicious.XXXXXX")"
+# Keep the malicious executable outside the world-writable /tmp ancestor so
+# the test reaches the intended gh installation boundary on Linux runners.
+MALICIOUS_ROOT="$(mktemp -d "$ROOT_DIR/../jdsnack-gh-malicious.XXXXXX")"
 cleanup() { rm -rf "$TEST_ROOT" "$MALICIOUS_ROOT"; }
 trap cleanup EXIT
 
