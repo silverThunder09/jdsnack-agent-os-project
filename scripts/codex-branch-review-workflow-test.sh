@@ -211,6 +211,14 @@ grep -Fq -- 'git config --local jdsnack.hookBash "$git_bash_path"' "$ROOT_DIR/sc
   || fail 'Git hook 설치가 검증한 Bash 실행 경로를 로컬 설정에 고정하지 않습니다.'
 grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex cat cp mkdir; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push 실행에 필요한 전체 host 도구를 확인하지 않습니다.'
+grep -Fq -- "stat -f -c '%T'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 WSL DrvFS/9p 파일시스템을 식별하지 않습니다.'
+grep -Fq -- 'Get-Acl -LiteralPath' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 WSL DrvFS/9p Codex 실행 파일의 Windows ACL을 확인하지 않습니다.'
+grep -Fq -- 'S-1-5-32-544' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 Windows ACL의 신뢰된 관리자 주체를 확인하지 않습니다.'
+grep -Fq -- 'WSL DrvFS/9p' "$ROOT_DIR/scripts/install-git-hooks-test.sh" \
+  || fail 'Git hook 설치 회귀 테스트가 WSL DrvFS/9p 권한 표시를 검증하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(git config --local --get jdsnack.hookBash || true)"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 설치 시 검증된 Git Bash 경로를 읽지 않습니다.'
 grep -Fq -- 'exec "$git_bash_path" "$trusted_review_script" "$@"' "$ROOT_DIR/.githooks/pre-push" \

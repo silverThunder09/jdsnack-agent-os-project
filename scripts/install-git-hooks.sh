@@ -82,33 +82,117 @@ validate_trusted_codex_path() {
       exit 1
       ;;
   esac
-  mode="$(stat -c '%a' -- "$canonical" 2>/dev/null || true)"
-  case "$mode" in
-    0*) mode="${mode#0}" ;;
-  esac
-  case "$mode" in
-    [0-7][0-7][0-7]) ;;
-    *)
-      echo "ERROR: Codex CLI 실행 파일 권한을 확인할 수 없습니다: $canonical" >&2
+
+  if is_windows_mounted_filesystem "$canonical"; then
+    if ! verify_windows_codex_acl "$canonical"; then
+      echo "ERROR: WSL/DrvFS Codex CLI의 Windows ACL을 확인할 수 없습니다: $canonical" >&2
       exit 1
-      ;;
-  esac
-  group_mode="${mode#?}"
-  group_mode="${group_mode%?}"
-  world_mode="${mode#??}"
-  case "$group_mode$world_mode" in
-    *[2367]*)
-      echo "ERROR: Codex CLI 실행 파일이 group/world writable입니다: $canonical" >&2
+    fi
+  else
+    mode="$(stat -c '%a' -- "$canonical" 2>/dev/null || true)"
+    case "$mode" in
+      0*) mode="${mode#0}" ;;
+    esac
+    case "$mode" in
+      [0-7][0-7][0-7]) ;;
+      *)
+        echo "ERROR: Codex CLI 실행 파일 권한을 확인할 수 없습니다: $canonical" >&2
+        exit 1
+        ;;
+    esac
+    group_mode="${mode#?}"
+    group_mode="${group_mode%?}"
+    world_mode="${mode#??}"
+    case "$group_mode$world_mode" in
+      *[2367]*)
+        echo "ERROR: Codex CLI 실행 파일이 group/world writable입니다: $canonical" >&2
+        exit 1
+        ;;
+    esac
+    owner="$(stat -c '%U' -- "$canonical" 2>/dev/null || true)"
+    current_user="$(id -un 2>/dev/null || true)"
+    if [ -z "$owner" ] || [ -z "$current_user" ] || { [ "$owner" != "$current_user" ] && [ "$owner" != root ]; }; then
+      echo "ERROR: Codex CLI 실행 파일 소유자를 신뢰할 수 없습니다: $canonical" >&2
       exit 1
-      ;;
-  esac
-  owner="$(stat -c '%U' -- "$canonical" 2>/dev/null || true)"
-  current_user="$(id -un 2>/dev/null || true)"
-  if [ -z "$owner" ] || [ -z "$current_user" ] || { [ "$owner" != "$current_user" ] && [ "$owner" != root ]; }; then
-    echo "ERROR: Codex CLI 실행 파일 소유자를 신뢰할 수 없습니다: $canonical" >&2
-    exit 1
+    fi
   fi
   printf '%s\n' "$canonical"
+}
+
+is_windows_mounted_filesystem() {
+  filesystem_type="$(stat -f -c '%T' -- "$1" 2>/dev/null || true)"
+  case "$filesystem_type" in
+    drvfs|9p|msys*|cygwin*) return 0 ;;
+  esac
+  if command -v cygpath >/dev/null 2>&1; then
+    windows_path_candidate="$(cygpath -w "$1" 2>/dev/null || true)"
+    case "$windows_path_candidate" in
+      [A-Za-z]:*|\\\\*) return 0 ;;
+    esac
+  fi
+  return 1
+}
+
+verify_windows_codex_acl() {
+  windows_acl_path_converter=""
+  windows_acl_path_converter_kind=""
+  if command -v wslpath >/dev/null 2>&1; then
+    windows_acl_path_converter="$(command -v wslpath)"
+    windows_acl_path_converter_kind='wslpath'
+  elif command -v cygpath >/dev/null 2>&1; then
+    windows_acl_path_converter="$(command -v cygpath)"
+    windows_acl_path_converter_kind='cygpath'
+  else
+    echo "ERROR: WSL/DrvFS Codex CLI 경로를 Windows 경로로 변환할 도구가 없습니다." >&2
+    return 1
+  fi
+
+  windows_acl_powershell="$(command -v powershell.exe 2>/dev/null || true)"
+  if [ -z "$windows_acl_powershell" ]; then
+    echo "ERROR: WSL/DrvFS Codex CLI의 Windows ACL을 확인하려면 powershell.exe가 필요합니다." >&2
+    return 1
+  fi
+  windows_acl_path="$("$windows_acl_path_converter" -w "$1" 2>/dev/null || true)"
+  case "$windows_acl_path" in
+    [A-Za-z]:*|\\\\*) ;;
+    *)
+      echo "ERROR: Codex CLI의 Windows 경로를 확인할 수 없습니다: $1" >&2
+      return 1
+      ;;
+  esac
+
+  windows_acl_script='
+$ErrorActionPreference = "Stop"
+$path = $args[0]
+$acl = Get-Acl -LiteralPath $path
+$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+if ($null -eq $identity.User) { exit 10 }
+$currentSid = $identity.User.Value
+$trustedSids = @($currentSid, "S-1-5-18", "S-1-5-32-544")
+$ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+if ($trustedSids -notcontains $ownerSid) { exit 11 }
+$writeRights = [int](
+  [System.Security.AccessControl.FileSystemRights]::WriteData -bor
+  [System.Security.AccessControl.FileSystemRights]::AppendData -bor
+  [System.Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor
+  [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+  [System.Security.AccessControl.FileSystemRights]::Delete -bor
+  [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+  [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+  [System.Security.AccessControl.FileSystemRights]::TakeOwnership)
+$rules = @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+foreach ($rule in $rules) {
+  if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
+  if ($trustedSids -notcontains $rule.IdentityReference.Value -and
+      (([int]$rule.FileSystemRights -band $writeRights) -ne 0)) { exit 12 }
+}
+exit 0
+'
+  if [ "$windows_acl_path_converter_kind" = 'cygpath' ]; then
+    MSYS2_ARG_CONV_EXCL='*' "$windows_acl_powershell" -NoProfile -NonInteractive -Command "$windows_acl_script" "$windows_acl_path"
+  else
+    "$windows_acl_powershell" -NoProfile -NonInteractive -Command "$windows_acl_script" "$windows_acl_path"
+  fi
 }
 
 codex_path="$(validate_trusted_codex_path "$codex_path")"

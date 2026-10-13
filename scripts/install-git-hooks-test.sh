@@ -22,6 +22,11 @@ trap cleanup EXIT
 mkdir -p "$fixture_bin"
 printf '#!/bin/sh\nexit 0\n' > "$fixture_bin/codex"
 chmod +x "$fixture_bin/codex"
+cat > "$fixture_bin/powershell.exe" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+chmod +x "$fixture_bin/powershell.exe"
 
 # The checkout's origin/main may predate the trusted-bundle installer. Use the
 # committed installer as the trusted fixture, then mutate only the worktree.
@@ -85,6 +90,41 @@ test ! -e "$test_worktree/codex.executed" \
   cd "$test_worktree"
   git show refs/remotes/origin/main:scripts/install-git-hooks.sh | PATH="$fixture_bin:$PATH" sh >/dev/null
 )
+
+# WSL DrvFS/9p commonly reports Windows executables as 777 even when the
+# Windows ACL is restricted. The installer must validate that ACL instead of
+# rejecting the executable based on a synthetic POSIX mode.
+permission_fixture_bin="$fixture_root/permission-bin"
+mkdir -p "$permission_fixture_bin"
+real_stat_path="$(command -v stat)"
+cat > "$permission_fixture_bin/stat" <<EOF
+#!/bin/sh
+case "\$*" in
+  *%a*) printf '%s\n' 777 ;;
+  *%T*) printf '%s\n' 9p ;;
+  *) exec "$real_stat_path" "\$@" ;;
+esac
+EOF
+cat > "$permission_fixture_bin/wslpath" <<'EOF'
+#!/bin/sh
+if [ "${1-}" = '-w' ]; then
+  printf '%s\n' 'C:\\Users\\test\\codex.exe'
+  exit 0
+fi
+exit 1
+EOF
+cat > "$permission_fixture_bin/powershell.exe" <<EOF
+#!/bin/sh
+printf '%s\n' invoked > "$permission_fixture_bin/powershell-called"
+exit 0
+EOF
+chmod +x "$permission_fixture_bin/stat" "$permission_fixture_bin/wslpath" "$permission_fixture_bin/powershell.exe"
+(
+  cd "$test_worktree"
+  PATH="$permission_fixture_bin:$fixture_bin:$PATH" sh < <(git show refs/remotes/origin/main:scripts/install-git-hooks.sh) >/dev/null
+)
+test -f "$permission_fixture_bin/powershell-called" \
+  || fail 'WSL/DrvFS Codex 권한 검증이 Windows ACL 확인기를 호출하지 않았습니다.'
 
 trusted_hooks_dir="$test_worktree/.git/jdsnack-hooks"
 (
