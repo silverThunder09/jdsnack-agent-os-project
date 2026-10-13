@@ -491,6 +491,7 @@ reject_untrusted_local_config() {
   local repo="$1"
   local key
   local local_keys
+  local worktree_keys
   local_keys="$(run_trusted_git -C "$repo" config --local --name-only --get-regexp \
     '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path|credential\..*\.helper|filter\..*\.(clean|smudge|process)|core\.(fsmonitor|fsmonitorhook|gitproxy|sshcommand|askpass)|diff\.(external|.*\.textconv)|merge\..*\.driver|remote\..*\.(uploadpack|receivepack)|submodule\..*\.update)$' 2>/dev/null || true)"
   while IFS= read -r key; do
@@ -500,6 +501,15 @@ reject_untrusted_local_config() {
       *) emit_needs_human "unsafe_local_git_config_${key}" ;;
     esac
   done <<< "$local_keys"
+  worktree_keys="$(run_trusted_git -C "$repo" config --worktree --name-only --get-regexp \
+    '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path|credential\..*\.helper|filter\..*\.(clean|smudge|process)|core\.(fsmonitor|fsmonitorhook|gitproxy|sshcommand|askpass)|diff\.(external|.*\.textconv)|merge\..*\.driver|remote\..*\.(uploadpack|receivepack)|submodule\..*\.update)$' 2>/dev/null || true)"
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    case "$key" in
+      http.https://github.com/.extraheader) ;;
+      *) emit_needs_human "unsafe_worktree_git_config_${key}" ;;
+    esac
+  done <<< "$worktree_keys"
 }
 
 run_trusted_python() (

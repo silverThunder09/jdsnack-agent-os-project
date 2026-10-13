@@ -604,7 +604,7 @@ validate_existing_github_header() {
         count=$((count + 1))
     done <<< "$values"
     if [ "$count" -gt 1 ]; then
-        printf 'codex push failed: repository local Git config contains multiple GitHub Authorization headers\n' >&2
+        printf 'codex push failed: repository Git config contains multiple GitHub Authorization headers\n' >&2
         return 20
     fi
 }
@@ -662,10 +662,12 @@ git_with_github_auth() {
         if ! validate_existing_github_header "$auth_repo"; then
             return 20
         fi
-        if trusted_git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+        if trusted_git -C "$auth_repo" config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1 ||
+            trusted_git -C "$auth_repo" config --worktree --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
             has_existing_header=true
         fi
-    elif trusted_git config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+    elif trusted_git config --local --get-all http.https://github.com/.extraheader >/dev/null 2>&1 ||
+        trusted_git config --worktree --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
         has_existing_header=true
     fi
 
@@ -685,6 +687,7 @@ git_with_trusted_push_hook() {
 reject_untrusted_local_config() {
     local key
     local local_keys
+    local worktree_keys
     local_keys="$(trusted_git -C "$WORKTREE" config --local --name-only --get-regexp \
         '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path|credential\..*\.helper|filter\..*\.(clean|smudge|process)|core\.(fsmonitor|fsmonitorhook|gitproxy|sshcommand|askpass)|diff\.(external|.*\.textconv)|merge\..*\.driver|remote\..*\.(uploadpack|receivepack)|submodule\..*\.update)$' 2>/dev/null || true)"
     while IFS= read -r key; do
@@ -694,6 +697,15 @@ reject_untrusted_local_config() {
             *) fail "worktree local Git config contains an unsafe executable or remote setting: $key" ;;
         esac
     done <<< "$local_keys"
+    worktree_keys="$(trusted_git -C "$WORKTREE" config --worktree --name-only --get-regexp \
+        '^(url\..*\.(insteadOf|pushInsteadOf)|http\..*|include(If\..*)?\.path|credential\..*\.helper|filter\..*\.(clean|smudge|process)|core\.(fsmonitor|fsmonitorhook|gitproxy|sshcommand|askpass)|diff\.(external|.*\.textconv)|merge\..*\.driver|remote\..*\.(uploadpack|receivepack)|submodule\..*\.update)$' 2>/dev/null || true)"
+    while IFS= read -r key; do
+        [ -z "$key" ] && continue
+        case "$key" in
+            http.https://github.com/.extraheader) ;;
+            *) fail "worktree Git config contains an unsafe executable or remote setting: $key" ;;
+        esac
+    done <<< "$worktree_keys"
 }
 
 while [ "$#" -gt 0 ]; do

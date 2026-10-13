@@ -241,6 +241,20 @@ linked_base_sha="$(git -C "$linked_worktree" rev-parse HEAD)"
 printf 'linked worktree publish\n' >> "$linked_worktree/state.txt"
 git -C "$linked_worktree" add state.txt
 git -C "$linked_worktree" commit -qm 'linked worktree publish'
+git -C "$linked_worktree" config --worktree core.fsmonitor '!printf unsafe-worktree'
+set +e
+linked_unsafe_output="$(PATH="$linked_worktree:$PATH" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_BIN="$real_codex" CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$real_bash" "$PUBLISH" --worktree "$linked_worktree" --branch codex/linked --base-sha "$linked_base_sha" 2>&1)"
+linked_unsafe_code=$?
+set -e
+assert_eq 20 "$linked_unsafe_code" "linked-worktree unsafe-config exit code"
+case "$linked_unsafe_output" in
+    *"worktree Git config contains an unsafe executable or remote setting: core.fsmonitor"*) ;;
+    *)
+        printf 'FAIL: linked-worktree unsafe-config output (%s)\n' "$linked_unsafe_output" >&2
+        exit 1
+        ;;
+esac
+git -C "$linked_worktree" config --worktree --unset core.fsmonitor
 linked_output="$(PATH="$linked_worktree:$PATH" MALICIOUS_HOOK_LOG="$malicious_hook_log" GH_TOKEN=fixture-token GH_BIN=fixture-gh GH_CONFIG_DIR=fixture-gh-config CODEX_BIN="$real_codex" CODEX_PUSH_ATTEMPTS=1 CODEX_PUSH_RETRY_DELAY_SECONDS=0 "$real_bash" "$PUBLISH" --worktree "$linked_worktree" --branch codex/linked --base-sha "$linked_base_sha" 2>&1)"
 case "$linked_output" in
     *"codex push verified"*) ;;

@@ -132,6 +132,16 @@ cat > "$failure_root/.agent-os/product/spec-queue.json" <<'EOF'
 }]}
 EOF
 "$(command -v git)" -C "$failure_root" init -q
+git -C "$failure_root" config extensions.worktreeConfig true
+git -C "$failure_root" config --worktree core.fsmonitor '!printf unsafe-worktree'
+set +e
+worktree_config_output="$(JQ_BIN="$trusted_jq_bin" PYTHON_BIN="$trusted_python_bin" "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+  --repo "$failure_root" --event push --event-key unsafe-worktree:fixture 2>&1)"
+worktree_config_code=$?
+set -e
+test "$worktree_config_code" -eq 20
+grep -q '"reason":"unsafe_worktree_git_config_core.fsmonitor"' <<<"$worktree_config_output"
+git -C "$failure_root" config --worktree --unset core.fsmonitor
 set +e
 failure_output="$(SECURITY_BIN=missing-security "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
   --repo "$failure_root" --event push --event-key worktree-failure:fixture --apply)"
