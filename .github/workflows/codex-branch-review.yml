@@ -189,7 +189,7 @@ jobs:
           }
           $report = Get-Content -LiteralPath $reportPath -Raw
           $decisionMatch = [regex]::Match($report, '(?im)^[ \t]*(?:-[ \t]*)?decision:[ \t]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[ \t]*$')
-          $scoreMatch = [regex]::Match($report, '(?im)^[ \t]*(?:-[ \t]*)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*$')
+          $scoreMatch = [regex]::Match($report, '(?im)^[ \t]*(?:-[ \t]*)?(?:review[ \t]+)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*$')
           if (-not $decisionMatch.Success -or -not $scoreMatch.Success) {
             throw 'Review report does not contain a valid decision and score.'
           }
