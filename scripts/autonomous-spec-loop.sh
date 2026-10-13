@@ -29,6 +29,7 @@ TRUSTED_CAT_BIN=""
 TRUSTED_DATE_BIN=""
 TRUSTED_BASH_BIN=""
 TRUSTED_JQ_BIN=""
+TRUSTED_GH_BIN=""
 TRUSTED_PYTHON_BIN=""
 TRUSTED_WSLPATH_BIN=""
 TRUSTED_DIRNAME_BIN=""
@@ -112,6 +113,48 @@ validate_trusted_path_ancestors() {
     [ "$parent" != "$path" ] || break
     path="$parent"
   done
+}
+
+resolve_trusted_gh_bin() {
+  local candidate="${GH_BIN:-}"
+  local canonical
+  local mode
+  local owner
+  local current_user
+  [ -n "$candidate" ] || emit_needs_human "gh_unavailable"
+  case "$candidate" in
+    /*|[A-Za-z]:[\\/]*) ;;
+    *) emit_needs_human "gh_path_must_be_absolute" ;;
+  esac
+  [ -f "$candidate" ] && [ -x "$candidate" ] || emit_needs_human "gh_executable_unavailable"
+  canonical="$($TRUSTED_READLINK -f -- "$candidate" 2>/dev/null || true)"
+  [ -n "$canonical" ] || emit_needs_human "gh_target_unavailable"
+  [ -f "$canonical" ] && [ -x "$canonical" ] || emit_needs_human "gh_target_not_executable"
+  validate_trusted_path_ancestors "$canonical"
+  case "$canonical" in
+    "$ROOT_DIR"|"$ROOT_DIR"/*|"$REPO"|"$REPO"/*) emit_needs_human "gh_inside_untrusted_checkout" ;;
+    /usr/bin/gh|/usr/bin/gh.exe|/bin/gh|/bin/gh.exe|/usr/local/bin/gh|/usr/local/bin/gh.exe|/mingw64/bin/gh|/mingw64/bin/gh.exe|/c/Program\ Files/GitHub\ CLI/gh.exe|/mnt/c/Program\ Files/GitHub\ CLI/gh.exe) ;;
+    *) emit_needs_human "gh_outside_trusted_installation" ;;
+  esac
+  mode="$($TRUSTED_STAT -c '%a' -- "$canonical" 2>/dev/null || true)"
+  case "$mode" in
+    ''|*[!0-7]*) emit_needs_human "gh_permissions_unavailable" ;;
+  esac
+  if (( 8#$mode & 022 )); then
+    emit_needs_human "gh_executable_is_writable"
+  fi
+  owner="$($TRUSTED_STAT -c '%U' -- "$canonical" 2>/dev/null || true)"
+  current_user="$($TRUSTED_ID -un 2>/dev/null || true)"
+  [ -n "$owner" ] && [ -n "$current_user" ] || emit_needs_human "gh_owner_unavailable"
+  case "$canonical" in
+    /usr/bin/*|/bin/*|/usr/local/bin/*|/mingw64/bin/*|/c/Program\ Files/*|/mnt/c/Program\ Files/*)
+      case "$owner" in root|"$current_user") ;; *) emit_needs_human "gh_system_owner_untrusted" ;; esac
+      ;;
+    *)
+      [ "$owner" = "$current_user" ] || emit_needs_human "gh_user_owner_untrusted"
+      ;;
+  esac
+  printf '%s\n' "$canonical"
 }
 
 resolve_trusted_codex_bin() {
@@ -247,6 +290,28 @@ init_trusted_codex() {
       esac
       ;;
   esac
+}
+
+init_trusted_gh() {
+  local resolution
+  case "$GH_BIN" in
+    /*|[A-Za-z]:[\\/]*) ;;
+    *) GH_BIN="$(resolve_runtime_tool "$GH_BIN")" ;;
+  esac
+  [ -n "$GH_BIN" ] || emit_needs_human "gh_unavailable"
+  if TRUSTED_GH_BIN="$(resolve_trusted_gh_bin)"; then
+    :
+  else
+    resolution="$TRUSTED_GH_BIN"
+    case "$resolution" in
+      *'"status":"needs_human"'*)
+        printf '%s\n' "$resolution"
+        exit "$NEEDS_HUMAN_EXIT"
+        ;;
+      *) emit_needs_human "gh_resolution_failed" ;;
+    esac
+  fi
+  GH_BIN="$TRUSTED_GH_BIN"
 }
 
 RM_BIN="$(resolve_runtime_tool rm)"
@@ -675,6 +740,7 @@ if [ "$APPLY" != true ]; then
 fi
 
 if [ "$EXECUTOR" != "fixture" ]; then
+  init_trusted_gh
   init_trusted_codex
 fi
 

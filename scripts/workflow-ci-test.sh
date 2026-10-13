@@ -71,6 +71,8 @@ grep -Fq -- 'GH_CONFIG_DIR/wp' "$AUTONOMOUS_WORKFLOW" \
   || { echo 'autonomous loop must pass the isolated GitHub CLI config path into WSL' >&2; exit 1; }
 grep -Fq -- 'resolve_trusted_codex_bin' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must resolve Codex from a trusted installation before planning' >&2; exit 1; }
+grep -Fq -- 'resolve_trusted_gh_bin' "$AUTONOMOUS_LOOP" \
+  || { echo 'autonomous loop must resolve GitHub CLI from a trusted installation before token use' >&2; exit 1; }
 grep -Fq -- 'run_codex exec --cd "$codex_worktree" --sandbox workspace-write' "$AUTONOMOUS_LOOP" \
   || { echo 'autonomous loop must run the Spec planner in the Codex workspace sandbox' >&2; exit 1; }
 grep -Fq -- '"$TRUSTED_ENV_BIN" -i' "$AUTONOMOUS_LOOP" \
@@ -492,6 +494,10 @@ test -f "$ROOT_DIR/scripts/autonomous-root-path-test.sh" \
   || { echo 'scripts/autonomous-root-path-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/autonomous-root-path-test.sh"
 bash "$ROOT_DIR/scripts/autonomous-root-path-test.sh"
+test -f "$ROOT_DIR/scripts/autonomous-gh-bin-test.sh" \
+  || { echo 'scripts/autonomous-gh-bin-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/autonomous-gh-bin-test.sh"
+bash "$ROOT_DIR/scripts/autonomous-gh-bin-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
 test -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" \
   || { echo 'scripts/secure-review-temp-acl-contract-test.ps1 is missing' >&2; exit 1; }
