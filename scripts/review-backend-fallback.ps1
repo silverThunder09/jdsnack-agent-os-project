@@ -277,8 +277,22 @@ function Submit-Review {
         return 127
     }
 
-    & $ghPath pr review $PullRequestNumber --repo $Repository $Action --body-file $ReportPath
-    return [int]$LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $reviewOutput = (& $ghPath pr review $PullRequestNumber --repo $Repository $Action --body-file $ReportPath 2>&1 | Out-String)
+        $reviewExitCode = [int]$LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    $script:LastReviewSubmissionOutput = $reviewOutput.Trim()
+    return $reviewExitCode
+}
+
+function Test-SelfReviewSubmissionFailure {
+    param([string]$Output)
+
+    return $Output -match '(?i)review can not request changes on your own pull request|cannot request changes on your own pull request'
 }
 
 function Get-BlockingRequiredChecks {
@@ -886,7 +900,16 @@ function Complete-ReviewDecision {
     if ($decision -eq 'REQUEST_CHANGES') {
         $status = Submit-Review '--request-changes' $ReportPath
         if ($status -ne 0) {
-            Stop-NeedsHuman "$($Result.ReviewerBackend) requested changes but GitHub review submission failed." $ReportPath -ReviewSubmissionAttempted
+            if (-not (Test-SelfReviewSubmissionFailure -Output $script:LastReviewSubmissionOutput)) {
+                Stop-NeedsHuman "$($Result.ReviewerBackend) requested changes but GitHub review submission failed." $ReportPath -ReviewSubmissionAttempted
+            }
+
+            $commentStatus = Submit-Review '--comment' $ReportPath
+            if ($commentStatus -ne 0) {
+                Stop-NeedsHuman "$($Result.ReviewerBackend) requested changes and the self-review fallback comment could not be published." $ReportPath -ReviewSubmissionAttempted
+            }
+            Add-StepSummary "$($Result.ReviewerBackend) requested changes; GitHub does not allow the authenticated PR author to submit REQUEST_CHANGES, so the report was published as a PR comment and the review check remains blocking."
+            return
         }
         Stop-NeedsHuman "$($Result.ReviewerBackend) requested changes; the implementation backend must address the findings." $ReportPath -ReviewSubmissionAttempted
     }
