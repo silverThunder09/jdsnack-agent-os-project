@@ -48,62 +48,8 @@ EOF
 trusted_bash_bin="$(command -v bash)"
 trusted_python_bin="$(command -v python.exe 2>/dev/null || command -v python3 2>/dev/null || true)"
 [ -n "$trusted_python_bin" ] || { echo 'a trusted Python executable is required' >&2; exit 1; }
-# This contract isolates GitHub CLI resolution from the runner's jq version or
-# installation state. jq-unavailable behavior is covered by the root-path test.
-trusted_jq_bin="$TEST_ROOT/trusted-jq"
-cat > "$trusted_jq_bin" <<'EOF'
-#!/usr/bin/env bash
-set -eu
-
-filter=""
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    -r|-c|-e|-n|-R|-s)
-      shift
-      ;;
-    --arg)
-      shift 3
-      ;;
-    *)
-      if [ -z "$filter" ]; then
-        filter="$1"
-      fi
-      shift
-      ;;
-  esac
-done
-
-case "$filter" in
-  *'any(. == "codex-auto"'*)
-    printf 'true\n'
-    ;;
-  *'index("codex-auto")'*)
-    exit 0
-    ;;
-  *'.issue.labels[]?.name'*)
-    printf 'codex-auto\n'
-    ;;
-  *'.issue.number'*)
-    printf '77\n'
-    ;;
-  *'.issue.title'*)
-    printf '[Bug] history detail fails\n'
-    ;;
-  *'.issue.body'*)
-    printf 'type: bug\nExpected: detail loads\n'
-    ;;
-  *'status:"dispatch_issue"'*)
-    printf '{"status":"dispatch_issue","reason":"trusted_bug_issue","event":"issues","issue_number":"77","issue_title":"[Bug] history detail fails"}\n'
-    ;;
-  *'.status'*)
-    printf 'dispatch_issue\n'
-    ;;
-  *)
-    printf '{}\n'
-    ;;
-esac
-EOF
-chmod 700 "$trusted_jq_bin"
+trusted_jq_bin="$(command -v jq 2>/dev/null || true)"
+[ -n "$trusted_jq_bin" ] || { echo 'a trusted jq executable is required' >&2; exit 1; }
 
 set +e
 output="$(

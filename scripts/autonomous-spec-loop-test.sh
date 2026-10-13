@@ -49,12 +49,6 @@ EOF
 chmod +x "$TEST_ROOT/bin/mkdir"
 
 trusted_jq_bin="$(command -v jq)"
-cat > "$TEST_ROOT/bin/jq" <<EOF
-#!$trusted_bash_bin
-printf 'jq-received-token=%s\n' "\${GH_TOKEN-}" >> "$helper_log"
-exec "$trusted_jq_bin" "\$@"
-EOF
-chmod +x "$TEST_ROOT/bin/jq"
 
 cat > "$TEST_ROOT/bin/bash" <<EOF
 #!$trusted_bash_bin
@@ -91,6 +85,7 @@ summary_path="$TEST_ROOT/step-summary.md"
 # trusted fixed-path Bash instead.
 set +e
 bash_path_output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token SECURITY_BIN=missing-security GITHUB_STEP_SUMMARY="$summary_path" \
+  JQ_BIN="$trusted_jq_bin" PYTHON_BIN="$trusted_python_bin" \
   JDSNACK_LOOP_EXECUTOR=fixture "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
     --repo "$TEST_ROOT" --event push --event-key bash:fixture --apply)"
 bash_path_code=$?
@@ -102,6 +97,7 @@ test ! -e "$bash_log"
 
 set +e
 waiting_output="$(SECURITY_BIN=missing-security GITHUB_STEP_SUMMARY="$summary_path" \
+  JQ_BIN="$trusted_jq_bin" PYTHON_BIN="$trusted_python_bin" \
   JDSNACK_LOOP_EXECUTOR=fixture bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
     --repo "$TEST_ROOT" --event push --event-key waiting:fixture --apply)"
 waiting_code=$?
@@ -143,7 +139,8 @@ test "$worktree_config_code" -eq 20
 grep -q '"reason":"unsafe_worktree_git_config_core.fsmonitor"' <<<"$worktree_config_output"
 git -C "$failure_root" config --worktree --unset core.fsmonitor
 set +e
-failure_output="$(SECURITY_BIN=missing-security "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+failure_output="$(SECURITY_BIN=missing-security JQ_BIN="$trusted_jq_bin" PYTHON_BIN="$trusted_python_bin" \
+  "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
   --repo "$failure_root" --event push --event-key worktree-failure:fixture --apply)"
 failure_code=$?
 set -e
@@ -155,7 +152,7 @@ test -z "$(find "$failure_root/.agent-os/runtime" -mindepth 1 -maxdepth 1 -type 
 # A malformed state remains a failure rather than becoming an idle success.
 printf 'invalid json\n' > "$TEST_ROOT/.agent-os/runtime/autonomous-loop-state.json"
 set +e
-invalid_output="$(SECURITY_BIN=missing-security JDSNACK_LOOP_EXECUTOR=fixture \
+invalid_output="$(SECURITY_BIN=missing-security JQ_BIN="$trusted_jq_bin" PYTHON_BIN="$trusted_python_bin" JDSNACK_LOOP_EXECUTOR=fixture \
   bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
     --repo "$TEST_ROOT" --event push --event-key invalid:fixture --apply)"
 invalid_code=$?
@@ -171,7 +168,7 @@ cp "$TEST_ROOT/.agent-os/specs/current/plan.md" "$TEST_ROOT/completed-plan.md"
 sed 's/구현 상태: `completed`/구현 상태: `in-progress`/' \
   "$TEST_ROOT/completed-plan.md" > "$TEST_ROOT/.agent-os/specs/current/plan.md"
 set +e
-blocked_output="$(SECURITY_BIN=missing-security JDSNACK_LOOP_EXECUTOR=fixture \
+blocked_output="$(SECURITY_BIN=missing-security JQ_BIN="$trusted_jq_bin" PYTHON_BIN="$trusted_python_bin" JDSNACK_LOOP_EXECUTOR=fixture \
   bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
     --repo "$TEST_ROOT" --event push --event-key blocked:fixture --apply)"
 blocked_code=$?
@@ -193,13 +190,12 @@ json.dump({"version": 1, "candidates": [{
 }]}, open(path, "w"), indent=2)
 PY
 
-output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token JQ_BIN="$TEST_ROOT/bin/jq" JDSNACK_LOOP_EXECUTOR=fixture "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+output="$(PATH="$TEST_ROOT/bin:$PATH" GH_TOKEN=fixture-token JQ_BIN="$trusted_jq_bin" JDSNACK_LOOP_EXECUTOR=fixture "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
   --repo "$TEST_ROOT" --event push --event-key merge:fixture --apply)"
 printf '%s\n' "$output"
 test -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
 grep -q '"status": "promote_spec"' "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
-test -f "$helper_log"
-! grep -Fq 'fixture-token' "$helper_log"
+test ! -s "$helper_log"
 
 cat > "$TEST_ROOT/issue.json" <<'EOF'
 {
@@ -212,7 +208,7 @@ cat > "$TEST_ROOT/issue.json" <<'EOF'
 }
 EOF
 rm -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
-issue_output="$(JDSNACK_LOOP_EXECUTOR=fixture bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+issue_output="$(JDSNACK_LOOP_EXECUTOR=fixture JQ_BIN="$trusted_jq_bin" PYTHON_BIN="$trusted_python_bin" bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
   --repo "$TEST_ROOT" --event issues --event-key issue:77 --event-path "$TEST_ROOT/issue.json" --apply)"
 printf '%s\n' "$issue_output"
 grep -q '"status": "dispatch_issue"' "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
@@ -228,7 +224,7 @@ cat > "$TEST_ROOT/feature-issue.json" <<'EOF'
 }
 EOF
 rm -f "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"
-feature_output="$(JDSNACK_LOOP_EXECUTOR=fixture bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+feature_output="$(JDSNACK_LOOP_EXECUTOR=fixture JQ_BIN="$trusted_jq_bin" PYTHON_BIN="$trusted_python_bin" bash "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
   --repo "$TEST_ROOT" --event issues --event-key issue:88 --event-path "$TEST_ROOT/feature-issue.json" --apply)"
 printf '%s\n' "$feature_output"
 grep -q '"status": "promote_spec"' "$TEST_ROOT/.agent-os/runtime/last-fixture-dispatch.json"

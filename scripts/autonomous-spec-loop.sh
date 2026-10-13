@@ -219,16 +219,48 @@ resolve_trusted_python_bin() {
 
 resolve_jq_bin() {
   local candidate="$JQ_BIN"
+  local canonical
+  local mode
+  local owner
+  local current_user
   case "$candidate" in
     /*|[A-Za-z]:[\\/]*) ;;
-    *) candidate="$(command -v "$candidate" 2>/dev/null || true)" ;;
+    *) candidate="$(resolve_runtime_tool "$candidate")" ;;
   esac
-  [ -n "$candidate" ] && [ -f "$candidate" ] && [ -x "$candidate" ] || return 20
-  printf '%s\n' "$candidate"
+  [ -n "$candidate" ] && [ -f "$candidate" ] && [ -x "$candidate" ] || emit_needs_human "jq_unavailable"
+  canonical="$($TRUSTED_READLINK -f -- "$candidate" 2>/dev/null || true)"
+  [ -n "$canonical" ] || emit_needs_human "jq_target_unavailable"
+  [ -f "$canonical" ] && [ -x "$canonical" ] || emit_needs_human "jq_target_not_executable"
+  validate_trusted_path_ancestors "$canonical"
+  case "$canonical" in
+    "$ROOT_DIR"|"$ROOT_DIR"/*|"$REPO"|"$REPO"/*) emit_needs_human "jq_inside_untrusted_checkout" ;;
+    /usr/bin/jq|/usr/bin/jq.exe|/bin/jq|/bin/jq.exe|/usr/local/bin/jq|/usr/local/bin/jq.exe|/mingw64/bin/jq|/mingw64/bin/jq.exe|/c/ProgramData/chocolatey/bin/jq|/c/ProgramData/chocolatey/bin/jq.exe|/c/ProgramData/chocolatey/lib/jq/tools/jq|/c/ProgramData/chocolatey/lib/jq/tools/jq.exe|/mnt/c/ProgramData/chocolatey/bin/jq|/mnt/c/ProgramData/chocolatey/bin/jq.exe|/mnt/c/ProgramData/chocolatey/lib/jq/tools/jq|/mnt/c/ProgramData/chocolatey/lib/jq/tools/jq.exe) ;;
+    *) emit_needs_human "jq_outside_trusted_installation" ;;
+  esac
+  mode="$($TRUSTED_STAT -c '%a' -- "$canonical" 2>/dev/null || true)"
+  case "$mode" in
+    ''|*[!0-7]*) emit_needs_human "jq_permissions_unavailable" ;;
+  esac
+  if (( 8#$mode & 022 )); then
+    emit_needs_human "jq_executable_is_writable"
+  fi
+  owner="$($TRUSTED_STAT -c '%U' -- "$canonical" 2>/dev/null || true)"
+  current_user="$($TRUSTED_ID -un 2>/dev/null || true)"
+  [ -n "$owner" ] && [ -n "$current_user" ] || emit_needs_human "jq_owner_unavailable"
+  case "$canonical" in
+    /usr/bin/*|/bin/*|/usr/local/bin/*|/mingw64/bin/*)
+      case "$owner" in root|"$current_user") ;; *) emit_needs_human "jq_system_owner_untrusted" ;; esac
+      ;;
+    *)
+      [ "$owner" = "$current_user" ] || emit_needs_human "jq_user_owner_untrusted"
+      ;;
+  esac
+  printf '%s\n' "$canonical"
 }
 
 init_trusted_runtime() {
   local directory
+  local resolution
   TRUSTED_TOOL_DIRS=()
   for directory in /usr/bin /bin /mingw64/bin; do
     [ -d "$directory" ] || continue
@@ -252,7 +284,14 @@ init_trusted_runtime() {
   TRUSTED_ID="$(resolve_runtime_tool id)"
   TRUSTED_PYTHON_BIN="$(resolve_trusted_python_bin)"
   if ! TRUSTED_JQ_BIN="$(resolve_jq_bin)"; then
-    emit_needs_human "jq_unavailable"
+    resolution="$TRUSTED_JQ_BIN"
+    case "$resolution" in
+      *'"status":"needs_human"'*)
+        printf '%s\n' "$resolution"
+        exit "$NEEDS_HUMAN_EXIT"
+        ;;
+      *) emit_needs_human "jq_unavailable" ;;
+    esac
   fi
   [ -n "$TRUSTED_ENV_BIN" ] && [ -n "$TRUSTED_GIT_BIN" ] && [ -n "$TRUSTED_MKTEMP_BIN" ] \
     && [ -n "$TRUSTED_MKDIR_BIN" ] && [ -n "$TRUSTED_CHMOD_BIN" ] && [ -n "$TRUSTED_GREP_BIN" ] && [ -n "$TRUSTED_CAT_BIN" ] && [ -n "$TRUSTED_DATE_BIN" ] \
