@@ -49,6 +49,43 @@ head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$base_sha"
 fixture_head_sha="$(git -C "$test_worktree" rev-parse HEAD)"
 [ "$fixture_head_sha" = "$head_sha" ] || fail '격리 fixture가 현재 HEAD에서 생성되지 않았습니다.'
+trusted_hooks_root="$test_worktree/.git/jdsnack-hooks"
+mkdir -p "$trusted_hooks_root/scripts"
+cp "$ROOT_DIR/.githooks/pre-push" "$trusted_hooks_root/pre-push"
+cp "$test_worktree/.githooks/pre-commit" "$trusted_hooks_root/pre-commit"
+cp "$test_worktree/scripts/check-ai-readiness.py" "$trusted_hooks_root/scripts/check-ai-readiness.py"
+cp "$test_worktree/backends.json" "$trusted_hooks_root/backends.json"
+cp "$test_worktree/scripts/pre-push-ai-review.sh" "$trusted_hooks_root/scripts/pre-push-ai-review.sh"
+for script_name in \
+  review-policy.json \
+  review-risk.ps1 \
+  secure-review-temp-acl.ps1 \
+  verify-codex-auth-permissions.ps1 \
+  codex-auth-permissions.ps1 \
+  review-path-safety.ps1; do
+  cp "$test_worktree/scripts/$script_name" "$trusted_hooks_root/scripts/$script_name"
+done
+chmod 700 "$trusted_hooks_root/pre-push" "$trusted_hooks_root/scripts/pre-push-ai-review.sh"
+printf '%s\n' "$head_sha" > "$trusted_hooks_root/source-sha"
+printf '%s\n' "$base_sha" > "$trusted_hooks_root/trusted-source-sha"
+printf '%s\n' refs/remotes/origin/main > "$trusted_hooks_root/trusted-source-ref"
+bundle_manifest="$trusted_hooks_root/bundle-manifest"
+: > "$bundle_manifest"
+for bundle_path in \
+  pre-commit \
+  pre-push \
+  scripts/check-ai-readiness.py \
+  backends.json \
+  scripts/pre-push-ai-review.sh \
+  scripts/review-policy.json \
+  scripts/review-risk.ps1 \
+  scripts/secure-review-temp-acl.ps1 \
+  scripts/verify-codex-auth-permissions.ps1 \
+  scripts/codex-auth-permissions.ps1 \
+  scripts/review-path-safety.ps1; do
+  printf '%s %s\n' "$bundle_path" "$(git -C "$test_worktree" hash-object "$trusted_hooks_root/$bundle_path")" >> "$bundle_manifest"
+done
+git -C "$test_worktree" config --local core.hooksPath "$trusted_hooks_root"
 head_tree="$(git -C "$test_worktree" rev-parse "$head_sha^{tree}")"
 non_ff_remote_sha="$(git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com commit-tree "$head_tree" -p "$base_sha" -m 'non-fast-forward pre-push fixture')"
 if git -C "$test_worktree" merge-base --is-ancestor "$non_ff_remote_sha" "$head_sha"; then
@@ -197,6 +234,10 @@ if [ -n "${JDSNACK_TEST_SECRET_TOKEN-}" ]; then
 fi
 if [ -n "${JDSNACK_TEST_CUSTOM-}" ]; then
   exit 7
+fi
+if [ "${JDSNACK_ASSERT_HOOK_GH_ISOLATION-}" = '1' ] &&
+    { [ -n "${GH_BIN-}" ] || [ -n "${GH_CONFIG_DIR-}" ]; }; then
+  exit 23
 fi
 if [ -n "${APPDATA-}" ] || [ -n "${LOCALAPPDATA-}" ]; then
   exit 11
@@ -354,8 +395,9 @@ FAKE_CYGPATH
   sed -i "s|__FAKE_ROOT__|$fake_root|g; s|__REAL_CYGPATH__|$test_cygpath_bin|g" "$fake_root/cygpath"
   chmod +x "$fake_root/cygpath"
 fi
-printf '#!/bin/sh\nif [ "$#" -eq 0 ]; then set -- 1; fi\nexec "%s" "$@"\n' "$test_sleep_bin" > "$fake_root/sleep-one-second"
+printf '#!/bin/sh\ncd /\nif [ "$#" -eq 0 ]; then set -- 1; fi\nexec "%s" "$@"\n' "$test_sleep_bin" > "$fake_root/sleep-one-second"
 chmod +x "$fake_root/sleep-one-second"
+git -C "$test_worktree" config --local jdsnack.codex "$fake_root/codex"
 
 set_origin_urls() {
   local origin_fetch_url="$1"
@@ -382,7 +424,24 @@ run_review() {
     printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$base_sha" \
       | PATH="$fake_root:$PATH" \
         JDSNACK_REVIEW_BASE_REF="$base_ref" \
-        run_hook_with_origin_urls "$test_worktree/.githooks/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
+        GH_BIN="$fake_root/gh.exe" \
+        GH_CONFIG_DIR="$fake_root/gh-config" \
+        JDSNACK_ASSERT_HOOK_GH_ISOLATION=1 \
+        run_hook_with_origin_urls "$trusted_hooks_root/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
+  )
+}
+
+run_protected_branch_review() {
+  local canonical_origin_url='https://github.com/silverThunder09/jdsnack-agent-os-project'
+  (
+    cd "$test_worktree"
+    printf 'refs/heads/main %s refs/heads/main %s\n' "$head_sha" "$base_sha" \
+      | PATH="$fake_root:$PATH" \
+        JDSNACK_REVIEW_BASE_REF="$base_ref" \
+        GH_BIN="$fake_root/gh.exe" \
+        GH_CONFIG_DIR="$fake_root/gh-config" \
+        JDSNACK_ASSERT_HOOK_GH_ISOLATION=1 \
+        run_hook_with_origin_urls "$trusted_hooks_root/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
   )
 }
 
@@ -424,6 +483,23 @@ fi
 set_fixture_windows_runtime
 if [ -z "$SystemRoot" ] || [ -z "$WINDIR" ]; then
   fail 'workflow fixture must provide SystemRoot and WINDIR to the isolated reviewer.'
+fi
+
+if [ "${JDSNACK_PRE_PUSH_TEST_CASE-}" = 'protected-branch' ]; then
+  rm -f "$fake_root/codex.invoked"
+  set +e
+  protected_branch_output="$(run_protected_branch_review 2>&1)"
+  protected_branch_status=$?
+  set -e
+  if [ "$protected_branch_status" -eq 0 ] || ! grep -Fq '보호 브랜치 직접 push는 허용하지 않습니다' <<< "$protected_branch_output"; then
+    printf '%s\n' "$protected_branch_output" >&2
+    fail 'main 직접 push focused fixture가 pre-push 차단을 확인하지 못했습니다.'
+  fi
+  if [ -e "$fake_root/codex.invoked" ]; then
+    fail 'main 직접 push focused fixture가 Codex reviewer 실행 전에 차단하지 못했습니다.'
+  fi
+  echo 'Protected branch push is rejected before Codex review'
+  exit 0
 fi
 
 assert_malformed_duplicate_scalar_headers_rejected
@@ -731,6 +807,19 @@ if [ "$tag_status" -eq 0 ] || ! grep -Fq 'branch push만 허용됩니다' <<< "$
 fi
 if [ -e "$fake_root/codex.invoked" ]; then
   fail 'tag ref push가 Codex reviewer 실행 전에 차단되지 않았습니다.'
+fi
+
+rm -f "$fake_root/codex.invoked"
+set +e
+protected_branch_output="$(run_protected_branch_review 2>&1)"
+protected_branch_status=$?
+set -e
+if [ "$protected_branch_status" -eq 0 ] || ! grep -Fq '보호 브랜치 직접 push는 허용하지 않습니다' <<< "$protected_branch_output"; then
+  printf '%s\n' "$protected_branch_output" >&2
+  fail 'main 직접 push를 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail 'main 직접 push가 Codex reviewer 실행 전에 차단되지 않았습니다.'
 fi
 
 set +e

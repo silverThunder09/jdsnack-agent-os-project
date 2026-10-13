@@ -48,6 +48,9 @@ jobs:
       pr_number: ${{ steps.resolve.outputs.pr_number }}
       base_sha: ${{ steps.resolve.outputs.base_sha }}
       head_sha: ${{ steps.resolve.outputs.head_sha }}
+      review_decision: ${{ steps.review_outcome.outputs.decision }}
+      review_score: ${{ steps.review_outcome.outputs.score }}
+      review_passed: ${{ steps.review_outcome.outputs.passed }}
     steps:
       - name: Check out trusted review base
         uses: actions/checkout@v4
@@ -175,6 +178,30 @@ jobs:
             -BaseSha $env:REVIEW_BASE_SHA `
             -HeadSha $env:REVIEW_HEAD_SHA
 
+      - name: Export structured review outcome
+        id: review_outcome
+        if: success()
+        shell: powershell
+        run: |
+          $reportPath = Join-Path $env:RUNNER_TEMP "jdsnack-review-backend-fallback/review-$($env:PR_NUMBER).md"
+          if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
+            throw "Review report not found: $reportPath"
+          }
+          $report = Get-Content -LiteralPath $reportPath -Raw
+          $decisionMatch = [regex]::Match($report, '(?im)^-\s*decision:\s*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)\s*$')
+          $scoreMatch = [regex]::Match($report, '(?im)^-\s*score:\s*([0-5])\s*/\s*5\s*$')
+          if (-not $decisionMatch.Success -or -not $scoreMatch.Success) {
+            throw 'Review report does not contain a valid decision and score.'
+          }
+          $decision = $decisionMatch.Groups[1].Value
+          $score = $scoreMatch.Groups[1].Value
+          $passed = if ($decision -eq 'PASS' -and [int]$score -ge 4) { 'true' } else { 'false' }
+          @(
+            "decision=$decision"
+            "score=$score"
+            "passed=$passed"
+          ) | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
       - name: Upload successful review report
         if: success()
         uses: actions/upload-artifact@v4
@@ -199,6 +226,9 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           REVIEW_HEAD_SHA: ${{ needs.run_review.outputs.head_sha }}
           REVIEW_JOB_RESULT: ${{ needs.run_review.result }}
+          REVIEW_DECISION: ${{ needs.run_review.outputs.review_decision }}
+          REVIEW_SCORE: ${{ needs.run_review.outputs.review_score }}
+          REVIEW_PASSED: ${{ needs.run_review.outputs.review_passed }}
           REVIEW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if ($env:REVIEW_HEAD_SHA -notmatch '^[0-9a-fA-F]{40}$') {
@@ -206,6 +236,12 @@ jobs:
           }
           if ($env:REVIEW_JOB_RESULT -notin @('success', 'failure', 'cancelled', 'timed_out')) {
             throw "The review job has an unsupported result: $env:REVIEW_JOB_RESULT"
+          }
+          if ($env:REVIEW_JOB_RESULT -eq 'success' -and
+              ($env:REVIEW_DECISION -notin @('PASS', 'COMMENT', 'REQUEST_CHANGES', 'NEEDS_HUMAN') -or
+               $env:REVIEW_SCORE -notmatch '^[0-5]$' -or
+               $env:REVIEW_PASSED -notin @('true', 'false'))) {
+            throw 'The successful review job did not export a valid structured outcome.'
           }
           if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
             throw 'The GitHub Actions token is unavailable for publishing the required review check.'
@@ -221,10 +257,12 @@ jobs:
           $checkRunsUri = "$apiRoot/repos/$($env:REPOSITORY)/commits/$($env:REVIEW_HEAD_SHA)/check-runs?check_name=review&filter=latest&per_page=100"
           $existingChecks = Invoke-RestMethod -Method Get -Uri $checkRunsUri -Headers $headers -TimeoutSec 30
           $existingCheck = @($existingChecks.check_runs | Where-Object { $_.external_id -eq $externalId } | Sort-Object { [long]$_.id } -Descending | Select-Object -First 1)
-          $conclusion = if ($env:REVIEW_JOB_RESULT -eq 'success') { 'success' } elseif ($env:REVIEW_JOB_RESULT -eq 'cancelled') { 'cancelled' } else { 'failure' }
+          $conclusion = if ($env:REVIEW_JOB_RESULT -eq 'success' -and $env:REVIEW_PASSED -eq 'true') { 'success' } elseif ($env:REVIEW_JOB_RESULT -eq 'cancelled') { 'cancelled' } else { 'failure' }
           $title = if ($conclusion -eq 'success') { 'PASS review and required gates' } else { 'Review gate blocked' }
           $summary = if ($conclusion -eq 'success') {
             "The configured reviewer returned PASS with score at least 4/5. Required checks passed for head $($env:REVIEW_HEAD_SHA)."
+          } elseif ($env:REVIEW_JOB_RESULT -eq 'success') {
+            "The configured reviewer returned $($env:REVIEW_DECISION) with score $($env:REVIEW_SCORE)/5. The report was published for the PR author, but automatic merge is blocked for head $($env:REVIEW_HEAD_SHA)."
           } else {
             "The trusted review job ended with result '$($env:REVIEW_JOB_RESULT)'. Automatic merge is blocked for head $($env:REVIEW_HEAD_SHA)."
           }
@@ -258,7 +296,7 @@ jobs:
 
   queue_squash:
     needs: [run_review, publish_review_check]
-    if: needs.run_review.result == 'success' && needs.publish_review_check.result == 'success'
+    if: needs.run_review.result == 'success' && needs.publish_review_check.result == 'success' && needs.run_review.outputs.review_passed == 'true'
     runs-on: [self-hosted, jdsnack]
     timeout-minutes: 15
     permissions:

@@ -8,8 +8,8 @@
 
 - `check-ai-readiness.py`: 모듈 안내 문서, Markdown 링크, 정적 eval 케이스를 검사합니다.
 - `run-ai-readiness-evals.py`: Codex CLI를 읽기 전용으로 실행해 context-on/off 계획 결과와 지표를 기록합니다.
-- `install-git-hooks.sh`: clone 직후 `core.hooksPath=.githooks`를 검증하고 pre-commit/pre-push를 연결합니다.
-- `pre-push-ai-review.sh`: staged/working-tree/branch diff를 읽기 전용 Codex 리뷰어에 전달하고 기준 미달 push를 차단합니다.
+- `install-git-hooks.sh`: `git fetch origin main` 뒤 `git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh`처럼 독립 trusted source를 stdin으로 실행해야 하며, origin/main의 source와 파일 digest로 Git common dir 아래 branch 외부 trusted hook bundle을 만들고 `core.hooksPath`를 검증해 pre-commit/pre-push를 연결합니다. branch `HEAD` source와 `JDSNACK_HOOK_SOURCE_REF` override는 거부합니다.
+- `pre-push-ai-review.sh`: trusted hook bundle에서 staged/working-tree/branch diff를 읽기 전용 Codex 리뷰어에 전달하고 기준 미달 push를 차단합니다.
 - `pre-push-ai-review-test.sh`: read-only 격리 옵션, 결정론 위험도·라벨 대조, 구조화 결과 차단을 fixture로 검증합니다.
 - `pre-push-git-invocation-test.sh`: 로컬 bare remote에 대한 실제 `git push --dry-run`으로 hook 인자와 ref stdin 전달을 검증합니다.
 - `review-risk.ps1`: PR 위험도 점수, 보호 정책, Security/Performance/Test Coverage/Architecture 라우팅을 결정론적으로 계산합니다.
@@ -62,7 +62,8 @@ flowchart LR
 
 ```bash
 python3 scripts/check-ai-readiness.py
-sh scripts/install-git-hooks.sh
+git fetch origin main
+git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh
 python3 scripts/run-ai-readiness-evals.py --dry-run
 bash scripts/smoke-test.sh
 bash scripts/sync-main-checkout.sh
