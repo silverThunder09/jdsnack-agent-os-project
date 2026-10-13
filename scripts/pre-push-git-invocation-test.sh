@@ -53,6 +53,7 @@ for script_name in \
   review-risk.ps1 \
   secure-review-temp-acl.ps1 \
   verify-codex-auth-permissions.ps1 \
+  verify-trusted-hook-bundle-acl.ps1 \
   codex-auth-permissions.ps1 \
   review-path-safety.ps1; do
   cp "$test_worktree/scripts/$script_name" "$trusted_hook_path/scripts/$script_name"
@@ -77,6 +78,7 @@ for script_name in \
   review-risk.ps1 \
   secure-review-temp-acl.ps1 \
   verify-codex-auth-permissions.ps1 \
+  verify-trusted-hook-bundle-acl.ps1 \
   codex-auth-permissions.ps1 \
   review-path-safety.ps1; do
   write_manifest_entry "scripts/$script_name"
