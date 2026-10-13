@@ -8,6 +8,19 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'review-path-safety.ps1')
 
+if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
+    $securityModulePath = Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1'
+    if (Test-Path -LiteralPath $securityModulePath) {
+        Import-Module -Name $securityModulePath -ErrorAction Stop
+    }
+    else {
+        Import-Module -Name Microsoft.PowerShell.Security -ErrorAction Stop
+    }
+}
+if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
+    throw 'Microsoft.PowerShell.Security 모듈에서 Get-Acl을 로드하지 못했습니다.'
+}
+
 Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;

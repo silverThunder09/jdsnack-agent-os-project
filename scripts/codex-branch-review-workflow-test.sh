@@ -215,6 +215,12 @@ grep -Fq -- "stat -f -c '%T'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 WSL DrvFS/9p 파일시스템을 식별하지 않습니다.'
 grep -Fq -- 'Get-Acl -LiteralPath' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 WSL DrvFS/9p Codex 실행 파일의 Windows ACL을 확인하지 않습니다.'
+grep -Fq -- 'Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 제한된 PowerShell 환경에서 Security 모듈 경로를 명시적으로 로드하지 않습니다.'
+grep -Fq -- 'Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1' "$ROOT_DIR/scripts/secure-review-temp-acl.ps1" \
+  || fail '임시 ACL 적용기가 제한된 PowerShell 환경에서 Security 모듈 경로를 명시적으로 로드하지 않습니다.'
+grep -Fq -- 'Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1' "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" \
+  || fail 'Codex auth ACL 검증기가 제한된 PowerShell 환경에서 Security 모듈 경로를 명시적으로 로드하지 않습니다.'
 grep -Fq -- 'S-1-5-32-544' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 Windows ACL의 신뢰된 관리자 주체를 확인하지 않습니다.'
 grep -Fq -- 'WSL DrvFS/9p' "$ROOT_DIR/scripts/install-git-hooks-test.sh" \

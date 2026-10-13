@@ -163,6 +163,15 @@ verify_windows_codex_acl() {
 
   windows_acl_script='
 $ErrorActionPreference = "Stop"
+$securityModulePath = Join-Path $PSHOME "Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1"
+if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
+  if (Test-Path -LiteralPath $securityModulePath) {
+    Import-Module -Name $securityModulePath -ErrorAction Stop
+  } else {
+    Import-Module -Name Microsoft.PowerShell.Security -ErrorAction Stop
+  }
+}
+if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) { exit 13 }
 $path = $args[0]
 $acl = Get-Acl -LiteralPath $path
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
