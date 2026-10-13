@@ -478,6 +478,71 @@ if ! pwsh_bin="$(resolve_powershell_bin "$codex_bin")"; then
   exit 1
 fi
 
+verify_trusted_bundle_acl() {
+  local bundle_root="$BUNDLE_ROOT"
+  local common_dir
+  local common_bundle_root
+  if [ ! -f "$bundle_root/pre-push" ]; then
+    common_dir="$($git_bin rev-parse --git-common-dir 2>/dev/null || true)"
+    case "$common_dir" in
+      /*|[A-Za-z]:[\\/]*) ;;
+      *) common_dir="$CHECKOUT_ROOT/$common_dir" ;;
+    esac
+    if [ -n "$common_dir" ] && [ -n "$path_converter_bin" ]; then
+      common_dir="$($path_converter_bin -u "$common_dir" 2>/dev/null || true)"
+    fi
+    common_dir="$(CDPATH= cd -- "$common_dir" 2>/dev/null && pwd -P || true)"
+    common_bundle_root="$common_dir/jdsnack-hooks"
+    if [ -f "$common_bundle_root/pre-push" ] &&
+      [ -f "$common_bundle_root/scripts/verify-trusted-hook-bundle-acl.ps1" ]; then
+      bundle_root="$common_bundle_root"
+    fi
+  fi
+
+  local verifier_path="$bundle_root/scripts/verify-trusted-hook-bundle-acl.ps1"
+  local windows_script_path
+  local windows_bundle_path
+  local expected_paths=()
+  if [ -f "$bundle_root/pre-push" ]; then
+    expected_paths=(
+      pre-commit pre-push bundle-manifest source-sha trusted-source-sha trusted-source-ref
+      scripts/check-ai-readiness.py scripts/pre-push-ai-review.sh scripts/review-policy.json
+      scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1
+      scripts/verify-codex-auth-permissions.ps1 scripts/verify-trusted-hook-bundle-acl.ps1
+      scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1)
+  elif [ -f "$bundle_root/.githooks/pre-push" ]; then
+    expected_paths=(
+      .githooks/pre-commit .githooks/pre-push backends.json
+      scripts/check-ai-readiness.py scripts/pre-push-ai-review.sh scripts/review-policy.json
+      scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1
+      scripts/verify-codex-auth-permissions.ps1 scripts/verify-trusted-hook-bundle-acl.ps1
+      scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1)
+  else
+    echo "ERROR: trusted hook bundle 경로를 확인할 수 없습니다: $bundle_root" >&2
+    return 1
+  fi
+  local expected_path_arg
+  expected_path_arg="$(IFS='|'; printf '%s' "${expected_paths[*]}")"
+  if [ ! -f "$verifier_path" ]; then
+    echo "ERROR: trusted hook bundle ACL 검증기가 없습니다: $verifier_path" >&2
+    return 1
+  fi
+  if [ -n "$path_converter_bin" ]; then
+    windows_script_path="$($path_converter_bin -w "$verifier_path")" || return 1
+    windows_bundle_path="$($path_converter_bin -w "$bundle_root")" || return 1
+    MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -NonInteractive -File \
+      "$windows_script_path" -Path "$windows_bundle_path" -ExpectedRelativePath "$expected_path_arg"
+  else
+    "$pwsh_bin" -NoProfile -NonInteractive -File "$verifier_path" -Path "$bundle_root" \
+      -ExpectedRelativePath "$expected_path_arg"
+  fi
+}
+
+if ! verify_trusted_bundle_acl; then
+  echo "ERROR: trusted hook bundle의 소유자 또는 Windows ACL을 확인할 수 없습니다." >&2
+  exit 1
+fi
+
 "$chmod_bin" 700 "$tmp_dir"
 if [ -n "$path_converter_bin" ]; then
   secure_windows_temp_path() {

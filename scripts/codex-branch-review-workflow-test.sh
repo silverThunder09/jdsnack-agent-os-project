@@ -221,6 +221,14 @@ grep -Fq -- 'Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1' "
   || fail '임시 ACL 적용기가 제한된 PowerShell 환경에서 Security 모듈 경로를 명시적으로 로드하지 않습니다.'
 grep -Fq -- 'Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1' "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" \
   || fail 'Codex auth ACL 검증기가 제한된 PowerShell 환경에서 Security 모듈 경로를 명시적으로 로드하지 않습니다.'
+[[ -f "$ROOT_DIR/scripts/verify-trusted-hook-bundle-acl.ps1" ]] \
+  || fail 'trusted hook bundle ACL 검증기가 없습니다.'
+grep -Fq -- 'verify_trusted_hook_bundle_acl' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 trusted bundle ACL을 검증하지 않습니다.'
+grep -Fq -- 'verify_trusted_bundle_acl' "$ROOT_DIR/scripts/pre-push-ai-review.sh" \
+  || fail 'pre-push가 실행 전에 trusted bundle ACL을 검증하지 않습니다.'
+grep -Fq -- '다른 사용자 쓰기 권한' "$ROOT_DIR/scripts/verify-trusted-hook-bundle-acl-test.ps1" \
+  || fail 'trusted bundle writable ACL 회귀 테스트가 없습니다.'
 grep -Fq -- 'S-1-5-32-544' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 Windows ACL의 신뢰된 관리자 주체를 확인하지 않습니다.'
 grep -Fq -- 'WSL DrvFS/9p' "$ROOT_DIR/scripts/install-git-hooks-test.sh" \

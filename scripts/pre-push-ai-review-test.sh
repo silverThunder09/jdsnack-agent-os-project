@@ -37,11 +37,12 @@ git -C "$test_worktree" config --local jdsnack.hookBash "$git_bash_path"
 cp "$ROOT_DIR/.githooks/pre-push" "$test_worktree/.githooks/pre-push"
 cp "$ROOT_DIR/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
 cp "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" "$test_worktree/scripts/verify-codex-auth-permissions.ps1"
+cp "$ROOT_DIR/scripts/verify-trusted-hook-bundle-acl.ps1" "$test_worktree/scripts/verify-trusted-hook-bundle-acl.ps1"
 cp "$ROOT_DIR/scripts/codex-auth-permissions.ps1" "$test_worktree/scripts/codex-auth-permissions.ps1"
 cp "$ROOT_DIR/scripts/review-path-safety.ps1" "$test_worktree/scripts/review-path-safety.ps1"
 cp "$ROOT_DIR/backends.json" "$test_worktree/backends.json"
 git -C "$test_worktree" add .githooks/pre-push scripts/pre-push-ai-review.sh scripts/verify-codex-auth-permissions.ps1 \
-  scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1 backends.json
+  scripts/verify-trusted-hook-bundle-acl.ps1 scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1 backends.json
 if ! git -C "$test_worktree" diff --cached --quiet; then
   git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com \
     commit --quiet -m 'test: isolate current pre-push hook fixture'
@@ -460,6 +461,7 @@ for script_name in \
   review-risk.ps1 \
   secure-review-temp-acl.ps1 \
   verify-codex-auth-permissions.ps1 \
+  verify-trusted-hook-bundle-acl.ps1 \
   codex-auth-permissions.ps1 \
   review-path-safety.ps1; do
   cp "$test_worktree/scripts/$script_name" "$trusted_hook_path/scripts/$script_name"
@@ -484,6 +486,7 @@ for script_name in \
   review-risk.ps1 \
   secure-review-temp-acl.ps1 \
   verify-codex-auth-permissions.ps1 \
+  verify-trusted-hook-bundle-acl.ps1 \
   codex-auth-permissions.ps1 \
   review-path-safety.ps1; do
   write_fixture_manifest_entry "scripts/$script_name"
@@ -492,6 +495,7 @@ chmod 700 "$trusted_hook_path/pre-commit" "$trusted_hook_path/pre-push" \
   "$trusted_hook_path/scripts/pre-push-ai-review.sh"
 chmod 600 "$trusted_hook_path/source-sha" "$trusted_hook_path/trusted-source-sha" \
   "$trusted_hook_path/trusted-source-ref" "$trusted_hook_path/bundle-manifest"
+secure_test_path "$trusted_hook_path"
 git -C "$test_worktree" config --local core.hooksPath "$trusted_hook_path"
 git -C "$test_worktree" config --local jdsnack.codex "$fake_root/codex"
 [ -x "$trusted_hook_path/pre-push" ] \

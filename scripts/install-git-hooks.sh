@@ -20,6 +20,7 @@ for required_file in \
   "scripts/review-risk.ps1" \
   "scripts/codex-auth-permissions.ps1" \
   "scripts/verify-codex-auth-permissions.ps1" \
+  "scripts/verify-trusted-hook-bundle-acl.ps1" \
   "scripts/review-path-safety.ps1" \
   "backends.json"; do
   if [ ! -f "$repo_root/$required_file" ]; then
@@ -170,6 +171,40 @@ if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
   } else {
     Import-Module -Name Microsoft.PowerShell.Security -ErrorAction Stop
   }
+}
+
+verify_trusted_hook_bundle_acl() {
+  bundle_path="$1"
+  expected_paths="$2"
+  verifier_path="$repo_root/scripts/verify-trusted-hook-bundle-acl.ps1"
+  if is_windows_mounted_filesystem "$bundle_path"; then
+    path_converter=""
+    if command -v wslpath >/dev/null 2>&1; then
+      path_converter="$(command -v wslpath)"
+    elif command -v cygpath >/dev/null 2>&1; then
+      path_converter="$(command -v cygpath)"
+    else
+      echo "ERROR: trusted hook bundle ACL을 확인할 Windows 경로 변환 도구가 없습니다." >&2
+      return 1
+    fi
+    powershell_path="$(command -v powershell.exe 2>/dev/null || true)"
+    if [ -z "$powershell_path" ]; then
+      echo "ERROR: trusted hook bundle ACL을 확인하려면 powershell.exe가 필요합니다." >&2
+      return 1
+    fi
+    windows_verifier_path="$($path_converter -w "$verifier_path" 2>/dev/null || true)"
+    windows_bundle_path="$($path_converter -w "$bundle_path" 2>/dev/null || true)"
+    case "$windows_verifier_path:$windows_bundle_path" in
+      [A-Za-z]:*:[A-Za-z]:*|\\\\*:\\\\*) ;;
+      *) echo "ERROR: trusted hook bundle ACL 경로를 Windows 경로로 변환할 수 없습니다." >&2; return 1 ;;
+    esac
+    MSYS2_ARG_CONV_EXCL='*' "$powershell_path" -NoProfile -NonInteractive -File \
+      "$windows_verifier_path" -Path "$windows_bundle_path" -ExpectedRelativePath "$expected_paths"
+    return $?
+  fi
+
+  "$powershell_tool" -NoProfile -NonInteractive -File "$verifier_path" \
+    -Path "$bundle_path" -ExpectedRelativePath "$expected_paths"
 }
 if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) { exit 13 }
 $path = $args[0]
@@ -329,6 +364,7 @@ for script_name in \
   review-risk.ps1 \
   secure-review-temp-acl.ps1 \
   verify-codex-auth-permissions.ps1 \
+  verify-trusted-hook-bundle-acl.ps1 \
   codex-auth-permissions.ps1 \
   review-path-safety.ps1; do
   copy_trusted_source "scripts/$script_name" "$trusted_hooks_dir/scripts/$script_name"
@@ -345,6 +381,7 @@ for script_name in \
   review-risk.ps1 \
   secure-review-temp-acl.ps1 \
   verify-codex-auth-permissions.ps1 \
+  verify-trusted-hook-bundle-acl.ps1 \
   codex-auth-permissions.ps1 \
   review-path-safety.ps1; do
   write_manifest_entry "scripts/$script_name" "scripts/$script_name"
@@ -355,6 +392,12 @@ printf '%s\n' "$trusted_source_sha" > "$trusted_hooks_dir/trusted-source-sha"
 printf '%s\n' "$trusted_source_ref" > "$trusted_hooks_dir/trusted-source-ref"
 chmod 600 "$trusted_hooks_dir/source-sha" "$trusted_hooks_dir/trusted-source-sha" "$trusted_hooks_dir/trusted-source-ref" "$bundle_manifest"
 chmod 700 "$trusted_hooks_dir/pre-commit" "$trusted_hooks_dir/pre-push" "$trusted_hooks_dir/scripts/pre-push-ai-review.sh"
+
+trusted_bundle_expected_paths='pre-commit|pre-push|bundle-manifest|source-sha|trusted-source-sha|trusted-source-ref|scripts/check-ai-readiness.py|scripts/pre-push-ai-review.sh|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/verify-trusted-hook-bundle-acl.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1'
+if ! verify_trusted_hook_bundle_acl "$trusted_hooks_dir" "$trusted_bundle_expected_paths"; then
+  echo "ERROR: trusted hook bundle의 소유자 또는 Windows ACL을 확인할 수 없습니다." >&2
+  exit 1
+fi
 
 git config --local jdsnack.hookBash "$git_bash_path"
 git config --local jdsnack.python "$python_path"

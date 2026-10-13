@@ -126,7 +126,7 @@ while IFS=' ' read -r bundle_path expected_blob extra; do
     exit 1
   fi
   case "$bundle_path" in
-    pre-commit|pre-push|backends.json|scripts/check-ai-readiness.py|scripts/pre-push-ai-review.sh|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1) ;;
+    pre-commit|pre-push|backends.json|scripts/check-ai-readiness.py|scripts/pre-push-ai-review.sh|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/verify-trusted-hook-bundle-acl.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1) ;;
     *)
       echo "ERROR: trusted pre-push bundle manifest에 허용되지 않은 경로가 있습니다: $bundle_path" >&2
       exit 1
@@ -164,7 +164,7 @@ while IFS=' ' read -r bundle_path expected_blob extra; do
   seen_paths="$seen_paths $bundle_path"
   manifest_count=$((manifest_count + 1))
 done < "$bundle_manifest"
-if [ "$manifest_count" -ne 11 ]; then
+if [ "$manifest_count" -ne 12 ]; then
   echo "ERROR: trusted pre-push bundle manifest 항목 수가 올바르지 않습니다." >&2
   exit 1
 fi
