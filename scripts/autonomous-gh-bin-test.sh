@@ -46,6 +46,12 @@ EOF
 trusted_bash_bin="$(command -v bash)"
 trusted_python_bin="$(command -v python.exe 2>/dev/null || command -v python3 2>/dev/null || true)"
 [ -n "$trusted_python_bin" ] || { echo 'a trusted Python executable is required' >&2; exit 1; }
+trusted_jq_bin="$(command -v jq 2>/dev/null || true)"
+if [ -z "$trusted_jq_bin" ]; then
+  trusted_jq_bin="$TEST_ROOT/trusted-jq"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$trusted_jq_bin"
+  chmod 700 "$trusted_jq_bin"
+fi
 
 set +e
 output="$(
@@ -53,6 +59,7 @@ output="$(
   GH_BIN="$MALICIOUS_ROOT/gh" \
   CODEX_BIN="$MALICIOUS_ROOT/gh" \
   PYTHON_BIN="$trusted_python_bin" \
+  JQ_BIN="$trusted_jq_bin" \
   "$trusted_bash_bin" "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
     --repo "$TEST_ROOT" --event issues --event-key gh-bin:fixture \
     --event-path "$TEST_ROOT/issue.json" --apply
