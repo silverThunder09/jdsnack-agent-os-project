@@ -309,6 +309,10 @@ test -f "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh" \
   || { echo 'scripts/pre-push-git-invocation-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"
 bash "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"
+test -f "$ROOT_DIR/scripts/install-git-hooks-test.sh" \
+  || { echo 'scripts/install-git-hooks-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/install-git-hooks-test.sh"
+bash "$ROOT_DIR/scripts/install-git-hooks-test.sh"
 bash -n "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
 bash "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"

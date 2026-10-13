@@ -8,12 +8,14 @@ eval-case structure without requiring an external model or third-party package.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+configured_root = os.environ.get("JDSNACK_AI_READINESS_ROOT")
+ROOT = Path(configured_root).resolve() if configured_root else Path(__file__).resolve().parent.parent
 POLICY_PATH = ROOT / ".agent-os/ai-readiness.yml"
 SCORE_PATH = ROOT / "docs/ai-readiness-score.json"
 EVALS_PATH = ROOT / "evals/context-tasks.json"

@@ -1,19 +1,167 @@
 #!/bin/sh
 set -eu
 
+unset GH_TOKEN GITHUB_TOKEN GH_BIN GH_CONFIG_DIR
+
+# Git may pass GIT_CONFIG_* values such as http.extraHeader into hooks. Clear
+# them with shell builtins before any PATH-resolved helper can observe them.
+sanitize_git_config_environment() {
+  variable_definition=''
+  variable_name=''
+  while IFS= read -r variable_definition; do
+    case "$variable_definition" in
+      GIT_CONFIG_*=*)
+        variable_name=${variable_definition%%=*}
+        case "$variable_name" in
+          GIT_CONFIG_*)
+            case "$variable_name" in
+              *[!A-Za-z0-9_]*) ;;
+              *) unset "$variable_name" ;;
+            esac
+            ;;
+        esac
+        ;;
+    esac
+  done <<EOF
+$(set)
+EOF
+}
+sanitize_git_config_environment
+
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if [ ! -f "$repo_root/scripts/pre-push-ai-review.sh" ]; then
-  echo "ERROR: pre-push AI 리뷰 스크립트가 없습니다." >&2
+hook_root="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+git_common_dir="$(git rev-parse --git-common-dir)"
+case "$git_common_dir" in
+  /*|[A-Za-z]:[\\/]*) ;;
+  *) git_common_dir="$repo_root/$git_common_dir" ;;
+esac
+git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
+  echo "ERROR: Git common dir를 trusted hook 경로로 확인할 수 없습니다." >&2
+  exit 1
+}
+case "$hook_root" in
+  "$git_common_dir/jdsnack-hooks") ;;
+  *)
+    echo "ERROR: pre-push는 Git common dir의 trusted hook bundle에서만 실행해야 합니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
+    exit 1
+    ;;
+esac
+
+trusted_review_script="$hook_root/scripts/pre-push-ai-review.sh"
+if [ ! -f "$trusted_review_script" ] || [ -L "$trusted_review_script" ]; then
+  echo "ERROR: trusted pre-push AI 리뷰 스크립트가 없습니다." >&2
+  exit 1
+fi
+trusted_source_sha_file="$hook_root/source-sha"
+if [ ! -f "$trusted_source_sha_file" ] || [ -L "$trusted_source_sha_file" ]; then
+  echo "ERROR: trusted pre-push bundle의 source SHA가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+IFS= read -r trusted_source_sha < "$trusted_source_sha_file" || {
+  echo "ERROR: trusted pre-push bundle의 source SHA를 읽을 수 없습니다." >&2
+  exit 1
+}
+if [ -z "$trusted_source_sha" ]; then
+  echo "ERROR: trusted pre-push bundle의 source SHA가 비어 있습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+trusted_source_ref_file="$hook_root/trusted-source-ref"
+if [ ! -f "$trusted_source_ref_file" ] || [ -L "$trusted_source_ref_file" ]; then
+  echo "ERROR: trusted pre-push bundle의 source ref가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+IFS= read -r trusted_source_ref < "$trusted_source_ref_file" || {
+  echo "ERROR: trusted pre-push bundle의 source ref를 읽을 수 없습니다." >&2
+  exit 1
+}
+trusted_base_sha_file="$hook_root/trusted-source-sha"
+if [ ! -f "$trusted_base_sha_file" ] || [ -L "$trusted_base_sha_file" ]; then
+  echo "ERROR: trusted pre-push bundle의 독립 trusted source SHA가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+IFS= read -r trusted_base_sha < "$trusted_base_sha_file" || {
+  echo "ERROR: trusted pre-push bundle의 독립 trusted source SHA를 읽을 수 없습니다." >&2
+  exit 1
+}
+if [ "$trusted_source_ref" != refs/remotes/origin/main ]; then
+  echo "ERROR: trusted pre-push bundle은 독립적인 origin/main source만 허용합니다: $trusted_source_ref" >&2
+  exit 1
+fi
+current_trusted_source_sha="$(git rev-parse --verify refs/remotes/origin/main^{commit} 2>/dev/null)" || {
+  echo "ERROR: origin/main의 trusted hook source SHA를 확인할 수 없습니다." >&2
+  exit 1
+}
+if [ -z "$trusted_base_sha" ] || [ "$trusted_base_sha" != "$current_trusted_source_sha" ]; then
+  echo "ERROR: trusted pre-push bundle의 source가 현재 origin/main보다 오래되었습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+if [ "$trusted_source_sha" != "$trusted_base_sha" ]; then
+  echo "ERROR: trusted pre-push bundle의 source SHA가 독립 trusted source와 다릅니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+bundle_manifest="$hook_root/bundle-manifest"
+if [ ! -f "$bundle_manifest" ] || [ -L "$bundle_manifest" ]; then
+  echo "ERROR: trusted pre-push bundle의 독립 content digest가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
+  exit 1
+fi
+manifest_count=0
+seen_paths=""
+while IFS=' ' read -r bundle_path expected_blob extra; do
+  if [ -z "$bundle_path" ] || [ -n "$extra" ]; then
+    echo "ERROR: trusted pre-push bundle manifest 형식이 잘못되었습니다." >&2
+    exit 1
+  fi
+  case "$bundle_path" in
+    pre-commit|pre-push|backends.json|scripts/check-ai-readiness.py|scripts/pre-push-ai-review.sh|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1) ;;
+    *)
+      echo "ERROR: trusted pre-push bundle manifest에 허용되지 않은 경로가 있습니다: $bundle_path" >&2
+      exit 1
+      ;;
+  esac
+  case " $seen_paths " in
+    *" $bundle_path "*)
+      echo "ERROR: trusted pre-push bundle manifest에 중복 경로가 있습니다: $bundle_path" >&2
+      exit 1
+      ;;
+  esac
+  case "$expected_blob" in
+    ''|*[!0-9a-f]*)
+      echo "ERROR: trusted pre-push bundle manifest digest가 잘못되었습니다: $bundle_path" >&2
+      exit 1
+      ;;
+  esac
+  if [ "${#expected_blob}" -ne 40 ]; then
+    echo "ERROR: trusted pre-push bundle manifest digest 길이가 잘못되었습니다: $bundle_path" >&2
+    exit 1
+  fi
+  bundle_file="$hook_root/$bundle_path"
+  if [ ! -f "$bundle_file" ] || [ -L "$bundle_file" ]; then
+    echo "ERROR: trusted pre-push bundle 파일이 없습니다: $bundle_path" >&2
+    exit 1
+  fi
+  actual_blob="$(git hash-object "$bundle_file")" || {
+    echo "ERROR: trusted pre-push bundle digest를 계산할 수 없습니다: $bundle_path" >&2
+    exit 1
+  }
+  if [ "$actual_blob" != "$expected_blob" ]; then
+    echo "ERROR: trusted pre-push bundle content가 독립 digest와 다릅니다: $bundle_path" >&2
+    exit 1
+  fi
+  seen_paths="$seen_paths $bundle_path"
+  manifest_count=$((manifest_count + 1))
+done < "$bundle_manifest"
+if [ "$manifest_count" -ne 11 ]; then
+  echo "ERROR: trusted pre-push bundle manifest 항목 수가 올바르지 않습니다." >&2
   exit 1
 fi
 
 # Git passes the destination remote name and its location as arguments 1 and 2.
 git_bash_path="$(git config --local --get jdsnack.hookBash || true)"
 if [ -z "$git_bash_path" ] || [ ! -x "$git_bash_path" ]; then
-  echo "ERROR: 검증된 Git Bash 경로가 없습니다. sh scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+  echo "ERROR: 검증된 Git Bash 경로가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
   exit 1
 fi
 
-exec "$git_bash_path" "$repo_root/scripts/pre-push-ai-review.sh" "$@"
+exec "$git_bash_path" "$trusted_review_script" "$@"
