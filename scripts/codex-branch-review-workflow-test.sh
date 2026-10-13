@@ -121,6 +121,13 @@ assert_not_contains "refs/pull/{0}/head"
 assert_contains "shell: powershell"
 assert_contains 'Join-Path $env:GITHUB_WORKSPACE'
 assert_contains 'Run configured reviewer with Codex fallback'
+assert_contains 'review_decision: ${{ steps.review_outcome.outputs.decision }}'
+assert_contains 'review_score: ${{ steps.review_outcome.outputs.score }}'
+assert_contains 'review_passed: ${{ steps.review_outcome.outputs.passed }}'
+assert_contains "(?:-[ \\t]*)?decision:"
+assert_contains "(?:-[ \\t]*)?score:"
+assert_contains 'The successful review job did not export a valid structured outcome.'
+assert_contains "REVIEW_PASSED -eq 'true'"
 assert_contains 'Verify GitHub review identity'
 assert_contains "gh api user --jq '.login'"
 assert_contains 'github.repository_owner'
