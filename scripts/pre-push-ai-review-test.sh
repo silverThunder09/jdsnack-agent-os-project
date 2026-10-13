@@ -342,6 +342,45 @@ exec "$real_pwsh" "$@"
 FAKE_PWSH
 sed -i "s|__FAKE_ROOT__|$fake_root|g; s|__REAL_PWSH__|$pwsh_bin|g" "$fake_root/pwsh"
 chmod +x "$fake_root/pwsh"
+
+# Windows Codex must never fall back to Linux pwsh when powershell.exe is not
+# discoverable. Extract only the pure resolver function so this contract stays
+# independent from the full reviewer fixture and from the host's PowerShell.
+powershell_resolver="$fake_root/resolve-powershell-bin.sh"
+awk '
+  /^resolve_powershell_bin\(\) \{/ { capture=1; depth=0 }
+  capture {
+    line=$0
+    print
+    depth += gsub(/\{/, "", line)
+    line=$0
+    depth -= gsub(/\}/, "", line)
+    if (depth == 0) exit
+  }
+' "$ROOT_DIR/scripts/pre-push-ai-review.sh" > "$powershell_resolver"
+. "$powershell_resolver"
+command() {
+  if [ "${1-}" = '-p' ] && [ "${2-}" = '-v' ] && [ "${3-}" = 'powershell.exe' ]; then
+    return 1
+  fi
+  if [ "${1-}" = '-v' ] && [ "${2-}" = 'powershell.exe' ]; then
+    return 1
+  fi
+  builtin command "$@"
+}
+resolver_path_backup="$PATH"
+PATH="$fake_root:$PATH"
+set +e
+powershell_resolver_output="$(resolve_powershell_bin "$fake_root/codex.exe" 2>&1)"
+powershell_resolver_status=$?
+set -e
+PATH="$resolver_path_backup"
+unset -f command
+if [ "$powershell_resolver_status" -eq 0 ] || ! grep -Fq 'Windows powershell.exe가 필요합니다' <<< "$powershell_resolver_output"; then
+  printf '%s\n' "$powershell_resolver_output" >&2
+  fail 'Windows Codex가 powershell.exe 대신 Linux pwsh로 대체되는 경로를 차단하지 않았습니다.'
+fi
+
 if [ -n "$test_cygpath_bin" ]; then
   cat > "$fake_root/cygpath" <<'FAKE_CYGPATH'
 #!/bin/sh

@@ -424,16 +424,31 @@ if [[ "$codex_bin" == *.exe ]] && [ "$path_converter_kind" = wslpath ] && [ -z "
   exit 1
 fi
 
-pwsh_bin=""
-if [[ "$codex_bin" == *.exe ]] && command -p -v powershell.exe >/dev/null 2>&1; then
-  pwsh_bin="$(command -p -v powershell.exe)"
-elif command -v pwsh >/dev/null 2>&1; then
-  pwsh_bin="$(command -v pwsh)"
-elif command -v powershell.exe >/dev/null 2>&1; then
-  pwsh_bin="$(command -v powershell.exe)"
-fi
-if [ -z "$pwsh_bin" ]; then
-  echo "ERROR: 결정론적 pre-push 검증을 위해 PowerShell이 필요합니다." >&2
+resolve_powershell_bin() {
+  local codex_path="$1"
+  local resolved_path=""
+  if [[ "$codex_path" == *.exe ]]; then
+    if command -p -v powershell.exe >/dev/null 2>&1; then
+      resolved_path="$(command -p -v powershell.exe)"
+    elif command -v powershell.exe >/dev/null 2>&1; then
+      resolved_path="$(command -v powershell.exe)"
+    else
+      echo "ERROR: Windows Codex를 실행하는 WSL 환경에서는 Windows powershell.exe가 필요합니다. Linux pwsh로 Windows 경로 검사를 실행하지 않습니다." >&2
+      return 1
+    fi
+  elif command -v pwsh >/dev/null 2>&1; then
+    resolved_path="$(command -v pwsh)"
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    resolved_path="$(command -v powershell.exe)"
+  fi
+  if [ -z "$resolved_path" ]; then
+    echo "ERROR: 결정론적 pre-push 검증을 위해 PowerShell이 필요합니다." >&2
+    return 1
+  fi
+  printf '%s\n' "$resolved_path"
+}
+
+if ! pwsh_bin="$(resolve_powershell_bin "$codex_bin")"; then
   exit 1
 fi
 
