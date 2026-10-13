@@ -126,6 +126,7 @@ assert_contains 'review_score: ${{ steps.review_outcome.outputs.score }}'
 assert_contains 'review_passed: ${{ steps.review_outcome.outputs.passed }}'
 assert_contains "(?:-[ \\t]*)?decision:"
 assert_contains "(?:-[ \\t]*)?score:"
+assert_contains "(?:[ \\t]*/[ \\t]*5)?"
 assert_contains 'The successful review job did not export a valid structured outcome.'
 assert_contains "REVIEW_PASSED -eq 'true'"
 assert_contains 'Verify GitHub review identity'

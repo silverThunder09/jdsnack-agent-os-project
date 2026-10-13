@@ -86,6 +86,22 @@ $fallbackSource = Get-Content -LiteralPath $sourcePath -Raw
 if (-not $fallbackSource.Contains("`$ErrorActionPreference = 'Continue'")) {
     throw 'Review submission must capture native GitHub CLI stderr without terminating the PowerShell fallback.'
 }
+$workflowSource = Get-Content -LiteralPath (Join-Path $Workspace '.github/workflows/codex-branch-review.yml') -Raw
+$decisionPattern = '(?im)^[ \t]*(?:-[ \t]*)?decision:[ \t]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[ \t]*$'
+$scorePattern = '(?im)^[ \t]*(?:-[ \t]*)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*$'
+if (-not $workflowSource.Contains($scorePattern)) {
+    throw 'Workflow review score parser does not accept both score: N and score: N/5 formats.'
+}
+foreach ($reviewOutput in @(
+        "decision: PASS`nscore: 4"
+        "- decision: PASS`n- score: 4/5"
+    )) {
+    $decisionMatch = [regex]::Match($reviewOutput, $decisionPattern)
+    $scoreMatch = [regex]::Match($reviewOutput, $scorePattern)
+    if (-not $decisionMatch.Success -or -not $scoreMatch.Success) {
+        throw "Workflow review outcome parser rejected a valid output fixture: $reviewOutput"
+    }
+}
 
 $paginatedComments = @(Get-PaginatedJsonItems -Json '[[{"id":101,"body":"first"}],[{"id":202,"body":"second"}]]')
 if ($paginatedComments.Count -ne 2 -or
