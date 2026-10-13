@@ -488,6 +488,10 @@ test -f "$ROOT_DIR/scripts/autonomous-github-auth-test.sh" \
   || { echo 'scripts/autonomous-github-auth-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/autonomous-github-auth-test.sh"
 bash "$ROOT_DIR/scripts/autonomous-github-auth-test.sh"
+test -f "$ROOT_DIR/scripts/autonomous-root-path-test.sh" \
+  || { echo 'scripts/autonomous-root-path-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/autonomous-root-path-test.sh"
+bash "$ROOT_DIR/scripts/autonomous-root-path-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
 test -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" \
   || { echo 'scripts/secure-review-temp-acl-contract-test.ps1 is missing' >&2; exit 1; }

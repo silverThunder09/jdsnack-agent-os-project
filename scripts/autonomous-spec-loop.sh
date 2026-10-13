@@ -4,6 +4,12 @@ set -euo pipefail
 # Event-driven coordinator. The deterministic Python engine decides what may
 # happen; this wrapper is the only layer allowed to call Codex/GitHub.
 
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+if [ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ]; then
+  SCRIPT_DIR='.'
+fi
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && builtin pwd)"
+
 readonly NEEDS_HUMAN_EXIT=20
 GH_BIN="${GH_BIN:-gh}"
 JQ_BIN="${JQ_BIN:-jq}"
@@ -246,7 +252,7 @@ init_trusted_codex() {
 RM_BIN="$(resolve_runtime_tool rm)"
 [ -n "$RM_BIN" ] || { echo 'rm is required for autonomous loop cleanup' >&2; exit 20; }
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && builtin pwd)"
 REPO="$ROOT_DIR"
 EVENT="${GITHUB_EVENT_NAME:-manual}"
 EVENT_KEY="${GITHUB_EVENT_NAME:-manual}:${GITHUB_SHA:-local}"
