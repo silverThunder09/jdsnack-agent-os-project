@@ -46,10 +46,10 @@ EOF
 trusted_bash_bin="$(command -v bash)"
 trusted_python_bin="$(command -v python.exe 2>/dev/null || command -v python3 2>/dev/null || true)"
 [ -n "$trusted_python_bin" ] || { echo 'a trusted Python executable is required' >&2; exit 1; }
-trusted_jq_bin="$(command -v jq 2>/dev/null || true)"
-if [ -z "$trusted_jq_bin" ]; then
-  trusted_jq_bin="$TEST_ROOT/trusted-jq"
-  cat > "$trusted_jq_bin" <<'EOF'
+# This contract isolates GitHub CLI resolution from the runner's jq version or
+# installation state. jq-unavailable behavior is covered by the root-path test.
+trusted_jq_bin="$TEST_ROOT/trusted-jq"
+cat > "$trusted_jq_bin" <<'EOF'
 #!/usr/bin/env bash
 set -eu
 
@@ -101,8 +101,7 @@ case "$filter" in
     ;;
 esac
 EOF
-  chmod 700 "$trusted_jq_bin"
-fi
+chmod 700 "$trusted_jq_bin"
 
 set +e
 output="$(
