@@ -82,6 +82,10 @@ if (-not (Test-SelfReviewSubmissionFailure -Output 'GraphQL: cannot request chan
 if (Test-SelfReviewSubmissionFailure -Output 'GraphQL: review submission failed for another reason') {
     throw 'An unrelated review submission failure was treated as a self-review rejection.'
 }
+$fallbackSource = Get-Content -LiteralPath $sourcePath -Raw
+if (-not $fallbackSource.Contains("`$ErrorActionPreference = 'Continue'")) {
+    throw 'Review submission must capture native GitHub CLI stderr without terminating the PowerShell fallback.'
+}
 
 $paginatedComments = @(Get-PaginatedJsonItems -Json '[[{"id":101,"body":"first"}],[{"id":202,"body":"second"}]]')
 if ($paginatedComments.Count -ne 2 -or

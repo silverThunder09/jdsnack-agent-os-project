@@ -277,8 +277,16 @@ function Submit-Review {
         return 127
     }
 
-    $script:LastReviewSubmissionOutput = (& $ghPath pr review $PullRequestNumber --repo $Repository $Action --body-file $ReportPath 2>&1 | Out-String).Trim()
-    return [int]$LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $reviewOutput = (& $ghPath pr review $PullRequestNumber --repo $Repository $Action --body-file $ReportPath 2>&1 | Out-String)
+        $reviewExitCode = [int]$LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    $script:LastReviewSubmissionOutput = $reviewOutput.Trim()
+    return $reviewExitCode
 }
 
 function Test-SelfReviewSubmissionFailure {
