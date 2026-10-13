@@ -24,6 +24,10 @@ mkdir -p "$TEST_ROOT/bin"
 helper_log="$TEST_ROOT/helper.log"
 bash_log="$TEST_ROOT/bash.log"
 trusted_bash_bin="$(command -v bash)"
+trusted_python_bin="$(command -v python.exe 2>/dev/null || command -v python3 2>/dev/null || true)"
+[ -n "$trusted_python_bin" ] || { echo 'a trusted Python executable is required' >&2; exit 1; }
+export PYTHON_BIN="$trusted_python_bin"
+
 cat > "$TEST_ROOT/bin/python3" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' '{"status":"idle"}'

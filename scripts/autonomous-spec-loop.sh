@@ -377,7 +377,6 @@ run_trusted_github_git() (
   "$TRUSTED_ENV_BIN" -i "PATH=$TRUSTED_PATH" "$TRUSTED_CHMOD_BIN" 700 "$askpass"
   (
     export PATH="$TRUSTED_PATH"
-    export GH_TOKEN="$token" GIT_ASKPASS="$askpass"
     unset GITHUB_TOKEN GH_BIN GH_CONFIG_DIR GIT_SSH GIT_SSH_COMMAND SSH_AUTH_SOCK SSH_AGENT_PID
     unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy GIT_PROXY_COMMAND
     unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS
@@ -387,6 +386,8 @@ run_trusted_github_git() (
     for variable in ${!GIT_@}; do
       unset "$variable"
     done
+    export GH_TOKEN="$token"
+    export GIT_ASKPASS="$askpass"
     export GIT_CONFIG_NOSYSTEM=1
     export GIT_CONFIG_SYSTEM=/dev/null
     export GIT_CONFIG_GLOBAL=/dev/null

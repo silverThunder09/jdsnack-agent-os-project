@@ -395,7 +395,7 @@ FAKE_CYGPATH
   sed -i "s|__FAKE_ROOT__|$fake_root|g; s|__REAL_CYGPATH__|$test_cygpath_bin|g" "$fake_root/cygpath"
   chmod +x "$fake_root/cygpath"
 fi
-printf '#!/bin/sh\nif [ "$#" -eq 0 ]; then set -- 1; fi\nexec "%s" "$@"\n' "$test_sleep_bin" > "$fake_root/sleep-one-second"
+printf '#!/bin/sh\ncd /\nif [ "$#" -eq 0 ]; then set -- 1; fi\nexec "%s" "$@"\n' "$test_sleep_bin" > "$fake_root/sleep-one-second"
 chmod +x "$fake_root/sleep-one-second"
 git -C "$test_worktree" config --local jdsnack.codex "$fake_root/codex"
 

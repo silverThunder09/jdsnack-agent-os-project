@@ -221,6 +221,15 @@ grep -Fq -- '$(set)' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publisher hooks must enumerate shell variables through the builtin set command' >&2; exit 1; }
 ! grep -Fq -- 'for variable in $(%s | %s -n' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publisher hooks must not expose coordinator Git config variables to env or sed' >&2; exit 1; }
+for auth_script in \
+  "$ROOT_DIR/scripts/autonomous-spec-loop.sh" \
+  "$ROOT_DIR/scripts/create-codex-worktree.sh" \
+  "$ROOT_DIR/scripts/publish-codex-branch.sh"; do
+  askpass_cleanup_line="$(grep -nF -- 'for variable in ${!GIT_@}' "$auth_script" | head -n 1 | cut -d: -f1)"
+  askpass_export_line="$(grep -nF -- 'export GIT_ASKPASS=' "$auth_script" | tail -n 1 | cut -d: -f1)"
+  [[ -n "$askpass_cleanup_line" && -n "$askpass_export_line" && "$askpass_cleanup_line" -lt "$askpass_export_line" ]] \
+    || { echo "GitHub auth askpass must be exported after inherited GIT_* cleanup: $auth_script" >&2; exit 1; }
+done
 grep -Fq -- 'TRUSTED_PATH="$(IFS=:; printf '\''%s'\'' "${TRUSTED_TOOL_DIRS[*]}")"' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
   || { echo 'Codex branch publishing must build PATH only from fixed trusted tool directories' >&2; exit 1; }
 grep -Fq -- 'remote get-url --push origin' "$ROOT_DIR/scripts/publish-codex-branch.sh" \
@@ -475,6 +484,10 @@ bash -n "$ROOT_DIR/scripts/install-git-hooks-test.sh"
 bash "$ROOT_DIR/scripts/install-git-hooks-test.sh"
 bash -n "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
 bash "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
+test -f "$ROOT_DIR/scripts/autonomous-github-auth-test.sh" \
+  || { echo 'scripts/autonomous-github-auth-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/autonomous-github-auth-test.sh"
+bash "$ROOT_DIR/scripts/autonomous-github-auth-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
 test -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" \
   || { echo 'scripts/secure-review-temp-acl-contract-test.ps1 is missing' >&2; exit 1; }
