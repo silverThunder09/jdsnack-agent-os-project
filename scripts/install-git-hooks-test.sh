@@ -31,6 +31,11 @@ git -C "$test_worktree" checkout -B codex/install-hook-test "$trusted_source_sha
 git -C "$test_worktree" config user.name test
 git -C "$test_worktree" config user.email test@example.com
 git -C "$test_worktree" update-ref refs/remotes/origin/main "$trusted_source_sha"
+printf '%s\n' branch-only-fixture > "$test_worktree/branch-only-fixture.txt"
+git -C "$test_worktree" add branch-only-fixture.txt
+git -C "$test_worktree" -c user.name=test -c user.email=test@example.com commit --quiet -m 'test: diverge installer fixture branch'
+test "$(git -C "$test_worktree" rev-parse HEAD)" != "$trusted_source_sha" \
+  || fail 'installer fixture branch가 trusted origin/main과 분기되지 않았습니다.'
 
 cat > "$test_worktree/.githooks/pre-push" <<'EOF'
 #!/bin/sh
@@ -55,6 +60,26 @@ echo branch-controlled-installer >&2
 exit 99
 EOF
 chmod +x "$test_worktree/scripts/install-git-hooks.sh"
+
+cat > "$test_worktree/codex" <<'EOF'
+#!/bin/sh
+: > "$0.executed"
+exit 0
+EOF
+chmod +x "$test_worktree/codex"
+set +e
+untrusted_codex_output="$(
+  cd "$test_worktree"
+  PATH="$test_worktree:$fixture_bin:$PATH" sh < <(git show refs/remotes/origin/main:scripts/install-git-hooks.sh) 2>&1
+)"
+untrusted_codex_status=$?
+set -e
+if [ "$untrusted_codex_status" -eq 0 ] || ! grep -Fq 'untrusted checkout 안에 있을 수 없습니다' <<<"$untrusted_codex_output"; then
+  printf '%s\n' "$untrusted_codex_output" >&2
+  fail 'installer가 checkout 내부의 Codex 실행 파일을 사전에 차단하지 않았습니다.'
+fi
+test ! -e "$test_worktree/codex.executed" \
+  || fail 'installer가 trusted path 검증 전에 checkout 내부 Codex를 실행했습니다.'
 
 (
   cd "$test_worktree"

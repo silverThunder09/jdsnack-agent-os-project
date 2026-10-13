@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo_root="$(git rev-parse --show-toplevel)"
+repo_root="$(CDPATH= cd -- "$(git rev-parse --show-toplevel)" && pwd -P)"
 cd "$repo_root"
 
 hooks_path=".githooks"
@@ -36,9 +36,20 @@ require_tool() {
   fi
 }
 
-for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex cat cp mkdir; do
+for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex cat cp mkdir; do
   require_tool "$required_tool"
 done
+
+trusted_repo_identity="$repo_root"
+trusted_path_separator='/'
+if command -v cygpath >/dev/null 2>&1; then
+  trusted_repo_identity="$(cygpath -m "$repo_root" 2>/dev/null || true)"
+  trusted_path_separator='/'
+fi
+if [ -z "$trusted_repo_identity" ]; then
+  echo "ERROR: trusted checkout 경로를 정규화할 수 없습니다." >&2
+  exit 1
+fi
 
 codex_path="$(command -v codex || true)"
 case "$codex_path" in
@@ -54,10 +65,53 @@ if command -v cygpath >/dev/null 2>&1; then
     codex_path="$normalized_codex_path"
   fi
 fi
-if [ ! -f "$codex_path" ] || [ ! -x "$codex_path" ]; then
-  echo "ERROR: Codex CLI 실행 파일을 사용할 수 없습니다: $codex_path" >&2
-  exit 1
-fi
+validate_trusted_codex_path() {
+  candidate="$1"
+  canonical="$(readlink -f -- "$candidate" 2>/dev/null || true)"
+  if [ -z "$canonical" ] || [ ! -f "$canonical" ] || [ ! -x "$canonical" ]; then
+    echo "ERROR: Codex CLI 실행 파일의 실제 대상을 확인할 수 없습니다: $candidate" >&2
+    exit 1
+  fi
+  canonical_identity="$canonical"
+  if command -v cygpath >/dev/null 2>&1; then
+    canonical_identity="$(cygpath -m "$canonical" 2>/dev/null || true)"
+  fi
+  case "$canonical_identity" in
+    "$trusted_repo_identity"|"$trusted_repo_identity$trusted_path_separator"*)
+      echo "ERROR: Codex CLI 실행 파일은 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
+      exit 1
+      ;;
+  esac
+  mode="$(stat -c '%a' -- "$canonical" 2>/dev/null || true)"
+  case "$mode" in
+    0*) mode="${mode#0}" ;;
+  esac
+  case "$mode" in
+    [0-7][0-7][0-7]) ;;
+    *)
+      echo "ERROR: Codex CLI 실행 파일 권한을 확인할 수 없습니다: $canonical" >&2
+      exit 1
+      ;;
+  esac
+  group_mode="${mode#?}"
+  group_mode="${group_mode%?}"
+  world_mode="${mode#??}"
+  case "$group_mode$world_mode" in
+    *[2367]*)
+      echo "ERROR: Codex CLI 실행 파일이 group/world writable입니다: $canonical" >&2
+      exit 1
+      ;;
+  esac
+  owner="$(stat -c '%U' -- "$canonical" 2>/dev/null || true)"
+  current_user="$(id -un 2>/dev/null || true)"
+  if [ -z "$owner" ] || [ -z "$current_user" ] || { [ "$owner" != "$current_user" ] && [ "$owner" != root ]; }; then
+    echo "ERROR: Codex CLI 실행 파일 소유자를 신뢰할 수 없습니다: $canonical" >&2
+    exit 1
+  fi
+  printf '%s\n' "$canonical"
+}
+
+codex_path="$(validate_trusted_codex_path "$codex_path")"
 
 git_bash_path="$(command -v bash || true)"
 if [ -z "$git_bash_path" ] || [ ! -x "$git_bash_path" ]; then
