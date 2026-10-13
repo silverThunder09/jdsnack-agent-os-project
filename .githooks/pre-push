@@ -28,16 +28,28 @@ EOF
 }
 sanitize_git_config_environment
 
+normalize_trusted_path() {
+  normalized_path="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    converted_path="$(cygpath -u "$normalized_path" 2>/dev/null || true)"
+    if [ -n "$converted_path" ]; then
+      normalized_path="$converted_path"
+    fi
+  fi
+  CDPATH= cd -- "$normalized_path" && pwd -P
+}
+
 repo_root="$(git rev-parse --show-toplevel)"
+repo_root="$(normalize_trusted_path "$repo_root")"
 cd "$repo_root"
 
-hook_root="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+hook_root="$(normalize_trusted_path "$(dirname -- "$0")")"
 git_common_dir="$(git rev-parse --git-common-dir)"
 case "$git_common_dir" in
   /*|[A-Za-z]:[\\/]*) ;;
   *) git_common_dir="$repo_root/$git_common_dir" ;;
 esac
-git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
+git_common_dir="$(normalize_trusted_path "$git_common_dir")" || {
   echo "ERROR: Git common dir를 trusted hook 경로로 확인할 수 없습니다." >&2
   exit 1
 }

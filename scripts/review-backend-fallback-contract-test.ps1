@@ -88,13 +88,14 @@ if (-not $fallbackSource.Contains("`$ErrorActionPreference = 'Continue'")) {
 }
 $workflowSource = Get-Content -LiteralPath (Join-Path $Workspace '.github/workflows/codex-branch-review.yml') -Raw
 $decisionPattern = '(?im)^[ \t]*(?:-[ \t]*)?decision:[ \t]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[ \t]*$'
-$scorePattern = '(?im)^[ \t]*(?:-[ \t]*)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*$'
+$scorePattern = '(?im)^[ \t]*(?:-[ \t]*)?(?:review[ \t]+)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*$'
 if (-not $workflowSource.Contains($scorePattern)) {
     throw 'Workflow review score parser does not accept both score: N and score: N/5 formats.'
 }
 foreach ($reviewOutput in @(
         "decision: PASS`nscore: 4"
         "- decision: PASS`n- score: 4/5"
+        "decision: PASS`nreview score: 4/5"
     )) {
     $decisionMatch = [regex]::Match($reviewOutput, $decisionPattern)
     $scoreMatch = [regex]::Match($reviewOutput, $scorePattern)

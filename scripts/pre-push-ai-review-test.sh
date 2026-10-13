@@ -34,12 +34,13 @@ git_bash_path="$(command -v bash)"
 git -C "$test_worktree" config --local jdsnack.hookBash "$git_bash_path"
 # git clone intentionally excludes uncommitted source edits, so include the
 # current hook implementation, auth ACL verifier, and reviewer settings in the disposable fixture.
+cp "$ROOT_DIR/.githooks/pre-push" "$test_worktree/.githooks/pre-push"
 cp "$ROOT_DIR/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
 cp "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" "$test_worktree/scripts/verify-codex-auth-permissions.ps1"
 cp "$ROOT_DIR/scripts/codex-auth-permissions.ps1" "$test_worktree/scripts/codex-auth-permissions.ps1"
 cp "$ROOT_DIR/scripts/review-path-safety.ps1" "$test_worktree/scripts/review-path-safety.ps1"
 cp "$ROOT_DIR/backends.json" "$test_worktree/backends.json"
-git -C "$test_worktree" add scripts/pre-push-ai-review.sh scripts/verify-codex-auth-permissions.ps1 \
+git -C "$test_worktree" add .githooks/pre-push scripts/pre-push-ai-review.sh scripts/verify-codex-auth-permissions.ps1 \
   scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1 backends.json
 if ! git -C "$test_worktree" diff --cached --quiet; then
   git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com \
@@ -416,6 +417,9 @@ if [ "$windows_git_output" != "$expected_windows_git" ]; then
   printf 'expected=%s actual=%s\n' "$expected_windows_git" "$windows_git_output" >&2
   fail 'Windows Codex 경로에서 Linux git 대신 검증된 git.exe를 선택하지 않았습니다.'
 fi
+# Git Bash resolves a bare `git` command to `git.exe`; remove the resolver
+# fixture before exercising the real hook so it cannot shadow the real Git CLI.
+rm -f "$fake_root/git.exe"
 
 if [ -n "$test_cygpath_bin" ]; then
   cat > "$fake_root/cygpath" <<'FAKE_CYGPATH'
@@ -431,6 +435,67 @@ FAKE_CYGPATH
 fi
 printf '#!/bin/sh\nif [ "$#" -eq 0 ]; then set -- 1; fi\nexec "%s" "$@"\n' "$test_sleep_bin" > "$fake_root/sleep-one-second"
 chmod +x "$fake_root/sleep-one-second"
+
+# The production hook runs from the Git common-dir bundle. This PR is the
+# bootstrap that introduces that bundle, so origin/main may still contain the
+# pre-bundle installer during CI. Build the equivalent isolated bundle directly
+# from the fixture checkout; install-git-hooks-test.sh separately verifies that
+# the committed installer copies only origin/main content.
+git_common_dir="$(git -C "$test_worktree" rev-parse --git-common-dir)"
+case "$git_common_dir" in
+  /*|[A-Za-z]:[\\/]*) ;;
+  *) git_common_dir="$test_worktree/$git_common_dir" ;;
+esac
+git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)"
+trusted_hook_path="$git_common_dir/jdsnack-hooks"
+mkdir -p "$trusted_hook_path/scripts"
+chmod 700 "$trusted_hook_path" "$trusted_hook_path/scripts"
+cp "$test_worktree/.githooks/pre-commit" "$trusted_hook_path/pre-commit"
+cp "$test_worktree/.githooks/pre-push" "$trusted_hook_path/pre-push"
+cp "$test_worktree/scripts/check-ai-readiness.py" "$trusted_hook_path/scripts/check-ai-readiness.py"
+cp "$test_worktree/backends.json" "$trusted_hook_path/backends.json"
+cp "$test_worktree/scripts/pre-push-ai-review.sh" "$trusted_hook_path/scripts/pre-push-ai-review.sh"
+for script_name in \
+  review-policy.json \
+  review-risk.ps1 \
+  secure-review-temp-acl.ps1 \
+  verify-codex-auth-permissions.ps1 \
+  codex-auth-permissions.ps1 \
+  review-path-safety.ps1; do
+  cp "$test_worktree/scripts/$script_name" "$trusted_hook_path/scripts/$script_name"
+done
+printf '%s\n' "$base_sha" > "$trusted_hook_path/source-sha"
+printf '%s\n' "$base_sha" > "$trusted_hook_path/trusted-source-sha"
+printf '%s\n' refs/remotes/origin/main > "$trusted_hook_path/trusted-source-ref"
+: > "$trusted_hook_path/bundle-manifest"
+write_fixture_manifest_entry() {
+  local bundle_path="$1"
+  local bundle_file="$trusted_hook_path/$bundle_path"
+  printf '%s %s\n' "$bundle_path" "$(git -C "$test_worktree" hash-object "$bundle_file")" \
+    >> "$trusted_hook_path/bundle-manifest"
+}
+write_fixture_manifest_entry pre-commit
+write_fixture_manifest_entry pre-push
+write_fixture_manifest_entry scripts/check-ai-readiness.py
+write_fixture_manifest_entry backends.json
+write_fixture_manifest_entry scripts/pre-push-ai-review.sh
+for script_name in \
+  review-policy.json \
+  review-risk.ps1 \
+  secure-review-temp-acl.ps1 \
+  verify-codex-auth-permissions.ps1 \
+  codex-auth-permissions.ps1 \
+  review-path-safety.ps1; do
+  write_fixture_manifest_entry "scripts/$script_name"
+done
+chmod 700 "$trusted_hook_path/pre-commit" "$trusted_hook_path/pre-push" \
+  "$trusted_hook_path/scripts/pre-push-ai-review.sh"
+chmod 600 "$trusted_hook_path/source-sha" "$trusted_hook_path/trusted-source-sha" \
+  "$trusted_hook_path/trusted-source-ref" "$trusted_hook_path/bundle-manifest"
+git -C "$test_worktree" config --local core.hooksPath "$trusted_hook_path"
+git -C "$test_worktree" config --local jdsnack.codex "$fake_root/codex"
+[ -x "$trusted_hook_path/pre-push" ] \
+  || fail 'trusted Git common-dir pre-push hook이 설치되지 않았습니다.'
 
 set_origin_urls() {
   local origin_fetch_url="$1"
@@ -457,7 +522,7 @@ run_review() {
     printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$base_sha" \
       | PATH="$fake_root:$PATH" \
         JDSNACK_REVIEW_BASE_REF="$base_ref" \
-        run_hook_with_origin_urls "$test_worktree/.githooks/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
+        run_hook_with_origin_urls "$trusted_hook_path/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
   )
 }
 
