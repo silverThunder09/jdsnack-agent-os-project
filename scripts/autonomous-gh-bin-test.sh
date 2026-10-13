@@ -49,7 +49,58 @@ trusted_python_bin="$(command -v python.exe 2>/dev/null || command -v python3 2>
 trusted_jq_bin="$(command -v jq 2>/dev/null || true)"
 if [ -z "$trusted_jq_bin" ]; then
   trusted_jq_bin="$TEST_ROOT/trusted-jq"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$trusted_jq_bin"
+  cat > "$trusted_jq_bin" <<'EOF'
+#!/usr/bin/env bash
+set -eu
+
+filter=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -r|-c|-e|-n|-R|-s)
+      shift
+      ;;
+    --arg)
+      shift 3
+      ;;
+    *)
+      if [ -z "$filter" ]; then
+        filter="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+case "$filter" in
+  *'any(. == "codex-auto"'*)
+    printf 'true\n'
+    ;;
+  *'index("codex-auto")'*)
+    exit 0
+    ;;
+  *'.issue.labels[]?.name'*)
+    printf 'codex-auto\n'
+    ;;
+  *'.issue.number'*)
+    printf '77\n'
+    ;;
+  *'.issue.title'*)
+    printf '[Bug] history detail fails\n'
+    ;;
+  *'.issue.body'*)
+    printf 'type: bug\nExpected: detail loads\n'
+    ;;
+  *'status:"dispatch_issue"'*)
+    printf '{"status":"dispatch_issue","reason":"trusted_bug_issue","event":"issues","issue_number":"77","issue_title":"[Bug] history detail fails"}\n'
+    ;;
+  *'.status'*)
+    printf 'dispatch_issue\n'
+    ;;
+  *)
+    printf '{}\n'
+    ;;
+esac
+EOF
   chmod 700 "$trusted_jq_bin"
 fi
 
