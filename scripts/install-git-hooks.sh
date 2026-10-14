@@ -173,39 +173,6 @@ if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
   }
 }
 
-verify_trusted_hook_bundle_acl() {
-  bundle_path="$1"
-  expected_paths="$2"
-  verifier_path="$repo_root/scripts/verify-trusted-hook-bundle-acl.ps1"
-  if is_windows_mounted_filesystem "$bundle_path"; then
-    path_converter=""
-    if command -v wslpath >/dev/null 2>&1; then
-      path_converter="$(command -v wslpath)"
-    elif command -v cygpath >/dev/null 2>&1; then
-      path_converter="$(command -v cygpath)"
-    else
-      echo "ERROR: trusted hook bundle ACL을 확인할 Windows 경로 변환 도구가 없습니다." >&2
-      return 1
-    fi
-    powershell_path="$(command -v powershell.exe 2>/dev/null || true)"
-    if [ -z "$powershell_path" ]; then
-      echo "ERROR: trusted hook bundle ACL을 확인하려면 powershell.exe가 필요합니다." >&2
-      return 1
-    fi
-    windows_verifier_path="$($path_converter -w "$verifier_path" 2>/dev/null || true)"
-    windows_bundle_path="$($path_converter -w "$bundle_path" 2>/dev/null || true)"
-    case "$windows_verifier_path:$windows_bundle_path" in
-      [A-Za-z]:*:[A-Za-z]:*|\\\\*:\\\\*) ;;
-      *) echo "ERROR: trusted hook bundle ACL 경로를 Windows 경로로 변환할 수 없습니다." >&2; return 1 ;;
-    esac
-    MSYS2_ARG_CONV_EXCL='*' "$powershell_path" -NoProfile -NonInteractive -File \
-      "$windows_verifier_path" -Path "$windows_bundle_path" -ExpectedRelativePath "$expected_paths"
-    return $?
-  fi
-
-  "$powershell_tool" -NoProfile -NonInteractive -File "$verifier_path" \
-    -Path "$bundle_path" -ExpectedRelativePath "$expected_paths"
-}
 if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) { exit 13 }
 $path = $args[0]
 $acl = Get-Acl -LiteralPath $path
@@ -237,6 +204,40 @@ exit 0
   else
     "$windows_acl_powershell" -NoProfile -NonInteractive -Command "$windows_acl_script" "$windows_acl_path"
   fi
+}
+
+verify_trusted_hook_bundle_acl() {
+  bundle_path="$1"
+  expected_paths="$2"
+  verifier_path="$bundle_path/scripts/verify-trusted-hook-bundle-acl.ps1"
+  if is_windows_mounted_filesystem "$bundle_path"; then
+    path_converter=""
+    if command -v wslpath >/dev/null 2>&1; then
+      path_converter="$(command -v wslpath)"
+    elif command -v cygpath >/dev/null 2>&1; then
+      path_converter="$(command -v cygpath)"
+    else
+      echo "ERROR: trusted hook bundle ACL을 확인할 Windows 경로 변환 도구가 없습니다." >&2
+      return 1
+    fi
+    powershell_path="$(command -v powershell.exe 2>/dev/null || true)"
+    if [ -z "$powershell_path" ]; then
+      echo "ERROR: trusted hook bundle ACL을 확인하려면 powershell.exe가 필요합니다." >&2
+      return 1
+    fi
+    windows_verifier_path="$($path_converter -w "$verifier_path" 2>/dev/null || true)"
+    windows_bundle_path="$($path_converter -w "$bundle_path" 2>/dev/null || true)"
+    case "$windows_verifier_path:$windows_bundle_path" in
+      [A-Za-z]:*:[A-Za-z]:*|\\\\*:\\\\*) ;;
+      *) echo "ERROR: trusted hook bundle ACL 경로를 Windows 경로로 변환할 수 없습니다." >&2; return 1 ;;
+    esac
+    MSYS2_ARG_CONV_EXCL='*' "$powershell_path" -NoProfile -NonInteractive -File \
+      "$windows_verifier_path" -Path "$windows_bundle_path" -ExpectedRelativePath "$expected_paths"
+    return $?
+  fi
+
+  "$powershell_tool" -NoProfile -NonInteractive -File "$verifier_path" \
+    -Path "$bundle_path" -ExpectedRelativePath "$expected_paths"
 }
 
 codex_path="$(validate_trusted_codex_path "$codex_path")"
