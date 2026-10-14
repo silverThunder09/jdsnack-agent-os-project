@@ -22,6 +22,22 @@ trap cleanup EXIT
 mkdir -p "$fixture_bin"
 printf '#!/bin/sh\nexit 0\n' > "$fixture_bin/codex"
 chmod +x "$fixture_bin/codex"
+windows_cli_only="$fixture_root/windows-cli-only"
+mkdir -p "$windows_cli_only"
+cp "$fixture_bin/codex" "$windows_cli_only/codex.exe"
+(
+  eval "$(sed -n '/^resolve_codex_path() {/,/^}/p' "$ROOT_DIR/scripts/install-git-hooks.sh")"
+  PATH="$windows_cli_only"
+  command() {
+    if [ "${1-}" = '-v' ] && [ "${2-}" = 'codex' ]; then
+      return 1
+    fi
+    builtin command "$@"
+  }
+  discovered_codex="$(resolve_codex_path)"
+  [ "$discovered_codex" = "$windows_cli_only/codex.exe" ] \
+    || fail "installer가 codex.exe만 있는 WSL 경로를 찾지 못했습니다: $discovered_codex"
+)
 cat > "$fixture_bin/powershell.exe" <<'EOF'
 #!/bin/sh
 exit 0

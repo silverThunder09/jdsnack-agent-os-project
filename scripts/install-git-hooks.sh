@@ -52,7 +52,15 @@ if [ -z "$trusted_repo_identity" ]; then
   exit 1
 fi
 
-codex_path="$(command -v codex || true)"
+resolve_codex_path() {
+  codex_candidate="$(command -v codex || true)"
+  if [ -z "$codex_candidate" ]; then
+    codex_candidate="$(command -v codex.exe || true)"
+  fi
+  printf '%s\n' "$codex_candidate"
+}
+
+codex_path="$(resolve_codex_path)"
 case "$codex_path" in
   /*|[A-Za-z]:[\\/]*) ;;
   *)
