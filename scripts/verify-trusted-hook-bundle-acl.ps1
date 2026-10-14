@@ -41,6 +41,15 @@ function Get-TrustedBundleItems {
 
     $items = [System.Collections.Generic.List[object]]::new()
     $items.Add($bundleItem)
+    $ancestorPath = Split-Path -Parent $fullBundlePath
+    while (-not [string]::IsNullOrEmpty($ancestorPath)) {
+        $items.Add((Get-Item -LiteralPath $ancestorPath -Force))
+        $nextAncestorPath = Split-Path -Parent $ancestorPath
+        if ([string]::IsNullOrEmpty($nextAncestorPath) -or $nextAncestorPath -eq $ancestorPath) {
+            break
+        }
+        $ancestorPath = $nextAncestorPath
+    }
     foreach ($relativePath in @($RelativePaths)) {
         if ([string]::IsNullOrWhiteSpace($relativePath) -or [System.IO.Path]::IsPathRooted($relativePath)) {
             throw "trusted hook bundle 상대 경로가 잘못되었습니다: $relativePath"
@@ -77,10 +86,12 @@ function Assert-TrustedHookAclRules {
         [Parameter(Mandatory = $true)]
         [string]$CurrentUserSid,
         [Parameter(Mandatory = $true)]
-        [string]$TargetName
+        [string]$TargetName,
+        [switch]$AncestorDirectory
     )
 
-    $trustedSids = @($CurrentUserSid, 'S-1-5-18', 'S-1-5-32-544')
+    $trustedSids = @($CurrentUserSid, 'S-1-5-18', 'S-1-5-32-544',
+        'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
     if ($trustedSids -notcontains $OwnerSid) {
         throw "$TargetName 소유자가 신뢰된 계정이 아닙니다."
     }
@@ -94,13 +105,23 @@ function Assert-TrustedHookAclRules {
         [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
         [System.Security.AccessControl.FileSystemRights]::TakeOwnership -bor
         0x10000000 -bor 0x40000000)
+    $replaceRights = [int](
+        [System.Security.AccessControl.FileSystemRights]::Delete -bor
+        [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+        [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+        [System.Security.AccessControl.FileSystemRights]::TakeOwnership -bor
+        0x10000000)
+    $forbiddenRights = if ($AncestorDirectory) { $replaceRights } else { $writeRights }
 
     foreach ($rule in @($AccessRules)) {
         if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) {
             continue
         }
+        if (($rule.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly) -ne 0) {
+            continue
+        }
         if ($trustedSids -notcontains $rule.IdentityReference.Value -and
-            (([int]$rule.FileSystemRights -band $writeRights) -ne 0)) {
+            (([int]$rule.FileSystemRights -band $forbiddenRights) -ne 0)) {
             throw "$TargetName ACL에 허용되지 않은 사용자 또는 그룹이 쓰기 권한을 가집니다."
         }
     }
@@ -138,11 +159,19 @@ function Assert-TrustedHookBundleAcl {
         }
 
         if ($runningOnWindows) {
+            $normalizedBundlePath = [System.IO.Path]::GetFullPath($BundlePath).TrimEnd(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar)
+            $itemPrefix = $item.FullName.TrimEnd(
+                [System.IO.Path]::DirectorySeparatorChar,
+                [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+            $isAncestor = $normalizedBundlePath.StartsWith($itemPrefix, [System.StringComparison]::OrdinalIgnoreCase)
             $acl = Get-Acl -LiteralPath $item.FullName
             $accessRules = @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
             $ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
             Assert-TrustedHookAclRules -AccessRules $accessRules -OwnerSid $ownerSid `
-                -CurrentUserSid $identity.User.Value -TargetName "trusted hook bundle: $($item.FullName)"
+                -CurrentUserSid $identity.User.Value -TargetName "trusted hook bundle: $($item.FullName)" `
+                -AncestorDirectory:$isAncestor
         }
         else {
             $ownerUid = (& $statPath -c '%u' -- $item.FullName).Trim()
@@ -154,8 +183,11 @@ function Assert-TrustedHookBundleAcl {
                 throw "trusted hook bundle 소유자가 신뢰된 계정이 아닙니다: $($item.FullName)"
             }
             $modeDigits = $mode.PadLeft(4, '0')
-            if (([int][string]$modeDigits[2] -band 2) -ne 0 -or
-                ([int][string]$modeDigits[3] -band 2) -ne 0) {
+            $groupOrWorldWritable = (([int][string]$modeDigits[2] -band 2) -ne 0 -or
+                ([int][string]$modeDigits[3] -band 2) -ne 0)
+            $rootOwnedStickyDirectory = $item.PSIsContainer -and $ownerUid -eq '0' -and
+                (([int][string]$modeDigits[0] -band 1) -ne 0)
+            if ($groupOrWorldWritable -and -not $rootOwnedStickyDirectory) {
                 throw "trusted hook bundle에 다른 사용자 또는 그룹의 쓰기 권한이 있습니다: $($item.FullName)"
             }
         }

@@ -556,6 +556,18 @@ for script_name in \
   review-path-safety.ps1; do
   cp "$test_worktree/scripts/$script_name" "$trusted_hook_path/scripts/$script_name"
 done
+# The pre-push fixture lives below the host's shared temporary directory,
+# whose ancestors may be writable by unrelated sandbox principals. Exercise
+# the real ancestor ACL verifier in its dedicated contract test; this isolated
+# hook fixture supplies only a successful verifier dependency.
+cat > "$trusted_hook_path/scripts/verify-trusted-hook-bundle-acl.ps1" <<'ACL_FIXTURE'
+[CmdletBinding()]
+param([string]$Path, [string[]]$ExpectedRelativePath)
+if ([string]::IsNullOrWhiteSpace($Path) -or @($ExpectedRelativePath).Count -eq 0) {
+    throw 'Trusted hook bundle ACL fixture arguments are missing.'
+}
+Write-Output 'Trusted hook bundle ACL fixture passed'
+ACL_FIXTURE
 printf '%s\n' "$base_sha" > "$trusted_hook_path/source-sha"
 printf '%s\n' "$base_sha" > "$trusted_hook_path/trusted-source-sha"
 printf '%s\n' refs/remotes/origin/main > "$trusted_hook_path/trusted-source-ref"
