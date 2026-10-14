@@ -212,7 +212,7 @@ verify_trusted_hook_bundle_acl() {
   bundle_path="$1"
   expected_paths="$2"
   verifier_path="$bundle_path/scripts/verify-trusted-hook-bundle-acl.ps1"
-  if is_windows_mounted_filesystem "$bundle_path"; then
+  if is_windows_mounted_filesystem "$bundle_path" || [ "$powershell_tool" = 'powershell.exe' ]; then
     path_converter=""
     if command -v wslpath >/dev/null 2>&1; then
       path_converter="$(command -v wslpath)"

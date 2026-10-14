@@ -138,6 +138,43 @@ chmod +x "$permission_fixture_bin/stat" "$permission_fixture_bin/wslpath" "$perm
 test -f "$permission_fixture_bin/powershell-called" \
   || fail 'WSL/DrvFS Codex 권한 검증이 Windows ACL 확인기를 호출하지 않았습니다.'
 
+# A WSL checkout on a Linux filesystem still needs Windows paths when only
+# powershell.exe is available for the trusted bundle verifier.
+posix_fixture_bin="$fixture_root/posix-bin"
+mkdir -p "$posix_fixture_bin"
+cat > "$posix_fixture_bin/wslpath" <<'EOF'
+#!/bin/sh
+test "${1-}" = '-w' || exit 1
+case "${2-}" in
+  */verify-trusted-hook-bundle-acl.ps1) printf '%s\n' '\\wsl.localhost\Ubuntu\home\test\verify-trusted-hook-bundle-acl.ps1' ;;
+  */jdsnack-hooks) printf '%s\n' '\\wsl.localhost\Ubuntu\home\test\jdsnack-hooks' ;;
+  *) exit 1 ;;
+esac
+EOF
+cat > "$posix_fixture_bin/powershell.exe" <<EOF
+#!/bin/sh
+test "\${3-}" = '-File' || exit 1
+test "\${5-}" = '-Path' || exit 1
+case "\${4-}:\${6-}" in
+  *wsl.localhost*:*wsl.localhost*) ;;
+  *) exit 1 ;;
+esac
+case "\${4-}:\${6-}" in
+  */home/*) exit 1 ;;
+esac
+printf '%s\n' invoked > "$posix_fixture_bin/powershell-called"
+EOF
+chmod +x "$posix_fixture_bin/wslpath" "$posix_fixture_bin/powershell.exe"
+(
+  PATH="$posix_fixture_bin:$PATH"
+  powershell_tool=powershell.exe
+  is_windows_mounted_filesystem() { return 1; }
+  eval "$(sed -n '/^verify_trusted_hook_bundle_acl() {/,/^}/p' "$ROOT_DIR/scripts/install-git-hooks.sh")"
+  verify_trusted_hook_bundle_acl '/home/test/.git/jdsnack-hooks' 'pre-commit'
+)
+test -f "$posix_fixture_bin/powershell-called" \
+  || fail 'WSL Linux 파일시스템에서 Windows PowerShell에 Windows 경로를 전달하지 않았습니다.'
+
 trusted_hooks_dir="$test_worktree/.git/jdsnack-hooks"
 (
   cd "$test_worktree"
