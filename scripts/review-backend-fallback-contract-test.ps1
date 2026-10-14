@@ -87,8 +87,8 @@ if (-not $fallbackSource.Contains("`$ErrorActionPreference = 'Continue'")) {
     throw 'Review submission must capture native GitHub CLI stderr without terminating the PowerShell fallback.'
 }
 $workflowSource = Get-Content -LiteralPath (Join-Path $Workspace '.github/workflows/codex-branch-review.yml') -Raw
-$decisionPattern = '(?im)^[ \t]*(?:-[ \t]*)?decision:[ \t]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[ \t]*$'
-$scorePattern = '(?im)^[ \t]*(?:-[ \t]*)?(?:review[ \t]+)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*$'
+$decisionPattern = '(?im)^[ \t]*(?:-[ \t]*)?decision:[ \t]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[ \t]*\r?$'
+$scorePattern = '(?im)^[ \t]*(?:-[ \t]*)?(?:review[ \t]+)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*\r?$'
 if (-not $workflowSource.Contains($scorePattern)) {
     throw 'Workflow review score parser does not accept both score: N and score: N/5 formats.'
 }
@@ -96,6 +96,7 @@ foreach ($reviewOutput in @(
         "decision: PASS`nscore: 4"
         "- decision: PASS`n- score: 4/5"
         "decision: PASS`nreview score: 4/5"
+        "- decision: PASS`r`n- score: 4/5`r`n"
     )) {
     $decisionMatch = [regex]::Match($reviewOutput, $decisionPattern)
     $scoreMatch = [regex]::Match($reviewOutput, $scorePattern)
