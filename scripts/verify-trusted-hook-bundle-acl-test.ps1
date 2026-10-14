@@ -4,8 +4,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$runningOnWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+    [System.Runtime.InteropServices.OSPlatform]::Windows)
 $securityModulePath = Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1'
-if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
+if ($runningOnWindows -and -not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
     if (Test-Path -LiteralPath $securityModulePath) {
         Import-Module -Name $securityModulePath -ErrorAction Stop
     }
@@ -37,6 +39,7 @@ foreach ($relativePath in $expectedPaths) {
 }
 
 try {
+    if ($runningOnWindows) {
     & $secureAclPath -Path $bundlePath | Out-Null
     & $verifierPath -Path $bundlePath -ExpectedRelativePath $expectedPaths | Out-Null
 
@@ -78,6 +81,30 @@ try {
     }
 
     Write-Output 'Trusted hook bundle writable ACL contract passed'
+    }
+    else {
+        & $verifierPath -Path $bundlePath -ExpectedRelativePath $expectedPaths | Out-Null
+        $unsafePath = Join-Path $bundlePath 'pre-push'
+        & /usr/bin/chmod 666 -- $unsafePath
+        if ($LASTEXITCODE -ne 0) {
+            throw 'POSIX 권한 fixture를 설정하지 못했습니다.'
+        }
+        $rejected = $false
+        try {
+            & $verifierPath -Path $bundlePath -ExpectedRelativePath $expectedPaths | Out-Null
+        }
+        catch {
+            $rejected = $_.Exception.Message -match '쓰기 권한'
+            if (-not $rejected) {
+                throw
+            }
+        }
+        if (-not $rejected) {
+            throw 'trusted hook bundle의 POSIX group/world 쓰기 권한을 거부하지 않았습니다.'
+        }
+        & /usr/bin/chmod 600 -- $unsafePath
+        Write-Output 'Trusted hook bundle POSIX permissions contract passed'
+    }
 }
 finally {
     if (Test-Path -LiteralPath $workspaceRoot) {
