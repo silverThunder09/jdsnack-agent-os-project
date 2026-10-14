@@ -204,12 +204,12 @@ grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-p
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
-grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 로그인 캐시 권한 검증을 위한 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 로그인 캐시 권한 검증을 위한 host 도구를 확인하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push에서 사용할 Git Bash 실행 경로를 명시적으로 확인하지 않습니다.'
 grep -Fq -- 'git config --local jdsnack.hookBash "$git_bash_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 검증한 Bash 실행 경로를 로컬 설정에 고정하지 않습니다.'
-grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex cat cp mkdir; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 codex cat cp mkdir; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push 실행에 필요한 전체 host 도구를 확인하지 않습니다.'
 grep -Fq -- "stat -f -c '%T'" "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 WSL DrvFS/9p 파일시스템을 식별하지 않습니다.'
