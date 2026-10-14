@@ -7,8 +7,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$runningOnWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+    [System.Runtime.InteropServices.OSPlatform]::Windows)
 
-if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
+if ($runningOnWindows -and -not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
     $securityModulePath = Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1'
     if (Test-Path -LiteralPath $securityModulePath) {
         Import-Module -Name $securityModulePath -ErrorAction Stop
@@ -17,7 +19,7 @@ if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
         Import-Module -Name Microsoft.PowerShell.Security -ErrorAction Stop
     }
 }
-if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
+if ($runningOnWindows -and -not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
     throw 'Microsoft.PowerShell.Security 모듈에서 Get-Acl을 로드하지 못했습니다.'
 }
 
@@ -46,8 +48,19 @@ function Get-TrustedBundleItems {
 
         $candidatePath = [System.IO.Path]::GetFullPath((Join-Path $fullBundlePath $relativePath))
         $bundlePrefix = $fullBundlePath + [System.IO.Path]::DirectorySeparatorChar
-        if (-not $candidatePath.StartsWith($bundlePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $pathComparison = if ($runningOnWindows) {
+            [System.StringComparison]::OrdinalIgnoreCase
+        }
+        else {
+            [System.StringComparison]::Ordinal
+        }
+        if (-not $candidatePath.StartsWith($bundlePrefix, $pathComparison)) {
             throw "trusted hook bundle 밖의 경로가 요청되었습니다: $relativePath"
+        }
+        $parentPath = Split-Path -Parent $candidatePath
+        while ($parentPath -ne $fullBundlePath) {
+            $items.Add((Get-Item -LiteralPath $parentPath -Force))
+            $parentPath = Split-Path -Parent $parentPath
         }
         $items.Add((Get-Item -LiteralPath $candidatePath -Force))
     }
@@ -100,9 +113,22 @@ function Assert-TrustedHookBundleAcl {
         [string[]]$RelativePaths
     )
 
-    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-    if ($null -eq $identity.User) {
-        throw '현재 Windows 사용자의 SID를 확인하지 못했습니다.'
+    if ($runningOnWindows) {
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        if ($null -eq $identity.User) {
+            throw '현재 Windows 사용자의 SID를 확인하지 못했습니다.'
+        }
+    }
+    else {
+        $statPath = '/usr/bin/stat'
+        $idPath = '/usr/bin/id'
+        if (-not (Test-Path -LiteralPath $statPath) -or -not (Test-Path -LiteralPath $idPath)) {
+            throw 'POSIX 권한 검증에 필요한 stat 또는 id가 없습니다.'
+        }
+        $currentUid = (& $idPath -u).Trim()
+        if ($LASTEXITCODE -ne 0 -or $currentUid -notmatch '^\d+$') {
+            throw '현재 POSIX 사용자 UID를 확인하지 못했습니다.'
+        }
     }
 
     foreach ($item in (Get-TrustedBundleItems -BundlePath $BundlePath -RelativePaths $RelativePaths)) {
@@ -110,11 +136,28 @@ function Assert-TrustedHookBundleAcl {
             throw "trusted hook bundle 항목은 재분석 지점일 수 없습니다: $($item.FullName)"
         }
 
-        $acl = Get-Acl -LiteralPath $item.FullName
-        $accessRules = @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
-        $ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
-        Assert-TrustedHookAclRules -AccessRules $accessRules -OwnerSid $ownerSid `
-            -CurrentUserSid $identity.User.Value -TargetName "trusted hook bundle: $($item.FullName)"
+        if ($runningOnWindows) {
+            $acl = Get-Acl -LiteralPath $item.FullName
+            $accessRules = @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+            $ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+            Assert-TrustedHookAclRules -AccessRules $accessRules -OwnerSid $ownerSid `
+                -CurrentUserSid $identity.User.Value -TargetName "trusted hook bundle: $($item.FullName)"
+        }
+        else {
+            $ownerUid = (& $statPath -c '%u' -- $item.FullName).Trim()
+            $mode = (& $statPath -c '%a' -- $item.FullName).Trim()
+            if ($LASTEXITCODE -ne 0 -or $ownerUid -notmatch '^\d+$' -or $mode -notmatch '^[0-7]{3,4}$') {
+                throw "trusted hook bundle의 POSIX 권한을 확인하지 못했습니다: $($item.FullName)"
+            }
+            if ($ownerUid -ne $currentUid -and $ownerUid -ne '0') {
+                throw "trusted hook bundle 소유자가 신뢰된 계정이 아닙니다: $($item.FullName)"
+            }
+            $modeDigits = $mode.PadLeft(4, '0')
+            if (([int][string]$modeDigits[2] -band 2) -ne 0 -or
+                ([int][string]$modeDigits[3] -band 2) -ne 0) {
+                throw "trusted hook bundle에 다른 사용자 또는 그룹의 쓰기 권한이 있습니다: $($item.FullName)"
+            }
+        }
     }
 }
 
