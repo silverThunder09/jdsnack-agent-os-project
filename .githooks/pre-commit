@@ -15,7 +15,7 @@ git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
   exit 1
 }
 case "$hook_root" in
-  "$git_common_dir/jdsnack-hooks") ;;
+  "$git_common_dir"/jdsnack-hooks-*) ;;
   *)
     echo "ERROR: pre-commit은 Git common dir의 trusted hook bundle에서만 실행해야 합니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
     exit 1

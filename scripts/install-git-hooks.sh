@@ -317,7 +317,6 @@ git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
   echo "ERROR: Git common dir를 trusted hook 경로로 정규화할 수 없습니다." >&2
   exit 1
 }
-trusted_hooks_dir="$git_common_dir/jdsnack-hooks"
 trusted_source_ref='refs/remotes/origin/main'
 if [ -n "${JDSNACK_HOOK_SOURCE_REF-}" ]; then
   echo "ERROR: trusted hook source override는 허용되지 않습니다. refs/remotes/origin/main의 installer를 실행하십시오." >&2
@@ -327,7 +326,11 @@ trusted_source_sha="$(git rev-parse --verify "${trusted_source_ref}^{commit}" 2>
   echo "ERROR: independently trusted hook source ${trusted_source_ref}를 확인할 수 없습니다." >&2
   exit 1
 }
-mkdir -p "$trusted_hooks_dir/scripts"
+trusted_hooks_dir="$(mktemp -d "$git_common_dir/jdsnack-hooks-${trusted_source_sha}.XXXXXX")" || {
+  echo "ERROR: trusted hook bundle을 새 디렉터리에 만들 수 없습니다." >&2
+  exit 1
+}
+mkdir "$trusted_hooks_dir/scripts"
 chmod 700 "$trusted_hooks_dir" "$trusted_hooks_dir/scripts"
 
 copy_trusted_source() {

@@ -86,10 +86,22 @@ fi
 test ! -e "$test_worktree/codex.executed" \
   || fail 'installer가 trusted path 검증 전에 checkout 내부 Codex를 실행했습니다.'
 
+outside_file="$fixture_root/outside-preserved.txt"
+outside_scripts="$fixture_root/outside-scripts"
+legacy_bundle="$test_worktree/.git/jdsnack-hooks"
+printf '%s\n' outside-original > "$outside_file"
+mkdir -p "$outside_scripts" "$legacy_bundle"
+ln "$outside_file" "$legacy_bundle/pre-push"
+ln -s "$outside_scripts" "$legacy_bundle/scripts" 2>/dev/null || true
+
 (
   cd "$test_worktree"
   git show refs/remotes/origin/main:scripts/install-git-hooks.sh | PATH="$fixture_bin:$PATH" sh >/dev/null
 )
+test "$(<"$outside_file")" = outside-original \
+  || fail 'installer가 기존 bundle의 하드링크를 따라가 외부 파일을 덮어썼습니다.'
+test ! -e "$outside_scripts/check-ai-readiness.py" \
+  || fail 'installer가 기존 bundle의 scripts 심볼릭 링크를 따라갔습니다.'
 
 # WSL DrvFS/9p commonly reports Windows executables as 777 even when the
 # Windows ACL is restricted. The installer must validate that ACL instead of
@@ -175,7 +187,14 @@ chmod +x "$posix_fixture_bin/wslpath" "$posix_fixture_bin/powershell.exe"
 test -f "$posix_fixture_bin/powershell-called" \
   || fail 'WSL Linux 파일시스템에서 Windows PowerShell에 Windows 경로를 전달하지 않았습니다.'
 
-trusted_hooks_dir="$test_worktree/.git/jdsnack-hooks"
+trusted_hooks_dir="$(git -C "$test_worktree" config --local --get core.hooksPath)"
+if command -v cygpath >/dev/null 2>&1; then
+  trusted_hooks_dir="$(cygpath -u "$trusted_hooks_dir")"
+fi
+case "$trusted_hooks_dir" in
+  "$test_worktree/.git/jdsnack-hooks-$trusted_source_sha".*) ;;
+  *) fail 'installer가 Git common dir 밖 또는 재사용 가능한 bundle 경로를 활성화했습니다.' ;;
+esac
 (
   cd "$test_worktree"
   MSYS_NO_PATHCONV=1 git show "refs/remotes/origin/main:.githooks/pre-push"
