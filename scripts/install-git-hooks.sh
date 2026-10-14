@@ -200,7 +200,7 @@ foreach ($rule in $rules) {
 }
 exit 0
 '
-  windows_acl_script="${windows_acl_script/__JDSNACK_PATH_B64__/$windows_acl_path_b64}"
+  windows_acl_script="$(printf '%s' "$windows_acl_script" | sed "s/__JDSNACK_PATH_B64__/$windows_acl_path_b64/g")"
   if [ "$windows_acl_path_converter_kind" = 'cygpath' ]; then
     MSYS2_ARG_CONV_EXCL='*' "$windows_acl_powershell" -NoProfile -NonInteractive -Command "$windows_acl_script"
   else
