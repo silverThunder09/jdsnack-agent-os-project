@@ -38,6 +38,10 @@ cp "$fixture_bin/codex" "$windows_cli_only/codex.exe"
   [ "$discovered_codex" = "$windows_cli_only/codex.exe" ] \
     || fail "installer가 codex.exe만 있는 WSL 경로를 찾지 못했습니다: $discovered_codex"
 )
+if sed -n '/^for required_tool in /,/^done/p' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+    | grep -Eq '(^|[[:space:]])codex([[:space:]]|;)'; then
+  fail 'installer가 codex.exe 대체 탐색 전에 codex를 필수 도구로 요구합니다.'
+fi
 cat > "$fixture_bin/powershell.exe" <<'EOF'
 #!/bin/sh
 exit 0

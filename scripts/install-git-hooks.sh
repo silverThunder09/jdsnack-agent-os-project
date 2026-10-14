@@ -37,7 +37,7 @@ require_tool() {
   fi
 }
 
-for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 codex cat cp mkdir; do
+for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 cat cp mkdir; do
   require_tool "$required_tool"
 done
 
