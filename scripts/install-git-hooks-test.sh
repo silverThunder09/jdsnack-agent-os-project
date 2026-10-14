@@ -118,14 +118,19 @@ cat > "$permission_fixture_bin/powershell.exe" <<EOF
 if [ "\${3-}" = '-Command' ]; then
   test "\$#" -eq 4 || exit 1
   case "\$4" in
-    *'FromBase64String("'*'")'*) ;;
+    *'FromBase64String("AA/=")'*) ;;
     *) exit 1 ;;
   esac
   printf '%s\n' invoked > "$permission_fixture_bin/powershell-called"
 fi
 exit 0
 EOF
-chmod +x "$permission_fixture_bin/stat" "$permission_fixture_bin/wslpath" "$permission_fixture_bin/powershell.exe"
+cat > "$permission_fixture_bin/base64" <<'EOF'
+#!/bin/sh
+test "$*" = '-w 0' || exit 1
+printf '%s' 'AA/='
+EOF
+chmod +x "$permission_fixture_bin/stat" "$permission_fixture_bin/wslpath" "$permission_fixture_bin/powershell.exe" "$permission_fixture_bin/base64"
 (
   cd "$test_worktree"
   PATH="$permission_fixture_bin:$fixture_bin:$PATH" sh < <(git show refs/remotes/origin/main:scripts/install-git-hooks.sh) >/dev/null
