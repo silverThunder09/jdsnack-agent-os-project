@@ -331,6 +331,9 @@ set -eu
 
 fixture_dir='__FAKE_ROOT__'
 real_pwsh='__REAL_PWSH__'
+case " $* " in
+  *'Get-Acl -LiteralPath $path'*) exit 0 ;;
+esac
 if [ -f "$fixture_dir/pwsh.invalid-json" ]; then
   printf '%s\n' '{"riskScore":65}'
   exit 0
@@ -382,6 +385,65 @@ if [ "$powershell_resolver_status" -eq 0 ] || ! grep -Fq 'Windows powershell.exe
   printf '%s\n' "$powershell_resolver_output" >&2
   fail 'Windows Codex가 powershell.exe 대신 Linux pwsh로 대체되는 경로를 차단하지 않았습니다.'
 fi
+
+# A Windows Codex executable on WSL DrvFS/9p can appear POSIX-writable even
+# when its Windows ACL is restricted. The hook must consult that ACL and reject
+# a failed ACL check rather than trusting the synthetic mode.
+codex_acl_validation="$fake_root/validate-codex-acl.sh"
+for function_name in validate_trusted_codex_path is_windows_mounted_filesystem verify_windows_codex_acl; do
+  awk -v function_name="$function_name" '
+    $0 ~ "^" function_name "\\(\\) \\{" { capture=1; depth=0 }
+    capture {
+      line=$0
+      print
+      depth += gsub(/\{/, "", line)
+      line=$0
+      depth -= gsub(/\}/, "", line)
+      if (depth == 0) exit
+    }
+  ' "$ROOT_DIR/scripts/pre-push-ai-review.sh" >> "$codex_acl_validation"
+done
+printf '#!/bin/sh\nexit 0\n' > "$fake_root/codex.exe"
+chmod +x "$fake_root/codex.exe"
+real_stat_bin="$(command -v stat)"
+cat > "$fake_root/stat-acl-fixture" <<EOF
+#!/bin/sh
+case "\$*" in
+  *%T*) printf '%s\n' 9p ;;
+  *%a*) printf '%s\n' 777 ;;
+  *) exec "$real_stat_bin" "\$@" ;;
+esac
+EOF
+cat > "$fake_root/wslpath-acl-fixture" <<'EOF'
+#!/bin/sh
+test "${1-}" = '-w' || exit 1
+printf '%s\n' 'C:\Users\test\codex.exe'
+EOF
+cat > "$fake_root/powershell-acl.exe" <<EOF
+#!/bin/sh
+printf '%s\n' invoked > "$fake_root/powershell-acl-called"
+test ! -f "$fake_root/powershell-acl-deny"
+EOF
+chmod +x "$fake_root/stat-acl-fixture" "$fake_root/wslpath-acl-fixture" "$fake_root/powershell-acl.exe"
+(
+  . "$codex_acl_validation"
+  readlink_bin="$(command -v readlink)"
+  base64_bin="$(command -v base64)"
+  stat_bin="$fake_root/stat-acl-fixture"
+  id_bin="$(command -v id)"
+  CHECKOUT_ROOT="$test_worktree"
+  path_converter_bin="$fake_root/wslpath-acl-fixture"
+  pwsh_bin="$fake_root/powershell-acl.exe"
+  validated_path="$(validate_trusted_codex_path "$fake_root/codex.exe")"
+  [ "$validated_path" = "$(readlink -f "$fake_root/codex.exe")" ] \
+    || fail 'WSL Windows Codex 경로를 ACL 검증 후 승인하지 않았습니다.'
+  test -f "$fake_root/powershell-acl-called" \
+    || fail 'WSL Windows Codex ACL 검증기가 호출되지 않았습니다.'
+  touch "$fake_root/powershell-acl-deny"
+  if validated_path="$(validate_trusted_codex_path "$fake_root/codex.exe" 2>&1)"; then
+    fail 'WSL Windows Codex의 안전하지 않은 ACL을 거부하지 않았습니다.'
+  fi
+)
 
 windows_git_resolver="$fake_root/resolve-windows-git-bin.sh"
 awk '

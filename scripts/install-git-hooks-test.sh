@@ -115,7 +115,14 @@ exit 1
 EOF
 cat > "$permission_fixture_bin/powershell.exe" <<EOF
 #!/bin/sh
-printf '%s\n' invoked > "$permission_fixture_bin/powershell-called"
+if [ "\${3-}" = '-Command' ]; then
+  test "\$#" -eq 4 || exit 1
+  case "\$4" in
+    *'FromBase64String("'*'")'*) ;;
+    *) exit 1 ;;
+  esac
+  printf '%s\n' invoked > "$permission_fixture_bin/powershell-called"
+fi
 exit 0
 EOF
 chmod +x "$permission_fixture_bin/stat" "$permission_fixture_bin/wslpath" "$permission_fixture_bin/powershell.exe"

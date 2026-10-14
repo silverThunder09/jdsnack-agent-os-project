@@ -54,7 +54,7 @@ require_host_tool() {
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex; do
+for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 codex; do
   if [ "$tool" = codex ]; then
     # Empty branch diffs must be rejected before the reviewer executable is required.
     continue
@@ -89,6 +89,14 @@ validate_trusted_codex_path() {
       exit 1
       ;;
   esac
+  if is_windows_mounted_filesystem "$canonical"; then
+    if ! verify_windows_codex_acl "$canonical"; then
+      echo "ERROR: Windows Codex 실행 파일의 ACL을 확인할 수 없습니다: $canonical" >&2
+      exit 1
+    fi
+    printf '%s\n' "$canonical"
+    return 0
+  fi
   mode="$($stat_bin -c '%a' -- "$canonical" 2>/dev/null || true)"
   case "$mode" in
     ''|*[!0-7]*)
@@ -107,6 +115,75 @@ validate_trusted_codex_path() {
     exit 1
   fi
   printf '%s\n' "$canonical"
+}
+
+is_windows_mounted_filesystem() {
+  local filesystem_type
+  filesystem_type="$($stat_bin -f -c '%T' -- "$1" 2>/dev/null || true)"
+  case "$filesystem_type" in
+    drvfs|9p|msys*|cygwin*) return 0 ;;
+  esac
+  if [ -n "$path_converter_bin" ]; then
+    local windows_path_candidate
+    windows_path_candidate="$($path_converter_bin -w "$1" 2>/dev/null || true)"
+    case "$windows_path_candidate" in
+      [A-Za-z]:*|\\\\*) return 0 ;;
+    esac
+  fi
+  return 1
+}
+
+verify_windows_codex_acl() {
+  local windows_path
+  local windows_path_b64
+  local windows_acl_script
+  if [ -z "$path_converter_bin" ] || [ -z "$pwsh_bin" ]; then
+    echo 'ERROR: Windows Codex ACL 검증에 경로 변환기와 Windows PowerShell이 필요합니다.' >&2
+    return 1
+  fi
+  windows_path="$($path_converter_bin -w "$1" 2>/dev/null || true)"
+  case "$windows_path" in
+    [A-Za-z]:*|\\\\*) ;;
+    *) echo "ERROR: Windows Codex 경로를 변환할 수 없습니다: $1" >&2; return 1 ;;
+  esac
+  windows_path_b64="$(printf '%s' "$windows_path" | "$base64_bin" -w 0)" || return 1
+  windows_acl_script='
+$ErrorActionPreference = "Stop"
+$securityModulePath = Join-Path $PSHOME "Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1"
+if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
+  if (Test-Path -LiteralPath $securityModulePath) {
+    Import-Module -Name $securityModulePath -ErrorAction Stop
+  } else {
+    Import-Module -Name Microsoft.PowerShell.Security -ErrorAction Stop
+  }
+}
+if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) { exit 13 }
+$path = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("__JDSNACK_PATH_B64__"))
+$acl = Get-Acl -LiteralPath $path
+$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+if ($null -eq $identity.User) { exit 10 }
+$trustedSids = @($identity.User.Value, "S-1-5-18", "S-1-5-32-544")
+$ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+if ($trustedSids -notcontains $ownerSid) { exit 11 }
+$writeRights = [int](
+  [System.Security.AccessControl.FileSystemRights]::WriteData -bor
+  [System.Security.AccessControl.FileSystemRights]::AppendData -bor
+  [System.Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor
+  [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+  [System.Security.AccessControl.FileSystemRights]::Delete -bor
+  [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+  [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+  [System.Security.AccessControl.FileSystemRights]::TakeOwnership)
+foreach ($rule in @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))) {
+  if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
+  if ($trustedSids -notcontains $rule.IdentityReference.Value -and
+      (([int]$rule.FileSystemRights -band $writeRights) -ne 0)) { exit 12 }
+}
+exit 0
+'
+  windows_acl_script="${windows_acl_script/__JDSNACK_PATH_B64__/$windows_path_b64}"
+  MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -NonInteractive -Command \
+    "$windows_acl_script"
 }
 
 normalize_github_repository_url() {
@@ -407,8 +484,6 @@ fi
 
 require_host_tool codex
 
-codex_bin="$(validate_trusted_codex_path "$codex_bin")"
-
 path_converter_bin=""
 path_converter_kind=""
 if cygpath_bin="$(command -p -v cygpath 2>/dev/null)"; then
@@ -477,6 +552,7 @@ resolve_windows_git_bin() {
 if ! pwsh_bin="$(resolve_powershell_bin "$codex_bin")"; then
   exit 1
 fi
+codex_bin="$(validate_trusted_codex_path "$codex_bin")"
 
 verify_trusted_bundle_acl() {
   local bundle_root="$BUNDLE_ROOT"

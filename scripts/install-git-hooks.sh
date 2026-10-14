@@ -37,7 +37,7 @@ require_tool() {
   fi
 }
 
-for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq codex cat cp mkdir; do
+for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 codex cat cp mkdir; do
   require_tool "$required_tool"
 done
 
@@ -161,6 +161,7 @@ verify_windows_codex_acl() {
       return 1
       ;;
   esac
+  windows_acl_path_b64="$(printf '%s' "$windows_acl_path" | base64 -w 0)" || return 1
 
   windows_acl_script='
 $ErrorActionPreference = "Stop"
@@ -174,7 +175,7 @@ if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
 }
 
 if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) { exit 13 }
-$path = $args[0]
+$path = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("__JDSNACK_PATH_B64__"))
 $acl = Get-Acl -LiteralPath $path
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
 if ($null -eq $identity.User) { exit 10 }
@@ -199,10 +200,11 @@ foreach ($rule in $rules) {
 }
 exit 0
 '
+  windows_acl_script="${windows_acl_script/__JDSNACK_PATH_B64__/$windows_acl_path_b64}"
   if [ "$windows_acl_path_converter_kind" = 'cygpath' ]; then
-    MSYS2_ARG_CONV_EXCL='*' "$windows_acl_powershell" -NoProfile -NonInteractive -Command "$windows_acl_script" "$windows_acl_path"
+    MSYS2_ARG_CONV_EXCL='*' "$windows_acl_powershell" -NoProfile -NonInteractive -Command "$windows_acl_script"
   else
-    "$windows_acl_powershell" -NoProfile -NonInteractive -Command "$windows_acl_script" "$windows_acl_path"
+    "$windows_acl_powershell" -NoProfile -NonInteractive -Command "$windows_acl_script"
   fi
 }
 
