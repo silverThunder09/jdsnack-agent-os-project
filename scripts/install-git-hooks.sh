@@ -90,32 +90,39 @@ validate_trusted_codex_path() {
       exit 1
     fi
   else
-    mode="$(stat -c '%a' -- "$canonical" 2>/dev/null || true)"
-    case "$mode" in
-      0*) mode="${mode#0}" ;;
-    esac
-    case "$mode" in
-      [0-7][0-7][0-7]) ;;
-      *)
-        echo "ERROR: Codex CLI 실행 파일 권한을 확인할 수 없습니다: $canonical" >&2
-        exit 1
-        ;;
-    esac
-    group_mode="${mode#?}"
-    group_mode="${group_mode%?}"
-    world_mode="${mode#??}"
-    case "$group_mode$world_mode" in
-      *[2367]*)
-        echo "ERROR: Codex CLI 실행 파일이 group/world writable입니다: $canonical" >&2
-        exit 1
-        ;;
-    esac
-    owner="$(stat -c '%U' -- "$canonical" 2>/dev/null || true)"
     current_user="$(id -un 2>/dev/null || true)"
-    if [ -z "$owner" ] || [ -z "$current_user" ] || { [ "$owner" != "$current_user" ] && [ "$owner" != root ]; }; then
-      echo "ERROR: Codex CLI 실행 파일 소유자를 신뢰할 수 없습니다: $canonical" >&2
-      exit 1
-    fi
+    path_to_check="$canonical"
+    while :; do
+      mode="$(stat -c '%a' -- "$path_to_check" 2>/dev/null || true)"
+      case "$mode" in
+        [0-7][0-7][0-7]) mode_digits="$mode"; sticky=0 ;;
+        [0-7][0-7][0-7][0-7])
+          mode_digits="${mode#?}"
+          sticky=0
+          case "$mode" in [1357]*) sticky=1 ;; esac
+          ;;
+        *) echo "ERROR: Codex CLI 경로 권한을 확인할 수 없습니다: $path_to_check" >&2; exit 1 ;;
+      esac
+      owner="$(stat -c '%U' -- "$path_to_check" 2>/dev/null || true)"
+      if [ -z "$owner" ] || [ -z "$current_user" ] || { [ "$owner" != "$current_user" ] && [ "$owner" != root ]; }; then
+        echo "ERROR: Codex CLI 경로 소유자를 신뢰할 수 없습니다: $path_to_check" >&2
+        exit 1
+      fi
+      group_mode="${mode_digits#?}"
+      group_mode="${group_mode%?}"
+      world_mode="${mode_digits#??}"
+      case "$group_mode$world_mode" in
+        *[2367]*)
+          if [ "$path_to_check" = "$canonical" ] || [ "$sticky" -ne 1 ] || [ "$owner" != root ]; then
+            echo "ERROR: Codex CLI 경로가 group/world writable입니다: $path_to_check" >&2
+            exit 1
+          fi
+          ;;
+      esac
+      [ "$path_to_check" = / ] && break
+      path_to_check="${path_to_check%/*}"
+      [ -n "$path_to_check" ] || path_to_check=/
+    done
   fi
   printf '%s\n' "$canonical"
 }
@@ -176,13 +183,10 @@ if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
 
 if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) { exit 13 }
 $path = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("__JDSNACK_PATH_B64__"))
-$acl = Get-Acl -LiteralPath $path
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
 if ($null -eq $identity.User) { exit 10 }
 $currentSid = $identity.User.Value
-$trustedSids = @($currentSid, "S-1-5-18", "S-1-5-32-544")
-$ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
-if ($trustedSids -notcontains $ownerSid) { exit 11 }
+$trustedSids = @($currentSid, "S-1-5-18", "S-1-5-32-544", "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464")
 $writeRights = [int](
   [System.Security.AccessControl.FileSystemRights]::WriteData -bor
   [System.Security.AccessControl.FileSystemRights]::AppendData -bor
@@ -191,12 +195,24 @@ $writeRights = [int](
   [System.Security.AccessControl.FileSystemRights]::Delete -bor
   [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
   [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
-  [System.Security.AccessControl.FileSystemRights]::TakeOwnership)
-$rules = @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
-foreach ($rule in $rules) {
-  if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
-  if ($trustedSids -notcontains $rule.IdentityReference.Value -and
-      (([int]$rule.FileSystemRights -band $writeRights) -ne 0)) { exit 12 }
+  [System.Security.AccessControl.FileSystemRights]::TakeOwnership -bor
+  0x10000000 -bor 0x40000000)
+$itemPath = $path
+while ($true) {
+  $item = Get-Item -LiteralPath $itemPath -Force
+  if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { exit 14 }
+  $acl = Get-Acl -LiteralPath $itemPath
+  $ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+  if ($trustedSids -notcontains $ownerSid) { exit 11 }
+  $rules = @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+  foreach ($rule in $rules) {
+    if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
+    if ($trustedSids -notcontains $rule.IdentityReference.Value -and
+        (([int]$rule.FileSystemRights -band $writeRights) -ne 0)) { exit 12 }
+  }
+  $parentPath = Split-Path -Parent $itemPath
+  if ([string]::IsNullOrEmpty($parentPath) -or $parentPath -eq $itemPath) { break }
+  $itemPath = $parentPath
 }
 exit 0
 '

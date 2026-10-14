@@ -133,6 +133,10 @@ if [ "\${3-}" = '-Command' ]; then
     *'FromBase64String("AA/=")'*) ;;
     *) exit 1 ;;
   esac
+  case "\$4" in
+    *'Split-Path -Parent \$itemPath'*) ;;
+    *) exit 1 ;;
+  esac
   printf '%s\n' invoked > "$permission_fixture_bin/powershell-called"
 fi
 exit 0

@@ -332,7 +332,7 @@ set -eu
 fixture_dir='__FAKE_ROOT__'
 real_pwsh='__REAL_PWSH__'
 case " $* " in
-  *'Get-Acl -LiteralPath $path'*) exit 0 ;;
+  *'Split-Path -Parent $itemPath'*) exit 0 ;;
 esac
 if [ -f "$fixture_dir/pwsh.invalid-json" ]; then
   printf '%s\n' '{"riskScore":65}'
@@ -421,6 +421,10 @@ printf '%s\n' 'C:\Users\test\codex.exe'
 EOF
 cat > "$fake_root/powershell-acl.exe" <<EOF
 #!/bin/sh
+case "\$*" in
+  *'Split-Path -Parent \$itemPath'*) ;;
+  *) exit 1 ;;
+esac
 printf '%s\n' invoked > "$fake_root/powershell-acl-called"
 test ! -f "$fake_root/powershell-acl-deny"
 EOF
@@ -442,6 +446,30 @@ chmod +x "$fake_root/stat-acl-fixture" "$fake_root/wslpath-acl-fixture" "$fake_r
   touch "$fake_root/powershell-acl-deny"
   if validated_path="$(validate_trusted_codex_path "$fake_root/codex.exe" 2>&1)"; then
     fail 'WSL Windows Codex의 안전하지 않은 ACL을 거부하지 않았습니다.'
+  fi
+)
+
+writable_codex_parent="$fake_root/writable-codex-parent"
+mkdir "$writable_codex_parent"
+cp "$fake_root/codex.exe" "$writable_codex_parent/codex.exe"
+chmod 755 "$writable_codex_parent/codex.exe"
+chmod 777 "$writable_codex_parent"
+(
+  . "$codex_acl_validation"
+  readlink_bin="$(command -v readlink)"
+  stat_bin="$(command -v stat)"
+  id_bin="$(command -v id)"
+  CHECKOUT_ROOT="$test_worktree"
+  is_windows_mounted_filesystem() { return 1; }
+  parent_mode="$($stat_bin -c '%a' -- "$writable_codex_parent")"
+  if (( 8#$parent_mode & 022 )); then
+    set +e
+    writable_parent_output="$(validate_trusted_codex_path "$writable_codex_parent/codex.exe" 2>&1)"
+    writable_parent_status=$?
+    set -e
+    if [ "$writable_parent_status" -eq 0 ] || ! grep -Fq "$writable_codex_parent" <<< "$writable_parent_output"; then
+      fail 'Codex 실행 파일의 group/world writable 상위 폴더를 차단하지 않았습니다.'
+    fi
   fi
 )
 
