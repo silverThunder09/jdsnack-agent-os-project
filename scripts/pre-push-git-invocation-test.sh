@@ -40,7 +40,7 @@ case "$git_common_dir" in
   *) git_common_dir="$test_worktree/$git_common_dir" ;;
 esac
 git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)"
-trusted_hook_path="$git_common_dir/jdsnack-hooks"
+trusted_hook_path="$(mktemp -d "$git_common_dir/jdsnack-hooks-${trusted_source_sha}.XXXXXX")"
 mkdir -p "$trusted_hook_path/scripts"
 chmod 700 "$trusted_hook_path" "$trusted_hook_path/scripts"
 cp "$test_worktree/.githooks/pre-commit" "$trusted_hook_path/pre-commit"

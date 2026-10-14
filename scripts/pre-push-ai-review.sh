@@ -558,6 +558,7 @@ verify_trusted_bundle_acl() {
   local bundle_root="$BUNDLE_ROOT"
   local common_dir
   local common_bundle_root
+  local configured_hooks_path
   if [ ! -f "$bundle_root/pre-push" ]; then
     common_dir="$($git_bin rev-parse --git-common-dir 2>/dev/null || true)"
     case "$common_dir" in
@@ -568,7 +569,23 @@ verify_trusted_bundle_acl() {
       common_dir="$($path_converter_bin -u "$common_dir" 2>/dev/null || true)"
     fi
     common_dir="$(CDPATH= cd -- "$common_dir" 2>/dev/null && pwd -P || true)"
-    common_bundle_root="$common_dir/jdsnack-hooks"
+    if [ -z "$common_dir" ]; then
+      echo "ERROR: trusted hook bundle의 Git common dir를 확인할 수 없습니다." >&2
+      return 1
+    fi
+    configured_hooks_path="$($git_bin config --local --get core.hooksPath 2>/dev/null || true)"
+    case "$configured_hooks_path" in
+      /*|[A-Za-z]:[\\/]*) ;;
+      *) configured_hooks_path="" ;;
+    esac
+    if [ -n "$configured_hooks_path" ] && [ -n "$path_converter_bin" ]; then
+      configured_hooks_path="$($path_converter_bin -u "$configured_hooks_path" 2>/dev/null || true)"
+    fi
+    common_bundle_root="$(CDPATH= cd -- "$configured_hooks_path" 2>/dev/null && pwd -P || true)"
+    case "$common_bundle_root" in
+      "$common_dir"/jdsnack-hooks-*) ;;
+      *) common_bundle_root="" ;;
+    esac
     if [ -f "$common_bundle_root/pre-push" ] &&
       [ -f "$common_bundle_root/scripts/verify-trusted-hook-bundle-acl.ps1" ]; then
       bundle_root="$common_bundle_root"
