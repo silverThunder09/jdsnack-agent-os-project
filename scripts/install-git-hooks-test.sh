@@ -86,6 +86,27 @@ fi
 test ! -e "$test_worktree/codex.executed" \
   || fail 'installer가 trusted path 검증 전에 checkout 내부 Codex를 실행했습니다.'
 
+# A Windows path can retain different letter case after readlink/cygpath.
+# The checkout exclusion must compare those paths without case sensitivity.
+(
+  eval "$(sed -n '/^validate_trusted_codex_path() {/,/^}/p' "$ROOT_DIR/scripts/install-git-hooks.sh")"
+  is_windows_mounted_filesystem() { return 0; }
+  repo_root="$test_worktree"
+  trusted_repo_identity="$test_worktree"
+  if command -v cygpath >/dev/null 2>&1; then
+    trusted_repo_identity="$(cygpath -m "$test_worktree")"
+  fi
+  trusted_repo_identity="$(printf '%s\n' "$trusted_repo_identity" | tr '[:lower:]' '[:upper:]')"
+  trusted_path_separator='/'
+  set +e
+  case_variant_output="$(validate_trusted_codex_path "$test_worktree/codex" 2>&1)"
+  case_variant_status=$?
+  set -e
+  if [ "$case_variant_status" -eq 0 ] || ! grep -Fq 'untrusted checkout 안에 있을 수 없습니다' <<< "$case_variant_output"; then
+    fail 'installer가 대소문자가 다른 Windows checkout Codex 경로를 차단하지 않았습니다.'
+  fi
+)
+
 outside_file="$fixture_root/outside-preserved.txt"
 outside_scripts="$fixture_root/outside-scripts"
 legacy_bundle="$test_worktree/.git/jdsnack-hooks"

@@ -390,7 +390,7 @@ fi
 # when its Windows ACL is restricted. The hook must consult that ACL and reject
 # a failed ACL check rather than trusting the synthetic mode.
 codex_acl_validation="$fake_root/validate-codex-acl.sh"
-for function_name in validate_trusted_codex_path is_windows_mounted_filesystem verify_windows_codex_acl; do
+for function_name in validate_trusted_codex_path is_windows_mounted_filesystem path_is_within_checkout verify_windows_codex_acl; do
   awk -v function_name="$function_name" '
     $0 ~ "^" function_name "\\(\\) \\{" { capture=1; depth=0 }
     capture {
@@ -405,6 +405,7 @@ for function_name in validate_trusted_codex_path is_windows_mounted_filesystem v
 done
 printf '#!/bin/sh\nexit 0\n' > "$fake_root/codex.exe"
 chmod +x "$fake_root/codex.exe"
+cp "$fake_root/codex.exe" "$test_worktree/codex.exe"
 real_stat_bin="$(command -v stat)"
 cat > "$fake_root/stat-acl-fixture" <<EOF
 #!/bin/sh
@@ -447,6 +448,14 @@ chmod +x "$fake_root/stat-acl-fixture" "$fake_root/wslpath-acl-fixture" "$fake_r
   if validated_path="$(validate_trusted_codex_path "$fake_root/codex.exe" 2>&1)"; then
     fail 'WSL Windows Codex의 안전하지 않은 ACL을 거부하지 않았습니다.'
   fi
+  CHECKOUT_ROOT="${test_worktree^^}"
+  set +e
+  case_variant_output="$(validate_trusted_codex_path "$test_worktree/codex.exe" 2>&1)"
+  case_variant_status=$?
+  set -e
+  if [ "$case_variant_status" -eq 0 ] || ! grep -Fq 'untrusted checkout 안에 있을 수 없습니다' <<< "$case_variant_output"; then
+    fail 'pre-push가 대소문자가 다른 Windows checkout Codex 경로를 차단하지 않았습니다.'
+  fi
 )
 
 writable_codex_parent="$fake_root/writable-codex-parent"
@@ -474,18 +483,21 @@ chmod 777 "$writable_codex_parent"
 )
 
 windows_git_resolver="$fake_root/resolve-windows-git-bin.sh"
-awk '
-  /^resolve_windows_git_bin\(\) \{/ { capture=1; depth=0 }
-  capture {
-    line=$0
-    print
-    depth += gsub(/\{/, "", line)
-    line=$0
-    depth -= gsub(/\}/, "", line)
-    if (depth == 0) exit
-  }
-' "$ROOT_DIR/scripts/pre-push-ai-review.sh" > "$windows_git_resolver"
+for function_name in path_is_within_checkout resolve_windows_git_bin; do
+  awk -v function_name="$function_name" '
+    $0 ~ "^" function_name "\\(\\) \\{" { capture=1; depth=0 }
+    capture {
+      line=$0
+      print
+      depth += gsub(/\{/, "", line)
+      line=$0
+      depth -= gsub(/\}/, "", line)
+      if (depth == 0) exit
+    }
+  ' "$ROOT_DIR/scripts/pre-push-ai-review.sh" >> "$windows_git_resolver"
+done
 . "$windows_git_resolver"
+is_windows_mounted_filesystem() { return 1; }
 printf '#!/bin/sh\nexit 0\n' > "$fake_root/git.exe"
 chmod +x "$fake_root/git.exe"
 readlink_bin="$(builtin command -v readlink)"

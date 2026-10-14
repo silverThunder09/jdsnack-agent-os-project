@@ -84,12 +84,10 @@ validate_trusted_codex_path() {
     echo "ERROR: installer가 승인한 Codex 실행 파일의 실제 대상을 확인할 수 없습니다: $candidate" >&2
     exit 1
   fi
-  case "$canonical" in
-    "$CHECKOUT_ROOT"|"$CHECKOUT_ROOT"/*)
-      echo "ERROR: Codex 실행 파일은 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
-      exit 1
-      ;;
-  esac
+  if path_is_within_checkout "$canonical"; then
+    echo "ERROR: Codex 실행 파일은 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
+    exit 1
+  fi
   if is_windows_mounted_filesystem "$canonical"; then
     if ! verify_windows_codex_acl "$canonical"; then
       echo "ERROR: Windows Codex 실행 파일의 ACL을 확인할 수 없습니다: $canonical" >&2
@@ -139,6 +137,19 @@ is_windows_mounted_filesystem() {
       [A-Za-z]:*|\\\\*) return 0 ;;
     esac
   fi
+  return 1
+}
+
+path_is_within_checkout() {
+  local candidate="$1"
+  local checkout_root="$CHECKOUT_ROOT"
+  if is_windows_mounted_filesystem "$candidate" && is_windows_mounted_filesystem "$checkout_root"; then
+    candidate="${candidate,,}"
+    checkout_root="${checkout_root,,}"
+  fi
+  case "$candidate" in
+    "$checkout_root"|"$checkout_root"/*) return 0 ;;
+  esac
   return 1
 }
 
@@ -558,12 +569,10 @@ resolve_windows_git_bin() {
     echo "ERROR: Windows git.exe의 실제 실행 파일을 확인할 수 없습니다: $candidate" >&2
     return 1
   fi
-  case "$canonical" in
-    "$CHECKOUT_ROOT"|"$CHECKOUT_ROOT"/*)
-      echo "ERROR: Windows git.exe는 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
-      return 1
-      ;;
-  esac
+  if path_is_within_checkout "$canonical"; then
+    echo "ERROR: Windows git.exe는 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
+    return 1
+  fi
   printf '%s\n' "$canonical"
 }
 

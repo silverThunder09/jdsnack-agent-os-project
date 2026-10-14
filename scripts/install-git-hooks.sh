@@ -77,8 +77,13 @@ validate_trusted_codex_path() {
   if command -v cygpath >/dev/null 2>&1; then
     canonical_identity="$(cygpath -m "$canonical" 2>/dev/null || true)"
   fi
+  comparison_repo_identity="$trusted_repo_identity"
+  if is_windows_mounted_filesystem "$canonical" && is_windows_mounted_filesystem "$repo_root"; then
+    canonical_identity="$(printf '%s\n' "$canonical_identity" | awk '{ print tolower($0) }')"
+    comparison_repo_identity="$(printf '%s\n' "$comparison_repo_identity" | awk '{ print tolower($0) }')"
+  fi
   case "$canonical_identity" in
-    "$trusted_repo_identity"|"$trusted_repo_identity$trusted_path_separator"*)
+    "$comparison_repo_identity"|"$comparison_repo_identity$trusted_path_separator"*)
       echo "ERROR: Codex CLI 실행 파일은 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
       exit 1
       ;;
