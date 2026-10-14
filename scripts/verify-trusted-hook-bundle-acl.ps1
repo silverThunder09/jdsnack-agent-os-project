@@ -92,7 +92,8 @@ function Assert-TrustedHookAclRules {
         [System.Security.AccessControl.FileSystemRights]::Delete -bor
         [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
         [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
-        [System.Security.AccessControl.FileSystemRights]::TakeOwnership)
+        [System.Security.AccessControl.FileSystemRights]::TakeOwnership -bor
+        0x10000000 -bor 0x40000000)
 
     foreach ($rule in @($AccessRules)) {
         if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) {

@@ -80,6 +80,30 @@ try {
         throw 'trusted hook bundle의 다른 사용자 쓰기 권한을 거부하지 않았습니다.'
     }
 
+    foreach ($genericRight in @(0x10000000, 0x40000000)) {
+        # FileSystemAccessRule rejects raw generic bits at construction time,
+        # so model the ACE returned by GetAccessRules with those bits intact.
+        $genericRule = [pscustomobject]@{
+            AccessControlType = $allow
+            IdentityReference = $usersSid
+            FileSystemRights = $genericRight
+        }
+        $rejected = $false
+        try {
+            Assert-TrustedHookAclRules -AccessRules ($safeRules + $genericRule) -OwnerSid $userSid.Value `
+                -CurrentUserSid $userSid.Value -TargetName 'fixture'
+        }
+        catch {
+            $rejected = $_.Exception.Message -match '쓰기 권한'
+            if (-not $rejected) {
+                throw
+            }
+        }
+        if (-not $rejected) {
+            throw ('trusted hook bundle의 generic 쓰기 권한을 거부하지 않았습니다: 0x{0:X8}' -f $genericRight)
+        }
+    }
+
     Write-Output 'Trusted hook bundle writable ACL contract passed'
     }
     else {
