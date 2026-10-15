@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+hook_root="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+git_common_dir="$(git rev-parse --git-common-dir)"
+case "$git_common_dir" in /*|[A-Za-z]:[\\/]*) ;; *) git_common_dir="$repo_root/$git_common_dir" ;; esac
+git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)"
+case "$hook_root" in
+  "$git_common_dir"/jdsnack-hooks-*) ;;
+  *) echo 'ERROR: pre-push must run from the external trusted hook bundle; reinstall from origin/main.' >&2; exit 1 ;;
+esac
+
+python_bin="$(git config --local --get jdsnack.python || true)"
+git_bash="$(git config --local --get jdsnack.hookBash || true)"
+codex_bin="$(git config --local --get jdsnack.codex || true)"
+for executable in "$python_bin" "$git_bash" "$codex_bin"; do
+  case "$executable" in /*|[A-Za-z]:[\\/]*) ;; *) echo 'ERROR: verified hook tools are not configured with absolute paths.' >&2; exit 1 ;; esac
+  [ -x "$executable" ] || { echo "ERROR: verified hook executable is unavailable: $executable" >&2; exit 1; }
+done
+"$python_bin" "$hook_root/scripts/verify-hook-bundle.py" "$hook_root"
+PATH="$(dirname -- "$codex_bin"):$PATH"
+export PATH
+exec "$git_bash" "$hook_root/scripts/pre-push-ai-review.sh" "$@"
