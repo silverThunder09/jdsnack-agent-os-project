@@ -1,2 +1,4 @@
 *.sh text eol=lf
+scripts/trusted-hooks/pre-commit text eol=lf
+scripts/trusted-hooks/pre-push text eol=lf
 scripts/test-fixtures/pr-feedback-detector/gh text eol=lf

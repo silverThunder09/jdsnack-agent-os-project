@@ -331,6 +331,24 @@ test -f "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" \
   || { echo 'scripts/complete-review-approval-contract-test.ps1 is missing' >&2; exit 1; }
 pwsh -NoProfile -File "$ROOT_DIR/scripts/complete-review-approval-contract-test.ps1" -Workspace "$ROOT_DIR"
 bash "$ROOT_DIR/scripts/pre-push-ai-review-test.sh"
+for trusted_hook in \
+  "$ROOT_DIR/scripts/trusted-hooks/pre-commit" \
+  "$ROOT_DIR/scripts/trusted-hooks/pre-push" \
+  "$ROOT_DIR/scripts/trusted-hooks/verify-hook-bundle.py" \
+  "$ROOT_DIR/scripts/trusted-hooks/render-reviewer.py" \
+  "$ROOT_DIR/scripts/trusted-hooks/verify-trusted-hook-bundle-acl.ps1"; do
+  test -f "$trusted_hook" || { echo "missing trusted hook source: $trusted_hook" >&2; exit 1; }
+done
+for trusted_shell in "$ROOT_DIR/scripts/trusted-hooks/pre-commit" "$ROOT_DIR/scripts/trusted-hooks/pre-push"; do
+  bash -n "$trusted_shell"
+done
+test -f "$ROOT_DIR/scripts/install-git-hooks-test.sh" \
+  || { echo 'scripts/install-git-hooks-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/install-git-hooks-test.sh"
+bash "$ROOT_DIR/scripts/install-git-hooks-test.sh"
+test -f "$ROOT_DIR/scripts/verify-trusted-hook-bundle-acl-test.ps1" \
+  || { echo 'scripts/verify-trusted-hook-bundle-acl-test.ps1 is missing' >&2; exit 1; }
+pwsh -NoProfile -File "$ROOT_DIR/scripts/verify-trusted-hook-bundle-acl-test.ps1" -Workspace "$ROOT_DIR"
 bash "$ROOT_DIR/scripts/backends-contract-test.sh"
 ./scripts/pr-ci-router-test.sh
 ./scripts/pr-feedback-workflow-test.sh

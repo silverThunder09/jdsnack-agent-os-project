@@ -6,7 +6,7 @@ Git 훅은 사람이 놓치기 쉬운 하네스 규칙을 커밋/푸시 전에 �
 
 ## 적용 단계
 
-현재 저장소는 버전관리되는 `.githooks/pre-commit`과 `.githooks/pre-push`를 사용합니다. clone 직후 `sh scripts/install-git-hooks.sh`를 실행하면 hook 파일과 downstream 스크립트, pre-push에서 사용할 실행 가능한 Git Bash를 검증해 절대 경로로 로컬 Git 설정(`jdsnack.hookBash`)에 저장하고, pre-commit readiness용 Python, `jq`, PowerShell(`pwsh` 또는 `powershell.exe`), Codex CLI를 확인한 뒤에만 `core.hooksPath=.githooks`를 연결합니다. push hook은 이 검증된 Bash 경로를 호출하므로 실행 시점의 PATH 차이로 Bash를 찾지 못하는 경우를 막습니다. 사전조건이나 설정 검증이 실패하면 hook 활성화를 성공으로 처리하지 않습니다.
+clone 또는 새 작업 환경에서는 먼저 `git fetch origin main`으로 trusted source를 갱신한 뒤 `git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh`를 실행합니다. installer는 현재 checkout의 hook 파일을 실행하지 않고, `origin/main`의 `scripts/trusted-hooks/`와 지정된 공통 의존 파일을 Git common dir 아래 별도 bundle로 복사합니다. trusted source SHA, 설치 당시 checkout SHA, 각 Git blob ID를 기록하고 Windows ACL 또는 POSIX 권한, Git Bash, Python, `jq`, PowerShell, Codex CLI를 확인한 뒤 `core.hooksPath`를 해당 외부 bundle에 연결합니다. 검증이나 설정이 실패하면 hook을 활성화하지 않습니다.
 
 ## `commit-msg` 훅
 
@@ -49,7 +49,7 @@ echo "$first_line" | grep -Eiq 'wip|temp|fix stuff|update$' && {
 - `api` 또는 `controller` 변경 시 `api-spec.md` 변경 필요
 - `components`, `hooks`, `services` 변경 시 `ui-spec.md` 또는 `test-scenarios.md` 변경 필요
 - `requirements.md` 변경 시 `acceptance-criteria.md`와 `traceability.md` 변경 필요
-- `python3 scripts/check-ai-readiness.py`가 모듈 문서, Markdown 링크, freshness, 정적 eval 케이스를 검사
+- trusted bundle의 `pre-commit`은 bundle 안의 `check-ai-readiness.py`를 실행하고 checkout 경로를 입력으로 전달해 모듈 문서, Markdown 링크, freshness, 정적 eval 케이스를 검사합니다.
 
 예시 스크립트:
 
@@ -85,7 +85,7 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 ## `pre-push` 훅
 
-푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. `scripts/pre-push-ai-review.sh`는 tracked checkout이 clean한지 먼저 확인한 뒤 현재 branch와 `origin/main`의 branch diff만 전달하고, `scripts/review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙도 프롬프트에 포함합니다. 요청 모델은 `backends.json`의 `workers.codex.review-fallback.model`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
+푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. Git common dir의 trusted `pre-push`는 `origin/main` SHA와 bundle manifest의 모든 파일 digest를 확인한 뒤에만 bundle reviewer를 실행합니다. reviewer는 checkout의 tracked 변경을 실행하지 않고 branch diff만 전달하며, bundle에 복사된 `review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙을 포함합니다. 요청 모델은 bundle의 `backends.json`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
 
 검사 규칙:
 
