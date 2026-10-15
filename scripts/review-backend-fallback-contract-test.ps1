@@ -88,14 +88,13 @@ if (-not $fallbackSource.Contains("`$ErrorActionPreference = 'Continue'")) {
 }
 $workflowSource = Get-Content -LiteralPath (Join-Path $Workspace '.github/workflows/codex-branch-review.yml') -Raw
 $decisionPattern = '(?im)^[ \t]*(?:-[ \t]*)?decision:[ \t]*(PASS|COMMENT|REQUEST_CHANGES|NEEDS_HUMAN)[ \t]*\r?$'
-$scorePattern = '(?im)^[ \t]*(?:-[ \t]*)?(?:review[ \t]+)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*\r?$'
+$scorePattern = '(?im)^[ \t]*(?:-[ \t]*)?score:[ \t]*([0-5])(?:[ \t]*/[ \t]*5)?[ \t]*\r?$'
 if (-not $workflowSource.Contains($scorePattern)) {
     throw 'Workflow review score parser does not accept both score: N and score: N/5 formats.'
 }
 foreach ($reviewOutput in @(
         "decision: PASS`nscore: 4"
         "- decision: PASS`n- score: 4/5"
-        "decision: PASS`nreview score: 4/5"
         "- decision: PASS`r`n- score: 4/5`r`n"
     )) {
     $decisionMatch = [regex]::Match($reviewOutput, $decisionPattern)
@@ -103,6 +102,9 @@ foreach ($reviewOutput in @(
     if (-not $decisionMatch.Success -or -not $scoreMatch.Success) {
         throw "Workflow review outcome parser rejected a valid output fixture: $reviewOutput"
     }
+}
+if ([regex]::Match("decision: PASS`nreview score: 4/5", $scorePattern).Success) {
+    throw 'Workflow review outcome parser accepted an unsupported review score alias.'
 }
 
 $paginatedComments = @(Get-PaginatedJsonItems -Json '[[{"id":101,"body":"first"}],[{"id":202,"body":"second"}]]')
