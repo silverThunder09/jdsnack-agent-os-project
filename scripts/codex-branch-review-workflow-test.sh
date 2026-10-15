@@ -125,7 +125,8 @@ assert_contains 'review_decision: ${{ steps.review_outcome.outputs.decision }}'
 assert_contains 'review_score: ${{ steps.review_outcome.outputs.score }}'
 assert_contains 'review_passed: ${{ steps.review_outcome.outputs.passed }}'
 assert_contains "(?:-[ \\t]*)?decision:"
-assert_contains "(?:-[ \\t]*)?(?:review[ \\t]+)?score:"
+assert_contains "(?:-[ \\t]*)?score:"
+assert_not_contains "(?:review[ \\t]+)?score:"
 assert_contains "(?:[ \\t]*/[ \\t]*5)?"
 assert_contains 'The successful review job did not export a valid structured outcome.'
 assert_contains "REVIEW_PASSED -eq 'true'"
