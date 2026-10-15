@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Path,
+    [string]$CodexPath,
+    [string]$CheckoutPath,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ExpectedRelativePath = @(),
     [switch]$RulesOnly
@@ -194,6 +196,58 @@ function Assert-TrustedHookBundleAcl {
     }
 }
 
+function Assert-TrustedCodexAcl {
+    param([Parameter(Mandatory = $true)][string]$ExecutablePath,
+        [Parameter(Mandatory = $true)][string]$RepositoryPath)
+    $fullExecutable = [System.IO.Path]::GetFullPath($ExecutablePath)
+    $fullRepository = [System.IO.Path]::GetFullPath($RepositoryPath).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $prefix = $fullRepository + [System.IO.Path]::DirectorySeparatorChar
+    $comparison = if ($runningOnWindows) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+    if ($fullExecutable.StartsWith($prefix, $comparison) -or $fullExecutable -eq $fullRepository) {
+        throw 'Codex CLI must be installed outside the checkout.'
+    }
+    $item = Get-Item -LiteralPath $fullExecutable -Force
+    if ($item.PSIsContainer -or ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'Codex CLI must resolve to a regular executable file.'
+    }
+    if ($runningOnWindows) {
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        $currentSid = $identity.User.Value
+        $path = $fullExecutable
+        while ($true) {
+            $entry = Get-Item -LiteralPath $path -Force
+            if (($entry.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Codex CLI path contains a reparse point: $path" }
+            $acl = Get-Acl -LiteralPath $path
+            $ancestor = $entry.PSIsContainer
+            Assert-TrustedHookAclRules -AccessRules @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) `
+                -OwnerSid $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value -CurrentUserSid $currentSid `
+                -TargetName "Codex CLI: $path" -AncestorDirectory:$ancestor
+            $parent = Split-Path -Parent $path
+            if ([string]::IsNullOrEmpty($parent) -or $parent -eq $path) { break }
+            $path = $parent
+        }
+    }
+    else {
+        $stat = '/usr/bin/stat'; $id = '/usr/bin/id'; $uid = (& $id -u).Trim()
+        $path = $fullExecutable
+        while ($true) {
+            $mode = (& $stat -c '%a' -- $path).Trim(); $owner = (& $stat -c '%u' -- $path).Trim()
+            if ($LASTEXITCODE -ne 0 -or $owner -notmatch '^\d+$' -or $mode -notmatch '^[0-7]{3,4}$' -or
+                ($owner -ne $uid -and $owner -ne '0')) { throw "Codex CLI path ownership or mode is unsafe: $path" }
+            $digits = $mode.PadLeft(4, '0')
+            $writable = ([int][string]$digits[2] -band 2) -ne 0 -or ([int][string]$digits[3] -band 2) -ne 0
+            $rootStickyAncestor = $path -ne $fullExecutable -and $owner -eq '0' -and ([int][string]$digits[0] -band 1) -ne 0
+            if ($writable -and -not $rootStickyAncestor) {
+                throw "Codex CLI path is writable by another user or group: $path"
+            }
+            if ($path -eq '/') { break }
+            $path = Split-Path -Parent $path
+            if ([string]::IsNullOrEmpty($path)) { $path = '/' }
+        }
+    }
+}
+
 if ($RulesOnly) {
     return
 }
@@ -207,4 +261,8 @@ $relativePaths = @(
         $value -split '\|' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     })
 Assert-TrustedHookBundleAcl -BundlePath $Path -RelativePaths $relativePaths
+if (-not [string]::IsNullOrWhiteSpace($CodexPath)) {
+    if ([string]::IsNullOrWhiteSpace($CheckoutPath)) { throw 'checkout path is required to validate Codex CLI ACL.' }
+    Assert-TrustedCodexAcl -ExecutablePath $CodexPath -RepositoryPath $CheckoutPath
+}
 Write-Output 'Trusted hook bundle ACL contract passed'

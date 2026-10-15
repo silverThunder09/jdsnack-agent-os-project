@@ -1,322 +1,75 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+workspace="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+test_root="${JDSNACK_HOOK_TEST_TMPDIR:-$workspace}"
+if [ -z "${JDSNACK_HOOK_TEST_TMPDIR-}" ] && [ -n "${LOCALAPPDATA-}" ] && command -v cygpath >/dev/null 2>&1; then
+  test_root="$(cygpath -u "$LOCALAPPDATA")"
+fi
+temporary="$(mktemp -d "$test_root/.trusted-hook-fixture.XXXXXX")"
+trap 'rm -rf "$temporary"' EXIT
+fixture="$temporary/repo"
+mkdir -p "$fixture"
+sources='scripts/trusted-hooks/pre-commit scripts/trusted-hooks/pre-push scripts/trusted-hooks/verify-hook-bundle.py scripts/trusted-hooks/render-reviewer.py scripts/trusted-hooks/verify-trusted-hook-bundle-acl.ps1 scripts/check-ai-readiness.py backends.json scripts/pre-push-ai-review.sh scripts/review-policy.json scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1 scripts/verify-codex-auth-permissions.ps1 scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1 scripts/install-git-hooks.sh'
+for source in $sources; do
+  mkdir -p "$fixture/$(dirname "$source")"
+  cp "$workspace/$source" "$fixture/$source"
+done
+cd "$fixture"
+git init -q
+git config user.name 'Trusted Hook Fixture'
+git config user.email 'trusted-hooks@example.invalid'
+git add .
+git commit -qm 'fixture: trusted main sources'
+git branch -M main
+main_sha="$(git rev-parse HEAD)"
+git update-ref refs/remotes/origin/main "$main_sha"
+git switch -qc feature/tampered
 
-fail() {
-  echo "FAIL: $1" >&2
+mkdir -p .githooks
+printf '%s\n' 'UNTRUSTED CHECKOUT HOOK' > .githooks/pre-push
+printf '%s\n' 'UNTRUSTED REVIEWER' > scripts/pre-push-ai-review.sh
+printf '%s\n' 'UNTRUSTED INSTALLER' > scripts/install-git-hooks.sh
+printf '%s\n' 'UNTRUSTED READINESS' > scripts/check-ai-readiness.py
+printf '%s\n' 'UNTRUSTED PRE-PUSH' > scripts/trusted-hooks/pre-push
+printf '%s\n' 'UNTRUSTED CONFIG' > backends.json
+git add .
+git commit -qm 'fixture: divergent checkout'
+checkout_sha="$(git rev-parse HEAD)"
+
+if ! command -v codex >/dev/null 2>&1; then
+  mkdir "$temporary/bin"
+  printf '#!/bin/sh\nexit 0\n' > "$temporary/bin/codex"
+  chmod 700 "$temporary/bin/codex"
+  PATH="$temporary/bin:$PATH"
+  export PATH
+fi
+git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh
+
+bundle="$(git config --local --get core.hooksPath)"
+common_dir="$(CDPATH= cd -- "$(git rev-parse --git-common-dir)" && pwd -P)"
+if command -v cygpath >/dev/null 2>&1; then
+  bundle="$(cygpath -u "$bundle")"
+  common_dir="$(cygpath -u "$common_dir")"
+fi
+case "$bundle" in "$common_dir"/jdsnack-hooks-*) ;; *) echo 'hook path is not in git common dir' >&2; exit 1 ;; esac
+test "$(cat "$bundle/trusted-source-ref")" = refs/remotes/origin/main
+test "$(cat "$bundle/source-sha")" = "$main_sha"
+test "$(cat "$bundle/trusted-source-sha")" = "$main_sha"
+test "$(cat "$bundle/checkout-sha")" = "$checkout_sha"
+test "$main_sha" != "$checkout_sha"
+git show "refs/remotes/origin/main:scripts/trusted-hooks/pre-push" | cmp - "$bundle/pre-push"
+git show "refs/remotes/origin/main:scripts/check-ai-readiness.py" | cmp - "$bundle/scripts/check-ai-readiness.py"
+grep -Fq 'BUNDLE_ROOT=' "$bundle/scripts/pre-push-ai-review.sh"
+grep -Fq 'CHECKOUT_ROOT="$($git_bin rev-parse --show-toplevel 2>/dev/null)"' "$bundle/scripts/pre-push-ai-review.sh"
+! grep -Fq 'UNTRUSTED' "$bundle/scripts/pre-push-ai-review.sh"
+python_bin="$(git config --local --get jdsnack.python)"
+"$python_bin" "$bundle/scripts/verify-hook-bundle.py" "$bundle"
+cp "$bundle/pre-push" "$temporary/pre-push.trusted"
+printf '%s\n' 'UNTRUSTED BUNDLE MUTATION' > "$bundle/pre-push"
+if "$python_bin" "$bundle/scripts/verify-hook-bundle.py" "$bundle" >/dev/null 2>&1; then
+  echo 'bundle digest verifier accepted a modified hook' >&2
   exit 1
-}
-
-command -v git >/dev/null 2>&1 || fail 'git이 필요합니다.'
-command -v bash >/dev/null 2>&1 || fail 'bash가 필요합니다.'
-
-fixture_root="$(mktemp -d)"
-test_worktree="$fixture_root/worktree"
-fixture_bin="$fixture_root/bin"
-cleanup() { rm -rf "$fixture_root"; }
-trap cleanup EXIT
-
-# The installer validates the Codex CLI contract, but this fixture only tests
-# trusted source copying. Keep it independent from the runner's installed CLI.
-mkdir -p "$fixture_bin"
-printf '#!/bin/sh\nexit 0\n' > "$fixture_bin/codex"
-chmod +x "$fixture_bin/codex"
-windows_cli_only="$fixture_root/windows-cli-only"
-mkdir -p "$windows_cli_only"
-cp "$fixture_bin/codex" "$windows_cli_only/codex.exe"
-(
-  eval "$(sed -n '/^resolve_codex_path() {/,/^}/p' "$ROOT_DIR/scripts/install-git-hooks.sh")"
-  PATH="$windows_cli_only"
-  command() {
-    if [ "${1-}" = '-v' ] && [ "${2-}" = 'codex' ]; then
-      return 1
-    fi
-    builtin command "$@"
-  }
-  discovered_codex="$(resolve_codex_path)"
-  [ "$discovered_codex" = "$windows_cli_only/codex.exe" ] \
-    || fail "installer가 codex.exe만 있는 WSL 경로를 찾지 못했습니다: $discovered_codex"
-)
-if sed -n '/^for required_tool in /,/^done/p' "$ROOT_DIR/scripts/install-git-hooks.sh" \
-    | grep -Eq '(^|[[:space:]])codex([[:space:]]|;)'; then
-  fail 'installer가 codex.exe 대체 탐색 전에 codex를 필수 도구로 요구합니다.'
 fi
-cat > "$fixture_bin/powershell.exe" <<'EOF'
-#!/bin/sh
-exit 0
-EOF
-chmod +x "$fixture_bin/powershell.exe"
-
-# The checkout's origin/main may predate the trusted-bundle installer. Use the
-# committed installer as the trusted fixture, then mutate only the worktree.
-trusted_source_sha="$(git rev-parse HEAD)"
-git clone --quiet --no-checkout "$ROOT_DIR" "$test_worktree"
-git -C "$test_worktree" checkout -B codex/install-hook-test "$trusted_source_sha" >/dev/null
-git -C "$test_worktree" config user.name test
-git -C "$test_worktree" config user.email test@example.com
-git -C "$test_worktree" update-ref refs/remotes/origin/main "$trusted_source_sha"
-printf '%s\n' branch-only-fixture > "$test_worktree/branch-only-fixture.txt"
-git -C "$test_worktree" add branch-only-fixture.txt
-git -C "$test_worktree" -c user.name=test -c user.email=test@example.com commit --quiet -m 'test: diverge installer fixture branch'
-test "$(git -C "$test_worktree" rev-parse HEAD)" != "$trusted_source_sha" \
-  || fail 'installer fixture branch가 trusted origin/main과 분기되지 않았습니다.'
-
-cat > "$test_worktree/.githooks/pre-push" <<'EOF'
-#!/bin/sh
-printf '%s\n' branch-controlled-hook
-EOF
-cat > "$test_worktree/scripts/pre-push-ai-review.sh" <<'EOF'
-#!/bin/sh
-printf '%s\n' branch-controlled-reviewer
-EOF
-chmod +x "$test_worktree/.githooks/pre-push" "$test_worktree/scripts/pre-push-ai-review.sh"
-cat > "$test_worktree/.githooks/pre-commit" <<'EOF'
-#!/bin/sh
-printf '%s\n' branch-controlled-pre-commit
-EOF
-cat > "$test_worktree/scripts/check-ai-readiness.py" <<'EOF'
-raise SystemExit('branch-controlled-readiness')
-EOF
-chmod +x "$test_worktree/.githooks/pre-commit"
-cat > "$test_worktree/scripts/install-git-hooks.sh" <<'EOF'
-#!/bin/sh
-echo branch-controlled-installer >&2
-exit 99
-EOF
-chmod +x "$test_worktree/scripts/install-git-hooks.sh"
-
-cat > "$test_worktree/codex" <<'EOF'
-#!/bin/sh
-: > "$0.executed"
-exit 0
-EOF
-chmod +x "$test_worktree/codex"
-set +e
-untrusted_codex_output="$(
-  cd "$test_worktree"
-  PATH="$test_worktree:$fixture_bin:$PATH" sh < <(git show refs/remotes/origin/main:scripts/install-git-hooks.sh) 2>&1
-)"
-untrusted_codex_status=$?
-set -e
-if [ "$untrusted_codex_status" -eq 0 ] || ! grep -Fq 'untrusted checkout 안에 있을 수 없습니다' <<<"$untrusted_codex_output"; then
-  printf '%s\n' "$untrusted_codex_output" >&2
-  fail 'installer가 checkout 내부의 Codex 실행 파일을 사전에 차단하지 않았습니다.'
-fi
-test ! -e "$test_worktree/codex.executed" \
-  || fail 'installer가 trusted path 검증 전에 checkout 내부 Codex를 실행했습니다.'
-
-# A Windows path can retain different letter case after readlink/cygpath.
-# The checkout exclusion must compare those paths without case sensitivity.
-(
-  eval "$(sed -n '/^validate_trusted_codex_path() {/,/^}/p' "$ROOT_DIR/scripts/install-git-hooks.sh")"
-  is_windows_mounted_filesystem() { return 0; }
-  repo_root="$test_worktree"
-  trusted_repo_identity="$test_worktree"
-  if command -v cygpath >/dev/null 2>&1; then
-    trusted_repo_identity="$(cygpath -m "$test_worktree")"
-  fi
-  trusted_repo_identity="$(printf '%s\n' "$trusted_repo_identity" | tr '[:lower:]' '[:upper:]')"
-  trusted_path_separator='/'
-  set +e
-  case_variant_output="$(validate_trusted_codex_path "$test_worktree/codex" 2>&1)"
-  case_variant_status=$?
-  set -e
-  if [ "$case_variant_status" -eq 0 ] || ! grep -Fq 'untrusted checkout 안에 있을 수 없습니다' <<< "$case_variant_output"; then
-    fail 'installer가 대소문자가 다른 Windows checkout Codex 경로를 차단하지 않았습니다.'
-  fi
-)
-
-outside_file="$fixture_root/outside-preserved.txt"
-outside_scripts="$fixture_root/outside-scripts"
-legacy_bundle="$test_worktree/.git/jdsnack-hooks"
-printf '%s\n' outside-original > "$outside_file"
-mkdir -p "$outside_scripts" "$legacy_bundle"
-ln "$outside_file" "$legacy_bundle/pre-push"
-ln -s "$outside_scripts" "$legacy_bundle/scripts" 2>/dev/null || true
-
-(
-  cd "$test_worktree"
-  git show refs/remotes/origin/main:scripts/install-git-hooks.sh | PATH="$fixture_bin:$PATH" sh >/dev/null
-)
-test "$(<"$outside_file")" = outside-original \
-  || fail 'installer가 기존 bundle의 하드링크를 따라가 외부 파일을 덮어썼습니다.'
-test ! -e "$outside_scripts/check-ai-readiness.py" \
-  || fail 'installer가 기존 bundle의 scripts 심볼릭 링크를 따라갔습니다.'
-
-# WSL DrvFS/9p commonly reports Windows executables as 777 even when the
-# Windows ACL is restricted. The installer must validate that ACL instead of
-# rejecting the executable based on a synthetic POSIX mode.
-permission_fixture_bin="$fixture_root/permission-bin"
-mkdir -p "$permission_fixture_bin"
-real_stat_path="$(command -v stat)"
-cat > "$permission_fixture_bin/stat" <<EOF
-#!/bin/sh
-case "\$*" in
-  *%a*) printf '%s\n' 777 ;;
-  *%T*) printf '%s\n' 9p ;;
-  *) exec "$real_stat_path" "\$@" ;;
-esac
-EOF
-cat > "$permission_fixture_bin/wslpath" <<'EOF'
-#!/bin/sh
-if [ "${1-}" = '-w' ]; then
-  printf '%s\n' 'C:\\Users\\test\\codex.exe'
-  exit 0
-fi
-exit 1
-EOF
-cat > "$permission_fixture_bin/powershell.exe" <<EOF
-#!/bin/sh
-if [ "\${3-}" = '-Command' ]; then
-  test "\$#" -eq 4 || exit 1
-  case "\$4" in
-    *'FromBase64String("AA/=")'*) ;;
-    *) exit 1 ;;
-  esac
-  case "\$4" in
-    *'Split-Path -Parent \$itemPath'*) ;;
-    *) exit 1 ;;
-  esac
-  printf '%s\n' invoked > "$permission_fixture_bin/powershell-called"
-fi
-exit 0
-EOF
-cat > "$permission_fixture_bin/base64" <<'EOF'
-#!/bin/sh
-test "$*" = '-w 0' || exit 1
-printf '%s' 'AA/='
-EOF
-chmod +x "$permission_fixture_bin/stat" "$permission_fixture_bin/wslpath" "$permission_fixture_bin/powershell.exe" "$permission_fixture_bin/base64"
-(
-  cd "$test_worktree"
-  PATH="$permission_fixture_bin:$fixture_bin:$PATH" sh < <(git show refs/remotes/origin/main:scripts/install-git-hooks.sh) >/dev/null
-)
-test -f "$permission_fixture_bin/powershell-called" \
-  || fail 'WSL/DrvFS Codex 권한 검증이 Windows ACL 확인기를 호출하지 않았습니다.'
-
-# A WSL checkout on a Linux filesystem still needs Windows paths when only
-# powershell.exe is available for the trusted bundle verifier.
-posix_fixture_bin="$fixture_root/posix-bin"
-mkdir -p "$posix_fixture_bin"
-cat > "$posix_fixture_bin/wslpath" <<'EOF'
-#!/bin/sh
-test "${1-}" = '-w' || exit 1
-case "${2-}" in
-  */verify-trusted-hook-bundle-acl.ps1) printf '%s\n' '\\wsl.localhost\Ubuntu\home\test\verify-trusted-hook-bundle-acl.ps1' ;;
-  */jdsnack-hooks) printf '%s\n' '\\wsl.localhost\Ubuntu\home\test\jdsnack-hooks' ;;
-  *) exit 1 ;;
-esac
-EOF
-cat > "$posix_fixture_bin/powershell.exe" <<EOF
-#!/bin/sh
-test "\${3-}" = '-File' || exit 1
-test "\${5-}" = '-Path' || exit 1
-case "\${4-}:\${6-}" in
-  *wsl.localhost*:*wsl.localhost*) ;;
-  *) exit 1 ;;
-esac
-case "\${4-}:\${6-}" in
-  */home/*) exit 1 ;;
-esac
-printf '%s\n' invoked > "$posix_fixture_bin/powershell-called"
-EOF
-chmod +x "$posix_fixture_bin/wslpath" "$posix_fixture_bin/powershell.exe"
-(
-  PATH="$posix_fixture_bin:$PATH"
-  powershell_tool=powershell.exe
-  is_windows_mounted_filesystem() { return 1; }
-  eval "$(sed -n '/^verify_trusted_hook_bundle_acl() {/,/^}/p' "$ROOT_DIR/scripts/install-git-hooks.sh")"
-  verify_trusted_hook_bundle_acl '/home/test/.git/jdsnack-hooks' 'pre-commit'
-)
-test -f "$posix_fixture_bin/powershell-called" \
-  || fail 'WSL Linux 파일시스템에서 Windows PowerShell에 Windows 경로를 전달하지 않았습니다.'
-
-trusted_hooks_dir="$(git -C "$test_worktree" config --local --get core.hooksPath)"
-if command -v cygpath >/dev/null 2>&1; then
-  trusted_hooks_dir="$(cygpath -u "$trusted_hooks_dir")"
-fi
-case "$trusted_hooks_dir" in
-  "$test_worktree/.git/jdsnack-hooks-$trusted_source_sha".*) ;;
-  *) fail 'installer가 Git common dir 밖 또는 재사용 가능한 bundle 경로를 활성화했습니다.' ;;
-esac
-(
-  cd "$test_worktree"
-  MSYS_NO_PATHCONV=1 git show "refs/remotes/origin/main:.githooks/pre-push"
-) | cmp - "$trusted_hooks_dir/pre-push" \
-  || fail 'installer가 branch에서 변조한 pre-push를 trusted bundle에 복사했습니다.'
-(
-  cd "$test_worktree"
-  MSYS_NO_PATHCONV=1 git show "refs/remotes/origin/main:scripts/pre-push-ai-review.sh"
-) | cmp - "$trusted_hooks_dir/scripts/pre-push-ai-review.sh" \
-  || fail 'installer가 branch에서 변조한 reviewer를 trusted bundle에 복사했습니다.'
-(
-  cd "$test_worktree"
-  MSYS_NO_PATHCONV=1 git show "refs/remotes/origin/main:.githooks/pre-commit"
-) | cmp - "$trusted_hooks_dir/pre-commit" \
-  || fail 'installer가 branch에서 변조한 pre-commit을 trusted bundle에 복사했습니다.'
-(
-  cd "$test_worktree"
-  MSYS_NO_PATHCONV=1 git show "refs/remotes/origin/main:scripts/check-ai-readiness.py"
-) | cmp - "$trusted_hooks_dir/scripts/check-ai-readiness.py" \
-  || fail 'installer가 branch에서 변조한 readiness 스크립트를 trusted bundle에 복사했습니다.'
-test "$(<"$trusted_hooks_dir/trusted-source-sha")" = "$trusted_source_sha" \
-  || fail 'trusted bundle이 독립 source SHA를 기록하지 않았습니다.'
-test "$(<"$trusted_hooks_dir/source-sha")" = "$trusted_source_sha" \
-  || fail 'trusted bundle이 checkout SHA를 source SHA로 기록했습니다.'
-test "$(<"$trusted_hooks_dir/trusted-source-ref")" = refs/remotes/origin/main \
-  || fail '기본 installer가 origin/main source ref를 기록하지 않았습니다.'
-configured_hooks_path="$(git -C "$test_worktree" config --local --get core.hooksPath)"
-if command -v cygpath >/dev/null 2>&1; then
-  configured_hooks_path="$(cygpath -u "$configured_hooks_path")"
-fi
-test "$configured_hooks_path" = "$trusted_hooks_dir" \
-  || fail 'installer가 trusted 외부 core.hooksPath를 연결하지 않았습니다.'
-configured_python_path="$(git -C "$test_worktree" config --local --get jdsnack.python)"
-if command -v cygpath >/dev/null 2>&1; then
-  configured_python_path="$(cygpath -u "$configured_python_path")"
-fi
-test -n "$configured_python_path" \
-  || fail 'installer가 trusted pre-commit Python 경로를 저장하지 않았습니다.'
-test -x "$configured_python_path" \
-  || fail 'installer가 저장한 Python 경로가 실행 파일을 가리키지 않습니다.'
-"$configured_python_path" --version >/dev/null 2>&1 \
-  || fail 'installer가 저장한 Python 경로를 실행할 수 없습니다.'
-configured_codex_path="$(git -C "$test_worktree" config --local --get jdsnack.codex)"
-if command -v cygpath >/dev/null 2>&1; then
-  configured_codex_path="$(cygpath -u "$configured_codex_path")"
-fi
-test "$configured_codex_path" = "$fixture_bin/codex" \
-  || fail 'installer가 trusted Codex 실행 파일 경로를 저장하지 않았습니다.'
-test -x "$configured_codex_path" \
-  || fail 'installer가 저장한 Codex 경로가 실행 파일을 가리키지 않습니다.'
-grep -Fq -- 'trusted_readiness_script=' "$trusted_hooks_dir/pre-commit" \
-  || fail 'trusted bundle pre-commit이 branch-controlled 경로를 실행하는 구버전입니다.'
-if grep -Fq -- 'branch-controlled-readiness' "$trusted_hooks_dir/scripts/check-ai-readiness.py"; then
-  fail 'trusted bundle readiness script 자체가 branch-controlled fixture입니다.'
-fi
-set +e
-precommit_output="$(
-  cd "$test_worktree"
-  PATH="$fixture_bin:$PATH" "$trusted_hooks_dir/pre-commit" 2>&1
-)"
-precommit_status=$?
-set -e
-if [ "$precommit_status" -ne 0 ]; then
-  printf '%s\n' "$precommit_output" >&2
-  fail 'trusted pre-commit이 branch 변조 readiness 스크립트를 실행했습니다.'
-fi
-
-set +e
-override_output="$(
-  cd "$test_worktree"
-  JDSNACK_HOOK_SOURCE_REF=HEAD PATH="$fixture_bin:$PATH" sh < <(git show refs/remotes/origin/main:scripts/install-git-hooks.sh) 2>&1
-)"
-override_status=$?
-set -e
-test "$override_status" -ne 0 \
-  || fail 'installer가 branch-controlled trusted source override를 허용했습니다.'
-grep -Fq 'trusted hook source override는 허용되지 않습니다' <<<"$override_output" \
-  || fail 'installer가 trusted source override 차단 원인을 설명하지 않았습니다.'
-
-echo 'Trusted hook installer requires the independent origin/main source'
+cp "$temporary/pre-push.trusted" "$bundle/pre-push"
+echo 'Trusted hook bootstrap ignores divergent checkout sources and records both SHAs.'

@@ -4,43 +4,6 @@ set -eu
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-hook_root="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
-git_common_dir="$(git rev-parse --git-common-dir)"
-case "$git_common_dir" in
-  /*|[A-Za-z]:[\\/]*) ;;
-  *) git_common_dir="$repo_root/$git_common_dir" ;;
-esac
-git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)" || {
-  echo "ERROR: pre-commit은 Git common dir의 trusted hook 경로를 확인할 수 없습니다." >&2
-  exit 1
-}
-case "$hook_root" in
-  "$git_common_dir"/jdsnack-hooks-*) ;;
-  *)
-    echo "ERROR: pre-commit은 Git common dir의 trusted hook bundle에서만 실행해야 합니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
-    exit 1
-    ;;
-esac
-
-trusted_readiness_script="$hook_root/scripts/check-ai-readiness.py"
-if [ ! -f "$trusted_readiness_script" ] || [ -L "$trusted_readiness_script" ]; then
-  echo "ERROR: trusted pre-commit readiness 스크립트가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
-  exit 1
-fi
-
-python_bin="$(git config --local --get jdsnack.python || true)"
-case "$python_bin" in
-  /*|[A-Za-z]:[\\/]*) ;;
-  *)
-  echo "ERROR: 검증된 pre-commit Python 경로가 없습니다. git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh를 다시 실행하십시오." >&2
-    exit 1
-    ;;
-esac
-if ! "$python_bin" --version >/dev/null 2>&1; then
-  echo "ERROR: 검증된 pre-commit Python을 실행할 수 없습니다: $python_bin" >&2
-  exit 1
-fi
-
 current_branch="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
 case "$current_branch" in
   main|master)
@@ -49,4 +12,17 @@ case "$current_branch" in
     ;;
 esac
 
-JDSNACK_AI_READINESS_ROOT="$repo_root" "$python_bin" "$trusted_readiness_script"
+python_bin=""
+for candidate in python3 python; do
+  candidate_path="$(command -v "$candidate" || true)"
+  if [ -n "$candidate_path" ] && "$candidate_path" --version >/dev/null 2>&1; then
+    python_bin="$candidate_path"
+    break
+  fi
+done
+if [ -z "$python_bin" ]; then
+  echo "ERROR: AI readiness 검증을 실행할 Python이 없습니다." >&2
+  exit 1
+fi
+
+"$python_bin" scripts/check-ai-readiness.py

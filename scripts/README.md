@@ -8,9 +8,11 @@
 
 - `check-ai-readiness.py`: 모듈 안내 문서, Markdown 링크, 정적 eval 케이스를 검사합니다.
 - `run-ai-readiness-evals.py`: Codex CLI를 읽기 전용으로 실행해 context-on/off 계획 결과와 지표를 기록합니다.
-- `install-git-hooks.sh`: `git fetch origin main` 뒤 `git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh`처럼 독립 trusted source를 stdin으로 실행해야 하며, origin/main의 source와 파일 digest로 Git common dir 아래 branch 외부 trusted hook bundle을 만들고 `core.hooksPath`를 검증해 pre-commit/pre-push를 연결합니다. branch `HEAD` source와 `JDSNACK_HOOK_SOURCE_REF` override는 거부하며, bundle의 source SHA도 설치 checkout이 아니라 `refs/remotes/origin/main`을 기록합니다. installer는 Codex CLI가 checkout 밖에 있고 소유자·쓰기 권한이 안전한지 `exec --help`보다 먼저 확인합니다.
-- `pre-push-ai-review.sh`: trusted hook bundle에서 staged/working-tree/branch diff를 읽기 전용 Codex 리뷰어에 전달하고 기준 미달 push를 차단합니다. Windows `codex.exe`를 WSL에서 실행할 때는 Windows `powershell.exe`와 `git.exe`를 사용하며 Linux `pwsh`나 Linux `git`로 Windows 경로 검사를 대체하지 않습니다.
-- `pre-push-ai-review-test.sh`: read-only 격리 옵션, 결정론 위험도·라벨 대조, 구조화 결과 차단을 fixture로 검증합니다.
+- `install-git-hooks.sh`: 독립된 `refs/remotes/origin/main` source만 읽어 Git common dir의 외부 bundle을 만들고, source SHA·blob ID·ACL을 확인한 뒤 pre-commit/pre-push를 연결합니다.
+- `trusted-hooks/`: trusted pre-commit/pre-push wrapper, bundle 검증기, main reviewer를 외부 bundle 경로에 맞게 렌더링하는 코드, ACL 검증기입니다. reviewer 본문과 정책 파일은 `origin/main`에서 복사합니다.
+- `install-git-hooks-test.sh`: working tree의 installer·hook·reviewer 변조가 bundle source에 반영되지 않는지 fixture로 확인합니다.
+- `pre-push-ai-review-test.sh`: trusted bundle의 read-only 격리 옵션, 위험도·라벨 대조, 구조화 결과 차단을 fixture로 검증합니다.
+- `verify-trusted-hook-bundle-acl-test.ps1`: Windows ACL 및 POSIX 권한 검증기의 허용·거부 계약을 확인합니다.
 - `pre-push-git-invocation-test.sh`: 로컬 bare remote에 대한 실제 `git push --dry-run`으로 hook 인자와 ref stdin 전달을 검증합니다.
 - `review-risk.ps1`: PR 위험도 점수, 보호 정책, Security/Performance/Test Coverage/Architecture 라우팅을 결정론적으로 계산합니다.
 - `smoke-test.sh`: 실행 중인 서비스의 기본 API smoke test를 수행합니다.
