@@ -390,7 +390,7 @@ fi
 # when its Windows ACL is restricted. The hook must consult that ACL and reject
 # a failed ACL check rather than trusting the synthetic mode.
 codex_acl_validation="$fake_root/validate-codex-acl.sh"
-for function_name in validate_trusted_codex_path is_windows_mounted_filesystem path_is_within_checkout verify_windows_codex_acl; do
+for function_name in validate_trusted_codex_path is_windows_mounted_filesystem path_is_within_checkout verify_trusted_windows_path_acl; do
   awk -v function_name="$function_name" '
     $0 ~ "^" function_name "\\(\\) \\{" { capture=1; depth=0 }
     capture {
@@ -483,7 +483,7 @@ chmod 777 "$writable_codex_parent"
 )
 
 windows_git_resolver="$fake_root/resolve-windows-git-bin.sh"
-for function_name in path_is_within_checkout resolve_windows_git_bin; do
+for function_name in path_is_within_checkout verify_trusted_windows_path_acl resolve_windows_git_bin; do
   awk -v function_name="$function_name" '
     $0 ~ "^" function_name "\\(\\) \\{" { capture=1; depth=0 }
     capture {
@@ -498,6 +498,10 @@ for function_name in path_is_within_checkout resolve_windows_git_bin; do
 done
 . "$windows_git_resolver"
 is_windows_mounted_filesystem() { return 1; }
+verify_trusted_windows_path_acl() {
+  printf '%s\n' "$1" >> "$fake_root/windows-git-acl-checked"
+  test ! -f "$fake_root/windows-git-acl-deny"
+}
 printf '#!/bin/sh\nexit 0\n' > "$fake_root/git.exe"
 chmod +x "$fake_root/git.exe"
 readlink_bin="$(builtin command -v readlink)"
@@ -519,6 +523,17 @@ unset -f command
 if [ "$windows_git_output" != "$expected_windows_git" ]; then
   printf 'expected=%s actual=%s\n' "$expected_windows_git" "$windows_git_output" >&2
   fail 'Windows Codex 경로에서 Linux git 대신 검증된 git.exe를 선택하지 않았습니다.'
+fi
+if ! grep -Fxq "$expected_windows_git" "$fake_root/windows-git-acl-checked"; then
+  fail 'Windows git.exe의 ACL을 검증하지 않았습니다.'
+fi
+touch "$fake_root/windows-git-acl-deny"
+if windows_git_output="$(resolve_windows_git_bin 2>&1)"; then
+  fail 'ACL 검증 실패에도 Windows git.exe를 승인했습니다.'
+fi
+if ! grep -Fq 'Windows Git 실행 파일의 ACL을 확인할 수 없습니다' <<< "$windows_git_output"; then
+  printf '%s\n' "$windows_git_output" >&2
+  fail 'Windows git.exe ACL 거부 사유를 출력하지 않았습니다.'
 fi
 # Git Bash resolves a bare `git` command to `git.exe`; remove the resolver
 # fixture before exercising the real hook so it cannot shadow the real Git CLI.

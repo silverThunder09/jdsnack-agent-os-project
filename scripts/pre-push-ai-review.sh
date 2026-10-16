@@ -89,7 +89,7 @@ validate_trusted_codex_path() {
     exit 1
   fi
   if is_windows_mounted_filesystem "$canonical"; then
-    if ! verify_windows_codex_acl "$canonical"; then
+    if ! verify_trusted_windows_path_acl "$canonical"; then
       echo "ERROR: Windows Codex 실행 파일의 ACL을 확인할 수 없습니다: $canonical" >&2
       exit 1
     fi
@@ -153,18 +153,18 @@ path_is_within_checkout() {
   return 1
 }
 
-verify_windows_codex_acl() {
+verify_trusted_windows_path_acl() {
   local windows_path
   local windows_path_b64
   local windows_acl_script
   if [ -z "$path_converter_bin" ] || [ -z "$pwsh_bin" ]; then
-    echo 'ERROR: Windows Codex ACL 검증에 경로 변환기와 Windows PowerShell이 필요합니다.' >&2
+    echo 'ERROR: Windows trusted path ACL 검증에 경로 변환기와 Windows PowerShell이 필요합니다.' >&2
     return 1
   fi
   windows_path="$($path_converter_bin -w "$1" 2>/dev/null || true)"
   case "$windows_path" in
     [A-Za-z]:*|\\\\*) ;;
-    *) echo "ERROR: Windows Codex 경로를 변환할 수 없습니다: $1" >&2; return 1 ;;
+    *) echo "ERROR: Windows trusted path 경로를 변환할 수 없습니다: $1" >&2; return 1 ;;
   esac
   windows_path_b64="$(printf '%s' "$windows_path" | "$base64_bin" -w 0)" || return 1
   windows_acl_script='
@@ -571,6 +571,10 @@ resolve_windows_git_bin() {
   fi
   if path_is_within_checkout "$canonical"; then
     echo "ERROR: Windows git.exe는 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
+    return 1
+  fi
+  if ! verify_trusted_windows_path_acl "$canonical"; then
+    echo "ERROR: Windows Git 실행 파일의 ACL을 확인할 수 없습니다: $canonical" >&2
     return 1
   fi
   printf '%s\n' "$canonical"
