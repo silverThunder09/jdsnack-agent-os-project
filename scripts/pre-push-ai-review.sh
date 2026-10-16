@@ -411,6 +411,7 @@ push_refs=()
 push_shas=()
 push_remote_refs=()
 push_remote_shas=()
+all_push_refs=()
 deletion_ref_seen=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "${local_ref:-}" ] && continue
@@ -421,6 +422,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       exit 1
       ;;
   esac
+  all_push_refs+=("$local_ref")
   case "$local_sha" in
     0000000000000000000000000000000000000000)
       deletion_ref_seen=1
@@ -433,6 +435,11 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   push_remote_shas+=("$remote_sha")
 done
 
+if [ "${#all_push_refs[@]}" -gt 1 ]; then
+  echo "ERROR: 여러 ref가 한 번에 push되어 pre-push 리뷰 대상을 단일 커밋에 고정할 수 없습니다. ref별로 다시 push하십시오." >&2
+  printf 'refs=%s\n' "${all_push_refs[*]}" >&2
+  exit 1
+fi
 if [ "${#push_shas[@]}" -eq 0 ]; then
   assert_clean_checkout
   if [ "$deletion_ref_seen" -eq 1 ]; then

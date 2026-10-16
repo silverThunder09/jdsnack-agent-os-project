@@ -1289,6 +1289,22 @@ if [ "$multi_status" -eq 0 ] || ! grep -Fq '여러 ref가 한 번에 push되어'
   fail '다중 ref push를 pre-push가 차단하지 않았습니다.'
 fi
 
+rm -f "$fake_root/codex.invoked"
+set +e
+mixed_update_delete_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\nrefs/heads/codex/deleted 0000000000000000000000000000000000000000 refs/heads/codex/deleted %s\n' "$head_sha" "$base_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
+mixed_update_delete_status=$?
+set -e
+if [ "$mixed_update_delete_status" -eq 0 ] || ! grep -Fq '여러 ref가 한 번에 push되어' <<< "$mixed_update_delete_output"; then
+  printf '%s\n' "$mixed_update_delete_output" >&2
+  fail 'branch update와 branch deletion을 함께 보낸 push를 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail '혼합 update/delete push가 다중 ref 검사 전에 Codex reviewer를 실행했습니다.'
+fi
+
 printf '\ndelete-only dirty fixture\n' >> "$test_worktree/scripts/README.md"
 rm -f "$fake_root/codex.invoked"
 set +e
