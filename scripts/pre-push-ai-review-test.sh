@@ -519,7 +519,6 @@ command() {
 }
 windows_git_output="$(resolve_windows_git_bin)"
 expected_windows_git="$(readlink -f -- "$fake_root/git.exe")"
-unset -f command
 if [ "$windows_git_output" != "$expected_windows_git" ]; then
   printf 'expected=%s actual=%s\n' "$expected_windows_git" "$windows_git_output" >&2
   fail 'Windows Codex 경로에서 Linux git 대신 검증된 git.exe를 선택하지 않았습니다.'
@@ -535,6 +534,7 @@ if ! grep -Fq 'Windows Git 실행 파일의 ACL을 확인할 수 없습니다' <
   printf '%s\n' "$windows_git_output" >&2
   fail 'Windows git.exe ACL 거부 사유를 출력하지 않았습니다.'
 fi
+unset -f command
 # Git Bash resolves a bare `git` command to `git.exe`; remove the resolver
 # fixture before exercising the real hook so it cannot shadow the real Git CLI.
 rm -f "$fake_root/git.exe"
