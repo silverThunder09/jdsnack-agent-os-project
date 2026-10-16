@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "score", "risk", "findings", "review_summary"],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["PASS", "COMMENT", "REQUEST_CHANGES", "NEEDS_HUMAN"]
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["Light", "Standard", "High-risk"]
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "text"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["P0", "P1", "P2", "P3"]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$"
+          }
+        }
+      }
+    },
+    "review_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "correctness",
+        "contract",
+        "tests",
+        "security",
+        "maintainability",
+        "score_rationale",
+        "conclusion"
+      ],
+      "properties": {
+        "correctness": { "type": "string", "minLength": 10, "pattern": "^[^\\r\\n]+$" },
+        "contract": { "type": "string", "minLength": 10, "pattern": "^[^\\r\\n]+$" },
+        "tests": { "type": "string", "minLength": 10, "pattern": "^[^\\r\\n]+$" },
+        "security": { "type": "string", "minLength": 10, "pattern": "^[^\\r\\n]+$" },
+        "maintainability": { "type": "string", "minLength": 10, "pattern": "^[^\\r\\n]+$" },
+        "score_rationale": { "type": "string", "minLength": 10, "pattern": "^[^\\r\\n]+$" },
+        "conclusion": { "type": "string", "minLength": 20, "pattern": "^[^\\r\\n]+$" }
+      }
+    }
+  }
+}

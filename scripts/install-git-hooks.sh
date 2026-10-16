@@ -4,14 +4,58 @@ set -eu
 repo_root="$(CDPATH= cd -- "$(git rev-parse --show-toplevel)" && pwd -P)"
 cd "$repo_root"
 source_ref=refs/remotes/origin/main
+source_kind=origin-main
 if [ -n "${JDSNACK_HOOK_SOURCE_REF-}" ]; then
-  echo 'ERROR: trusted hook source override is disabled; use refs/remotes/origin/main.' >&2
+  echo 'ERROR: arbitrary trusted hook source overrides are disabled.' >&2
   exit 1
 fi
-source_sha="$(git rev-parse --verify "${source_ref}^{commit}" 2>/dev/null)" || {
-  echo "ERROR: fetch origin main before installing trusted Git hooks (${source_ref} is missing)." >&2
-  exit 1
-}
+if [ "$#" -eq 0 ]; then
+  source_sha="$(git rev-parse --verify "${source_ref}^{commit}" 2>/dev/null)" || {
+    echo "ERROR: fetch origin main before installing trusted Git hooks (${source_ref} is missing)." >&2
+    exit 1
+  }
+elif [ "$#" -eq 2 ] && [ "$1" = '--approved-bootstrap' ]; then
+  bootstrap_tree="$2"
+  case "$bootstrap_tree" in
+    *[!0-9a-f]*|'') echo 'ERROR: bootstrap tree SHA must be full lowercase hexadecimal.' >&2; exit 1 ;;
+  esac
+  [ "${#bootstrap_tree}" -ge 40 ] && [ "${#bootstrap_tree}" -le 64 ] || {
+    echo 'ERROR: bootstrap tree SHA must contain 40 to 64 hexadecimal characters.' >&2; exit 1
+  }
+  if ! git diff --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    echo 'ERROR: bootstrap installation requires no unstaged tracked or untracked changes.' >&2
+    exit 1
+  fi
+  actual_tree="$(git write-tree)"
+  [ "$actual_tree" = "$bootstrap_tree" ] || {
+    echo 'ERROR: staged checkout tree does not match the requested bootstrap approval.' >&2
+    exit 1
+  }
+  approved_tree="$(git config --local --get jdsnack.trustedHookBootstrapTreeSha 2>/dev/null || true)"
+  [ "$approved_tree" = "$bootstrap_tree" ] || {
+    echo 'ERROR: this bootstrap tree has not been explicitly approved.' >&2
+    exit 1
+  }
+  source_ref="refs/codex/trusted-hook-bootstrap/$bootstrap_tree"
+  pinned_tree="$(git rev-parse --verify "${source_ref}^{tree}" 2>/dev/null || true)"
+  [ "$pinned_tree" = "$bootstrap_tree" ] || {
+    echo 'ERROR: the local bootstrap ref is missing or does not match the approved tree.' >&2
+    exit 1
+  }
+  main_sha="$(git rev-parse --verify 'refs/remotes/origin/main^{commit}' 2>/dev/null)" || {
+    echo 'ERROR: fetch origin main before installing trusted Git hooks.' >&2
+    exit 1
+  }
+  if ! git merge-base --is-ancestor "$main_sha" HEAD; then
+    echo 'ERROR: current HEAD must include the fetched origin/main commit.' >&2
+    exit 1
+  fi
+  source_kind=approved-bootstrap
+  source_sha="$bootstrap_tree"
+else
+  echo 'Usage: scripts/install-git-hooks.sh [--approved-bootstrap <approved-tree-sha>]' >&2
+  exit 2
+fi
 checkout_sha="$(git rev-parse --verify 'HEAD^{commit}' 2>/dev/null)" || exit 1
 
 source_files='scripts/trusted-hooks/pre-commit scripts/trusted-hooks/pre-push scripts/trusted-hooks/verify-hook-bundle.py scripts/trusted-hooks/render-reviewer.py scripts/trusted-hooks/verify-trusted-hook-bundle-acl.ps1 scripts/check-ai-readiness.py backends.json scripts/pre-push-ai-review.sh scripts/review-policy.json scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1 scripts/verify-codex-auth-permissions.ps1 scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1'
@@ -97,20 +141,20 @@ copy_source scripts/trusted-hooks/verify-trusted-hook-bundle-acl.ps1 scripts/ver
 for source_file in scripts/check-ai-readiness.py backends.json scripts/review-policy.json scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1 scripts/verify-codex-auth-permissions.ps1 scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1; do
   copy_source "$source_file" "$source_file"
 done
-git show "$source_ref:scripts/pre-push-ai-review.sh" > "$bundle/scripts/pre-push-ai-review.source"
-git show "$source_ref:scripts/trusted-hooks/render-reviewer.py" > "$bundle/render-reviewer.py"
-"$python_path" "$bundle/render-reviewer.py" "$bundle/scripts/pre-push-ai-review.source" "$bundle/scripts/pre-push-ai-review.sh"
-rm "$bundle/render-reviewer.py" "$bundle/scripts/pre-push-ai-review.source"
+copy_source scripts/pre-push-ai-review.sh scripts/pre-push-ai-review.source
+copy_source scripts/trusted-hooks/render-reviewer.py scripts/render-reviewer.py
+"$python_path" "$bundle/scripts/render-reviewer.py" "$bundle/scripts/pre-push-ai-review.source" "$bundle/scripts/pre-push-ai-review.sh"
 printf 'scripts/pre-push-ai-review.sh %s\n' "$(git hash-object "$bundle/scripts/pre-push-ai-review.sh")" >> "$manifest"
 
 printf '%s\n' "$source_sha" > "$bundle/source-sha"
 printf '%s\n' "$source_sha" > "$bundle/trusted-source-sha"
 printf '%s\n' "$source_ref" > "$bundle/trusted-source-ref"
+printf '%s\n' "$source_kind" > "$bundle/trusted-source-kind"
 printf '%s\n' "$checkout_sha" > "$bundle/checkout-sha"
-chmod 600 "$manifest" "$bundle/source-sha" "$bundle/trusted-source-sha" "$bundle/trusted-source-ref" "$bundle/checkout-sha"
+chmod 600 "$manifest" "$bundle/source-sha" "$bundle/trusted-source-sha" "$bundle/trusted-source-ref" "$bundle/trusted-source-kind" "$bundle/checkout-sha"
 chmod 700 "$bundle/pre-commit" "$bundle/pre-push" "$bundle/scripts/pre-push-ai-review.sh"
 
-expected_paths='pre-commit|pre-push|bundle-manifest|source-sha|checkout-sha|trusted-source-sha|trusted-source-ref|scripts/verify-hook-bundle.py|scripts/verify-trusted-hook-bundle-acl.ps1|scripts/check-ai-readiness.py|backends.json|scripts/pre-push-ai-review.sh|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1'
+expected_paths='pre-commit|pre-push|bundle-manifest|source-sha|checkout-sha|trusted-source-sha|trusted-source-ref|trusted-source-kind|scripts/verify-hook-bundle.py|scripts/verify-trusted-hook-bundle-acl.ps1|scripts/check-ai-readiness.py|backends.json|scripts/pre-push-ai-review.sh|scripts/pre-push-ai-review.source|scripts/render-reviewer.py|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1'
 acl_file="$bundle/scripts/verify-trusted-hook-bundle-acl.ps1"
 acl_bundle="$bundle"
 acl_codex="$codex_path"
@@ -132,4 +176,4 @@ git config --local core.hooksPath "$bundle"
 configured_path="$(git config --local --get core.hooksPath)"
 if command -v cygpath >/dev/null 2>&1; then configured_path="$(cygpath -u "$configured_path")"; bundle="$(cygpath -u "$bundle")"; fi
 [ "$configured_path" = "$bundle" ] || { echo 'ERROR: core.hooksPath could not be verified.' >&2; exit 1; }
-echo "Trusted Git hooks installed from ${source_ref} (${source_sha}); checkout ${checkout_sha}."
+echo "Trusted Git hooks installed from ${source_kind} ${source_ref} (${source_sha}); checkout ${checkout_sha}."

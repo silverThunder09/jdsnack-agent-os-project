@@ -9,6 +9,9 @@ fail() {
 }
 
 command -v jq >/dev/null 2>&1 || fail 'jq가 필요합니다.'
+python_bin="$(command -v python || command -v python3 || true)"
+[ -n "$python_bin" ] || fail 'reviewer 렌더링 테스트에 사용할 Python을 찾지 못했습니다.'
+"$python_bin" --version >/dev/null 2>&1 || fail 'reviewer 렌더링 테스트에 사용할 Python을 실행할 수 없습니다.'
 if command -v pwsh >/dev/null 2>&1; then
   pwsh_bin="$(command -v pwsh)"
 elif command -v powershell.exe >/dev/null 2>&1; then
@@ -34,13 +37,15 @@ git_bash_path="$(command -v bash)"
 git -C "$test_worktree" config --local jdsnack.hookBash "$git_bash_path"
 # git clone intentionally excludes uncommitted source edits, so include the
 # current hook implementation, auth ACL verifier, and reviewer settings in the disposable fixture.
+cp "$ROOT_DIR/.githooks/pre-push" "$test_worktree/.githooks/pre-push"
 cp "$ROOT_DIR/scripts/pre-push-ai-review.sh" "$test_worktree/scripts/pre-push-ai-review.sh"
 cp "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" "$test_worktree/scripts/verify-codex-auth-permissions.ps1"
+cp "$ROOT_DIR/scripts/trusted-hooks/verify-trusted-hook-bundle-acl.ps1" "$test_worktree/scripts/verify-trusted-hook-bundle-acl.ps1"
 cp "$ROOT_DIR/scripts/codex-auth-permissions.ps1" "$test_worktree/scripts/codex-auth-permissions.ps1"
 cp "$ROOT_DIR/scripts/review-path-safety.ps1" "$test_worktree/scripts/review-path-safety.ps1"
 cp "$ROOT_DIR/backends.json" "$test_worktree/backends.json"
-git -C "$test_worktree" add scripts/pre-push-ai-review.sh scripts/verify-codex-auth-permissions.ps1 \
-  scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1 backends.json
+git -C "$test_worktree" add .githooks/pre-push scripts/pre-push-ai-review.sh scripts/verify-codex-auth-permissions.ps1 \
+  scripts/verify-trusted-hook-bundle-acl.ps1 scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1 backends.json
 if ! git -C "$test_worktree" diff --cached --quiet; then
   git -C "$test_worktree" -c user.name=review-test -c user.email=review-test@example.com \
     commit --quiet -m 'test: isolate current pre-push hook fixture'
@@ -329,6 +334,9 @@ set -eu
 
 fixture_dir='__FAKE_ROOT__'
 real_pwsh='__REAL_PWSH__'
+case " $* " in
+  *'Split-Path -Parent $itemPath'*) exit 0 ;;
+esac
 if [ -f "$fixture_dir/pwsh.invalid-json" ]; then
   printf '%s\n' '{"riskScore":65}'
   exit 0
@@ -342,6 +350,198 @@ exec "$real_pwsh" "$@"
 FAKE_PWSH
 sed -i "s|__FAKE_ROOT__|$fake_root|g; s|__REAL_PWSH__|$pwsh_bin|g" "$fake_root/pwsh"
 chmod +x "$fake_root/pwsh"
+
+# Windows Codex must never fall back to Linux pwsh when powershell.exe is not
+# discoverable. Extract only the pure resolver function so this contract stays
+# independent from the full reviewer fixture and from the host's PowerShell.
+powershell_resolver="$fake_root/resolve-powershell-bin.sh"
+awk '
+  /^resolve_powershell_bin\(\) \{/ { capture=1; depth=0 }
+  capture {
+    line=$0
+    print
+    depth += gsub(/\{/, "", line)
+    line=$0
+    depth -= gsub(/\}/, "", line)
+    if (depth == 0) exit
+  }
+' "$ROOT_DIR/scripts/pre-push-ai-review.sh" > "$powershell_resolver"
+. "$powershell_resolver"
+command() {
+  if [ "${1-}" = '-p' ] && [ "${2-}" = '-v' ] && [ "${3-}" = 'powershell.exe' ]; then
+    return 1
+  fi
+  if [ "${1-}" = '-v' ] && [ "${2-}" = 'powershell.exe' ]; then
+    return 1
+  fi
+  builtin command "$@"
+}
+resolver_path_backup="$PATH"
+PATH="$fake_root:$PATH"
+set +e
+powershell_resolver_output="$(resolve_powershell_bin "$fake_root/codex.exe" 2>&1)"
+powershell_resolver_status=$?
+set -e
+PATH="$resolver_path_backup"
+unset -f command
+if [ "$powershell_resolver_status" -eq 0 ] || ! grep -Fq 'Windows powershell.exe가 필요합니다' <<< "$powershell_resolver_output"; then
+  printf '%s\n' "$powershell_resolver_output" >&2
+  fail 'Windows Codex가 powershell.exe 대신 Linux pwsh로 대체되는 경로를 차단하지 않았습니다.'
+fi
+
+# A Windows Codex executable on WSL DrvFS/9p can appear POSIX-writable even
+# when its Windows ACL is restricted. The hook must consult that ACL and reject
+# a failed ACL check rather than trusting the synthetic mode.
+codex_acl_validation="$fake_root/validate-codex-acl.sh"
+for function_name in validate_trusted_codex_path is_windows_mounted_filesystem path_is_within_checkout verify_trusted_windows_path_acl; do
+  awk -v function_name="$function_name" '
+    $0 ~ "^" function_name "\\(\\) \\{" { capture=1; depth=0 }
+    capture {
+      line=$0
+      print
+      depth += gsub(/\{/, "", line)
+      line=$0
+      depth -= gsub(/\}/, "", line)
+      if (depth == 0) exit
+    }
+  ' "$ROOT_DIR/scripts/pre-push-ai-review.sh" >> "$codex_acl_validation"
+done
+printf '#!/bin/sh\nexit 0\n' > "$fake_root/codex.exe"
+chmod +x "$fake_root/codex.exe"
+cp "$fake_root/codex.exe" "$test_worktree/codex.exe"
+real_stat_bin="$(command -v stat)"
+cat > "$fake_root/stat-acl-fixture" <<EOF
+#!/bin/sh
+case "\$*" in
+  *%T*) printf '%s\n' 9p ;;
+  *%a*) printf '%s\n' 777 ;;
+  *) exec "$real_stat_bin" "\$@" ;;
+esac
+EOF
+cat > "$fake_root/wslpath-acl-fixture" <<'EOF'
+#!/bin/sh
+test "${1-}" = '-w' || exit 1
+printf '%s\n' 'C:\Users\test\codex.exe'
+EOF
+cat > "$fake_root/powershell-acl.exe" <<EOF
+#!/bin/sh
+case "\$*" in
+  *'Split-Path -Parent \$itemPath'*) ;;
+  *) exit 1 ;;
+esac
+printf '%s\n' invoked > "$fake_root/powershell-acl-called"
+test ! -f "$fake_root/powershell-acl-deny"
+EOF
+chmod +x "$fake_root/stat-acl-fixture" "$fake_root/wslpath-acl-fixture" "$fake_root/powershell-acl.exe"
+(
+  . "$codex_acl_validation"
+  readlink_bin="$(command -v readlink)"
+  base64_bin="$(command -v base64)"
+  stat_bin="$fake_root/stat-acl-fixture"
+  id_bin="$(command -v id)"
+  CHECKOUT_ROOT="$test_worktree"
+  path_converter_bin="$fake_root/wslpath-acl-fixture"
+  pwsh_bin="$fake_root/powershell-acl.exe"
+  validated_path="$(validate_trusted_codex_path "$fake_root/codex.exe")"
+  [ "$validated_path" = "$(readlink -f "$fake_root/codex.exe")" ] \
+    || fail 'WSL Windows Codex 경로를 ACL 검증 후 승인하지 않았습니다.'
+  test -f "$fake_root/powershell-acl-called" \
+    || fail 'WSL Windows Codex ACL 검증기가 호출되지 않았습니다.'
+  touch "$fake_root/powershell-acl-deny"
+  if validated_path="$(validate_trusted_codex_path "$fake_root/codex.exe" 2>&1)"; then
+    fail 'WSL Windows Codex의 안전하지 않은 ACL을 거부하지 않았습니다.'
+  fi
+  CHECKOUT_ROOT="${test_worktree^^}"
+  set +e
+  case_variant_output="$(validate_trusted_codex_path "$test_worktree/codex.exe" 2>&1)"
+  case_variant_status=$?
+  set -e
+  if [ "$case_variant_status" -eq 0 ] || ! grep -Fq 'untrusted checkout 안에 있을 수 없습니다' <<< "$case_variant_output"; then
+    fail 'pre-push가 대소문자가 다른 Windows checkout Codex 경로를 차단하지 않았습니다.'
+  fi
+)
+
+writable_codex_parent="$fake_root/writable-codex-parent"
+mkdir "$writable_codex_parent"
+cp "$fake_root/codex.exe" "$writable_codex_parent/codex.exe"
+chmod 755 "$writable_codex_parent/codex.exe"
+chmod 777 "$writable_codex_parent"
+(
+  . "$codex_acl_validation"
+  readlink_bin="$(command -v readlink)"
+  stat_bin="$(command -v stat)"
+  id_bin="$(command -v id)"
+  CHECKOUT_ROOT="$test_worktree"
+  is_windows_mounted_filesystem() { return 1; }
+  parent_mode="$($stat_bin -c '%a' -- "$writable_codex_parent")"
+  if (( 8#$parent_mode & 022 )); then
+    set +e
+    writable_parent_output="$(validate_trusted_codex_path "$writable_codex_parent/codex.exe" 2>&1)"
+    writable_parent_status=$?
+    set -e
+    if [ "$writable_parent_status" -eq 0 ] || ! grep -Fq "$writable_codex_parent" <<< "$writable_parent_output"; then
+      fail 'Codex 실행 파일의 group/world writable 상위 폴더를 차단하지 않았습니다.'
+    fi
+  fi
+)
+
+windows_git_resolver="$fake_root/resolve-windows-git-bin.sh"
+for function_name in path_is_within_checkout verify_trusted_windows_path_acl resolve_windows_git_bin; do
+  awk -v function_name="$function_name" '
+    $0 ~ "^" function_name "\\(\\) \\{" { capture=1; depth=0 }
+    capture {
+      line=$0
+      print
+      depth += gsub(/\{/, "", line)
+      line=$0
+      depth -= gsub(/\}/, "", line)
+      if (depth == 0) exit
+    }
+  ' "$ROOT_DIR/scripts/pre-push-ai-review.sh" >> "$windows_git_resolver"
+done
+. "$windows_git_resolver"
+is_windows_mounted_filesystem() { return 1; }
+verify_trusted_windows_path_acl() {
+  printf '%s\n' "$1" >> "$fake_root/windows-git-acl-checked"
+  test ! -f "$fake_root/windows-git-acl-deny"
+}
+printf '#!/bin/sh\nexit 0\n' > "$fake_root/git.exe"
+chmod +x "$fake_root/git.exe"
+readlink_bin="$(builtin command -v readlink)"
+CHECKOUT_ROOT="$test_worktree"
+command() {
+  if [ "${1-}" = '-p' ] && [ "${2-}" = '-v' ] && [ "${3-}" = 'git.exe' ]; then
+    printf '%s\n' "$fake_root/git.exe"
+    return 0
+  fi
+  if [ "${1-}" = '-v' ] && [ "${2-}" = 'git.exe' ]; then
+    printf '%s\n' "$fake_root/git.exe"
+    return 0
+  fi
+  builtin command "$@"
+}
+windows_git_output="$(resolve_windows_git_bin)"
+expected_windows_git="$(readlink -f -- "$fake_root/git.exe")"
+if [ "$windows_git_output" != "$expected_windows_git" ]; then
+  printf 'expected=%s actual=%s\n' "$expected_windows_git" "$windows_git_output" >&2
+  fail 'Windows Codex 경로에서 Linux git 대신 검증된 git.exe를 선택하지 않았습니다.'
+fi
+if ! grep -Fxq "$expected_windows_git" "$fake_root/windows-git-acl-checked"; then
+  fail 'Windows git.exe의 ACL을 검증하지 않았습니다.'
+fi
+touch "$fake_root/windows-git-acl-deny"
+if windows_git_output="$(resolve_windows_git_bin 2>&1)"; then
+  fail 'ACL 검증 실패에도 Windows git.exe를 승인했습니다.'
+fi
+if ! grep -Fq 'Windows Git 실행 파일의 ACL을 확인할 수 없습니다' <<< "$windows_git_output"; then
+  printf '%s\n' "$windows_git_output" >&2
+  fail 'Windows git.exe ACL 거부 사유를 출력하지 않았습니다.'
+fi
+unset -f command
+# Git Bash resolves a bare `git` command to `git.exe`; remove the resolver
+# fixture before exercising the real hook so it cannot shadow the real Git CLI.
+rm -f "$fake_root/git.exe"
+
 if [ -n "$test_cygpath_bin" ]; then
   cat > "$fake_root/cygpath" <<'FAKE_CYGPATH'
 #!/bin/sh
@@ -356,6 +556,112 @@ FAKE_CYGPATH
 fi
 printf '#!/bin/sh\nif [ "$#" -eq 0 ]; then set -- 1; fi\nexec "%s" "$@"\n' "$test_sleep_bin" > "$fake_root/sleep-one-second"
 chmod +x "$fake_root/sleep-one-second"
+
+# The production hook runs from the Git common-dir bundle. This PR is the
+# bootstrap that introduces that bundle, so origin/main may still contain the
+# pre-bundle installer during CI. Build the equivalent isolated bundle directly
+# from the fixture checkout; install-git-hooks-test.sh separately verifies that
+# the committed installer copies only origin/main content.
+git_common_dir="$(git -C "$test_worktree" rev-parse --git-common-dir)"
+case "$git_common_dir" in
+  /*|[A-Za-z]:[\\/]*) ;;
+  *) git_common_dir="$test_worktree/$git_common_dir" ;;
+esac
+git_common_dir="$(CDPATH= cd -- "$git_common_dir" && pwd -P)"
+trusted_hook_path="$(mktemp -d "$git_common_dir/jdsnack-hooks-${base_sha}.XXXXXX")"
+mkdir -p "$trusted_hook_path/scripts"
+chmod 700 "$trusted_hook_path" "$trusted_hook_path/scripts"
+cp "$test_worktree/.githooks/pre-commit" "$trusted_hook_path/pre-commit"
+cp "$test_worktree/.githooks/pre-push" "$trusted_hook_path/pre-push"
+cp "$test_worktree/scripts/check-ai-readiness.py" "$trusted_hook_path/scripts/check-ai-readiness.py"
+cp "$test_worktree/backends.json" "$trusted_hook_path/backends.json"
+cp "$test_worktree/scripts/trusted-hooks/verify-hook-bundle.py" "$trusted_hook_path/scripts/verify-hook-bundle.py"
+source_pinned_bundle=0
+if git -C "$test_worktree" show refs/remotes/origin/main:scripts/trusted-hooks/verify-hook-bundle.py \
+  | grep -Fq '"scripts/pre-push-ai-review.source"'; then
+  git -C "$test_worktree" show "refs/remotes/origin/main:scripts/pre-push-ai-review.sh" \
+    > "$trusted_hook_path/scripts/pre-push-ai-review.source"
+  git -C "$test_worktree" show "refs/remotes/origin/main:scripts/trusted-hooks/render-reviewer.py" \
+    > "$trusted_hook_path/scripts/render-reviewer.py"
+  "$python_bin" "$trusted_hook_path/scripts/render-reviewer.py" \
+    "$trusted_hook_path/scripts/pre-push-ai-review.source" "$trusted_hook_path/scripts/pre-push-ai-review.sh"
+  source_pinned_bundle=1
+else
+  cp "$test_worktree/scripts/pre-push-ai-review.sh" "$trusted_hook_path/scripts/pre-push-ai-review.sh"
+fi
+for script_name in \
+  review-policy.json \
+  review-risk.ps1 \
+  secure-review-temp-acl.ps1 \
+  verify-codex-auth-permissions.ps1 \
+  verify-trusted-hook-bundle-acl.ps1 \
+  codex-auth-permissions.ps1 \
+  review-path-safety.ps1; do
+  cp "$test_worktree/scripts/$script_name" "$trusted_hook_path/scripts/$script_name"
+done
+# The pre-push fixture lives below the host's shared temporary directory,
+# whose ancestors may be writable by unrelated sandbox principals. Exercise
+# the real ancestor ACL verifier in its dedicated contract test; this isolated
+# hook fixture supplies only a successful verifier dependency.
+cat > "$trusted_hook_path/scripts/verify-trusted-hook-bundle-acl.ps1" <<'ACL_FIXTURE'
+[CmdletBinding()]
+param([string]$Path, [string[]]$ExpectedRelativePath)
+if ([string]::IsNullOrWhiteSpace($Path) -or @($ExpectedRelativePath).Count -eq 0) {
+    throw 'Trusted hook bundle ACL fixture arguments are missing.'
+}
+$expectedPaths = @(
+    foreach ($value in @($ExpectedRelativePath)) {
+        $value -split '\|' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    })
+if ($expectedPaths -notcontains 'scripts/verify-hook-bundle.py' -or
+    $expectedPaths -notcontains 'backends.json' -or
+    $expectedPaths -notcontains 'scripts/pre-push-ai-review.source' -or
+    $expectedPaths -notcontains 'scripts/render-reviewer.py') {
+    throw 'Trusted hook bundle ACL fixture missed a verifier, reviewer source, or backend setting.'
+}
+Write-Output 'Trusted hook bundle ACL fixture passed'
+ACL_FIXTURE
+printf '%s\n' "$base_sha" > "$trusted_hook_path/source-sha"
+printf '%s\n' "$base_sha" > "$trusted_hook_path/trusted-source-sha"
+printf '%s\n' refs/remotes/origin/main > "$trusted_hook_path/trusted-source-ref"
+printf '%s\n' origin-main > "$trusted_hook_path/trusted-source-kind"
+: > "$trusted_hook_path/bundle-manifest"
+write_fixture_manifest_entry() {
+  local bundle_path="$1"
+  local bundle_file="$trusted_hook_path/$bundle_path"
+  printf '%s %s\n' "$bundle_path" "$(git -C "$test_worktree" hash-object "$bundle_file")" \
+    >> "$trusted_hook_path/bundle-manifest"
+}
+write_fixture_manifest_entry pre-commit
+write_fixture_manifest_entry pre-push
+write_fixture_manifest_entry scripts/check-ai-readiness.py
+write_fixture_manifest_entry backends.json
+write_fixture_manifest_entry scripts/verify-hook-bundle.py
+write_fixture_manifest_entry scripts/pre-push-ai-review.sh
+if [ "$source_pinned_bundle" -eq 1 ]; then
+  write_fixture_manifest_entry scripts/pre-push-ai-review.source
+  write_fixture_manifest_entry scripts/render-reviewer.py
+fi
+for script_name in \
+  review-policy.json \
+  review-risk.ps1 \
+  secure-review-temp-acl.ps1 \
+  verify-codex-auth-permissions.ps1 \
+  verify-trusted-hook-bundle-acl.ps1 \
+  codex-auth-permissions.ps1 \
+  review-path-safety.ps1; do
+  write_fixture_manifest_entry "scripts/$script_name"
+done
+chmod 700 "$trusted_hook_path/pre-commit" "$trusted_hook_path/pre-push" \
+  "$trusted_hook_path/scripts/pre-push-ai-review.sh"
+chmod 600 "$trusted_hook_path/source-sha" "$trusted_hook_path/trusted-source-sha" \
+  "$trusted_hook_path/trusted-source-ref" "$trusted_hook_path/trusted-source-kind" \
+  "$trusted_hook_path/bundle-manifest"
+secure_test_path "$trusted_hook_path"
+git -C "$test_worktree" config --local core.hooksPath "$trusted_hook_path"
+git -C "$test_worktree" config --local jdsnack.codex "$fake_root/codex"
+[ -x "$trusted_hook_path/pre-push" ] \
+  || fail 'trusted Git common-dir pre-push hook이 설치되지 않았습니다.'
 
 set_origin_urls() {
   local origin_fetch_url="$1"
@@ -382,7 +688,7 @@ run_review() {
     printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\n' "$head_sha" "$base_sha" \
       | PATH="$fake_root:$PATH" \
         JDSNACK_REVIEW_BASE_REF="$base_ref" \
-        run_hook_with_origin_urls "$test_worktree/.githooks/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
+        run_hook_with_origin_urls "$trusted_hook_path/pre-push" "$canonical_origin_url" "$canonical_origin_url" "$canonical_origin_url"
   )
 }
 
@@ -981,6 +1287,22 @@ set -e
 if [ "$multi_status" -eq 0 ] || ! grep -Fq '여러 ref가 한 번에 push되어' <<< "$multi_output"; then
   printf '%s\n' "$multi_output" >&2
   fail '다중 ref push를 pre-push가 차단하지 않았습니다.'
+fi
+
+rm -f "$fake_root/codex.invoked"
+set +e
+mixed_update_delete_output="$(printf 'refs/heads/codex/pre-push-test %s refs/heads/codex/pre-push-test %s\nrefs/heads/codex/deleted 0000000000000000000000000000000000000000 refs/heads/codex/deleted %s\n' "$head_sha" "$base_sha" "$head_sha" \
+  | (cd "$test_worktree" && PATH="$fake_root:$PATH" \
+      JDSNACK_REVIEW_BASE_REF="$base_ref" \
+      bash "$test_worktree/scripts/pre-push-ai-review.sh" origin https://github.com/silverThunder09/jdsnack-agent-os-project) 2>&1)"
+mixed_update_delete_status=$?
+set -e
+if [ "$mixed_update_delete_status" -eq 0 ] || ! grep -Fq '여러 ref가 한 번에 push되어' <<< "$mixed_update_delete_output"; then
+  printf '%s\n' "$mixed_update_delete_output" >&2
+  fail 'branch update와 branch deletion을 함께 보낸 push를 pre-push가 차단하지 않았습니다.'
+fi
+if [ -e "$fake_root/codex.invoked" ]; then
+  fail '혼합 update/delete push가 다중 ref 검사 전에 Codex reviewer를 실행했습니다.'
 fi
 
 printf '\ndelete-only dirty fixture\n' >> "$test_worktree/scripts/README.md"

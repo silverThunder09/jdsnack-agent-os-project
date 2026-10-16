@@ -6,11 +6,12 @@
 
 ## Key files
 
-- `check-ai-readiness.py`: 모듈 안내 문서, Markdown 링크, 정적 eval 케이스를 검사합니다.
+- `check-ai-readiness.py`: 모듈 안내 문서, Markdown 링크, 정적 eval 케이스를 검사합니다. trusted hook bundle에서 실행할 때 전달된 checkout 경로가 현재 Git root와 같은지 확인하고, 일치하는 checkout의 정책만 읽습니다.
 - `run-ai-readiness-evals.py`: Codex CLI를 읽기 전용으로 실행해 context-on/off 계획 결과와 지표를 기록합니다.
-- `install-git-hooks.sh`: 독립된 `refs/remotes/origin/main` source만 읽어 Git common dir의 외부 bundle을 만들고, source SHA·blob ID·ACL을 확인한 뒤 pre-commit/pre-push를 연결합니다.
-- `trusted-hooks/`: trusted pre-commit/pre-push wrapper, bundle 검증기, main reviewer를 외부 bundle 경로에 맞게 렌더링하는 코드, ACL 검증기입니다. reviewer 본문과 정책 파일은 `origin/main`에서 복사합니다.
-- `install-git-hooks-test.sh`: working tree의 installer·hook·reviewer 변조가 bundle source에 반영되지 않는지 fixture로 확인합니다.
+- `install-git-hooks.sh`: 기본적으로 `refs/remotes/origin/main`에서 외부 hook bundle을 만들고, source SHA·blob ID·ACL을 확인한 뒤 pre-commit/pre-push를 연결합니다. 최초 bootstrap은 명시 승인된 정확한 staged-tree SHA만 받습니다.
+- `approve-trusted-hook-bootstrap.sh`: staged tree SHA를 검토자가 명시해 로컬 승인 ref/config에 고정하거나 승인을 철회합니다. unstaged·untracked 변경과 최신 `origin/main`을 포함하지 않는 checkout은 거부합니다.
+- `trusted-hooks/`: trusted pre-commit/pre-push wrapper, bundle 검증기, main reviewer 렌더러, ACL 검증기입니다. reviewer 원본과 렌더러를 승인된 Git source에 고정하고, bundle 검증 때 생성 reviewer를 다시 렌더링해 비교합니다.
+- `install-git-hooks-test.sh`: working tree 변조가 기본 bundle에 반영되지 않는지, 정확한 staged-tree를 승인하기 전에는 bootstrap 설치가 거부되고 승인 후에는 pin과 manifest가 검증되는지 fixture로 확인합니다.
 - `pre-push-ai-review-test.sh`: trusted bundle의 read-only 격리 옵션, 위험도·라벨 대조, 구조화 결과 차단을 fixture로 검증합니다.
 - `verify-trusted-hook-bundle-acl-test.ps1`: Windows ACL 및 POSIX 권한 검증기의 허용·거부 계약을 확인합니다.
 - `pre-push-git-invocation-test.sh`: 로컬 bare remote에 대한 실제 `git push --dry-run`으로 hook 인자와 ref stdin 전달을 검증합니다.

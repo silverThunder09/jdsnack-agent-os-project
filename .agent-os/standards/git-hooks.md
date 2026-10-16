@@ -6,7 +6,20 @@ Git 훅은 사람이 놓치기 쉬운 하네스 규칙을 커밋/푸시 전에 �
 
 ## 적용 단계
 
-clone 또는 새 작업 환경에서는 먼저 `git fetch origin main`으로 trusted source를 갱신한 뒤 `git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh`를 실행합니다. installer는 현재 checkout의 hook 파일을 실행하지 않고, `origin/main`의 `scripts/trusted-hooks/`와 지정된 공통 의존 파일을 Git common dir 아래 별도 bundle로 복사합니다. trusted source SHA, 설치 당시 checkout SHA, 각 Git blob ID를 기록하고 Windows ACL 또는 POSIX 권한, Git Bash, Python, `jq`, PowerShell, Codex CLI를 확인한 뒤 `core.hooksPath`를 해당 외부 bundle에 연결합니다. 검증이나 설정이 실패하면 hook을 활성화하지 않습니다.
+clone 또는 새 작업 환경에서는 먼저 `git fetch origin main`으로 trusted source를 갱신한 뒤 `git show refs/remotes/origin/main:scripts/install-git-hooks.sh | sh`를 실행합니다. installer는 현재 checkout의 hook 파일을 실행하지 않고, `origin/main`의 `scripts/trusted-hooks/`와 지정된 공통 의존 파일을 Git common dir 아래 별도 bundle로 복사합니다. trusted source SHA, 설치 당시 checkout SHA, 각 Git blob ID를 기록하고 Windows ACL 또는 POSIX 권한을 확인합니다. Git Bash 경로를 검증해 절대 경로로 로컬 Git 설정(`jdsnack.hookBash`)에 저장하고 Python과 Codex CLI 경로도 절대 경로로 기록한 뒤, Git Bash, Python, `jq`, PowerShell, Codex CLI를 확인해 `core.hooksPath`를 해당 외부 bundle에 연결합니다. 검증이나 설정이 실패하면 hook을 활성화하지 않습니다.
+
+### 최초 bootstrap 승인 경로
+
+PR에 포함될 trusted-hook 수정은 아직 `origin/main`에 없으므로, 기본 설치 경로만으로는 해당 수정 자체를 검증에 사용할 수 없습니다. 이 경우 리뷰어가 변경 전체를 확인한 뒤 **정확히 같은 staged Git tree SHA**를 승인해야 합니다. 승인 helper는 전체 SHA가 현재 staged tree와 일치하는지, unstaged·untracked 변경이 없는지, 현재 HEAD가 fetch한 `origin/main`을 포함하는지 확인한 후 `refs/codex/trusted-hook-bootstrap/<tree-sha>`와 로컬 Git 설정에 승인값을 고정합니다.
+
+```bash
+git add <검토한-변경-파일들>
+tree_sha="$(git write-tree)"
+bash scripts/approve-trusted-hook-bootstrap.sh "$tree_sha"
+bash scripts/install-git-hooks.sh --approved-bootstrap "$tree_sha"
+```
+
+설치기는 명시적으로 승인된 tree 이외의 source override를 거부하고, 그 tree의 hook·검증기·정책 파일을 외부 bundle에 복사합니다. 설치 후에는 source 종류와 tree SHA를 기록하고 기존 bundle digest 검사, Windows ACL 검사, pre-commit, 실제 pre-push Codex 리뷰를 동일하게 적용합니다. 승인값이나 pinned ref가 바뀌거나 사라지면 bundle 검증이 실패합니다. PR이 `origin/main`에 반영된 뒤에는 기존 `origin/main` 설치 명령으로 재설치하고, 임시 승인은 `bash scripts/approve-trusted-hook-bootstrap.sh --revoke "$tree_sha"`로 제거합니다. SHA는 코드 내용의 자동 승인이 아니므로, 사람이 검토한 tree 값만 입력해야 합니다.
 
 ## `commit-msg` 훅
 
@@ -49,7 +62,7 @@ echo "$first_line" | grep -Eiq 'wip|temp|fix stuff|update$' && {
 - `api` 또는 `controller` 변경 시 `api-spec.md` 변경 필요
 - `components`, `hooks`, `services` 변경 시 `ui-spec.md` 또는 `test-scenarios.md` 변경 필요
 - `requirements.md` 변경 시 `acceptance-criteria.md`와 `traceability.md` 변경 필요
-- trusted bundle의 `pre-commit`은 bundle 안의 `check-ai-readiness.py`를 실행하고 checkout 경로를 입력으로 전달해 모듈 문서, Markdown 링크, freshness, 정적 eval 케이스를 검사합니다.
+- trusted bundle의 `pre-commit`은 bundle 안의 `check-ai-readiness.py`를 실행하고 checkout 경로를 전달합니다. 검사기는 Git Bash의 `/c/...` 경로를 Windows 경로로 정규화한 뒤, 전달된 경로가 현재 Git의 `rev-parse --show-toplevel` 결과와 같은지 확인합니다. Git checkout이 없거나 두 경로가 다르면 실패 처리해 다른 저장소의 정책을 검사하지 않습니다. 검사는 bundle 파일 위치가 아니라 확인된 checkout을 기준으로 모듈 문서, Markdown 링크, freshness, 정적 eval 케이스를 읽습니다.
 
 예시 스크립트:
 
@@ -85,7 +98,7 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 ## `pre-push` 훅
 
-푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. Git common dir의 trusted `pre-push`는 `origin/main` SHA와 bundle manifest의 모든 파일 digest를 확인한 뒤에만 bundle reviewer를 실행합니다. reviewer는 checkout의 tracked 변경을 실행하지 않고 branch diff만 전달하며, bundle에 복사된 `review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙을 포함합니다. 요청 모델은 bundle의 `backends.json`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
+푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. Git common dir의 trusted `pre-push`는 `origin/main` SHA와 bundle manifest의 모든 파일 digest를 확인하고, 승인된 reviewer 원본과 렌더러에서 생성 reviewer를 다시 만들어 비교한 뒤에만 실행합니다. reviewer는 checkout의 tracked 변경을 실행하지 않고 branch diff만 전달하며, bundle에 복사된 `review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙을 포함합니다. 요청 모델은 bundle의 `backends.json`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
 
 검사 규칙:
 

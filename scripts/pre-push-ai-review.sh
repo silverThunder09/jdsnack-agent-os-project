@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUNDLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CHECKOUT_ROOT=""
 push_remote="${1-}"
 if [ "$push_remote" != "origin" ]; then
   echo "ERROR: pre-push 리뷰 대상 remote는 origin으로 고정됩니다: ${push_remote:-unavailable}" >&2
@@ -11,28 +12,208 @@ fi
 require_host_tool() {
   local name="$1"
   local path
-  path="$(command -v "$name" || true)"
+  if [ "$name" = codex ]; then
+    path="$($git_bin config --worktree --get jdsnack.codex 2>/dev/null || true)"
+    if [ -z "$path" ]; then
+      path="$($git_bin config --local --get jdsnack.codex 2>/dev/null || true)"
+    fi
+    if [ -z "$path" ]; then
+      echo "ERROR: installer가 승인한 Codex 경로가 없습니다. scripts/install-git-hooks.sh를 다시 실행하십시오." >&2
+      exit 1
+    fi
+    case "$path" in
+      /*|[A-Za-z]:[\\/]*) ;;
+      *)
+        echo "ERROR: installer가 저장한 Codex 경로는 절대 경로여야 합니다: $path" >&2
+        exit 1
+        ;;
+    esac
+    if [ ! -f "$path" ] || [ ! -x "$path" ]; then
+      echo "ERROR: installer가 저장한 Codex 실행 파일을 사용할 수 없습니다: $path" >&2
+      exit 1
+    fi
+  elif [ "$name" = jq ] && [ -n "${JQ_BIN:-}" ]; then
+    path="$JQ_BIN"
+    case "$path" in
+      /*|[A-Za-z]:[\\/]*) ;;
+      *)
+        echo "ERROR: JQ_BIN은 절대 경로여야 합니다." >&2
+        exit 1
+        ;;
+    esac
+    if [ ! -f "$path" ] || [ ! -x "$path" ]; then
+      echo "ERROR: JQ_BIN 실행 파일을 사용할 수 없습니다: $path" >&2
+      exit 1
+    fi
+  else
+    path="$(command -v "$name" || true)"
+  fi
   if [ -z "$path" ]; then
     echo "ERROR: pre-push AI 리뷰를 위해 $name이(가) 필요합니다." >&2
     exit 1
   fi
   printf -v "${name}_bin" '%s' "$path"
 }
-for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex; do
+for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 codex; do
+  if [ "$tool" = codex ]; then
+    # Empty branch diffs must be rejected before the reviewer executable is required.
+    continue
+  fi
   require_host_tool "$tool"
 done
 require_host_tool cat
 
-pwsh_bin=""
-if command -v pwsh >/dev/null 2>&1; then
-  pwsh_bin="$(command -v pwsh)"
-elif command -v powershell.exe >/dev/null 2>&1; then
-  pwsh_bin="$(command -v powershell.exe)"
-fi
-if [ -z "$pwsh_bin" ]; then
-  echo "ERROR: 결정론적 pre-push 검증을 위해 PowerShell이 필요합니다." >&2
+CHECKOUT_ROOT="$($git_bin rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "ERROR: pre-push 리뷰 대상 checkout root를 확인할 수 없습니다." >&2
   exit 1
-fi
+}
+CHECKOUT_ROOT="$(CDPATH= cd -- "$CHECKOUT_ROOT" && pwd -P)" || {
+  echo "ERROR: pre-push 리뷰 대상 checkout root를 정규화할 수 없습니다." >&2
+  exit 1
+}
+
+validate_trusted_codex_path() {
+  local candidate="$1"
+  local canonical
+  local current_user
+  local owner
+  local mode
+  local path_to_check
+  canonical="$($readlink_bin -f -- "$candidate" 2>/dev/null || true)"
+  if [ -z "$canonical" ] || [ ! -f "$canonical" ] || [ ! -x "$canonical" ]; then
+    echo "ERROR: installer가 승인한 Codex 실행 파일의 실제 대상을 확인할 수 없습니다: $candidate" >&2
+    exit 1
+  fi
+  if path_is_within_checkout "$canonical"; then
+    echo "ERROR: Codex 실행 파일은 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
+    exit 1
+  fi
+  if is_windows_mounted_filesystem "$canonical"; then
+    if ! verify_trusted_windows_path_acl "$canonical"; then
+      echo "ERROR: Windows Codex 실행 파일의 ACL을 확인할 수 없습니다: $canonical" >&2
+      exit 1
+    fi
+    printf '%s\n' "$canonical"
+    return 0
+  fi
+  current_user="$($id_bin -un 2>/dev/null || true)"
+  path_to_check="$canonical"
+  while :; do
+    mode="$($stat_bin -c '%a' -- "$path_to_check" 2>/dev/null || true)"
+    case "$mode" in
+      ''|*[!0-7]*)
+        echo "ERROR: Codex 실행 경로 권한을 확인할 수 없습니다: $path_to_check" >&2
+        exit 1
+        ;;
+    esac
+    owner="$($stat_bin -c '%U' -- "$path_to_check" 2>/dev/null || true)"
+    if [ -z "$owner" ] || [ -z "$current_user" ] || { [ "$owner" != "$current_user" ] && [ "$owner" != root ]; }; then
+      echo "ERROR: Codex 실행 경로 소유자를 신뢰할 수 없습니다: $path_to_check" >&2
+      exit 1
+    fi
+    if (( 8#$mode & 022 )); then
+      if [ "$path_to_check" = "$canonical" ] || (( ! (8#$mode & 01000) )) || [ "$owner" != root ]; then
+        echo "ERROR: Codex 실행 경로가 group/world writable입니다: $path_to_check" >&2
+        exit 1
+      fi
+    fi
+    [ "$path_to_check" = / ] && break
+    path_to_check="${path_to_check%/*}"
+    [ -n "$path_to_check" ] || path_to_check=/
+  done
+  printf '%s\n' "$canonical"
+}
+
+is_windows_mounted_filesystem() {
+  local filesystem_type
+  filesystem_type="$($stat_bin -f -c '%T' -- "$1" 2>/dev/null || true)"
+  case "$filesystem_type" in
+    drvfs|9p|msys*|cygwin*) return 0 ;;
+  esac
+  if [ -n "$path_converter_bin" ]; then
+    local windows_path_candidate
+    windows_path_candidate="$($path_converter_bin -w "$1" 2>/dev/null || true)"
+    case "$windows_path_candidate" in
+      [A-Za-z]:*|\\\\*) return 0 ;;
+    esac
+  fi
+  return 1
+}
+
+path_is_within_checkout() {
+  local candidate="$1"
+  local checkout_root="$CHECKOUT_ROOT"
+  if is_windows_mounted_filesystem "$candidate" && is_windows_mounted_filesystem "$checkout_root"; then
+    candidate="${candidate,,}"
+    checkout_root="${checkout_root,,}"
+  fi
+  case "$candidate" in
+    "$checkout_root"|"$checkout_root"/*) return 0 ;;
+  esac
+  return 1
+}
+
+verify_trusted_windows_path_acl() {
+  local windows_path
+  local windows_path_b64
+  local windows_acl_script
+  if [ -z "$path_converter_bin" ] || [ -z "$pwsh_bin" ]; then
+    echo 'ERROR: Windows trusted path ACL 검증에 경로 변환기와 Windows PowerShell이 필요합니다.' >&2
+    return 1
+  fi
+  windows_path="$($path_converter_bin -w "$1" 2>/dev/null || true)"
+  case "$windows_path" in
+    [A-Za-z]:*|\\\\*) ;;
+    *) echo "ERROR: Windows trusted path 경로를 변환할 수 없습니다: $1" >&2; return 1 ;;
+  esac
+  windows_path_b64="$(printf '%s' "$windows_path" | "$base64_bin" -w 0)" || return 1
+  windows_acl_script='
+$ErrorActionPreference = "Stop"
+$securityModulePath = Join-Path $PSHOME "Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1"
+if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) {
+  if (Test-Path -LiteralPath $securityModulePath) {
+    Import-Module -Name $securityModulePath -ErrorAction Stop
+  } else {
+    Import-Module -Name Microsoft.PowerShell.Security -ErrorAction Stop
+  }
+}
+if (-not (Get-Command Get-Acl -ErrorAction SilentlyContinue)) { exit 13 }
+$path = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("__JDSNACK_PATH_B64__"))
+$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+if ($null -eq $identity.User) { exit 10 }
+$trustedSids = @($identity.User.Value, "S-1-5-18", "S-1-5-32-544", "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464")
+$writeRights = [int](
+  [System.Security.AccessControl.FileSystemRights]::WriteData -bor
+  [System.Security.AccessControl.FileSystemRights]::AppendData -bor
+  [System.Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor
+  [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+  [System.Security.AccessControl.FileSystemRights]::Delete -bor
+  [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+  [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+  [System.Security.AccessControl.FileSystemRights]::TakeOwnership -bor
+  0x10000000 -bor 0x40000000)
+$itemPath = $path
+while ($true) {
+  $item = Get-Item -LiteralPath $itemPath -Force
+  if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { exit 14 }
+  $acl = Get-Acl -LiteralPath $itemPath
+  $ownerSid = $acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value
+  if ($trustedSids -notcontains $ownerSid) { exit 11 }
+  foreach ($rule in @($acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))) {
+    if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
+    if ($trustedSids -notcontains $rule.IdentityReference.Value -and
+        (([int]$rule.FileSystemRights -band $writeRights) -ne 0)) { exit 12 }
+  }
+  $parentPath = Split-Path -Parent $itemPath
+  if ([string]::IsNullOrEmpty($parentPath) -or $parentPath -eq $itemPath) { break }
+  $itemPath = $parentPath
+}
+exit 0
+'
+  windows_acl_script="${windows_acl_script/__JDSNACK_PATH_B64__/$windows_path_b64}"
+  MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -NonInteractive -Command \
+    "$windows_acl_script"
+}
 
 normalize_github_repository_url() {
   local candidate="${1%/}"
@@ -95,8 +276,8 @@ if [ "$push_repository" != "$origin_push_repository" ] || [ "$origin_fetch_repos
   exit 1
 fi
 
-MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$ROOT_DIR/backends.json")"
-EFFORT="$("$jq_bin" -r '.workers.codex["review-fallback"].effort // empty' "$ROOT_DIR/backends.json")"
+MODEL="$("$jq_bin" -r '.workers.codex["review-fallback"].model // empty' "$BUNDLE_ROOT/backends.json")"
+EFFORT="$("$jq_bin" -r '.workers.codex["review-fallback"].effort // empty' "$BUNDLE_ROOT/backends.json")"
 
 if [ -z "$MODEL" ] || [ -z "$EFFORT" ]; then
   echo "ERROR: backends.json에 Codex review-fallback 모델과 effort가 필요합니다." >&2
@@ -109,7 +290,7 @@ case "$EFFORT" in
     exit 1
     ;;
 esac
-if [ ! -f "$ROOT_DIR/scripts/review-policy.json" ]; then
+if [ ! -f "$BUNDLE_ROOT/scripts/review-policy.json" ]; then
   echo "ERROR: 전문 리뷰 라우팅 정책이 없습니다: scripts/review-policy.json" >&2
   exit 1
 fi
@@ -148,30 +329,13 @@ trap 'handle_signal 129' HUP
 trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
 
-"$chmod_bin" 700 "$tmp_dir"
-if command -v cygpath >/dev/null 2>&1; then
-  secure_windows_temp_path() {
-    local path="$1"
-    local windows_path
-    local windows_script_path
-    windows_path="$(cygpath -w "$path")" || return 1
-    windows_script_path="$(cygpath -w "$ROOT_DIR/scripts/secure-review-temp-acl.ps1")" || return 1
-    # Both PowerShell arguments are already cygpath-converted Windows paths; keep this conversion override scoped to this call.
-    MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path"
-  }
-  if ! secure_windows_temp_path "$tmp_dir"; then
-    echo "ERROR: Windows pre-push 임시 디렉터리 ACL을 현재 제한 실행 환경에 맞게 고정할 수 없습니다." >&2
-    exit 1
-  fi
-fi
-
 verify_codex_auth_permissions() {
   local auth_path="$codex_home_dir/auth.json"
-  if command -v cygpath >/dev/null 2>&1; then
+  if [ -n "$path_converter_bin" ]; then
     local windows_home_path
     local windows_script_path
-    windows_home_path="$(cygpath -w "$codex_home_base")" || return 1
-    windows_script_path="$(cygpath -w "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1")" || return 1
+    windows_home_path="$("$path_converter_bin" -w "$codex_home_base")" || return 1
+    windows_script_path="$("$path_converter_bin" -w "$BUNDLE_ROOT/scripts/verify-codex-auth-permissions.ps1")" || return 1
     MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_home_path"
     return $?
   fi
@@ -247,6 +411,7 @@ push_refs=()
 push_shas=()
 push_remote_refs=()
 push_remote_shas=()
+all_push_refs=()
 deletion_ref_seen=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "${local_ref:-}" ] && continue
@@ -257,6 +422,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       exit 1
       ;;
   esac
+  all_push_refs+=("$local_ref")
   case "$local_sha" in
     0000000000000000000000000000000000000000)
       deletion_ref_seen=1
@@ -269,6 +435,11 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   push_remote_shas+=("$remote_sha")
 done
 
+if [ "${#all_push_refs[@]}" -gt 1 ]; then
+  echo "ERROR: 여러 ref가 한 번에 push되어 pre-push 리뷰 대상을 단일 커밋에 고정할 수 없습니다. ref별로 다시 push하십시오." >&2
+  printf 'refs=%s\n' "${all_push_refs[*]}" >&2
+  exit 1
+fi
 if [ "${#push_shas[@]}" -eq 0 ]; then
   assert_clean_checkout
   if [ "$deletion_ref_seen" -eq 1 ]; then
@@ -283,6 +454,12 @@ if [ "${#push_shas[@]}" -ne 1 ]; then
   printf 'refs=%s\n' "${push_refs[*]}" >&2
   exit 1
 fi
+case "${push_refs[0]}" in
+  refs/heads/main|refs/heads/master)
+    echo "ERROR: 보호 브랜치 직접 push는 허용하지 않습니다. codex/* 작업 브랜치에서 PR을 생성하십시오." >&2
+    exit 1
+    ;;
+esac
 if ! checkout_ref="$("$git_bin" symbolic-ref --quiet HEAD 2>/dev/null)"; then
   echo "ERROR: detached checkout에서는 push branch를 리뷰 대상 ref에 고정할 수 없습니다." >&2
   exit 1
@@ -341,12 +518,208 @@ if [ ! -s "$branch_path" ]; then
   exit 1
 fi
 
-workspace_arg="$ROOT_DIR"
-if command -v cygpath >/dev/null 2>&1; then
-  workspace_arg="$(cygpath -w "$ROOT_DIR")"
+require_host_tool codex
+
+path_converter_bin=""
+path_converter_kind=""
+if cygpath_bin="$(command -p -v cygpath 2>/dev/null)"; then
+  path_converter_bin="$cygpath_bin"
+  path_converter_kind="cygpath"
+elif [[ "$codex_bin" == *.exe ]]; then
+  require_host_tool wslpath
+  path_converter_bin="$wslpath_bin"
+  path_converter_kind="wslpath"
+fi
+if [[ "$codex_bin" == *.exe ]] && [ "$path_converter_kind" = wslpath ] && [ -z "${WSL_INTEROP-}" ]; then
+  echo "ERROR: WSL에서 Windows Codex를 실행하려면 WSL_INTEROP가 필요합니다." >&2
+  exit 1
+fi
+
+resolve_powershell_bin() {
+  local codex_path="$1"
+  local resolved_path=""
+  if [[ "$codex_path" == *.exe ]]; then
+    if command -p -v powershell.exe >/dev/null 2>&1; then
+      resolved_path="$(command -p -v powershell.exe)"
+    elif command -v powershell.exe >/dev/null 2>&1; then
+      resolved_path="$(command -v powershell.exe)"
+    else
+      echo "ERROR: Windows Codex를 실행하는 WSL 환경에서는 Windows powershell.exe가 필요합니다. Linux pwsh로 Windows 경로 검사를 실행하지 않습니다." >&2
+      return 1
+    fi
+  elif command -v pwsh >/dev/null 2>&1; then
+    resolved_path="$(command -v pwsh)"
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    resolved_path="$(command -v powershell.exe)"
+  fi
+  if [ -z "$resolved_path" ]; then
+    echo "ERROR: 결정론적 pre-push 검증을 위해 PowerShell이 필요합니다." >&2
+    return 1
+  fi
+  printf '%s\n' "$resolved_path"
+}
+
+resolve_windows_git_bin() {
+  local candidate=""
+  local canonical=""
+  if command -p -v git.exe >/dev/null 2>&1; then
+    candidate="$(command -p -v git.exe)"
+  elif command -v git.exe >/dev/null 2>&1; then
+    candidate="$(command -v git.exe)"
+  fi
+  if [ -z "$candidate" ]; then
+    echo "ERROR: Windows Codex를 실행하는 WSL 환경에서는 Windows git.exe가 필요합니다. Linux git 경로를 Windows PowerShell에 전달하지 않습니다." >&2
+    return 1
+  fi
+  canonical="$($readlink_bin -f -- "$candidate" 2>/dev/null || true)"
+  if [ -z "$canonical" ] || [ ! -f "$canonical" ] || [ ! -x "$canonical" ]; then
+    echo "ERROR: Windows git.exe의 실제 실행 파일을 확인할 수 없습니다: $candidate" >&2
+    return 1
+  fi
+  if path_is_within_checkout "$canonical"; then
+    echo "ERROR: Windows git.exe는 untrusted checkout 안에 있을 수 없습니다: $canonical" >&2
+    return 1
+  fi
+  if ! verify_trusted_windows_path_acl "$canonical"; then
+    echo "ERROR: Windows Git 실행 파일의 ACL을 확인할 수 없습니다: $canonical" >&2
+    return 1
+  fi
+  printf '%s\n' "$canonical"
+}
+
+if ! pwsh_bin="$(resolve_powershell_bin "$codex_bin")"; then
+  exit 1
+fi
+codex_bin="$(validate_trusted_codex_path "$codex_bin")"
+
+verify_trusted_bundle_acl() {
+  local bundle_root="$BUNDLE_ROOT"
+  local common_dir
+  local common_bundle_root
+  local configured_hooks_path
+  if [ ! -f "$bundle_root/pre-push" ]; then
+    common_dir="$($git_bin rev-parse --git-common-dir 2>/dev/null || true)"
+    case "$common_dir" in
+      /*|[A-Za-z]:[\\/]*) ;;
+      *) common_dir="$CHECKOUT_ROOT/$common_dir" ;;
+    esac
+    if [ -n "$common_dir" ] && [ -n "$path_converter_bin" ]; then
+      common_dir="$($path_converter_bin -u "$common_dir" 2>/dev/null || true)"
+    fi
+    common_dir="$(CDPATH= cd -- "$common_dir" 2>/dev/null && pwd -P || true)"
+    if [ -z "$common_dir" ]; then
+      echo "ERROR: trusted hook bundle의 Git common dir를 확인할 수 없습니다." >&2
+      return 1
+    fi
+    configured_hooks_path="$($git_bin config --local --get core.hooksPath 2>/dev/null || true)"
+    case "$configured_hooks_path" in
+      /*|[A-Za-z]:[\\/]*) ;;
+      *) configured_hooks_path="" ;;
+    esac
+    if [ -n "$configured_hooks_path" ] && [ -n "$path_converter_bin" ]; then
+      configured_hooks_path="$($path_converter_bin -u "$configured_hooks_path" 2>/dev/null || true)"
+    fi
+    common_bundle_root="$(CDPATH= cd -- "$configured_hooks_path" 2>/dev/null && pwd -P || true)"
+    case "$common_bundle_root" in
+      "$common_dir"/jdsnack-hooks-*) ;;
+      *) common_bundle_root="" ;;
+    esac
+    if [ -f "$common_bundle_root/pre-push" ] &&
+      [ -f "$common_bundle_root/scripts/verify-trusted-hook-bundle-acl.ps1" ]; then
+      bundle_root="$common_bundle_root"
+    fi
+  fi
+
+  local verifier_path="$bundle_root/scripts/verify-trusted-hook-bundle-acl.ps1"
+  local windows_script_path
+  local windows_bundle_path
+  local expected_paths=()
+  if [ -f "$bundle_root/pre-push" ]; then
+    expected_paths=(
+      pre-commit pre-push bundle-manifest source-sha trusted-source-sha trusted-source-ref trusted-source-kind
+      scripts/check-ai-readiness.py scripts/verify-hook-bundle.py backends.json scripts/pre-push-ai-review.sh
+      scripts/pre-push-ai-review.source scripts/render-reviewer.py scripts/review-policy.json
+      scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1
+      scripts/verify-codex-auth-permissions.ps1 scripts/verify-trusted-hook-bundle-acl.ps1
+      scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1)
+  elif [ -f "$bundle_root/.githooks/pre-push" ]; then
+    expected_paths=(
+      .githooks/pre-commit .githooks/pre-push backends.json
+      scripts/check-ai-readiness.py scripts/pre-push-ai-review.sh scripts/review-policy.json
+      scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1
+      scripts/verify-codex-auth-permissions.ps1 scripts/verify-trusted-hook-bundle-acl.ps1
+      scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1)
+  else
+    echo "ERROR: trusted hook bundle 경로를 확인할 수 없습니다: $bundle_root" >&2
+    return 1
+  fi
+  local expected_path_arg
+  expected_path_arg="$(IFS='|'; printf '%s' "${expected_paths[*]}")"
+  if [ ! -f "$verifier_path" ]; then
+    echo "ERROR: trusted hook bundle ACL 검증기가 없습니다: $verifier_path" >&2
+    return 1
+  fi
+  if [ -n "$path_converter_bin" ]; then
+    windows_script_path="$($path_converter_bin -w "$verifier_path")" || return 1
+    windows_bundle_path="$($path_converter_bin -w "$bundle_root")" || return 1
+    MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -NonInteractive -File \
+      "$windows_script_path" -Path "$windows_bundle_path" -ExpectedRelativePath "$expected_path_arg"
+  else
+    "$pwsh_bin" -NoProfile -NonInteractive -File "$verifier_path" -Path "$bundle_root" \
+      -ExpectedRelativePath "$expected_path_arg"
+  fi
+}
+
+if ! verify_trusted_bundle_acl; then
+  echo "ERROR: trusted hook bundle의 소유자 또는 Windows ACL을 확인할 수 없습니다." >&2
+  exit 1
+fi
+
+"$chmod_bin" 700 "$tmp_dir"
+if [ -n "$path_converter_bin" ]; then
+  secure_windows_temp_path() {
+    local path="$1"
+    local windows_path
+    local windows_script_path
+    windows_path="$("$path_converter_bin" -w "$path")" || return 1
+    windows_script_path="$("$path_converter_bin" -w "$BUNDLE_ROOT/scripts/secure-review-temp-acl.ps1")" || return 1
+    # Both PowerShell arguments are already cygpath-converted Windows paths; keep this conversion override scoped to this call.
+    MSYS2_ARG_CONV_EXCL='*' "$pwsh_bin" -NoProfile -File "$windows_script_path" -Path "$windows_path"
+  }
+  if ! secure_windows_temp_path "$tmp_dir"; then
+    echo "ERROR: Windows pre-push 임시 디렉터리 ACL을 현재 제한 실행 환경에 맞게 고정할 수 없습니다." >&2
+    exit 1
+  fi
+fi
+
+workspace_arg="$CHECKOUT_ROOT"
+git_path_arg=""
+if [ -n "$path_converter_bin" ]; then
+  workspace_arg="$("$path_converter_bin" -w "$CHECKOUT_ROOT")"
+  if [[ "$codex_bin" == *.exe ]]; then
+    windows_git_bin="$(resolve_windows_git_bin)" || exit 1
+    git_path_arg="$("$path_converter_bin" -w "$windows_git_bin")"
+  fi
+fi
+risk_script_arg="$BUNDLE_ROOT/scripts/review-risk.ps1"
+policy_path_arg="$BUNDLE_ROOT/scripts/review-policy.json"
+if [ -n "$path_converter_bin" ]; then
+  risk_script_arg="$("$path_converter_bin" -w "$risk_script_arg")"
+  policy_path_arg="$("$path_converter_bin" -w "$policy_path_arg")"
 fi
 risk_stderr_path="$tmp_dir/review-risk.stderr"
-if ! risk_json="$($pwsh_bin -NoProfile -File "$workspace_arg/scripts/review-risk.ps1" -Workspace "$workspace_arg" -BaseSha "$base_sha" -HeadSha "$reviewed_ref" 2>"$risk_stderr_path")"; then
+risk_args=(
+  -NoProfile
+  -File "$risk_script_arg"
+  -Workspace "$workspace_arg"
+  -PolicyPath "$policy_path_arg"
+  -BaseSha "$base_sha"
+  -HeadSha "$reviewed_ref"
+)
+if [ -n "$git_path_arg" ]; then
+  risk_args+=( -GitPath "$git_path_arg" )
+fi
+if ! risk_json="$("$pwsh_bin" "${risk_args[@]}" 2>"$risk_stderr_path")"; then
   echo "ERROR: 결정론적 pre-push 위험도 계산기가 실패했습니다. push를 차단합니다." >&2
   exit 1
 fi
@@ -429,7 +802,7 @@ printf '\nReviewer model: %s\nReviewer effort: %s\n' "$MODEL" "$EFFORT" >> "$pro
 printf '\nReview base: %s\nReview head: %s\n' "$base_sha" "$reviewed_ref" >> "$prompt_path"
 printf '\nDeterministic risk score: %s/100\nDeterministic risk band: %s\nDeterministic review labels: %s\n' "$expected_risk_score" "$expected_risk" "$expected_labels" >> "$prompt_path"
 printf '\nSpecialized review routing labels and path rules (apply these to findings):\n' >> "$prompt_path"
-cat "$ROOT_DIR/scripts/review-policy.json" >> "$prompt_path"
+cat "$BUNDLE_ROOT/scripts/review-policy.json" >> "$prompt_path"
 printf '\n--- BEGIN BRANCH DIFF ---\n' >> "$prompt_path"
 cat "$branch_path" >> "$prompt_path"
 printf '\n--- END BRANCH DIFF ---\n' >> "$prompt_path"
@@ -439,16 +812,16 @@ codex_answer_path="$answer_path"
 codex_home_base="${CODEX_HOME-}"
 if [ -z "$codex_home_base" ] && [ -n "${HOME-}" ]; then
   codex_home_base="$HOME"
-  if [ "${codex_home_base:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
-    codex_home_base="$(cygpath -u "$codex_home_base")" || {
+  if [ "${codex_home_base:1:1}" = ':' ] && [ -n "$path_converter_bin" ]; then
+    codex_home_base="$("$path_converter_bin" -u "$codex_home_base")" || {
       echo "ERROR: Codex 사용자 홈 경로를 확인할 수 없습니다." >&2
       exit 1
     }
   fi
   codex_home_base="$codex_home_base/.codex"
 fi
-if [ "${codex_home_base:1:1}" = ':' ] && command -v cygpath >/dev/null 2>&1; then
-  codex_home_base="$(cygpath -u "$codex_home_base")" || {
+if [ "${codex_home_base:1:1}" = ':' ] && [ -n "$path_converter_bin" ]; then
+  codex_home_base="$("$path_converter_bin" -u "$codex_home_base")" || {
     echo "ERROR: Codex 사용자 홈 경로를 확인할 수 없습니다." >&2
     exit 1
   }
@@ -457,12 +830,12 @@ if [ -z "$codex_home_base" ] || [ ! -d "$codex_home_base" ]; then
   echo "ERROR: Codex CLI 홈 디렉터리가 없습니다." >&2
   exit 1
 fi
-if ! command -v cygpath >/dev/null 2>&1 && [ -L "$codex_home_base" ]; then
+if [ -z "$path_converter_bin" ] && [ -L "$codex_home_base" ]; then
   echo "ERROR: Codex CLI 홈 디렉터리는 심볼릭 링크일 수 없습니다." >&2
   exit 1
 fi
 codex_auth_home_root="$(cd "$codex_home_base" && pwd -P)"
-repo_root_real="$(cd "$ROOT_DIR" && pwd -P)"
+repo_root_real="$(cd "$CHECKOUT_ROOT" && pwd -P)"
 codex_auth_home_comparison="$codex_auth_home_root"
 repo_root_comparison="$repo_root_real"
 case "${OSTYPE-}" in
@@ -510,15 +883,15 @@ if ! "$chmod_bin" 700 "$review_lock_dir"; then
   echo "ERROR: Codex reviewer lock 권한을 제한할 수 없습니다." >&2
   exit 1
 fi
-if command -v cygpath >/dev/null 2>&1 && ! secure_windows_temp_path "$review_lock_dir"; then
+if [ -n "$path_converter_bin" ] && ! secure_windows_temp_path "$review_lock_dir"; then
   echo "ERROR: Windows Codex reviewer lock ACL을 제한할 수 없습니다." >&2
   exit 1
 fi
 codex_home_arg="$codex_home_dir"
-if command -v cygpath >/dev/null 2>&1; then
-  codex_tmp_dir="$(cygpath -w "$tmp_dir")"
-  codex_answer_path="$(cygpath -w "$answer_path")"
-  codex_home_arg="$(cygpath -w "$codex_home_arg")"
+if [ -n "$path_converter_bin" ]; then
+  codex_tmp_dir="$("$path_converter_bin" -w "$tmp_dir")"
+  codex_answer_path="$("$path_converter_bin" -w "$answer_path")"
+  codex_home_arg="$("$path_converter_bin" -w "$codex_home_arg")"
 fi
 
 codex_dir="${codex_bin%/*}"
@@ -549,7 +922,16 @@ if [ -z "$windows_root" ]; then
   echo "ERROR: Windows Codex reviewer runtime에 필요한 SystemRoot/WINDIR가 없습니다." >&2
   exit 1
 fi
+if [ -n "$path_converter_bin" ] && [[ "$windows_root" == /* ]]; then
+  windows_root="$("$path_converter_bin" -w "$windows_root")" || {
+    echo "ERROR: Windows Codex reviewer의 SystemRoot/WINDIR 경로를 변환할 수 없습니다." >&2
+    exit 1
+  }
+fi
 review_env_args+=("SystemRoot=$windows_root" "WINDIR=$windows_root")
+if [[ "$codex_bin" == *.exe ]] && [ -n "${WSL_INTEROP-}" ]; then
+  review_env_args+=("WSL_INTEROP=$WSL_INTEROP" 'WSLENV=CODEX_HOME/p:TEMP/p:TMP/p:TMPDIR/p')
+fi
 
 run_reviewer() (
     cd "$tmp_dir"

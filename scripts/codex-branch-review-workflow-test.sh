@@ -204,12 +204,12 @@ grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-p
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
 grep -Fq -- 'git stash push로 보관한 뒤 재시도' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push dirty checkout remediation 안내가 없습니다.'
 grep -Fq -- 'git stash push' "$ROOT_DIR/.agent-os/standards/git-hooks.md" || fail 'git-hooks 문서에 dirty checkout 전환 절차가 없습니다.'
-grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 로그인 캐시 권한 검증을 위한 host 도구를 확인하지 않습니다.'
+grep -Fq -- 'for tool in env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 codex' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push가 로그인 캐시 권한 검증을 위한 host 도구를 확인하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push에서 사용할 Git Bash 실행 경로를 명시적으로 확인하지 않습니다.'
 grep -Fq -- 'git config --local jdsnack.hookBash "$git_bash_path"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 검증한 Bash 실행 경로를 로컬 설정에 고정하지 않습니다.'
-grep -Fq -- 'for required_tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id jq codex cat; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+grep -Fq -- 'for tool in dirname env git grep tail sed head awk cmp rm chmod mktemp stat id readlink jq base64 cat cp mkdir tr; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
   || fail 'Git hook 설치가 pre-push 실행에 필요한 전체 host 도구를 확인하지 않습니다.'
 grep -Fq -- 'git_bash_path="$(git config --local --get jdsnack.hookBash || true)"' "$ROOT_DIR/.githooks/pre-push" \
   || fail 'pre-push hook이 설치 시 검증된 Git Bash 경로를 읽지 않습니다.'
@@ -240,17 +240,20 @@ grep -Fq -- '재분석 지점' "$ROOT_DIR/scripts/review-path-safety.ps1" \
 grep -Fq -- "검증해 절대 경로로 로컬 Git 설정(\`jdsnack.hookBash\`)에 저장" "$ROOT_DIR/.agent-os/standards/git-hooks.md" \
   || fail 'git-hooks 문서가 설치 시 검증하는 도구 의존성을 설명하지 않습니다.'
 grep -Fq -- 'powershell.exe' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 PowerShell 사전조건을 확인하지 않습니다.'
-grep -Fq -- 'required_file' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 downstream 파일 의존성을 확인하지 않습니다.'
+grep -Fq -- 'for source_file in $source_files; do' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 origin/main downstream 파일 목록을 검증하지 않습니다.'
+grep -Fq -- 'git ls-tree "$source_ref" -- "$source_file"' "$ROOT_DIR/scripts/install-git-hooks.sh" \
+  || fail 'Git hook 설치가 trusted source의 downstream 파일 존재와 모드를 확인하지 않습니다.'
 grep -Fq -- 'scripts/check-ai-readiness.py' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 readiness 스크립트 의존성을 확인하지 않습니다.'
 grep -Fq -- 'scripts/review-policy.json' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 review policy 의존성을 확인하지 않습니다.'
-grep -Fq -- 'if ! codex exec' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex exec 호환성을 확인하지 않습니다.'
+grep -Fq -- 'if ! "$codex_path" exec --ephemeral --ignore-user-config --strict-config --sandbox read-only --skip-git-repo-check --help' "$ROOT_DIR/scripts/install-git-hooks.sh" || fail 'Git hook 설치가 Codex의 제한된 읽기 전용 실행 옵션을 확인하지 않습니다.'
 install_prereq_line="$(grep -nF -- 'git_bash_path="$(command -v bash || true)"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
-install_chmod_line="$(grep -nF -- 'chmod +x "$repo_root/$hooks_path/$hook"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
-[[ -n "$install_prereq_line" && -n "$install_chmod_line" && "$install_prereq_line" -lt "$install_chmod_line" ]] \
-    || fail 'Git hook 설치가 사전조건 검증 전에 tracked hook을 변경합니다.'
-install_exec_line="$(grep -nF -- 'if ! codex exec' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
-[[ -n "$install_exec_line" && "$install_exec_line" -lt "$install_chmod_line" ]] \
-    || fail 'Git hook 설치가 Codex exec 호환성 확인 전에 tracked hook을 변경합니다.'
+install_bundle_line="$(grep -nF -- 'bundle="$(mktemp -d "$git_common_dir/jdsnack-hooks-${source_sha}.XXXXXX")"' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
+[[ -n "$install_prereq_line" && -n "$install_bundle_line" && "$install_prereq_line" -lt "$install_bundle_line" ]] \
+    || fail 'Git hook 설치가 사전조건 검증 전에 bundle을 생성합니다.'
+install_exec_line="$(grep -nF -- 'if ! "$codex_path" exec --ephemeral --ignore-user-config --strict-config --sandbox read-only --skip-git-repo-check --help' "$ROOT_DIR/scripts/install-git-hooks.sh" | head -n 1 | cut -d: -f1)"
+[[ -n "$install_exec_line" && "$install_exec_line" -lt "$install_bundle_line" ]] \
+    || fail 'Git hook 설치가 Codex 호환성 확인 전에 bundle을 생성합니다.'
 grep -Fq -- 'Specialized review routing labels and path rules' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰 프롬프트에 전문 라우팅 지침이 없습니다.'
 grep -Fq -- '--sandbox read-only' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || fail 'pre-push 리뷰가 read-only sandbox를 강제하지 않습니다.'
 if grep -Fq -- 'sandbox_workspace_write.network_access=false' "$ROOT_DIR/scripts/pre-push-ai-review.sh" || grep -Fq -- 'sandbox_workspace_write.network_access=false' "$ROOT_DIR/scripts/install-git-hooks.sh"; then

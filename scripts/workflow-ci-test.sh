@@ -309,12 +309,20 @@ test -f "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh" \
   || { echo 'scripts/pre-push-git-invocation-test.sh is missing' >&2; exit 1; }
 bash -n "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"
 bash "$ROOT_DIR/scripts/pre-push-git-invocation-test.sh"
+test -f "$ROOT_DIR/scripts/install-git-hooks-test.sh" \
+  || { echo 'scripts/install-git-hooks-test.sh is missing' >&2; exit 1; }
+bash -n "$ROOT_DIR/scripts/install-git-hooks-test.sh"
+bash "$ROOT_DIR/scripts/install-git-hooks-test.sh"
 bash -n "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
 bash "$ROOT_DIR/scripts/pre-push-empty-diff-test.sh"
 pwsh -NoProfile -File "$ROOT_DIR/scripts/review-risk-test.ps1"
 test -f "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" \
   || { echo 'scripts/secure-review-temp-acl-contract-test.ps1 is missing' >&2; exit 1; }
 pwsh -NoProfile -File "$ROOT_DIR/scripts/secure-review-temp-acl-contract-test.ps1" -Workspace "$ROOT_DIR"
+pwsh -NoProfile -File "$ROOT_DIR/scripts/codex-review-outcome-parser-test.ps1" -Workspace "$ROOT_DIR"
+test -f "$ROOT_DIR/scripts/verify-trusted-hook-bundle-acl-test.ps1" \
+  || { echo 'scripts/verify-trusted-hook-bundle-acl-test.ps1 is missing' >&2; exit 1; }
+pwsh -NoProfile -File "$ROOT_DIR/scripts/verify-trusted-hook-bundle-acl-test.ps1" -Workspace "$ROOT_DIR"
 test -f "$ROOT_DIR/scripts/verify-codex-auth-permissions.ps1" \
   || { echo 'scripts/verify-codex-auth-permissions.ps1 is missing' >&2; exit 1; }
 test -f "$ROOT_DIR/scripts/codex-auth-permissions.ps1" \
