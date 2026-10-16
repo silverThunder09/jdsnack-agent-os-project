@@ -557,6 +557,7 @@ cp "$test_worktree/.githooks/pre-commit" "$trusted_hook_path/pre-commit"
 cp "$test_worktree/.githooks/pre-push" "$trusted_hook_path/pre-push"
 cp "$test_worktree/scripts/check-ai-readiness.py" "$trusted_hook_path/scripts/check-ai-readiness.py"
 cp "$test_worktree/backends.json" "$trusted_hook_path/backends.json"
+cp "$test_worktree/scripts/trusted-hooks/verify-hook-bundle.py" "$trusted_hook_path/scripts/verify-hook-bundle.py"
 cp "$test_worktree/scripts/pre-push-ai-review.sh" "$trusted_hook_path/scripts/pre-push-ai-review.sh"
 for script_name in \
   review-policy.json \
@@ -578,6 +579,13 @@ param([string]$Path, [string[]]$ExpectedRelativePath)
 if ([string]::IsNullOrWhiteSpace($Path) -or @($ExpectedRelativePath).Count -eq 0) {
     throw 'Trusted hook bundle ACL fixture arguments are missing.'
 }
+$expectedPaths = @(
+    foreach ($value in @($ExpectedRelativePath)) {
+        $value -split '\|' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    })
+if ($expectedPaths -notcontains 'scripts/verify-hook-bundle.py' -or $expectedPaths -notcontains 'backends.json') {
+    throw 'Trusted hook bundle ACL fixture missed verifier or backend settings.'
+}
 Write-Output 'Trusted hook bundle ACL fixture passed'
 ACL_FIXTURE
 printf '%s\n' "$base_sha" > "$trusted_hook_path/source-sha"
@@ -595,6 +603,7 @@ write_fixture_manifest_entry pre-commit
 write_fixture_manifest_entry pre-push
 write_fixture_manifest_entry scripts/check-ai-readiness.py
 write_fixture_manifest_entry backends.json
+write_fixture_manifest_entry scripts/verify-hook-bundle.py
 write_fixture_manifest_entry scripts/pre-push-ai-review.sh
 for script_name in \
   review-policy.json \
