@@ -47,9 +47,11 @@ $rubricPrompt = '<rubric>: PASS: ...'
 $scorePrompt = 'score rationale: <reported score>/5: ...'
 $rubricPromptCount = [regex]::Matches($fallbackSource, [regex]::Escape($rubricPrompt)).Count
 $scorePromptCount = [regex]::Matches($fallbackSource, [regex]::Escape($scorePrompt)).Count
-if ($rubricPromptCount -ne 2 -or $scorePromptCount -ne 2 -or
-    $fallbackSource.Contains('<rubric>: PASS — ...')) {
-    throw 'Both trusted review prompts must require ASCII colon separators.'
+if ($rubricPromptCount -ne 1 -or $scorePromptCount -ne 1 -or
+    $fallbackSource.Contains('<rubric>: PASS — ...') -or
+    -not $fallbackSource.Contains("'--output-schema'") -or
+    -not $fallbackSource.Contains('$codexOutputSchemaPath')) {
+    throw 'Claude must retain the Markdown contract while Codex uses the trusted JSON output schema.'
 }
 
 $functionAst = $ast.Find({
@@ -61,7 +63,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-KoreanReviewText', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Test-SelfReviewSubmissionFailure', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput', 'ConvertFrom-CodexReviewJson', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-KoreanReviewText', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Test-SelfReviewSubmissionFailure', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -71,6 +73,22 @@ foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput'
         throw "$functionName function was not found."
     }
     . ([scriptblock]::Create($dependencyAst.Extent.Text))
+}
+
+$codexSchemaPath = Join-Path $Workspace 'scripts/codex-review-output.schema.json'
+if (-not (Test-Path -LiteralPath $codexSchemaPath -PathType Leaf)) {
+    throw 'The trusted Codex review output schema was not found.'
+}
+$codexSchema = Get-Content -LiteralPath $codexSchemaPath -Raw | ConvertFrom-Json
+if ($codexSchema.type -ne 'object' -or
+    $codexSchema.additionalProperties -ne $false -or
+    @($codexSchema.required).Count -ne 5 -or
+    $codexSchema.properties.decision.enum -notcontains 'NEEDS_HUMAN' -or
+    $codexSchema.properties.findings.items.properties.severity.enum -notcontains 'P1' -or
+    @($codexSchema.properties.review_summary.required).Count -ne 7 -or
+    $codexSchema.properties.review_summary.properties.correctness.minLength -lt 10 -or
+    $codexSchema.properties.review_summary.properties.conclusion.minLength -lt 20) {
+    throw 'The Codex review schema does not enforce the complete structured review shape.'
 }
 
 if (-not (Test-SelfReviewSubmissionFailure -Output 'GraphQL: Review Can not request changes on your own pull request')) {
@@ -416,6 +434,66 @@ $validReview = @(
 $validResult = Get-StructuredReviewResult -Text $validReview -ReviewerBackend 'claude' -FallbackReason 'none'
 if (-not $validResult.FindingsContractValid -or -not $validResult.ReviewSummaryContractValid) {
     throw "A valid structured review result did not preserve both contract-valid flags (decision=$($validResult.DecisionMatch.Success), score=$($validResult.ScoreMatch.Success), risk=$($validResult.RiskMatch.Success), findings=$($validResult.FindingsContractValid), summary=$($validResult.ReviewSummaryContractValid))."
+}
+$validCodexReviewJson = @'
+{
+  "decision": "PASS",
+  "score": 4,
+  "risk": "Standard",
+  "findings": [],
+  "review_summary": {
+    "correctness": "요청된 변경이 올바른 동작을 유지합니다.",
+    "contract": "기존 계약과 출력 조건을 지킵니다.",
+    "tests": "관련 회귀 검증이 동작을 확인합니다.",
+    "security": "신뢰된 입력과 읽기 전용 경계를 유지합니다.",
+    "maintainability": "변경 책임이 작고 명확하게 분리되어 있습니다.",
+    "score_rationale": "네 점은 변경 범위와 검증 근거를 함께 반영합니다.",
+    "conclusion": "현재 검토 근거에서 병합을 막을 결함은 확인되지 않았습니다."
+  }
+}
+'@
+$normalizedCodexReview = ConvertFrom-CodexReviewJson -Json $validCodexReviewJson
+$codexJsonResult = Get-StructuredReviewResult -Text $normalizedCodexReview -ReviewerBackend 'codex' -FallbackReason 'none'
+if (-not $codexJsonResult.DecisionMatch.Success -or
+    -not $codexJsonResult.ScoreMatch.Success -or
+    -not $codexJsonResult.RiskMatch.Success -or
+    -not $codexJsonResult.FindingsContractValid -or
+    -not $codexJsonResult.ReviewSummaryContractValid) {
+    throw 'A schema-shaped Codex JSON review did not pass the existing review contract checks.'
+}
+$invalidCodexJsonRejected = $false
+try {
+    $null = ConvertFrom-CodexReviewJson -Json '{"decision":'
+} catch {
+    $invalidCodexJsonRejected = $true
+}
+if (-not $invalidCodexJsonRejected) {
+    throw 'Malformed Codex JSON was accepted as a structured review.'
+}
+$stringScoreJsonRejected = $false
+try {
+    $null = ConvertFrom-CodexReviewJson -Json $validCodexReviewJson.Replace('"score": 4', '"score": "4"')
+} catch {
+    $stringScoreJsonRejected = $true
+}
+if (-not $stringScoreJsonRejected) {
+    throw 'A string score was accepted despite the integer score schema.'
+}
+$shortConclusionJson = [regex]::Replace($validCodexReviewJson, '"conclusion":\s*"[^"]+"', '"conclusion": "승인합니다."')
+$shortConclusionJsonRejected = $false
+try {
+    $null = ConvertFrom-CodexReviewJson -Json $shortConclusionJson
+} catch {
+    $shortConclusionJsonRejected = $true
+}
+if (-not $shortConclusionJsonRejected) {
+    throw 'A review conclusion shorter than the published contract was accepted.'
+}
+$passWithP1Json = $validCodexReviewJson.Replace('"findings": []', '"findings": [{"severity": "P1", "text": "보안 검증을 우회합니다."}]')
+$passWithP1Text = ConvertFrom-CodexReviewJson -Json $passWithP1Json
+$passWithP1Result = Get-StructuredReviewResult -Text $passWithP1Text -ReviewerBackend 'codex' -FallbackReason 'none'
+if ($passWithP1Result.FindingsContractValid) {
+    throw 'A PASS Codex result containing a P1 finding was accepted.'
 }
 $splitDecisionReview = $validReview.Replace('decision: PASS', "decision:`nPASS")
 $splitDecisionResult = Get-StructuredReviewResult -Text $splitDecisionReview -ReviewerBackend 'claude' -FallbackReason 'none'

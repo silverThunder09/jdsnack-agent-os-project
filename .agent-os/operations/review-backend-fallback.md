@@ -9,9 +9,9 @@
 
 ## 구조화 요약 형식
 
-- Codex와 Claude 프롬프트는 rubric과 score rationale의 구분자로 ASCII colon을 요청합니다. review_summary는 rubric 5줄, score rationale 1줄, conclusion 1줄로 구성합니다.
-- parser는 전환 중 기존 em dash와 ASCII colon을 허용하고, 물음표 등 다른 구분자는 잘못된 구조화 결과로 처리합니다.
-- workflow_run은 trusted main의 스크립트를 실행합니다. 리뷰 프롬프트 변경은 main에 반영된 뒤 실행되는 후속 PR부터 적용됩니다.
+- Claude 리뷰는 rubric과 score rationale의 구분자로 ASCII colon을 요청합니다. review_summary는 rubric 5줄, score rationale 1줄, conclusion 1줄로 구성합니다.
+- Codex CLI는 scripts/codex-review-output.schema.json을 --output-schema에 전달해 JSON 응답의 필수 필드, 값 종류, findings 배열과 7개 요약 필드를 고정합니다. 루브릭·점수 근거는 각각 10자 이상, 결론은 20자 이상이며, 스크립트는 JSON을 검증한 뒤 기존 한국어·finding·점수 계약 검사도 적용합니다.
+- workflow_run은 trusted main의 스크립트와 스키마를 실행합니다. 리뷰 프롬프트·스키마 변경은 main에 반영된 뒤 실행되는 후속 PR부터 적용됩니다.
 
 ## 점수와 병합
 
