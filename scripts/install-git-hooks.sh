@@ -141,10 +141,9 @@ copy_source scripts/trusted-hooks/verify-trusted-hook-bundle-acl.ps1 scripts/ver
 for source_file in scripts/check-ai-readiness.py backends.json scripts/review-policy.json scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1 scripts/verify-codex-auth-permissions.ps1 scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1; do
   copy_source "$source_file" "$source_file"
 done
-git show "$source_ref:scripts/pre-push-ai-review.sh" > "$bundle/scripts/pre-push-ai-review.source"
-git show "$source_ref:scripts/trusted-hooks/render-reviewer.py" > "$bundle/render-reviewer.py"
-"$python_path" "$bundle/render-reviewer.py" "$bundle/scripts/pre-push-ai-review.source" "$bundle/scripts/pre-push-ai-review.sh"
-rm "$bundle/render-reviewer.py" "$bundle/scripts/pre-push-ai-review.source"
+copy_source scripts/pre-push-ai-review.sh scripts/pre-push-ai-review.source
+copy_source scripts/trusted-hooks/render-reviewer.py scripts/render-reviewer.py
+"$python_path" "$bundle/scripts/render-reviewer.py" "$bundle/scripts/pre-push-ai-review.source" "$bundle/scripts/pre-push-ai-review.sh"
 printf 'scripts/pre-push-ai-review.sh %s\n' "$(git hash-object "$bundle/scripts/pre-push-ai-review.sh")" >> "$manifest"
 
 printf '%s\n' "$source_sha" > "$bundle/source-sha"
@@ -155,7 +154,7 @@ printf '%s\n' "$checkout_sha" > "$bundle/checkout-sha"
 chmod 600 "$manifest" "$bundle/source-sha" "$bundle/trusted-source-sha" "$bundle/trusted-source-ref" "$bundle/trusted-source-kind" "$bundle/checkout-sha"
 chmod 700 "$bundle/pre-commit" "$bundle/pre-push" "$bundle/scripts/pre-push-ai-review.sh"
 
-expected_paths='pre-commit|pre-push|bundle-manifest|source-sha|checkout-sha|trusted-source-sha|trusted-source-ref|trusted-source-kind|scripts/verify-hook-bundle.py|scripts/verify-trusted-hook-bundle-acl.ps1|scripts/check-ai-readiness.py|backends.json|scripts/pre-push-ai-review.sh|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1'
+expected_paths='pre-commit|pre-push|bundle-manifest|source-sha|checkout-sha|trusted-source-sha|trusted-source-ref|trusted-source-kind|scripts/verify-hook-bundle.py|scripts/verify-trusted-hook-bundle-acl.ps1|scripts/check-ai-readiness.py|backends.json|scripts/pre-push-ai-review.sh|scripts/pre-push-ai-review.source|scripts/render-reviewer.py|scripts/review-policy.json|scripts/review-risk.ps1|scripts/secure-review-temp-acl.ps1|scripts/verify-codex-auth-permissions.ps1|scripts/codex-auth-permissions.ps1|scripts/review-path-safety.ps1'
 acl_file="$bundle/scripts/verify-trusted-hook-bundle-acl.ps1"
 acl_bundle="$bundle"
 acl_codex="$codex_path"

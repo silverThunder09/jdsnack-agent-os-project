@@ -630,7 +630,8 @@ verify_trusted_bundle_acl() {
   if [ -f "$bundle_root/pre-push" ]; then
     expected_paths=(
       pre-commit pre-push bundle-manifest source-sha trusted-source-sha trusted-source-ref trusted-source-kind
-      scripts/check-ai-readiness.py scripts/verify-hook-bundle.py backends.json scripts/pre-push-ai-review.sh scripts/review-policy.json
+      scripts/check-ai-readiness.py scripts/verify-hook-bundle.py backends.json scripts/pre-push-ai-review.sh
+      scripts/pre-push-ai-review.source scripts/render-reviewer.py scripts/review-policy.json
       scripts/review-risk.ps1 scripts/secure-review-temp-acl.ps1
       scripts/verify-codex-auth-permissions.ps1 scripts/verify-trusted-hook-bundle-acl.ps1
       scripts/codex-auth-permissions.ps1 scripts/review-path-safety.ps1)

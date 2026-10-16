@@ -70,11 +70,31 @@ test "$(cat "$bundle/checkout-sha")" = "$checkout_sha"
 test "$main_sha" != "$checkout_sha"
 git show "refs/remotes/origin/main:scripts/trusted-hooks/pre-push" | cmp - "$bundle/pre-push"
 git show "refs/remotes/origin/main:scripts/check-ai-readiness.py" | cmp - "$bundle/scripts/check-ai-readiness.py"
+git show "refs/remotes/origin/main:scripts/pre-push-ai-review.sh" | cmp - "$bundle/scripts/pre-push-ai-review.source"
+git show "refs/remotes/origin/main:scripts/trusted-hooks/render-reviewer.py" | cmp - "$bundle/scripts/render-reviewer.py"
 grep -Fq 'BUNDLE_ROOT=' "$bundle/scripts/pre-push-ai-review.sh"
 grep -Fq 'CHECKOUT_ROOT="$($git_bin rev-parse --show-toplevel 2>/dev/null)"' "$bundle/scripts/pre-push-ai-review.sh"
 ! grep -Fq 'UNTRUSTED' "$bundle/scripts/pre-push-ai-review.sh"
 python_bin="$(git config --local --get jdsnack.python)"
 "$python_bin" "$bundle/scripts/verify-hook-bundle.py" "$bundle"
+cp "$bundle/scripts/pre-push-ai-review.sh" "$temporary/reviewer.trusted"
+cp "$bundle/bundle-manifest" "$temporary/bundle-manifest.trusted"
+printf '%s\n' 'UNTRUSTED REVIEWER' > "$bundle/scripts/pre-push-ai-review.sh"
+tampered_reviewer_sha="$(git hash-object "$bundle/scripts/pre-push-ai-review.sh")"
+awk -v digest="$tampered_reviewer_sha" '$1 == "scripts/pre-push-ai-review.sh" {$2=digest} {print $1 " " $2}' \
+  "$bundle/bundle-manifest" > "$temporary/bundle-manifest.tampered"
+mv "$temporary/bundle-manifest.tampered" "$bundle/bundle-manifest"
+if "$python_bin" "$bundle/scripts/verify-hook-bundle.py" "$bundle" > "$temporary/reviewer-manifest-tamper.log" 2>&1; then
+  echo 'bundle verifier accepted a modified reviewer with a self-updated manifest digest' >&2
+  exit 1
+fi
+if ! grep -Fq 'rendered reviewer does not match its approved source' "$temporary/reviewer-manifest-tamper.log"; then
+  cat "$temporary/reviewer-manifest-tamper.log" >&2
+  echo 'modified generated reviewer was rejected for an unexpected reason' >&2
+  exit 1
+fi
+cp "$temporary/reviewer.trusted" "$bundle/scripts/pre-push-ai-review.sh"
+cp "$temporary/bundle-manifest.trusted" "$bundle/bundle-manifest"
 
 active_root="$(git rev-parse --show-toplevel)"
 if ! JDSNACK_AI_READINESS_ROOT="$active_root" "$python_bin" "$bundle/scripts/check-ai-readiness.py" > "$temporary/readiness-matching-root.log" 2>&1; then

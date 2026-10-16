@@ -98,7 +98,7 @@ echo "$changed" | grep -q 'requirements.md' && {
 
 ## `pre-push` 훅
 
-푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. Git common dir의 trusted `pre-push`는 `origin/main` SHA와 bundle manifest의 모든 파일 digest를 확인한 뒤에만 bundle reviewer를 실행합니다. reviewer는 checkout의 tracked 변경을 실행하지 않고 branch diff만 전달하며, bundle에 복사된 `review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙을 포함합니다. 요청 모델은 bundle의 `backends.json`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
+푸시 전 결정론 검증과 읽기 전용 Codex AI 리뷰를 수행합니다. Git common dir의 trusted `pre-push`는 `origin/main` SHA와 bundle manifest의 모든 파일 digest를 확인하고, 승인된 reviewer 원본과 렌더러에서 생성 reviewer를 다시 만들어 비교한 뒤에만 실행합니다. reviewer는 checkout의 tracked 변경을 실행하지 않고 branch diff만 전달하며, bundle에 복사된 `review-policy.json`의 Security·Performance·Test Coverage·Architecture 라우팅 규칙을 포함합니다. 요청 모델은 bundle의 `backends.json`에 기록하고, 실행 모델은 `runtimeModel`을 사용합니다.
 
 검사 규칙:
 

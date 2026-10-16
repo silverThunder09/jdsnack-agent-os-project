@@ -6,11 +6,13 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 FILES = {
     "pre-commit", "pre-push", "backends.json", "scripts/verify-hook-bundle.py",
     "scripts/verify-trusted-hook-bundle-acl.ps1", "scripts/check-ai-readiness.py",
-    "scripts/pre-push-ai-review.sh", "scripts/review-policy.json", "scripts/review-risk.ps1",
+    "scripts/pre-push-ai-review.sh", "scripts/pre-push-ai-review.source", "scripts/render-reviewer.py",
+    "scripts/review-policy.json", "scripts/review-risk.ps1",
     "scripts/secure-review-temp-acl.ps1", "scripts/verify-codex-auth-permissions.ps1",
     "scripts/codex-auth-permissions.ps1", "scripts/review-path-safety.ps1",
 }
@@ -21,6 +23,8 @@ SOURCE_FILES = {
     "scripts/verify-hook-bundle.py": "scripts/trusted-hooks/verify-hook-bundle.py",
     "scripts/verify-trusted-hook-bundle-acl.ps1": "scripts/trusted-hooks/verify-trusted-hook-bundle-acl.ps1",
     "scripts/check-ai-readiness.py": "scripts/check-ai-readiness.py",
+    "scripts/pre-push-ai-review.source": "scripts/pre-push-ai-review.sh",
+    "scripts/render-reviewer.py": "scripts/trusted-hooks/render-reviewer.py",
     "scripts/review-policy.json": "scripts/review-policy.json",
     "scripts/review-risk.ps1": "scripts/review-risk.ps1",
     "scripts/secure-review-temp-acl.ps1": "scripts/secure-review-temp-acl.ps1",
@@ -103,6 +107,26 @@ def main() -> int:
             source_blob = git(["rev-parse", f"{ref}:{source_file}"], repo)
             if expected != source_blob:
                 fail(f"bundle manifest does not match its approved source tree: {relative}")
+    try:
+        with tempfile.TemporaryDirectory(prefix="jdsnack-reviewer-") as temporary:
+            rendered_path = Path(temporary) / "pre-push-ai-review.sh"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(root / "scripts/render-reviewer.py"),
+                    str(root / "scripts/pre-push-ai-review.source"),
+                    str(rendered_path),
+                ],
+                check=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            rendered_reviewer = rendered_path.read_bytes()
+    except (OSError, subprocess.CalledProcessError):
+        fail("approved reviewer source could not be rendered")
+    if rendered_reviewer != read_regular(root, "scripts/pre-push-ai-review.sh"):
+        fail("rendered reviewer does not match its approved source")
     return 0
 
 

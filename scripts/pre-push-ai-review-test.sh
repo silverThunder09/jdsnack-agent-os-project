@@ -9,6 +9,9 @@ fail() {
 }
 
 command -v jq >/dev/null 2>&1 || fail 'jq가 필요합니다.'
+python_bin="$(command -v python || command -v python3 || true)"
+[ -n "$python_bin" ] || fail 'reviewer 렌더링 테스트에 사용할 Python을 찾지 못했습니다.'
+"$python_bin" --version >/dev/null 2>&1 || fail 'reviewer 렌더링 테스트에 사용할 Python을 실행할 수 없습니다.'
 if command -v pwsh >/dev/null 2>&1; then
   pwsh_bin="$(command -v pwsh)"
 elif command -v powershell.exe >/dev/null 2>&1; then
@@ -573,7 +576,19 @@ cp "$test_worktree/.githooks/pre-push" "$trusted_hook_path/pre-push"
 cp "$test_worktree/scripts/check-ai-readiness.py" "$trusted_hook_path/scripts/check-ai-readiness.py"
 cp "$test_worktree/backends.json" "$trusted_hook_path/backends.json"
 cp "$test_worktree/scripts/trusted-hooks/verify-hook-bundle.py" "$trusted_hook_path/scripts/verify-hook-bundle.py"
-cp "$test_worktree/scripts/pre-push-ai-review.sh" "$trusted_hook_path/scripts/pre-push-ai-review.sh"
+source_pinned_bundle=0
+if git -C "$test_worktree" show refs/remotes/origin/main:scripts/trusted-hooks/verify-hook-bundle.py \
+  | grep -Fq '"scripts/pre-push-ai-review.source"'; then
+  git -C "$test_worktree" show "refs/remotes/origin/main:scripts/pre-push-ai-review.sh" \
+    > "$trusted_hook_path/scripts/pre-push-ai-review.source"
+  git -C "$test_worktree" show "refs/remotes/origin/main:scripts/trusted-hooks/render-reviewer.py" \
+    > "$trusted_hook_path/scripts/render-reviewer.py"
+  "$python_bin" "$trusted_hook_path/scripts/render-reviewer.py" \
+    "$trusted_hook_path/scripts/pre-push-ai-review.source" "$trusted_hook_path/scripts/pre-push-ai-review.sh"
+  source_pinned_bundle=1
+else
+  cp "$test_worktree/scripts/pre-push-ai-review.sh" "$trusted_hook_path/scripts/pre-push-ai-review.sh"
+fi
 for script_name in \
   review-policy.json \
   review-risk.ps1 \
@@ -598,8 +613,11 @@ $expectedPaths = @(
     foreach ($value in @($ExpectedRelativePath)) {
         $value -split '\|' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     })
-if ($expectedPaths -notcontains 'scripts/verify-hook-bundle.py' -or $expectedPaths -notcontains 'backends.json') {
-    throw 'Trusted hook bundle ACL fixture missed verifier or backend settings.'
+if ($expectedPaths -notcontains 'scripts/verify-hook-bundle.py' -or
+    $expectedPaths -notcontains 'backends.json' -or
+    $expectedPaths -notcontains 'scripts/pre-push-ai-review.source' -or
+    $expectedPaths -notcontains 'scripts/render-reviewer.py') {
+    throw 'Trusted hook bundle ACL fixture missed a verifier, reviewer source, or backend setting.'
 }
 Write-Output 'Trusted hook bundle ACL fixture passed'
 ACL_FIXTURE
@@ -620,6 +638,10 @@ write_fixture_manifest_entry scripts/check-ai-readiness.py
 write_fixture_manifest_entry backends.json
 write_fixture_manifest_entry scripts/verify-hook-bundle.py
 write_fixture_manifest_entry scripts/pre-push-ai-review.sh
+if [ "$source_pinned_bundle" -eq 1 ]; then
+  write_fixture_manifest_entry scripts/pre-push-ai-review.source
+  write_fixture_manifest_entry scripts/render-reviewer.py
+fi
 for script_name in \
   review-policy.json \
   review-risk.ps1 \
