@@ -583,6 +583,7 @@ ACL_FIXTURE
 printf '%s\n' "$base_sha" > "$trusted_hook_path/source-sha"
 printf '%s\n' "$base_sha" > "$trusted_hook_path/trusted-source-sha"
 printf '%s\n' refs/remotes/origin/main > "$trusted_hook_path/trusted-source-ref"
+printf '%s\n' origin-main > "$trusted_hook_path/trusted-source-kind"
 : > "$trusted_hook_path/bundle-manifest"
 write_fixture_manifest_entry() {
   local bundle_path="$1"
@@ -608,7 +609,8 @@ done
 chmod 700 "$trusted_hook_path/pre-commit" "$trusted_hook_path/pre-push" \
   "$trusted_hook_path/scripts/pre-push-ai-review.sh"
 chmod 600 "$trusted_hook_path/source-sha" "$trusted_hook_path/trusted-source-sha" \
-  "$trusted_hook_path/trusted-source-ref" "$trusted_hook_path/bundle-manifest"
+  "$trusted_hook_path/trusted-source-ref" "$trusted_hook_path/trusted-source-kind" \
+  "$trusted_hook_path/bundle-manifest"
 secure_test_path "$trusted_hook_path"
 git -C "$test_worktree" config --local core.hooksPath "$trusted_hook_path"
 git -C "$test_worktree" config --local jdsnack.codex "$fake_root/codex"

@@ -10,12 +10,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-configured_root = os.environ.get("JDSNACK_AI_READINESS_ROOT")
-ROOT = Path(configured_root).resolve() if configured_root else Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 POLICY_PATH = ROOT / ".agent-os/ai-readiness.yml"
 SCORE_PATH = ROOT / "docs/ai-readiness-score.json"
 EVALS_PATH = ROOT / "evals/context-tasks.json"
@@ -23,6 +23,43 @@ LATEST_EVAL_PATH = ROOT / "evals/results/latest.json"
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 IGNORED_LINK_PREFIXES = ("http://", "https://", "mailto:", "#")
 CODE_EXTENSIONS = {".java", ".ts", ".tsx", ".js", ".jsx", ".py", ".sh", ".go", ".rs", ".kt"}
+
+
+def normalize_path(path_value: str) -> Path:
+    """Resolve Git Bash drive paths before comparing them with Windows paths."""
+    if os.name == "nt":
+        match = re.fullmatch(r"/([A-Za-z])(?:/(.*))?", path_value.strip())
+        if match:
+            suffix = match.group(2) or ""
+            path_value = f"{match.group(1).upper()}:/{suffix}"
+    return Path(path_value).resolve()
+
+
+def resolve_root() -> Path:
+    configured_root = os.environ.get("JDSNACK_AI_READINESS_ROOT")
+    if not configured_root:
+        return Path(__file__).resolve().parent.parent
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            check=True,
+            capture_output=True,
+            cwd=Path.cwd(),
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ValueError("JDSNACK_AI_READINESS_ROOT requires an active Git checkout.") from error
+
+    active_root_value = result.stdout.strip()
+    if not active_root_value:
+        raise ValueError("JDSNACK_AI_READINESS_ROOT requires an active Git checkout.")
+
+    active_root = normalize_path(active_root_value)
+    configured_path = normalize_path(configured_root)
+    if os.path.normcase(str(configured_path)) != os.path.normcase(str(active_root)):
+        raise ValueError("JDSNACK_AI_READINESS_ROOT must match the active Git checkout root.")
+    return active_root
 
 
 def read_policy(path: Path) -> dict[str, object]:
@@ -186,6 +223,19 @@ def validate_eval_results(pass_rate_threshold: float) -> list[str]:
 
 
 def main() -> int:
+    global ROOT, POLICY_PATH, SCORE_PATH, EVALS_PATH, LATEST_EVAL_PATH
+
+    try:
+        ROOT = resolve_root()
+    except ValueError as error:
+        print(f"AI-readiness gate failed: {error}", file=sys.stderr)
+        return 1
+
+    POLICY_PATH = ROOT / ".agent-os/ai-readiness.yml"
+    SCORE_PATH = ROOT / "docs/ai-readiness-score.json"
+    EVALS_PATH = ROOT / "evals/context-tasks.json"
+    LATEST_EVAL_PATH = ROOT / "evals/results/latest.json"
+
     if not POLICY_PATH.exists():
         print(f"missing policy: {POLICY_PATH.relative_to(ROOT)}")
         return 1
