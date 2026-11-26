@@ -331,6 +331,107 @@ class JdFetchServiceTest {
         assertEquals("JD_FETCH_FAILED", exception.errorCode().name());
     }
 
+    @Test
+    void wantedStaticHtmlReturnsJobDescriptionWithoutRecommendationNoise() throws Exception {
+        String url = "https://www.wanted.co.kr/wd/400228";
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, fixture("jd/fixtures/wanted-static.html"), URI.create(url)));
+
+        JdFetchResponse result = new JdFetchService(http, new JdHtmlExtractor())
+                .fetch(new JdFetchRequest(url));
+
+        assertEquals("wanted", result.sourceSite());
+        assertEquals("static-html", result.fetchMode());
+        assertEquals(url, result.sourceUrl());
+        assertTrue(result.jdText().contains("Spring Boot 기반 REST API"));
+        assertTrue(result.jdText().contains("MySQL 데이터베이스 설계"));
+        assertTrue(!result.jdText().contains("추천 채용공고"));
+        assertTrue(!result.jdText().contains("예비 텍스트"));
+    }
+
+    @Test
+    void wantedNextDataExtractsActualJobSectionsWithoutRenderedArticle() throws Exception {
+        String url = "https://www.wanted.co.kr/wd/400228?ref=bookmark";
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, fixture("jd/fixtures/wanted-next-data.html"), URI.create(url)));
+
+        JdFetchResponse result = new JdFetchService(http, new JdHtmlExtractor())
+                .fetch(new JdFetchRequest(url));
+
+        assertEquals("wanted", result.sourceSite());
+        assertEquals("static-html", result.fetchMode());
+        assertTrue(result.jdText().contains("Spring Boot를 사용하여 서버 API"));
+        assertTrue(result.jdText().contains("클라우드 서비스 운영 경험"));
+        assertTrue(!result.jdText().contains("맞춤 공고 추천"));
+    }
+
+    @Test
+    void wantedClosedPostingIsNeverReportedAsSuccessful() throws Exception {
+        String url = "https://www.wanted.co.kr/wd/400228";
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, fixture("jd/fixtures/wanted-closed.html"), URI.create(url)));
+
+        ApiException error = assertThrows(ApiException.class, () ->
+                new JdFetchService(http, new JdHtmlExtractor()).fetch(new JdFetchRequest(url)));
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", error.errorCode().name());
+    }
+
+    @Test
+    void wantedRecommendationOnlyIsNotAcceptedAsJd() throws Exception {
+        String url = "https://www.wanted.co.kr/wd/400228";
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200,
+                        "<html><body><main>원티드 채용 공고를 추천해드리는 서비스입니다. "
+                                + "지원하기 추천 포지션을 확인하세요.</main></body></html>", URI.create(url)));
+
+        ApiException error = assertThrows(ApiException.class, () ->
+                new JdFetchService(http, new JdHtmlExtractor()).fetch(new JdFetchRequest(url)));
+        assertEquals("JD_FETCH_EMPTY_CONTENT", error.errorCode().name());
+    }
+
+    @Test
+    void wantedOnlyAcceptsNumericPostingPathsAndExactHosts() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        JdFetchService service = new JdFetchService(http, new JdHtmlExtractor());
+        for (String url : java.util.List.of(
+                "https://www.wanted.co.kr/jobs",
+                "https://www.wanted.co.kr/wd/not-a-number",
+                "https://wanted.co.kr.evil.example/wd/400228",
+                "https://www.wanted.co.kr:8443/wd/400228",
+                "https://127.0.0.1/wd/400228"
+        )) {
+            assertThrows(ApiException.class, () -> service.fetch(new JdFetchRequest(url)), url);
+        }
+        verify(http, never()).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void wantedHtmlRedirectToPrivateOrExternalUrlIsBlockedBeforeSecondRequest() throws Exception {
+        String url = "https://www.wanted.co.kr/wd/400228";
+        for (String destination : java.util.List.of("http://127.0.0.1/private", "https://evil.example.com/jd")) {
+            HttpClient http = mock(HttpClient.class);
+            when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(new HttpResponse<String>() {
+                        public int statusCode() { return 302; }
+                        public String body() { return ""; }
+                        public HttpRequest request() { return HttpRequest.newBuilder().uri(URI.create(url)).build(); }
+                        public Optional<HttpResponse<String>> previousResponse() { return Optional.empty(); }
+                        public HttpHeaders headers() { return HttpHeaders.of(java.util.Map.of("Location", java.util.List.of(destination)), (a, b) -> true); }
+                        public Optional<SSLSession> sslSession() { return Optional.empty(); }
+                        public URI uri() { return URI.create(url); }
+                        public HttpClient.Version version() { return HttpClient.Version.HTTP_1_1; }
+                    });
+            ApiException error = assertThrows(ApiException.class, () ->
+                    new JdFetchService(http, new JdHtmlExtractor()).fetch(new JdFetchRequest(url)));
+            assertEquals("JD_FETCH_FAILED", error.errorCode().name());
+            verify(http, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        }
+    }
+
     private HttpResponse<String> response(int statusCode, String body) {
         return response(statusCode, body, URI.create("https://www.saramin.co.kr"));
     }

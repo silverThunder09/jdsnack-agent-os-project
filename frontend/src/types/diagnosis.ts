@@ -138,8 +138,8 @@ export interface JdFetchResult {
   sections?: Partial<JdSections>
 }
 
-export type JdInputType = 'TEXT' | 'SARAMIN_URL' | 'JOBKOREA_URL'
-export type JdSourceSite = 'saramin' | 'jobkorea'
+export type JdInputType = 'TEXT' | 'SARAMIN_URL' | 'JOBKOREA_URL' | 'WANTED_URL'
+export type JdSourceSite = 'saramin' | 'jobkorea' | 'wanted'
 
 export interface AnalysisHistoryCreateRequest {
   resumeText: string

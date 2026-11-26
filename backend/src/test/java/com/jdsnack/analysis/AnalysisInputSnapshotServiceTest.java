@@ -135,6 +135,24 @@ class AnalysisInputSnapshotServiceTest {
     }
 
     @Test
+    void wantedOcrUrlPreservesOriginalSourceAndSnapshotText() {
+        AnalysisInputSnapshotService service = service();
+        String url = "https://www.wanted.co.kr/wd/400228";
+        when(jdFetchService.fetch(any(JdFetchRequest.class)))
+                .thenReturn(new JdFetchResponse(JD_TEXT, url, "백엔드 개발자 | 원티드", "image-ocr", "wanted"));
+        when(repository.save(any(AnalysisInputSnapshot.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AnalysisInputSnapshot snapshot = service.saveUrlInput(USER_ID, RESUME_TEXT, url);
+
+        assertThat(snapshot.jdInputType()).isEqualTo(JdInputType.WANTED_URL);
+        assertThat(snapshot.sourceSite()).isEqualTo("wanted");
+        assertThat(snapshot.sourceUrl()).isEqualTo(url);
+        assertThat(snapshot.fetchMode()).isEqualTo("image-ocr");
+        assertThat(snapshot.jdText()).isEqualTo(JD_TEXT);
+    }
+
+    @Test
     void failedJdFetchDoesNotPersistInput() {
         AnalysisInputSnapshotService service = service();
         when(jdFetchService.fetch(any(JdFetchRequest.class)))

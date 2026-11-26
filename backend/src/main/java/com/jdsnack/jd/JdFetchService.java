@@ -27,17 +27,19 @@ import java.util.Optional;
 public class JdFetchService {
 
     private static final int MAX_RESPONSE_BODY_LENGTH = 1_000_000;
+    private static final int MAX_PAGE_REDIRECTS = 3;
     private final HttpClient httpClient;
     private final HttpClient imageHttpClient;
     private final JdHtmlExtractor jdHtmlExtractor;
     private final JdImageOcrFallback imageOcrFallback;
+    private final WantedJdSourceAdapter wantedAdapter = new WantedJdSourceAdapter();
 
     @Autowired
     public JdFetchService(JdHtmlExtractor jdHtmlExtractor, JdImageOcr jdImageOcr) {
         this(
                 HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(10))
-                        .followRedirects(HttpClient.Redirect.NORMAL)
+                        .followRedirects(HttpClient.Redirect.NEVER)
                         .build(),
                 HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(10))
@@ -87,6 +89,9 @@ public class JdFetchService {
         try {
             FetchedHtml page = fetchHtml(buildPageRequest(uri));
             fetchedPages.add(page);
+            if ("wanted".equals(sourceSite)) {
+                wantedAdapter.verifyAvailable(page.html());
+            }
             try {
                 return jdHtmlExtractor.extract(page.html(), jdUrl);
             } catch (ApiException exception) {
@@ -221,18 +226,65 @@ public class JdFetchService {
     }
 
     private FetchedHtml fetchHtml(HttpRequest httpRequest) throws IOException, InterruptedException {
-        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+        HttpRequest currentRequest = httpRequest;
+        for (int redirects = 0; redirects <= MAX_PAGE_REDIRECTS; redirects++) {
+            HttpResponse<String> response = httpClient.send(currentRequest, HttpResponse.BodyHandlers.ofString());
+            URI responseUri = response.uri() == null ? currentRequest.uri() : response.uri();
+            if (!isAllowedPageUri(responseUri, httpRequest.uri())) {
+                throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+            }
+            if (response.statusCode() >= 300 && response.statusCode() < 400) {
+                if (redirects == MAX_PAGE_REDIRECTS) {
+                    throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+                }
+                String location = response.headers().firstValue("Location")
+                        .orElseThrow(() -> new ApiException(ErrorCode.JD_FETCH_FAILED));
+                URI nextUri;
+                try {
+                    nextUri = responseUri.resolve(location);
+                } catch (IllegalArgumentException exception) {
+                    throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+                }
+                if (!isAllowedPageUri(nextUri, httpRequest.uri())) {
+                    throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+                }
+                currentRequest = buildPageRequest(nextUri);
+                continue;
+            }
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+            }
+            String contentType = response.headers().firstValue("Content-Type")
+                    .orElse("").toLowerCase(Locale.ROOT);
+            if (!contentType.isBlank() && !contentType.startsWith("text/html")
+                    && !contentType.startsWith("application/xhtml+xml")) {
+                throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+            }
+            if (response.headers().firstValueAsLong("Content-Length")
+                    .orElse(0) > MAX_RESPONSE_BODY_LENGTH
+                    || response.body() == null || response.body().length() > MAX_RESPONSE_BODY_LENGTH) {
+                throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+            }
+            return new FetchedHtml(responseUri, response.body());
         }
-        if (response.body() == null || response.body().length() > MAX_RESPONSE_BODY_LENGTH) {
-            throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+        throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+    }
+
+    private boolean isAllowedPageUri(URI uri, URI origin) {
+        if (uri == null || uri.getScheme() == null || uri.getHost() == null
+                || uri.getUserInfo() != null || uri.getPort() != -1) {
+            return false;
         }
-        URI responseUri = response.uri() == null ? httpRequest.uri() : response.uri();
-        if (!isSupportedHost(responseUri.getHost())) {
-            throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+        String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+        if (!"https".equals(scheme) && !"http".equals(scheme)) {
+            return false;
         }
-        return new FetchedHtml(responseUri, response.body());
+        if (isUnsafeHost(uri.getHost()) || !isSupportedHost(uri.getHost())
+                || !sourceSiteFor(uri).equals(sourceSiteFor(origin))) {
+            return false;
+        }
+        return !"wanted".equals(sourceSiteFor(origin))
+                || isWantedPostingPath(uri) && uri.getPath().equals(origin.getPath());
     }
 
     private boolean shouldTrySaraminAjaxFallback(ApiException exception, URI uri) {
@@ -323,11 +375,14 @@ public class JdFetchService {
                 throw new ApiException(ErrorCode.INVALID_JD_URL);
             }
 
-            if (isUnsafeHost(host)) {
+            if (isUnsafeHost(host) || uri.getRawUserInfo() != null || uri.getPort() != -1) {
                 throw new ApiException(ErrorCode.INVALID_JD_URL);
             }
             if (!isSupportedHost(host)) {
                 throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
+            }
+            if (isWantedHost(host) && !isWantedPostingPath(uri)) {
+                throw new ApiException(ErrorCode.INVALID_JD_URL);
             }
 
             return uri;
@@ -344,7 +399,8 @@ public class JdFetchService {
         String normalizedHost = host.toLowerCase(Locale.ROOT);
         return isSaraminHost(normalizedHost)
                 || normalizedHost.equals("www.jobkorea.co.kr")
-                || normalizedHost.equals("jobkorea.co.kr");
+                || normalizedHost.equals("jobkorea.co.kr")
+                || isWantedHost(normalizedHost);
     }
 
     private String sourceSiteFor(URI uri) {
@@ -355,7 +411,22 @@ public class JdFetchService {
         if (normalizedHost.equals("www.jobkorea.co.kr") || normalizedHost.equals("jobkorea.co.kr")) {
             return "jobkorea";
         }
+        if (isWantedHost(normalizedHost)) {
+            return "wanted";
+        }
         return "";
+    }
+
+    private boolean isWantedHost(String host) {
+        if (host == null) {
+            return false;
+        }
+        String normalized = host.toLowerCase(Locale.ROOT);
+        return normalized.equals("www.wanted.co.kr") || normalized.equals("wanted.co.kr");
+    }
+
+    private boolean isWantedPostingPath(URI uri) {
+        return uri.getPath() != null && uri.getPath().matches("/wd/[1-9]\\d*/?");
     }
 
     private boolean isSaraminHost(String host) {
