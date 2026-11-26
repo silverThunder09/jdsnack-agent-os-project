@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AnalysisHistoryDetail } from '../../types/diagnosis'
-import { analysisHistoryExportFileName, buildAnalysisHistoryMarkdown, inferJdSourceMetadata } from './analysisUtils'
+import { analysisHistoryExportFileName, buildAnalysisHistoryMarkdown, getAnalysisReadiness, inferJdSourceMetadata } from './analysisUtils'
 
 function history(overrides: Partial<NonNullable<AnalysisHistoryDetail['result']>> = {}): AnalysisHistoryDetail {
   return {
@@ -75,5 +75,21 @@ describe('JD 출처 메타데이터', () => {
       sourceSite: null,
     })
     expect(inferJdSourceMetadata('')).toEqual({ inputType: 'TEXT', sourceSite: null })
+  })
+})
+
+describe('분석 입력 준비 상태', () => {
+  it('JD, 이력서, 분석 옵션의 검증 결과를 각각 제공한다', () => {
+    const validJd = 'Spring Boot 기반 백엔드 API 개발과 테스트 자동화 경험을 요구하는 채용 공고입니다.'
+    expect(getAnalysisReadiness({ resumeFile: null, resumeText: '', jdText: '', selectedOptionCount: 0 })).toEqual({
+      resume: '이력서 파일을 업로드해 주세요.',
+      jd: 'JD 내용을 입력해주세요.',
+      options: '분석 항목을 1개 이상 선택해 주세요.',
+    })
+    expect(getAnalysisReadiness({ resumeFile: new File(['resume'], 'resume.pdf'), jdText: validJd, selectedOptionCount: 1 })).toEqual({
+      resume: null,
+      jd: null,
+      options: null,
+    })
   })
 })

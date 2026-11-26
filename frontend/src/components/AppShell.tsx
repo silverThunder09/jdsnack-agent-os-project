@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { UiIcon } from './UiIcon'
 
 type AppView = 'home' | 'interview' | 'history'
 
@@ -46,10 +47,11 @@ export function AppShell({
           <button
             type="button"
             className={`saas-nav-item${currentView === 'home' ? ' saas-nav-item--active' : ''}`}
+            aria-current={currentView === 'home' ? 'page' : undefined}
             onClick={() => onNavigate('home')}
           >
             <span className="saas-nav-item__icon" aria-hidden="true">
-              ▣
+              <UiIcon name="file" />
             </span>
             <span>홈</span>
           </button>
@@ -59,10 +61,11 @@ export function AppShell({
             className={`saas-nav-item${currentView === 'interview' ? ' saas-nav-item--active' : ''}${!isAuthenticated ? ' saas-nav-item--locked' : ''}`}
             aria-disabled={!isAuthenticated}
             disabled={!isAuthenticated}
+            aria-current={currentView === 'interview' ? 'page' : undefined}
             onClick={() => onNavigate('interview')}
           >
             <span className="saas-nav-item__icon" aria-hidden="true">
-              ▸
+              <UiIcon name="chat" />
             </span>
             <span>모의 면접</span>
           </button>
@@ -72,10 +75,11 @@ export function AppShell({
             className={`saas-nav-item${currentView === 'history' ? ' saas-nav-item--active' : ''}${!isAuthenticated ? ' saas-nav-item--locked' : ''}`}
             aria-disabled={!isAuthenticated}
             disabled={!isAuthenticated}
+            aria-current={currentView === 'history' ? 'page' : undefined}
             onClick={() => onNavigate('history')}
           >
             <span className="saas-nav-item__icon" aria-hidden="true">
-              ◷
+              <UiIcon name="history" />
             </span>
             <span>분석 내역</span>
           </button>
@@ -91,7 +95,7 @@ export function AppShell({
               disabled
             >
               <span className="saas-nav-item__icon" aria-hidden="true">
-                🔒
+                <UiIcon name="lock" />
               </span>
               <span>{item}</span>
             </button>
@@ -108,16 +112,12 @@ export function AppShell({
               className="saas-menu-button"
               onClick={onToggleSidebar}
               aria-label="사이드바 열기 또는 닫기"
+              aria-expanded={isSidebarOpen}
             >
-              ☰
+              <UiIcon name="menu" />
             </button>
           </div>
           <div className="saas-topbar__right">
-            <span className="saas-help-pill">도움말</span>
-            <span className="saas-bell" aria-label="알림 3개">
-              🔔
-              <span className="saas-bell__badge">3</span>
-            </span>
             {topbarAction}
           </div>
         </header>

@@ -47,29 +47,28 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
         </div>
       </header>
 
-      <AnalysisProgress state={analysisProgress} />
-
-      {submittedOptions.jdMatch ? (
-        <div className="summary-grid">
+      {submittedOptions.jdMatch || submittedOptions.ats ? (
+        <div className="summary-grid" role="region" aria-label="분석 점수 요약">
+          {submittedOptions.jdMatch ? (
           <SummaryCard
             label="JD 적합도"
             score={previewResult.matchPreview?.matchingScore}
             summary={previewResult.matchPreview?.summary}
             description="JD와 이력서 적합도를 계산하고 있습니다."
           />
-        </div>
-      ) : null}
-
-      {submittedOptions.ats ? (
-        <div className="summary-grid">
+          ) : null}
+          {submittedOptions.ats ? (
           <SummaryCard
             label="ATS 점수"
             score={atsResult.atsPreview?.atsScore}
             summary={atsResult.atsPreview?.summary}
             description="이력서가 ATS에서 읽힐 수 있는 신호를 점검하고 있습니다."
           />
+          ) : null}
         </div>
       ) : null}
+
+      <AnalysisProgress state={analysisProgress} />
 
       {analysisQuality ? <AnalysisQualityCard quality={analysisQuality} /> : null}
 
@@ -81,7 +80,11 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
             description="공고 강점과 gap, 보강 제안을 함께 확인하세요."
             result={previewResult}
             successContent={
-              <div className="detail-list-grid detail-list-grid--triple">
+              <div className="detail-list-grid detail-list-grid--triple match-detail">
+                <section className="detail-card match-detail__suggestions">
+                  <h3>제안</h3>
+                  <ul>{previewResult.matchPreview?.suggestions.map((item) => <li key={item}>{item}</li>)}</ul>
+                </section>
                 <section className="detail-card">
                   <h3>강점</h3>
                   <ul>{previewResult.matchPreview?.strengths.map((item) => <li key={item}>{item}</li>)}</ul>
@@ -89,10 +92,6 @@ export function AnalysisResultView(props: AnalysisResultViewProps) {
                 <section className="detail-card">
                   <h3>Gap</h3>
                   <ul>{previewResult.matchPreview?.gaps.map((item) => <li key={item}>{item}</li>)}</ul>
-                </section>
-                <section className="detail-card">
-                  <h3>제안</h3>
-                  <ul>{previewResult.matchPreview?.suggestions.map((item) => <li key={item}>{item}</li>)}</ul>
                 </section>
               </div>
             }

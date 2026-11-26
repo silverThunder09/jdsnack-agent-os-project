@@ -177,6 +177,24 @@ test('PDF 업로드 + JD 붙여넣기 후 JD 적합도 결과를 확인한다', 
   await expect(page.getByText('Kubernetes')).toBeVisible()
   await expect(page.getByRole('heading', { name: '문장 첨삭' })).toBeVisible()
   await expect(page.getByText('Spring Boot REST API를 설계하고 테스트 자동화로 안정성을 높였습니다.')).toBeVisible()
+  await expect(page.getByRole('region', { name: '분석 점수 요약' })).toBeVisible()
+})
+
+test('모바일 분석 입력과 결과는 가로 넘침 없이 표시된다', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await mockFixtureFlow(page)
+  await page.goto('/')
+
+  await page.getByRole('tab', { name: 'JD 내용 붙여넣기' }).click()
+  await page.getByLabel('JD 내용 붙여넣기').fill(jdText)
+  await page.locator('#resume-file').setInputFiles(fixturePdf)
+  await expect(page.getByRole('heading', { name: '분석 준비' })).toBeVisible()
+  await page.getByRole('button', { name: '분석 시작하기 →' }).click()
+
+  await expect(page.getByText('76점')).toBeVisible()
+  await expect(page.getByRole('region', { name: '분석 점수 요약' })).toBeVisible()
+  const dimensions = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }))
+  expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.viewport)
 })
 
 test('키워드 분석만 선택해도 매칭 요청과 키워드 결과를 제공한다', async ({ page }) => {

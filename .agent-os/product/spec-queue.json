@@ -138,6 +138,17 @@
       "status": "candidate",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:analysis-quality"}
+    },
+    {
+      "id": "ui-redesign",
+      "slug": "2026-11-27-ui-redesign",
+      "title": "분석 입력 및 결과 화면 미니멀 SaaS 디자인 개선",
+      "priority": 14,
+      "status": "active",
+      "spec_path": ".agent-os/specs/2026-11-27-ui-redesign",
+      "auto_promote": false,
+      "start_condition": {"type": "manual_request"},
+      "source_issue": 243
     }
   ]
 }

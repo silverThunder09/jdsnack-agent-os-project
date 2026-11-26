@@ -3,7 +3,7 @@ import { StatusMessage } from '../../components/StatusMessage'
 import type { ResultState } from '../../types/diagnosis'
 
 export function SummaryCard({ label, score, summary, description }: { label: string; score?: number; summary?: string; description: string }) {
-  return <article className="summary-card"><span>{label}</span>{typeof score === 'number' ? <><strong>{score}점</strong><p>{summary}</p></> : <><strong className="summary-card__empty">-</strong><p>{description}</p></>}</article>
+  return <article className="summary-card"><span>{label}</span>{typeof score === 'number' ? <><strong>{score}점</strong><progress className="summary-card__meter" aria-label={label} value={score} max={100} /><p>{summary}</p></> : <><strong className="summary-card__empty">-</strong><p>{description}</p></>}</article>
 }
 
 export function AnalysisPanel({ badge, title, description, result, resultRef, successContent }: { badge: string; title: string; description: string; result: ResultState; resultRef?: RefObject<HTMLElement | null>; successContent: ReactNode }) {
