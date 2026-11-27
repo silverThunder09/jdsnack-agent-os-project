@@ -124,7 +124,8 @@ final class JdImageOcrFallback {
         try {
             URI resolved = pageUri.resolve(trimmedSource);
             String scheme = resolved.getScheme();
-            if (scheme == null || resolved.getHost() == null || resolved.getUserInfo() != null) {
+            if (scheme == null || resolved.getHost() == null || resolved.getUserInfo() != null
+                    || resolved.getPort() != -1) {
                 return Optional.empty();
             }
             String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
@@ -254,7 +255,7 @@ final class JdImageOcrFallback {
     private boolean isTrustedImageUri(URI uri, String sourceSite) {
         String scheme = uri.getScheme();
         String host = uri.getHost();
-        if (scheme == null || host == null || uri.getUserInfo() != null) {
+        if (scheme == null || host == null || uri.getUserInfo() != null || uri.getPort() != -1) {
             return false;
         }
         String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
@@ -289,6 +290,8 @@ final class JdImageOcrFallback {
                     URI original = URI.create(source);
                     return "https".equalsIgnoreCase(original.getScheme())
                             && "static.wanted.co.kr".equalsIgnoreCase(original.getHost())
+                            && original.getUserInfo() == null
+                            && original.getPort() == -1
                             && original.getPath() != null && original.getPath().startsWith("/images/");
                 } catch (IllegalArgumentException exception) {
                     return false;

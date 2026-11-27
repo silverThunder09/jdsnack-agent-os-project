@@ -163,6 +163,31 @@ class JdFetchImageOcrTest {
     }
 
     @Test
+    void wantedImageAndOptimizerSourceWithCustomPortAreRejectedBeforeDownload() throws Exception {
+        String url = "https://www.wanted.co.kr/wd/400228";
+        String html = fixture("jd/fixtures/wanted-image-only.html");
+        for (String replacement : List.of(
+                "https://static.wanted.co.kr:8443/images/job/job-description.png",
+                "https://image.wanted.co.kr:8443/optimize?src=https%3A%2F%2Fstatic.wanted.co.kr%2Fimages%2Fjob%2Fjob-description.png",
+                "https://image.wanted.co.kr/optimize?src=https%3A%2F%2Fstatic.wanted.co.kr%3A8443%2Fimages%2Fjob%2Fjob-description.png"
+        )) {
+            HttpClient client = mock(HttpClient.class);
+            JdImageOcr ocr = availableOcr();
+            String imageWithPort = html.replace(
+                    "https://image.wanted.co.kr/optimize?src=https%3A%2F%2Fstatic.wanted.co.kr%2Fimages%2Fjob%2Fjob-description.png",
+                    replacement
+            );
+            when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(htmlResponse(imageWithPort, URI.create(url)));
+
+            assertThrows(ApiException.class, () ->
+                    new JdFetchService(client, new JdHtmlExtractor(), ocr).fetch(new JdFetchRequest(url)));
+            verify(client, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+            verify(ocr, never()).extractText(any(), any());
+        }
+    }
+
+    @Test
     void wantedOcrTextWithoutJobSectionsIsRejected() throws Exception {
         String url = "https://www.wanted.co.kr/wd/400228";
         HttpClient httpClient = mock(HttpClient.class);
