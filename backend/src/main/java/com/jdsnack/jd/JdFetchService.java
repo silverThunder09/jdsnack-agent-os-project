@@ -260,7 +260,7 @@ public class JdFetchService {
             }
             String contentType = response.headers().firstValue("Content-Type")
                     .orElse("").toLowerCase(Locale.ROOT);
-            if (!contentType.isBlank() && !contentType.startsWith("text/html")
+            if (!contentType.startsWith("text/html")
                     && !contentType.startsWith("application/xhtml+xml")) {
                 closeResponseBody(response);
                 throw new ApiException(ErrorCode.JD_FETCH_FAILED);

@@ -382,6 +382,20 @@ class JdFetchServiceTest {
     }
 
     @Test
+    void missingHtmlContentTypeIsRejectedWithoutParsingBody() throws Exception {
+        String url = "https://www.wanted.co.kr/wd/400228";
+        HttpClient client = mock(HttpClient.class);
+        when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, fixture("jd/fixtures/wanted-static.html"),
+                        URI.create(url), java.util.Map.of()));
+
+        ApiException error = assertThrows(ApiException.class, () ->
+                new JdFetchService(client, new JdHtmlExtractor()).fetch(new JdFetchRequest(url)));
+        assertEquals("JD_FETCH_FAILED", error.errorCode().name());
+        verify(client, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
     void redirectOutsideAllowlistReturnsBadGateway() throws Exception {
         HttpClient httpClient = mock(HttpClient.class);
         JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
@@ -600,7 +614,8 @@ class JdFetchServiceTest {
     }
 
     private HttpResponse<InputStream> response(int statusCode, String body, URI responseUri) {
-        return response(statusCode, body, responseUri, java.util.Map.of());
+        return response(statusCode, body, responseUri,
+                java.util.Map.of("Content-Type", java.util.List.of("text/html; charset=UTF-8")));
     }
 
     private HttpResponse<InputStream> response(int statusCode, String body, URI responseUri,

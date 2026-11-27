@@ -503,7 +503,8 @@ class JdFetchImageOcrTest {
     }
 
     private HttpResponse<InputStream> htmlResponse(String body, URI uri) {
-        return new TestResponse<>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)), uri, Map.of());
+        return new TestResponse<>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)), uri,
+                Map.of("Content-Type", List.of("text/html; charset=UTF-8")));
     }
 
     private HttpResponse<InputStream> imageResponse(String mimeType, byte[] bytes, URI uri) {
