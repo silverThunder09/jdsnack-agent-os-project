@@ -512,6 +512,47 @@ class JdFetchServiceTest {
         }
     }
 
+    @Test
+    void wantedRedirectAllowsTrailingSlashNormalizationForSamePosting() throws Exception {
+        String original = "https://www.wanted.co.kr/wd/400228";
+        for (String from : java.util.List.of(original, original + "/")) {
+            String to = from.endsWith("/") ? original : original + "/";
+            URI source = URI.create(from);
+            URI destination = URI.create(to);
+            HttpClient http = mock(HttpClient.class);
+            when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(response(301, "", source, java.util.Map.of(
+                            "Location", java.util.List.of(to)
+                    )))
+                    .thenReturn(response(200, fixture("jd/fixtures/wanted-static.html"), destination));
+
+            JdFetchResponse result = new JdFetchService(http, new JdHtmlExtractor())
+                    .fetch(new JdFetchRequest(from));
+
+            assertEquals("wanted", result.sourceSite());
+            assertEquals(from, result.sourceUrl());
+            assertTrue(result.jdText().contains("Spring Boot 기반 REST API"));
+            var requests = forClass(HttpRequest.class);
+            verify(http, times(2)).send(requests.capture(), any(HttpResponse.BodyHandler.class));
+            assertEquals(destination, requests.getAllValues().get(1).uri());
+        }
+    }
+
+    @Test
+    void wantedRedirectToDifferentPostingIdIsRejectedBeforeSecondRequest() throws Exception {
+        String original = "https://www.wanted.co.kr/wd/400228/";
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(302, "", URI.create(original), java.util.Map.of(
+                        "Location", java.util.List.of("/wd/400229")
+                )));
+
+        ApiException error = assertThrows(ApiException.class, () ->
+                new JdFetchService(http, new JdHtmlExtractor()).fetch(new JdFetchRequest(original)));
+        assertEquals("JD_FETCH_FAILED", error.errorCode().name());
+        verify(http, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
     private HttpResponse<InputStream> response(int statusCode, String body) {
         return response(statusCode, body, URI.create("https://www.saramin.co.kr"));
     }

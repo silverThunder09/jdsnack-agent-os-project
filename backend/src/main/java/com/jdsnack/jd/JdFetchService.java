@@ -322,7 +322,8 @@ public class JdFetchService {
             return false;
         }
         return !"wanted".equals(sourceSiteFor(origin))
-                || isWantedPostingPath(uri) && uri.getPath().equals(origin.getPath());
+                || !wantedPostingId(uri).isBlank()
+                && wantedPostingId(uri).equals(wantedPostingId(origin));
     }
 
     private boolean shouldTrySaraminAjaxFallback(ApiException exception, URI uri) {
@@ -464,7 +465,15 @@ public class JdFetchService {
     }
 
     private boolean isWantedPostingPath(URI uri) {
-        return uri.getPath() != null && uri.getPath().matches("/wd/[1-9]\\d*/?");
+        return !wantedPostingId(uri).isBlank();
+    }
+
+    private String wantedPostingId(URI uri) {
+        String path = uri.getRawPath();
+        if (path == null || !path.matches("/wd/[1-9]\\d*/?")) {
+            return "";
+        }
+        return path.substring(4, path.endsWith("/") ? path.length() - 1 : path.length());
     }
 
     private boolean isSaraminHost(String host) {
