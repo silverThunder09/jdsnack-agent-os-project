@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
@@ -415,11 +416,11 @@ class JdFetchServiceTest {
         for (String destination : java.util.List.of("http://127.0.0.1/private", "https://evil.example.com/jd")) {
             HttpClient http = mock(HttpClient.class);
             when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                    .thenReturn(new HttpResponse<String>() {
+                    .thenReturn(new HttpResponse<InputStream>() {
                         public int statusCode() { return 302; }
-                        public String body() { return ""; }
+                        public InputStream body() { return new ByteArrayInputStream(new byte[0]); }
                         public HttpRequest request() { return HttpRequest.newBuilder().uri(URI.create(url)).build(); }
-                        public Optional<HttpResponse<String>> previousResponse() { return Optional.empty(); }
+                        public Optional<HttpResponse<InputStream>> previousResponse() { return Optional.empty(); }
                         public HttpHeaders headers() { return HttpHeaders.of(java.util.Map.of("Location", java.util.List.of(destination)), (a, b) -> true); }
                         public Optional<SSLSession> sslSession() { return Optional.empty(); }
                         public URI uri() { return URI.create(url); }
@@ -432,11 +433,53 @@ class JdFetchServiceTest {
         }
     }
 
-    private HttpResponse<String> response(int statusCode, String body) {
+    private HttpResponse<InputStream> response(int statusCode, String body) {
         return response(statusCode, body, URI.create("https://www.saramin.co.kr"));
     }
 
-    private HttpResponse<String> response(int statusCode, String body, URI responseUri) {
+    @Test
+    void rejectsOversizedHtmlWhileReadingAndClosesResponseBody() throws Exception {
+        HttpClient client = mock(HttpClient.class);
+        String url = "https://www.wanted.co.kr/wd/400228";
+        java.io.InputStream largeBody = new java.io.InputStream() {
+            private int readCount;
+            private boolean closed;
+
+            @Override
+            public int read() {
+                if (closed) {
+                    throw new IllegalStateException("body already closed");
+                }
+                readCount++;
+                if (readCount > 1_000_001) {
+                    throw new IllegalStateException("read exceeded bound");
+                }
+                return 'x';
+            }
+
+            @Override
+            public void close() {
+                closed = true;
+            }
+        };
+        HttpResponse<InputStream> response = new HttpResponse<>() {
+            public int statusCode() { return 200; }
+            public HttpRequest request() { return HttpRequest.newBuilder(URI.create(url)).build(); }
+            public Optional<HttpResponse<InputStream>> previousResponse() { return Optional.empty(); }
+            public HttpHeaders headers() { return HttpHeaders.of(java.util.Map.of("Content-Type", java.util.List.of("text/html")), (a, b) -> true); }
+            public InputStream body() { return largeBody; }
+            public Optional<SSLSession> sslSession() { return Optional.empty(); }
+            public URI uri() { return URI.create(url); }
+            public HttpClient.Version version() { return HttpClient.Version.HTTP_1_1; }
+        };
+        when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+        ApiException error = assertThrows(ApiException.class, () ->
+                new JdFetchService(client, new JdHtmlExtractor()).fetch(new JdFetchRequest(url)));
+        assertEquals("JD_FETCH_FAILED", error.errorCode().name());
+        assertThrows(IllegalStateException.class, largeBody::read);
+    }
+
+    private HttpResponse<InputStream> response(int statusCode, String body, URI responseUri) {
         return new HttpResponse<>() {
             @Override
             public int statusCode() {
@@ -449,7 +492,7 @@ class JdFetchServiceTest {
             }
 
             @Override
-            public Optional<HttpResponse<String>> previousResponse() {
+            public Optional<HttpResponse<InputStream>> previousResponse() {
                 return Optional.empty();
             }
 
@@ -459,8 +502,8 @@ class JdFetchServiceTest {
             }
 
             @Override
-            public String body() {
-                return body;
+            public InputStream body() {
+                return new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8));
             }
 
             @Override

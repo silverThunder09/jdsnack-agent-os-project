@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
@@ -228,12 +229,14 @@ public class JdFetchService {
     private FetchedHtml fetchHtml(HttpRequest httpRequest) throws IOException, InterruptedException {
         HttpRequest currentRequest = httpRequest;
         for (int redirects = 0; redirects <= MAX_PAGE_REDIRECTS; redirects++) {
-            HttpResponse<String> response = httpClient.send(currentRequest, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<InputStream> response = httpClient.send(currentRequest, HttpResponse.BodyHandlers.ofInputStream());
             URI responseUri = response.uri() == null ? currentRequest.uri() : response.uri();
             if (!isAllowedPageUri(responseUri, httpRequest.uri())) {
+                closeResponseBody(response);
                 throw new ApiException(ErrorCode.JD_FETCH_FAILED);
             }
             if (response.statusCode() >= 300 && response.statusCode() < 400) {
+                closeResponseBody(response);
                 if (redirects == MAX_PAGE_REDIRECTS) {
                     throw new ApiException(ErrorCode.JD_FETCH_FAILED);
                 }
@@ -252,22 +255,43 @@ public class JdFetchService {
                 continue;
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                closeResponseBody(response);
                 throw new ApiException(ErrorCode.JD_FETCH_FAILED);
             }
             String contentType = response.headers().firstValue("Content-Type")
                     .orElse("").toLowerCase(Locale.ROOT);
             if (!contentType.isBlank() && !contentType.startsWith("text/html")
                     && !contentType.startsWith("application/xhtml+xml")) {
+                closeResponseBody(response);
                 throw new ApiException(ErrorCode.JD_FETCH_FAILED);
             }
             if (response.headers().firstValueAsLong("Content-Length")
-                    .orElse(0) > MAX_RESPONSE_BODY_LENGTH
-                    || response.body() == null || response.body().length() > MAX_RESPONSE_BODY_LENGTH) {
+                    .orElse(0) > MAX_RESPONSE_BODY_LENGTH) {
+                closeResponseBody(response);
                 throw new ApiException(ErrorCode.JD_FETCH_FAILED);
             }
-            return new FetchedHtml(responseUri, response.body());
+            try (InputStream body = response.body()) {
+                if (body == null) {
+                    throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+                }
+                byte[] bytes = body.readNBytes(MAX_RESPONSE_BODY_LENGTH + 1);
+                if (bytes.length > MAX_RESPONSE_BODY_LENGTH) {
+                    throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+                }
+                return new FetchedHtml(responseUri, new String(bytes, StandardCharsets.UTF_8));
+            }
         }
         throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+    }
+
+    private void closeResponseBody(HttpResponse<InputStream> response) {
+        if (response.body() != null) {
+            try {
+                response.body().close();
+            } catch (IOException ignored) {
+                // Discard the rejected response while preserving its original error.
+            }
+        }
     }
 
     private boolean isAllowedPageUri(URI uri, URI origin) {

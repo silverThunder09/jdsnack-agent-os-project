@@ -477,8 +477,8 @@ class JdFetchImageOcrTest {
         return "<div class=\"user_content\"><img src=\"" + source + "\"></div>";
     }
 
-    private HttpResponse<String> htmlResponse(String body, URI uri) {
-        return new TestResponse<>(200, body, uri, Map.of());
+    private HttpResponse<InputStream> htmlResponse(String body, URI uri) {
+        return new TestResponse<>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)), uri, Map.of());
     }
 
     private HttpResponse<InputStream> imageResponse(String mimeType, byte[] bytes, URI uri) {
