@@ -1,6 +1,7 @@
 import type { ChangeEvent, Dispatch, DragEvent, SetStateAction } from 'react'
 import type { JdFetchState } from '../../hooks/useMatchPreview'
-import { ACCURACY_TIPS, ANALYSIS_OPTIONS, type AnalysisOptionKey, type JdTab, type ResumeInputTab, formatFileSize, JD_MAX_LENGTH, PROGRESS_STEPS } from './analysisUtils'
+import { ACCURACY_TIPS, ANALYSIS_OPTIONS, type AnalysisOptionKey, type JdTab, type ResumeInputTab, formatFileSize, JD_MAX_LENGTH, getAnalysisReadiness } from './analysisUtils'
+import { UiIcon } from '../../components/UiIcon'
 
 interface AnalysisInputViewProps {
   jdTab: JdTab
@@ -37,19 +38,32 @@ interface AnalysisInputViewProps {
 
 export function AnalysisInputView(props: AnalysisInputViewProps) {
   const { jdTab, setJdTab, jdUrl, jdText, trimmedJd, resumeInputTab, setResumeInputTab, resumeText, setResumeText, resumeFile, isDragging, setIsDragging, options, formError, prevalidationReasons, canStart, isFetchingJd, isPreviewSubmitting, isAtsSubmitting, isSentenceSubmitting, jdFetchState, handleJdUrlChange, handleJdTextChange, handleJdFetch, handleFileInput, handleDrop, setFile, toggleOption, handleStartAnalysis, handleResetInput } = props
+  const selectedCount = ANALYSIS_OPTIONS.filter((option) => options[option.key]).length
+  const readiness = getAnalysisReadiness({
+    resumeFile: resumeInputTab === 'file' ? resumeFile : null,
+    resumeText: resumeInputTab === 'text' ? resumeText : '',
+    jdText,
+    selectedOptionCount: selectedCount,
+  })
+  const steps = [
+    { label: '채용 공고 입력', ready: !readiness.jd },
+    { label: '이력서 입력', ready: !readiness.resume },
+    { label: '분석 항목 선택', ready: !readiness.options },
+  ]
+  const readyCount = steps.filter((step) => step.ready).length
   return (
     <section className="start-page" aria-label="새로운 분석 시작">
       <header className="start-page__head">
-        <p className="start-page__eyebrow">분석 시작</p>
+        <p className="start-page__eyebrow">RESUME ANALYSIS</p>
         <h1>새로운 분석 시작</h1>
-        <p className="start-page__sub">채용 공고와 이력서를 연결하여 합격 가능성을 높이세요.</p>
+        <p className="start-page__sub">채용 공고와 이력서를 비교하고, 지원 전 보완할 점을 확인하세요.</p>
       </header>
 
       <div className="start-layout">
         <div className="start-main">
           <section className="step-card" aria-label="채용 공고 입력">
             <h2 className="step-card__title">
-              <span className="step-badge">1</span> 채용 공고 (JD) 입력
+              <span className="step-badge">01</span> 채용 공고 (JD) 입력
             </h2>
             <div className="jd-tabs" role="tablist" aria-label="JD 입력 방식">
               <button
@@ -131,7 +145,7 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
 
           <section className="step-card" aria-label="이력서 업로드">
             <h2 className="step-card__title">
-              <span className="step-badge">2</span> 이력서 업로드
+              <span className="step-badge">02</span> 이력서 업로드
             </h2>
             <div className="input-tabs" role="tablist" aria-label="이력서 입력 방식">
               <button type="button" role="tab" aria-selected={resumeInputTab === 'text'} className={resumeInputTab === 'text' ? 'input-tab input-tab--active' : 'input-tab'} onClick={() => setResumeInputTab('text')}>
@@ -157,11 +171,14 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
               >
-                <span className="dropzone__icon" aria-hidden="true">⬆</span>
-                <p className="dropzone__title">이력서 파일을 드래그하거나 클릭하여 업로드하세요</p>
-                <p className="dropzone__hint">PDF, DOCX 파일을 지원합니다. (최대 10MB)</p>
-                <label className="file-select-button" htmlFor="resume-file">파일 선택</label>
-                <input id="resume-file" className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileInput} />
+                <span className="dropzone__icon"><UiIcon name="upload" /></span>
+                <div className="dropzone__copy">
+                  <p className="dropzone__title">이력서 파일을 선택하거나 드래그하세요</p>
+                  <p className="dropzone__hint">PDF, DOCX · 최대 10MB</p>
+                </div>
+                <label className="file-select-button">파일 선택
+                  <input id="resume-file" className="sr-only" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileInput} />
+                </label>
               </div>
             )}
             {resumeFile ? (
@@ -179,7 +196,8 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
 
           <section className="step-card" aria-label="분석 옵션 선택">
             <h2 className="step-card__title">
-              <span className="step-badge">3</span> 분석 옵션 선택
+              <span className="step-badge">03</span> 분석 옵션 선택
+              <span className="step-card__count">{selectedCount}개 선택됨</span>
             </h2>
             <p className="step-card__desc">필요한 분석 항목을 선택하세요. 선택한 항목에 따라 분석 결과가 제공됩니다.</p>
             <div className="option-grid">
@@ -205,6 +223,25 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
               ))}
             </div>
 
+          </section>
+        </div>
+
+        <aside className="start-rail" aria-label="분석 안내">
+          <section className="rail-card readiness-card" aria-label="분석 준비">
+            <div className="readiness-card__header">
+              <h2>분석 준비</h2>
+              <span role="status">{readyCount} / 3 완료</span>
+            </div>
+            <progress className="readiness-progress" aria-label="입력 준비 상태" value={readyCount} max={3} />
+            <ul className="readiness-list">
+              {steps.map((step) => (
+                <li key={step.label} className={step.ready ? 'readiness-list__done' : ''}>
+                  <UiIcon name={step.ready ? 'check-circle' : 'circle'} />
+                  <span>{step.label}</span>
+                  <span className="sr-only">{step.ready ? '완료' : '미완료'}</span>
+                </li>
+              ))}
+            </ul>
             {formError ? (
               <p className="form-error" role="alert">
                 {formError}
@@ -235,28 +272,11 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
                 입력 초기화
               </button>
             </div>
-            <p className="start-footer">🔒 입력하신 정보는 안전하게 처리되며, 분석 후 즉시 삭제됩니다.</p>
-          </section>
-        </div>
-
-        <aside className="start-rail" aria-label="분석 안내">
-          <section className="rail-card">
-            <h3>분석이 이렇게 진행돼요</h3>
-            <ol className="rail-steps">
-              {PROGRESS_STEPS.map((step, index) => (
-                <li key={step.title}>
-                  <span className="rail-steps__num">{index + 1}</span>
-                  <div>
-                    <strong>{step.title}</strong>
-                    <p>{step.description}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <p className="start-footer"><UiIcon name="info" /> 분석 입력 텍스트는 분석 내역에 저장되며, 내역에서 삭제할 수 있습니다.</p>
           </section>
 
           <section className="rail-card">
-            <h3>💡 분석 정확도를 높이는 팁</h3>
+            <h3>분석 정확도를 높이는 팁</h3>
             <ul className="rail-tips">
               {ACCURACY_TIPS.map((tip) => (
                 <li key={tip}>{tip}</li>
@@ -264,14 +284,6 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
             </ul>
           </section>
 
-          <section className="rail-card">
-            <h3>지원 가능한 파일 형식</h3>
-            <div className="format-chips">
-              <span className="format-chip">PDF</span>
-              <span className="format-chip">DOCX</span>
-            </div>
-            <p className="rail-note">최대 10MB까지 업로드 가능합니다.</p>
-          </section>
         </aside>
       </div>
     </section>
