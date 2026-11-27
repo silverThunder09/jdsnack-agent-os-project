@@ -420,9 +420,11 @@ for fallback_contract in \
     'ErrorOutputPath' \
     '$claudeErrorOutput' \
     '1> $OutputFile 2> $ErrorOutputFile' \
+    '$OutputEncoding = [System.Text.UTF8Encoding]::new($false)' \
+    '[System.IO.File]::ReadAllText($InputFile, [System.Text.Encoding]::UTF8)' \
     'The PR diff and review criteria below are the only review evidence' \
     'Do not ask for or use any tools, shell, git, gh, web, or repository access' \
-    'Get-Content -LiteralPath $reviewInputs.DiffPath -Raw' \
+    '[System.IO.File]::ReadAllText($reviewInputs.DiffPath, [System.Text.Encoding]::UTF8)' \
     "'--output-last-message'" \
     'Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory' \
     'Get-StructuredField' \

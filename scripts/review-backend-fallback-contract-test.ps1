@@ -63,7 +63,7 @@ if ($null -eq $functionAst) {
     throw 'Test-StructuredReviewSummary function was not found.'
 }
 . ([scriptblock]::Create($functionAst.Extent.Text))
-foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput', 'ConvertFrom-CodexReviewJson', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-KoreanReviewText', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Test-SelfReviewSubmissionFailure', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems')) {
+foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput', 'Invoke-GitUtf8Output', 'ConvertFrom-CodexReviewJson', 'Get-StructuredField', 'Get-ExactlyOneStructuredMatch', 'Test-KoreanReviewText', 'Test-StructuredFindings', 'Get-StructuredReviewResult', 'Get-ClaudeFallbackReason', 'Get-ConfiguredCodexReviewSettings', 'Test-SelfReviewSubmissionFailure', 'Get-BlockingRequiredChecks', 'Get-PrGateFailure', 'Get-PaginatedJsonItems')) {
     $dependencyAst = $ast.Find({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
@@ -73,6 +73,27 @@ foreach ($functionName in @('Resolve-ToolPath', 'Invoke-Tool', 'Read-ToolOutput'
         throw "$functionName function was not found."
     }
     . ([scriptblock]::Create($dependencyAst.Extent.Text))
+}
+
+$gitEncodingTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('jdsnack-git-utf8-contract-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $gitEncodingTempRoot -Force | Out-Null
+try {
+    $gitPath = (Get-Command git -ErrorAction Stop).Source
+    $fixturePath = Join-Path $gitEncodingTempRoot '요구사항.md'
+    [System.IO.File]::WriteAllText($fixturePath, "요구사항: 한국어 원문 보존`n", [System.Text.UTF8Encoding]::new($false))
+    & $gitPath -C $gitEncodingTempRoot init --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the Git UTF-8 fixture repository.' }
+    & $gitPath -C $gitEncodingTempRoot -c user.name='JDSnack Test' -c user.email='test@example.invalid' add -- '요구사항.md'
+    if ($LASTEXITCODE -ne 0) { throw 'Could not stage the Git UTF-8 fixture.' }
+    & $gitPath -C $gitEncodingTempRoot -c user.name='JDSnack Test' -c user.email='test@example.invalid' commit --quiet -m 'test: initial Korean fixture'
+    if ($LASTEXITCODE -ne 0) { throw 'Could not commit the Git UTF-8 fixture.' }
+    [System.IO.File]::WriteAllText($fixturePath, "요구사항: 한국어 원문과 수용 기준을 보존합니다`n", [System.Text.UTF8Encoding]::new($false))
+    $koreanDiff = Invoke-GitUtf8Output -GitPath $gitPath -Arguments "-C `"$gitEncodingTempRoot`" -c core.quotepath=false diff --no-ext-diff --unified=0 HEAD"
+    if ($koreanDiff -notmatch '한국어 원문과 수용 기준을 보존합니다' -or $koreanDiff -match '\?{3,}') {
+        throw 'Git diff evidence did not preserve Korean REQ/AC text through strict UTF-8 decoding.'
+    }
+} finally {
+    Remove-Item -LiteralPath $gitEncodingTempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 $codexSchemaPath = Join-Path $Workspace 'scripts/codex-review-output.schema.json'
@@ -566,15 +587,23 @@ if ($decodedReviewText -cne $utf8ReviewText) {
     throw 'UTF-8 reviewer output without a BOM was not read without character corruption.'
 }
 @'
+$utf8InputReader = New-Object System.IO.StreamReader([System.Console]::OpenStandardInput(), [System.Text.UTF8Encoding]::new($false, $true))
+$receivedInput = $utf8InputReader.ReadToEnd()
+if (-not $receivedInput.Contains('한글 검토 결과가 UTF-8로 유지됩니다')) {
+    [System.Console]::Error.WriteLine('KOREAN INPUT WAS CORRUPTED')
+    exit 17
+}
 [System.Console]::Out.WriteLine('review text mentions a timeout, but is standard output')
 [System.Console]::Error.WriteLine('ERROR: Claude subscription access is disabled.')
 '@ | Set-Content -LiteralPath $ioFixturePath -Encoding utf8
-$ioExitCode = Invoke-Tool -Name 'pwsh' -Arguments @('-NoProfile', '-File', $ioFixturePath) -OutputPath $ioOutputPath -TimeoutSeconds 30 -ErrorOutputPath $ioErrorPath
+$nativePowerShell = if ($PSVersionTable.PSEdition -eq 'Desktop') { 'powershell.exe' } else { 'pwsh' }
+$ioExitCode = Invoke-Tool -Name $nativePowerShell -Arguments @('-NoProfile', '-File', $ioFixturePath) -OutputPath $ioOutputPath -TimeoutSeconds 30 -InputPath $utf8ReviewPath -ErrorOutputPath $ioErrorPath
 $ioStandardOutput = Get-Content -LiteralPath $ioOutputPath -Raw
 $ioStandardError = Get-Content -LiteralPath $ioErrorPath -Raw
 if ($ioExitCode -ne 0 -or
     $ioStandardOutput -notmatch 'standard output' -or
     $ioStandardError -notmatch 'ERROR: Claude subscription access is disabled' -or
+    $ioStandardError -match 'KOREAN INPUT WAS CORRUPTED' -or
     $ioStandardError -match 'standard output') {
     throw "Invoke-Tool did not preserve separate stdout/stderr for fallback classification (exit=$ioExitCode, stdout=$ioStandardOutput, stderr=$ioStandardError)."
 }
