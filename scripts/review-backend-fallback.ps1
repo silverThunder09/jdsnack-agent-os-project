@@ -329,6 +329,7 @@ function Invoke-Tool {
         foreach ($EnvironmentName in $EnvironmentNames) {
             [Environment]::SetEnvironmentVariable([string]$EnvironmentName, $null, 'Process')
         }
+        $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
         if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
             Set-Location -LiteralPath $WorkingDirectory
         }
@@ -336,12 +337,12 @@ function Invoke-Tool {
             if ([string]::IsNullOrWhiteSpace($InputFile)) {
                 $null | & $ToolPath @ToolArguments *> $OutputFile
             } else {
-                Get-Content -LiteralPath $InputFile -Raw | & $ToolPath @ToolArguments *> $OutputFile
+                [System.IO.File]::ReadAllText($InputFile, [System.Text.Encoding]::UTF8) | & $ToolPath @ToolArguments *> $OutputFile
             }
         } elseif ([string]::IsNullOrWhiteSpace($InputFile)) {
             $null | & $ToolPath @ToolArguments 1> $OutputFile 2> $ErrorOutputFile
         } else {
-            Get-Content -LiteralPath $InputFile -Raw | & $ToolPath @ToolArguments 1> $OutputFile 2> $ErrorOutputFile
+            [System.IO.File]::ReadAllText($InputFile, [System.Text.Encoding]::UTF8) | & $ToolPath @ToolArguments 1> $OutputFile 2> $ErrorOutputFile
         }
         [int]$LASTEXITCODE
     } -ArgumentList @(
