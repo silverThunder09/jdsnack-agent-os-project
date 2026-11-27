@@ -391,7 +391,20 @@ class JdFetchServiceTest {
 
         ApiException error = assertThrows(ApiException.class, () ->
                 new JdFetchService(http, new JdHtmlExtractor()).fetch(new JdFetchRequest(url)));
-        assertEquals("JD_FETCH_EMPTY_CONTENT", error.errorCode().name());
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", error.errorCode().name());
+    }
+
+    @Test
+    void wantedPostingWithoutVerifiedActiveStatusIsRejected() throws Exception {
+        String url = "https://www.wanted.co.kr/wd/400228";
+        HttpClient client = mock(HttpClient.class);
+        String html = fixture("jd/fixtures/wanted-static.html")
+                .replace("\"status\":\"active\"", "\"status\":\"\"");
+        when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, html, URI.create(url)));
+        ApiException error = assertThrows(ApiException.class, () ->
+                new JdFetchService(client, new JdHtmlExtractor()).fetch(new JdFetchRequest(url)));
+        assertEquals("JD_FETCH_UNSUPPORTED_SOURCE", error.errorCode().name());
     }
 
     @Test

@@ -28,13 +28,11 @@ final class WantedJdSourceAdapter {
     void verifyAvailable(String html) {
         Document document = Jsoup.parse(html);
         JsonNode data = initialData(document);
-        if (!data.isMissingNode()) {
-            String status = data.path("status").asText("");
-            if ((!status.isBlank() && !"active".equalsIgnoreCase(status))
-                    || data.path("hidden").asBoolean(false)
-                    || data.path("is_private").asBoolean(false)) {
-                throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
-            }
+        if (data.isMissingNode()
+                || !"active".equalsIgnoreCase(data.path("status").asText(""))
+                || data.path("hidden").asBoolean(false)
+                || data.path("is_private").asBoolean(false)) {
+            throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
         }
         Element description = document.selectFirst("meta[name=description]");
         if (description != null && description.attr("content").contains("마감되었습니다")) {
