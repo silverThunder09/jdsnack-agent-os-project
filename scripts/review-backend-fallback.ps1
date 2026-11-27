@@ -508,6 +508,39 @@ if (-not (Test-Path -LiteralPath $prCheckPolicyPath -PathType Leaf)) {
 }
 . $prCheckPolicyPath
 
+function Invoke-GitUtf8Output {
+    param(
+        [Parameter(Mandatory = $true)][string]$GitPath,
+        [Parameter(Mandatory = $true)][string]$Arguments
+    )
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $GitPath
+    $startInfo.Arguments = $Arguments
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw 'Git could not be started while preparing UTF-8 review evidence.'
+        }
+        $output = New-Object System.IO.MemoryStream
+        $process.StandardOutput.BaseStream.CopyTo($output)
+        $standardError = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) {
+            throw "Git review evidence command failed (exit $($process.ExitCode)): $standardError"
+        }
+        $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+        return $strictUtf8.GetString($output.ToArray())
+    } finally {
+        $process.Dispose()
+    }
+}
+
 function New-CodexReviewInputs {
     param(
         [string]$ReviewWorkspace,
@@ -526,21 +559,11 @@ function New-CodexReviewInputs {
     $diffPath = Join-Path $evidenceDirectory 'pr-diff.txt'
     $criteriaPath = Join-Path $evidenceDirectory 'review-criteria.md'
     $diffRange = "$ReviewBaseSha...$ReviewHeadSha"
-    $diffLines = & $gitPath -c core.quotepath=false diff --no-ext-diff --unified=80 $diffRange
-    $gitExitCode = [int]$LASTEXITCODE
-    if ($gitExitCode -ne 0) {
-        throw "Git could not prepare $diffRange for Codex review (exit $gitExitCode)."
-    }
-
-    $diffText = ($diffLines -join [Environment]::NewLine)
+    $diffText = Invoke-GitUtf8Output -GitPath $gitPath -Arguments "-c core.quotepath=false diff --no-ext-diff --unified=80 $diffRange"
     if ([string]::IsNullOrWhiteSpace($diffText)) {
         throw 'The Codex review diff is empty.'
     }
-    $changedPaths = & $gitPath -c core.quotepath=false diff --no-ext-diff --no-textconv --no-renames --name-only $diffRange
-    $gitExitCode = [int]$LASTEXITCODE
-    if ($gitExitCode -ne 0) {
-        throw "Git could not classify $diffRange for deterministic risk checks (exit $gitExitCode)."
-    }
+    $changedPaths = Invoke-GitUtf8Output -GitPath $gitPath -Arguments "-c core.quotepath=false diff --no-ext-diff --no-textconv --no-renames --name-only $diffRange"
 
     $null = Assert-FixedReviewPolicy -ReviewWorkspace $ReviewWorkspace
 
@@ -561,7 +584,7 @@ function New-CodexReviewInputs {
     } catch {
         throw "Deterministic review risk calculator returned invalid JSON: $($_.Exception.Message)"
     }
-    Set-Content -LiteralPath $diffPath -Value $diffText -Encoding utf8
+    [System.IO.File]::WriteAllText($diffPath, $diffText, [System.Text.UTF8Encoding]::new($false))
 
     $contextPaths = @(
         (Join-Path $ReviewWorkspace '.agent-os/operations/pr-rules.md'),
@@ -573,7 +596,7 @@ function New-CodexReviewInputs {
     $indexPath = Join-Path $ReviewWorkspace '.agent-os/standards/index.yml'
     if (Test-Path -LiteralPath $indexPath -PathType Leaf) {
         $inActiveSpecs = $false
-        foreach ($line in @(Get-Content -LiteralPath $indexPath)) {
+        foreach ($line in @([System.IO.File]::ReadAllLines($indexPath, [System.Text.Encoding]::UTF8))) {
             if ($line -match '^active_specs:\s*$') {
                 $inActiveSpecs = $true
                 continue
@@ -598,7 +621,7 @@ function New-CodexReviewInputs {
     foreach ($contextPath in $contextPaths) {
         if (Test-Path -LiteralPath $contextPath -PathType Leaf) {
             $criteriaSections += "## $([System.IO.Path]::GetFileName($contextPath))"
-            $criteriaSections += Get-Content -LiteralPath $contextPath -Raw
+            $criteriaSections += [System.IO.File]::ReadAllText($contextPath, [System.Text.Encoding]::UTF8)
         }
     }
     if ($criteriaSections.Count -eq 0) {
@@ -616,7 +639,7 @@ function New-CodexReviewInputs {
         $routingLines += "- $($labelProperty.Name) paths: $(@($labelProperty.Value) -join ', ')"
     }
     $criteriaSections += ($routingLines -join [Environment]::NewLine)
-    Set-Content -LiteralPath $criteriaPath -Value ($criteriaSections -join [Environment]::NewLine) -Encoding utf8
+    [System.IO.File]::WriteAllText($criteriaPath, ($criteriaSections -join [Environment]::NewLine), [System.Text.UTF8Encoding]::new($false))
 
     return [pscustomobject]@{
         DiffPath = $diffPath
@@ -1078,8 +1101,8 @@ $preReviewCheckFailure = Get-RequiredCheckFailure -AllowReviewCheckPending
 if (-not [string]::IsNullOrWhiteSpace($preReviewCheckFailure)) {
     Stop-NeedsHuman "Required CI and PR gates must pass before review starts: $preReviewCheckFailure" ''
 }
-$reviewDiff = Get-Content -LiteralPath $reviewInputs.DiffPath -Raw
-$reviewCriteria = Get-Content -LiteralPath $reviewInputs.CriteriaPath -Raw
+$reviewDiff = [System.IO.File]::ReadAllText($reviewInputs.DiffPath, [System.Text.Encoding]::UTF8)
+$reviewCriteria = [System.IO.File]::ReadAllText($reviewInputs.CriteriaPath, [System.Text.Encoding]::UTF8)
 
 $claudeFallbackReason = 'configured-primary'
 if ($reviewInputs.RiskAssessment.primaryReviewer -eq 'claude') {
@@ -1205,7 +1228,7 @@ $reviewDiff
 $reviewCriteria
 --- END REVIEW CRITERIA ---
 "@
-Set-Content -LiteralPath $reviewInputs.CriteriaPath -Value $codexPrompt -Encoding utf8
+[System.IO.File]::WriteAllText($reviewInputs.CriteriaPath, $codexPrompt, [System.Text.UTF8Encoding]::new($false))
 
 $codexExitCode = 1
 $codexStructuredText = ''

@@ -422,7 +422,7 @@ for fallback_contract in \
     '1> $OutputFile 2> $ErrorOutputFile' \
     'The PR diff and review criteria below are the only review evidence' \
     'Do not ask for or use any tools, shell, git, gh, web, or repository access' \
-    'Get-Content -LiteralPath $reviewInputs.DiffPath -Raw' \
+    '[System.IO.File]::ReadAllText($reviewInputs.DiffPath, [System.Text.Encoding]::UTF8)' \
     "'--output-last-message'" \
     'Remove-Item -LiteralPath $reviewInputs.EvidenceDirectory' \
     'Get-StructuredField' \
