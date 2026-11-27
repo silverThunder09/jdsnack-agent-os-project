@@ -251,7 +251,7 @@ public class JdFetchService {
                 if (!isAllowedPageUri(nextUri, httpRequest.uri())) {
                     throw new ApiException(ErrorCode.JD_FETCH_FAILED);
                 }
-                currentRequest = buildPageRequest(nextUri);
+                currentRequest = buildRedirectRequest(currentRequest, nextUri, response.statusCode());
                 continue;
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -282,6 +282,20 @@ public class JdFetchService {
             }
         }
         throw new ApiException(ErrorCode.JD_FETCH_FAILED);
+    }
+
+    private HttpRequest buildRedirectRequest(HttpRequest previousRequest, URI nextUri, int statusCode) {
+        if (statusCode != 307 && statusCode != 308) {
+            return buildPageRequest(nextUri);
+        }
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder(nextUri)
+                .timeout(Duration.ofSeconds(15));
+        previousRequest.headers().map().forEach((name, values) ->
+                values.forEach(value -> builder.header(name, value)));
+        return builder.method(previousRequest.method(),
+                previousRequest.bodyPublisher().orElse(HttpRequest.BodyPublishers.noBody()))
+                .build();
     }
 
     private void closeResponseBody(HttpResponse<InputStream> response) {

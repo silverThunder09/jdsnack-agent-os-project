@@ -119,6 +119,72 @@ class JdFetchServiceTest {
     }
 
     @Test
+    void saraminAjaxTemporaryAndPermanentRedirectsPreservePostAndFormBody() throws Exception {
+        String url = "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=123456";
+        URI ajaxUri = URI.create("https://www.saramin.co.kr/zf_user/jobs/relay/view-ajax");
+        for (int status : new int[]{307, 308}) {
+            HttpClient client = mock(HttpClient.class);
+            when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(response(200, """
+                            <html><body><div>추천공고만 표시되는 페이지입니다.</div></body></html>
+                            """, URI.create(url)))
+                    .thenReturn(response(status, "", ajaxUri, java.util.Map.of(
+                            "Location", java.util.List.of("/zf_user/jobs/relay/view-ajax?redirected=1")
+                    )))
+                    .thenReturn(response(200, """
+                            <div class="wrap_jv_cont"><div class="jv_cont jv_summary"><div class="cont">
+                            <dl><dt>담당업무</dt><dd>Spring Boot 기반 API 설계와 Java 서비스 개발을 담당합니다.</dd></dl>
+                            <dl><dt>자격요건</dt><dd>MySQL 운영 경험과 REST API 구현 경험이 필요합니다.</dd></dl>
+                            <dl><dt>우대사항</dt><dd>테스트 자동화와 배포 경험을 우대합니다.</dd></dl>
+                            </div></div></div>
+                            """, URI.create("https://www.saramin.co.kr/zf_user/jobs/relay/view-ajax?redirected=1")));
+
+            JdFetchResponse result = new JdFetchService(client, new JdHtmlExtractor())
+                    .fetch(new JdFetchRequest(url));
+            assertEquals("saramin", result.sourceSite());
+            assertTrue(result.jdText().contains("Spring Boot 기반 API"));
+
+            var requests = forClass(HttpRequest.class);
+            verify(client, times(3)).send(requests.capture(), any(HttpResponse.BodyHandler.class));
+            HttpRequest originalAjax = requests.getAllValues().get(1);
+            HttpRequest redirectedAjax = requests.getAllValues().get(2);
+            assertEquals("POST", originalAjax.method());
+            assertEquals("POST", redirectedAjax.method(), "HTTP " + status);
+            assertEquals("redirected=1", redirectedAjax.uri().getQuery());
+            assertEquals(originalAjax.bodyPublisher().orElseThrow(),
+                    redirectedAjax.bodyPublisher().orElseThrow(), "form body must be replayed");
+            assertTrue(redirectedAjax.bodyPublisher().orElseThrow().contentLength() > 0);
+            assertEquals("application/x-www-form-urlencoded; charset=UTF-8",
+                    redirectedAjax.headers().firstValue("Content-Type").orElseThrow());
+        }
+    }
+
+    @Test
+    void saraminAjaxSeeOtherRedirectUsesGet() throws Exception {
+        String url = "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=123456";
+        HttpClient client = mock(HttpClient.class);
+        when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response(200, "<div>추천공고 목록</div>", URI.create(url)))
+                .thenReturn(response(303, "",
+                        URI.create("https://www.saramin.co.kr/zf_user/jobs/relay/view-ajax"),
+                        java.util.Map.of("Location", java.util.List.of("/zf_user/jobs/relay/view-detail?rec_idx=123456"))))
+                .thenReturn(response(200, """
+                        <div class="user_content">
+                        <h3>주요업무</h3><p>Java Spring Boot API 개발을 담당합니다.</p>
+                        <h3>자격요건</h3><p>SQL과 백엔드 서비스 운영 경험을 요구합니다.</p>
+                        <h3>우대사항</h3><p>테스트 자동화 경험을 우대합니다.</p></div>
+                        """, URI.create("https://www.saramin.co.kr/zf_user/jobs/relay/view-detail?rec_idx=123456")));
+        JdFetchResponse result = new JdFetchService(client, new JdHtmlExtractor())
+                .fetch(new JdFetchRequest(url));
+        assertEquals("saramin", result.sourceSite());
+        var requests = forClass(HttpRequest.class);
+        verify(client, times(3)).send(requests.capture(), any(HttpResponse.BodyHandler.class));
+        HttpRequest redirected = requests.getAllValues().get(2);
+        assertEquals("GET", redirected.method());
+        assertTrue(redirected.bodyPublisher().isEmpty());
+    }
+
+    @Test
     void saraminRelayViewLoadsDetailIframeWhenAjaxUsesIframeContent() throws Exception {
         HttpClient httpClient = mock(HttpClient.class);
         JdFetchService service = new JdFetchService(httpClient, new JdHtmlExtractor());
@@ -493,6 +559,11 @@ class JdFetchServiceTest {
     }
 
     private HttpResponse<InputStream> response(int statusCode, String body, URI responseUri) {
+        return response(statusCode, body, responseUri, java.util.Map.of());
+    }
+
+    private HttpResponse<InputStream> response(int statusCode, String body, URI responseUri,
+                                                java.util.Map<String, java.util.List<String>> headers) {
         return new HttpResponse<>() {
             @Override
             public int statusCode() {
@@ -511,7 +582,7 @@ class JdFetchServiceTest {
 
             @Override
             public HttpHeaders headers() {
-                return HttpHeaders.of(java.util.Map.of(), (a, b) -> true);
+                return HttpHeaders.of(headers, (a, b) -> true);
             }
 
             @Override
