@@ -347,7 +347,8 @@ public class AnalysisHistoryService {
         }
 
         JdInputType inputType = parseInputType(request.jd().inputType());
-        if ((inputType == JdInputType.SARAMIN_URL || inputType == JdInputType.JOBKOREA_URL)
+        if ((inputType == JdInputType.SARAMIN_URL || inputType == JdInputType.JOBKOREA_URL
+                || inputType == JdInputType.WANTED_URL)
                 && !isBlank(request.jd().sourceUrl())) {
             return snapshotService.saveUrlInput(userId, request.resumeText(), request.jd().sourceUrl());
         }

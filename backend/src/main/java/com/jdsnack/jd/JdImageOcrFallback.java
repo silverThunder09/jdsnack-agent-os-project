@@ -37,6 +37,10 @@ final class JdImageOcrFallback {
             ".jobkorea-job-description",
             "[data-jobkorea-description]"
     );
+    private static final List<String> WANTED_IMAGE_CONTAINER_SELECTORS = List.of(
+            "main article[class*=JobDescription]",
+            "section[class*=descriptionWrapper] article"
+    );
 
     private final HttpClient httpClient;
     private final JdHtmlExtractor htmlExtractor;
@@ -68,6 +72,9 @@ final class JdImageOcrFallback {
                     imageOcr.extractText(image.get().bytes(), image.get().mimeType())
             );
             if (!htmlExtractor.isValidOcrText(jdText)) {
+                return Optional.empty();
+            }
+            if ("wanted".equals(sourceSite) && !WantedJdSourceAdapter.hasJobSections(jdText)) {
                 return Optional.empty();
             }
 
@@ -117,7 +124,8 @@ final class JdImageOcrFallback {
         try {
             URI resolved = pageUri.resolve(trimmedSource);
             String scheme = resolved.getScheme();
-            if (scheme == null || resolved.getHost() == null || resolved.getUserInfo() != null) {
+            if (scheme == null || resolved.getHost() == null || resolved.getUserInfo() != null
+                    || resolved.getPort() != -1) {
                 return Optional.empty();
             }
             String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
@@ -247,16 +255,17 @@ final class JdImageOcrFallback {
     private boolean isTrustedImageUri(URI uri, String sourceSite) {
         String scheme = uri.getScheme();
         String host = uri.getHost();
-        if (scheme == null || host == null || uri.getUserInfo() != null) {
+        if (scheme == null || host == null || uri.getUserInfo() != null || uri.getPort() != -1) {
             return false;
         }
         String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
         return ("http".equals(normalizedScheme) || "https".equals(normalizedScheme))
                 && !isUnsafeHost(host)
-                && isTrustedImageHost(host, sourceSite);
+                && isTrustedImageHost(uri, sourceSite);
     }
 
-    private boolean isTrustedImageHost(String host, String sourceSite) {
+    private boolean isTrustedImageHost(URI uri, String sourceSite) {
+        String host = uri.getHost();
         String normalizedHost = host.toLowerCase(Locale.ROOT);
         if ("saramin".equals(sourceSite)) {
             return normalizedHost.equals("saramin.co.kr")
@@ -268,6 +277,28 @@ final class JdImageOcrFallback {
             return normalizedHost.equals("jobkorea.co.kr")
                     || normalizedHost.endsWith(".jobkorea.co.kr");
         }
+        if ("wanted".equals(sourceSite)) {
+            if (normalizedHost.equals("static.wanted.co.kr")) {
+                return uri.getPath() != null && uri.getPath().startsWith("/images/");
+            }
+            if (normalizedHost.equals("image.wanted.co.kr") && "/optimize".equals(uri.getPath())) {
+                String source = queryParameter(uri, "src");
+                if (source.isBlank()) {
+                    return false;
+                }
+                try {
+                    URI original = URI.create(source);
+                    return "https".equalsIgnoreCase(original.getScheme())
+                            && "static.wanted.co.kr".equalsIgnoreCase(original.getHost())
+                            && original.getUserInfo() == null
+                            && original.getPort() == -1
+                            && original.getPath() != null && original.getPath().startsWith("/images/");
+                } catch (IllegalArgumentException exception) {
+                    return false;
+                }
+            }
+            return false;
+        }
         return false;
     }
 
@@ -278,7 +309,27 @@ final class JdImageOcrFallback {
         if ("jobkorea".equals(sourceSite)) {
             return JOBKOREA_IMAGE_CONTAINER_SELECTORS;
         }
+        if ("wanted".equals(sourceSite)) {
+            return WANTED_IMAGE_CONTAINER_SELECTORS;
+        }
         return List.of();
+    }
+
+    private String queryParameter(URI uri, String name) {
+        if (uri.getRawQuery() == null) {
+            return "";
+        }
+        for (String pair : uri.getRawQuery().split("&")) {
+            int separator = pair.indexOf('=');
+            if (separator > 0 && pair.substring(0, separator).equals(name)) {
+                try {
+                    return java.net.URLDecoder.decode(pair.substring(separator + 1), java.nio.charset.StandardCharsets.UTF_8);
+                } catch (IllegalArgumentException exception) {
+                    return "";
+                }
+            }
+        }
+        return "";
     }
 
     private boolean isUnsafeHost(String host) {

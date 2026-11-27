@@ -55,6 +55,20 @@ describe('분석 이력 Markdown 내보내기', () => {
 })
 
 describe('JD 출처 메타데이터', () => {
+  it('원티드 숫자형 공고 URL만 WANTED_URL과 wanted로 판별한다', () => {
+    expect(inferJdSourceMetadata('https://www.wanted.co.kr/wd/400228?utm_source=share')).toEqual({
+      inputType: 'WANTED_URL',
+      sourceSite: 'wanted',
+    })
+    expect(inferJdSourceMetadata('https://www.wanted.co.kr/wdlist')).toEqual({
+      inputType: 'TEXT',
+      sourceSite: null,
+    })
+    expect(inferJdSourceMetadata('https://wanted.co.kr.evil.example/wd/400228')).toEqual({
+      inputType: 'TEXT',
+      sourceSite: null,
+    })
+  })
   it('잡코리아 URL을 JOBKOREA_URL과 jobkorea로 식별한다', () => {
     expect(inferJdSourceMetadata('https://www.jobkorea.co.kr/Recruit/GI_Read/777777')).toEqual({
       inputType: 'JOBKOREA_URL',

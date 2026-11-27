@@ -147,10 +147,14 @@ public class JdHtmlExtractor {
     );
 
     private final JdCandidateSelector candidateSelector = new JdCandidateSelector();
+    private final WantedJdSourceAdapter wantedAdapter = new WantedJdSourceAdapter();
 
     public JdFetchResponse extract(String html, String sourceUrl) {
         Document document = Jsoup.parse(html, sourceUrl);
         String sourceSite = detectSourceSite(sourceUrl);
+        if ("wanted".equals(sourceSite)) {
+            return wantedAdapter.extract(html, sourceUrl, this);
+        }
         candidateSelector.sanitize(document, sourceSite);
 
         Element candidate = candidateSelector.findCandidate(document, sourceSite);
@@ -435,6 +439,7 @@ public class JdHtmlExtractor {
             return switch (host.toLowerCase(Locale.ROOT)) {
                 case "www.saramin.co.kr", "saramin.co.kr" -> "saramin";
                 case "www.jobkorea.co.kr", "jobkorea.co.kr" -> "jobkorea";
+                case "www.wanted.co.kr", "wanted.co.kr" -> "wanted";
                 default -> "unknown";
             };
         } catch (URISyntaxException exception) {

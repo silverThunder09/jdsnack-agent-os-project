@@ -81,6 +81,9 @@ public class AnalysisInputSnapshotService {
         if ("jobkorea".equalsIgnoreCase(sourceSite)) {
             return JdInputType.JOBKOREA_URL;
         }
+        if ("wanted".equalsIgnoreCase(sourceSite)) {
+            return JdInputType.WANTED_URL;
+        }
         throw new ApiException(ErrorCode.JD_FETCH_UNSUPPORTED_SOURCE);
     }
 

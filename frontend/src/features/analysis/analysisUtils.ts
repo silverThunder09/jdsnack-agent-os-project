@@ -33,6 +33,9 @@ export function inferJdSourceMetadata(value: string): JdSourceMetadata {
     if (host === 'jobkorea.co.kr' || host === 'www.jobkorea.co.kr') {
       return { inputType: 'JOBKOREA_URL', sourceSite: 'jobkorea' }
     }
+    if ((host === 'wanted.co.kr' || host === 'www.wanted.co.kr') && /^\/wd\/[1-9]\d*\/?$/.test(parsed.pathname)) {
+      return { inputType: 'WANTED_URL', sourceSite: 'wanted' }
+    }
   } catch {
     // URL validation and source validation are handled by the backend.
   }

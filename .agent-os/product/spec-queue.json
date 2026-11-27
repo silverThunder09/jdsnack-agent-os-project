@@ -77,10 +77,21 @@
       "start_condition": {"type": "issue_label", "label": "product-signal:jobkorea"}
     },
     {
+      "id": "wanted-jd-adapter",
+      "slug": "2026-11-27-wanted-jd-adapter",
+      "title": "원티드 JD Source Adapter",
+      "priority": 7,
+      "status": "active",
+      "spec_path": ".agent-os/specs/2026-11-27-wanted-jd-adapter",
+      "auto_promote": false,
+      "start_condition": {"type": "issue_label", "label": "codex-auto"},
+      "source_issue": 236
+    },
+    {
       "id": "rocketpunch-jd-adapter",
       "slug": "rocketpunch-jd-adapter",
       "title": "RocketPunch JD adapter",
-      "priority": 7,
+      "priority": 8,
       "status": "candidate",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:rocketpunch"}
@@ -89,7 +100,7 @@
       "id": "async-analysis-worker",
       "slug": "async-analysis-worker",
       "title": "비동기 analysis worker와 Redis",
-      "priority": 8,
+      "priority": 9,
       "status": "candidate",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:analysis-latency"}
@@ -98,7 +109,7 @@
       "id": "observability-incident-response",
       "slug": "observability-incident-response",
       "title": "분석·수집 관측성과 장애 대응",
-      "priority": 9,
+      "priority": 10,
       "status": "candidate",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:operations"}
@@ -107,7 +118,7 @@
       "id": "billing",
       "slug": "billing",
       "title": "결제 연동",
-      "priority": 10,
+      "priority": 11,
       "status": "candidate",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:pricing"}
@@ -116,7 +127,7 @@
       "id": "usage-metering",
       "slug": "usage-metering",
       "title": "요금제·사용량 제한",
-      "priority": 11,
+      "priority": 12,
       "status": "candidate",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:usage"}
@@ -125,7 +136,7 @@
       "id": "ec2-production",
       "slug": "ec2-production",
       "title": "EC2 실배포",
-      "priority": 12,
+      "priority": 13,
       "status": "candidate",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:production"}
@@ -134,7 +145,7 @@
       "id": "deterministic-ai-quality",
       "slug": "deterministic-ai-quality",
       "title": "결정론적 AI 품질 평가 (quality-v1)",
-      "priority": 13,
+      "priority": 14,
       "status": "candidate",
       "auto_promote": true,
       "start_condition": {"type": "issue_label", "label": "product-signal:analysis-quality"}

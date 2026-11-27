@@ -96,7 +96,7 @@ export function AnalysisInputView(props: AnalysisInputViewProps) {
                     {isFetchingJd ? '불러오는 중...' : 'JD 불러오기'}
                   </button>
                 </div>
-                <p className="field-help">지원하는 사이트: 사람인·잡코리아 정적 채용 공고와 이미지형 공고(OCR fallback). 그 외 링크는 본문 붙여넣기로 진행하세요.</p>
+                <p className="field-help">지원 사이트: 사람인·잡코리아·원티드의 공개 채용공고(HTML 및 이미지 OCR). 불러오지 못하면 JD 본문을 직접 붙여넣어 주세요.</p>
                 {jdFetchState.status !== 'idle' ? (
                   <p className={`field-help field-help--${jdFetchState.status}`} role={jdFetchState.status === 'fetch-error' ? 'alert' : undefined}>
                     {jdFetchState.message}
