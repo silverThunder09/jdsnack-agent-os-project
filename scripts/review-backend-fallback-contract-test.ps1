@@ -596,7 +596,7 @@ if (-not $receivedInput.Contains('한글 검토 결과가 UTF-8로 유지됩니�
 [System.Console]::Out.WriteLine('review text mentions a timeout, but is standard output')
 [System.Console]::Error.WriteLine('ERROR: Claude subscription access is disabled.')
 '@ | Set-Content -LiteralPath $ioFixturePath -Encoding utf8
-$ioExitCode = Invoke-Tool -Name 'pwsh' -Arguments @('-NoProfile', '-File', $ioFixturePath) -OutputPath $ioOutputPath -TimeoutSeconds 30 -InputPath $utf8ReviewPath -ErrorOutputPath $ioErrorPath
+$ioExitCode = Invoke-Tool -Name 'powershell.exe' -Arguments @('-NoProfile', '-File', $ioFixturePath) -OutputPath $ioOutputPath -TimeoutSeconds 30 -InputPath $utf8ReviewPath -ErrorOutputPath $ioErrorPath
 $ioStandardOutput = Get-Content -LiteralPath $ioOutputPath -Raw
 $ioStandardError = Get-Content -LiteralPath $ioErrorPath -Raw
 if ($ioExitCode -ne 0 -or
